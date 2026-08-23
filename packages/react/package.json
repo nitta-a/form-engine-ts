@@ -21,6 +21,7 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --clean --external react --external react/jsx-runtime --external @form-engine/core",
+    "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
   },

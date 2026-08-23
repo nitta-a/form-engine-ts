@@ -108,7 +108,7 @@ export function FormProvider({
     setSubmitStatus("submitting");
     setSubmitError(null);
     try {
-      await onSubmit(selectVisibleAnswers(validSchema, values) as FormValues);
+      await onSubmit(selectVisibleAnswers(validSchema, values));
       if (resetOnSuccess) setValues({ ...initialValues });
       setSubmitStatus("success");
       return true;

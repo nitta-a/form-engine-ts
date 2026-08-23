@@ -1,6 +1,6 @@
-import { MockTranslationAdapter, mockTranslator } from "../src";
+import { createMockTranslationAdapter, mockTranslator } from "../src";
 
-describe("MockTranslationAdapter", () => {
+describe("createMockTranslationAdapter", () => {
   it("serves complete English and Japanese form catalogs", () => {
     expect(mockTranslator.translate("form.title", "en")).toBe("Customer feedback");
     expect(mockTranslator.translate("form.title", "ja")).toBe("お客様アンケート");
@@ -11,7 +11,7 @@ describe("MockTranslationAdapter", () => {
   });
 
   it("falls back to English and then to the unresolved key", () => {
-    const translator = new MockTranslationAdapter({ en: { greeting: "Hello" }, ja: {} });
+    const translator = createMockTranslationAdapter({ en: { greeting: "Hello" }, ja: {} });
     expect(translator.translate("greeting", "ja")).toBe("Hello");
     expect(translator.translate("missing", "ja")).toBe("missing");
   });

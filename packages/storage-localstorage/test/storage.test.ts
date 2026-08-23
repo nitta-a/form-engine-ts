@@ -39,10 +39,15 @@ describe("createLocalStorageAdapter", () => {
     expect(await adapter.getSchema("form", 1)).toEqual(schema);
     const loaded = await adapter.getSchema("form", 1);
     if (loaded === null) throw new Error("Expected schema");
-    (loaded.fields as FormSchema["fields"]).slice();
+    (loaded.fields[0] as { labelKey: string }).labelKey = "mutated";
+    expect((await adapter.getSchema("form", 1))?.fields[0]?.labelKey).toBe("answer");
     await adapter.saveSubmission(submission("one"));
     const responses = await adapter.listSubmissions("form", 1);
     expect(responses).toHaveLength(1);
+    const first = responses[0];
+    if (first === undefined) throw new Error("Expected submission");
+    (first.values as Record<string, string>).answer = "mutated";
+    expect((await adapter.listSubmissions("form", 1))[0]?.values.answer).toBe("yes");
     await adapter.deleteSubmission("one");
     expect(await adapter.listSubmissions("form")).toEqual([]);
     await adapter.deleteSchema("form", 1);

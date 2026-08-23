@@ -1,4 +1,4 @@
-import type { FormField, FormSchema } from "./types";
+import type { FormField, FormSchema, FormValues } from "./types";
 
 function isEmpty(value: unknown): boolean {
   if (value === undefined || value === null) return true;
@@ -50,10 +50,7 @@ export function calculateFieldVisibility(
   return Object.freeze(Object.fromEntries(resolved));
 }
 
-export function selectVisibleAnswers(
-  schema: FormSchema,
-  currentAnswers: Readonly<Record<string, unknown>>
-): Record<string, unknown> {
+export function selectVisibleAnswers(schema: FormSchema, currentAnswers: FormValues): FormValues {
   const visibility = calculateFieldVisibility(schema, currentAnswers);
   return Object.fromEntries(
     schema.fields

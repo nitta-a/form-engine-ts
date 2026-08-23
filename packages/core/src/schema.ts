@@ -207,15 +207,16 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
   if (!Array.isArray(input.fields) || input.fields.length === 0) {
     issue(issues, "fields", "invalid_fields", "Expected at least one field.");
   } else {
+    const inputFields = input.fields;
     const ids = new Set<string>();
-    input.fields.forEach((field, index) => {
+    inputFields.forEach((field, index) => {
       validateField(field, `fields[${index}]`, issues);
       if (isRecord(field) && isNonEmptyString(field.id)) {
         if (ids.has(field.id)) issue(issues, `fields[${index}].id`, "duplicate_field", "Field IDs must be unique.");
         ids.add(field.id);
       }
     });
-    input.fields.forEach((field, index) => {
+    inputFields.forEach((field, index) => {
       if (!isRecord(field) || !isRecord(field.displayCondition) || !isNonEmptyString(field.id)) return;
       const sourceId = field.displayCondition.questionId;
       if (!isNonEmptyString(sourceId)) return;
@@ -237,7 +238,7 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
     });
 
     const fieldById = new Map(
-      input.fields
+      inputFields
         .filter((field): field is Record<string, unknown> => isRecord(field) && isNonEmptyString(field.id))
         .map((field) => [field.id as string, field])
     );
@@ -248,7 +249,7 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
       if (resolved.has(id)) return;
       if (resolving.has(id)) {
         if (!reported.has(id)) {
-          const cycleIndex = input.fields.findIndex((field) => isRecord(field) && field.id === id);
+          const cycleIndex = inputFields.findIndex((field) => isRecord(field) && field.id === id);
           issue(
             issues,
             `fields[${cycleIndex}].displayCondition`,

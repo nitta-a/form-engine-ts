@@ -33,7 +33,7 @@ export function calculateChoiceDistribution(
   const counts = new Map<string, number>();
   for (const response of responses) {
     const value = response.values[questionId];
-    const selections = Array.isArray(value) ? value : typeof value === "string" && value !== "" ? [value] : [];
+    const selections = new Set(Array.isArray(value) ? value : typeof value === "string" && value !== "" ? [value] : []);
     for (const selection of selections) counts.set(selection, (counts.get(selection) ?? 0) + 1);
   }
   return Object.fromEntries(
@@ -75,6 +75,7 @@ function valueIsValid(field: FormField, value: FormValue): boolean {
     return Math.abs(quotient - Math.round(quotient)) <= 1e-9;
   }
   if (field.type === "checkbox") return typeof value === "boolean";
+  if (!("options" in field)) return false;
   const allowed = new Set(field.options.map((option) => option.value));
   if (field.type === "multi-select") {
     return (
@@ -128,6 +129,7 @@ function aggregateField(
     };
   }
 
+  if (!("options" in field)) throw new TypeError(`Field ${field.id} cannot be aggregated.`);
   const optionCounts = new Map(field.options.map((option) => [option.value, 0]));
   for (const value of values) {
     const selections = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];

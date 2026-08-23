@@ -9,10 +9,11 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "check": "turbo run check",
     "dev": "turbo run dev --filter=@form-engine/preview",
     "format": "biome format .",
     "format:fix": "biome format . --write",
-    "lint": "biome check . ",
+    "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"

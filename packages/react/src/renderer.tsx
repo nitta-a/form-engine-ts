@@ -50,7 +50,7 @@ function fieldRuleParams(field: FormField): Readonly<Record<string, string | num
   } else if (field.type === "number" || field.type === "rating") {
     if (field.min !== undefined) params.min = field.min;
     if (field.max !== undefined) params.max = field.max;
-    if (field.step !== undefined) params.step = field.step;
+    if (field.type === "number" && field.step !== undefined) params.step = field.step;
   } else if (field.type === "multi-select") {
     if (field.minSelections !== undefined) params.min = field.minSelections;
     if (field.maxSelections !== undefined) params.max = field.maxSelections;

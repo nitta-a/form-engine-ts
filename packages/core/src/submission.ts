@@ -32,7 +32,7 @@ export function createSubmission(
   if (options.submittedAt.trim().length === 0 || !Number.isFinite(Date.parse(options.submittedAt))) {
     throw new TypeError("submittedAt must be a valid date string.");
   }
-  const visibleValues = selectVisibleAnswers(schema, values) as FormValues;
+  const visibleValues = selectVisibleAnswers(schema, values);
   return Object.freeze({
     id: options.id,
     formId: schema.id,

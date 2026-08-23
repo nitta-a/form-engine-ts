@@ -84,6 +84,21 @@ export const customerFeedbackSchema = {
         { value: "yes", labelKey: "option.yes" },
         { value: "no", labelKey: "option.no" }
       ]
+    },
+    {
+      id: "rating",
+      type: "rating",
+      labelKey: "field.rating.label",
+      required: true,
+      min: 1,
+      max: 5
+    },
+    {
+      id: "followup",
+      type: "textarea",
+      labelKey: "field.followup.label",
+      maxLength: 200,
+      displayCondition: { questionId: "recommend", operator: "equals", value: "no" }
     }
   ]
 } as const satisfies FormSchema;

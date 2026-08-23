@@ -2,7 +2,7 @@ import type { FormSchema, FormValues, TranslationAdapter } from "@form-engine/co
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { FormProvider, FormRenderer, useField } from "../src";
+import { FormBuilder, FormProvider, FormRenderer, useField } from "../src";
 
 const schema = {
   id: "test",
@@ -12,6 +12,7 @@ const schema = {
   fields: [
     { id: "name", type: "text", labelKey: "name", required: true, minLength: 2 },
     { id: "age", type: "number", labelKey: "age", min: 1 },
+    { id: "rating", type: "rating", labelKey: "rating" },
     { id: "team", type: "select", labelKey: "team", options: [{ value: "a", labelKey: "option.a" }] },
     { id: "tags", type: "multi-select", labelKey: "tags", options: [{ value: "x", labelKey: "option.x" }] },
     { id: "agree", type: "checkbox", labelKey: "agree" },
@@ -56,6 +57,7 @@ describe("React form engine", () => {
     expect(screen.getByRole("heading", { name: "en:title" })).toBeInTheDocument();
     expect(screen.getByLabelText(/en:name/)).toHaveAttribute("type", "text");
     expect(screen.getByLabelText("en:age")).toHaveAttribute("type", "number");
+    expect(screen.getByLabelText("1")).toHaveAttribute("type", "radio");
     expect(screen.getByLabelText("en:team").tagName).toBe("SELECT");
     expect(screen.getByLabelText("en:option.x")).toHaveAttribute("type", "checkbox");
     expect(screen.getByLabelText("en:agree")).toHaveAttribute("type", "checkbox");
@@ -118,5 +120,86 @@ describe("React form engine", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Custom" }));
     expect(screen.getByRole("button", { name: "Custom Custom" })).toBeInTheDocument();
+  });
+
+  it("renders conditional chains, restores hidden answers, and excludes them from submission", async () => {
+    const user = userEvent.setup();
+    const conditional = {
+      id: "conditional",
+      version: 1,
+      titleKey: "title",
+      fields: [
+        {
+          id: "show",
+          type: "select",
+          labelKey: "show",
+          options: [
+            { value: "yes", labelKey: "yes" },
+            { value: "no", labelKey: "no" }
+          ]
+        },
+        {
+          id: "details",
+          type: "text",
+          labelKey: "details",
+          displayCondition: { questionId: "show", operator: "equals", value: "yes" }
+        },
+        {
+          id: "nested",
+          type: "text",
+          labelKey: "nested",
+          displayCondition: { questionId: "details", operator: "not_empty" }
+        }
+      ]
+    } as const satisfies FormSchema;
+    const onSubmit = vi.fn();
+    render(
+      <FormProvider schema={conditional} locale="en" translator={translator} onSubmit={onSubmit}>
+        <FormRenderer />
+      </FormProvider>
+    );
+    expect(screen.queryByLabelText("en:details")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("en:show"), "yes");
+    await user.type(screen.getByLabelText("en:details"), "kept");
+    expect(screen.getByLabelText("en:nested")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("en:show"), "no");
+    expect(screen.queryByLabelText("en:details")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("en:show"), "yes");
+    expect(screen.getByLabelText("en:details")).toHaveValue("kept");
+    await user.selectOptions(screen.getByLabelText("en:show"), "no");
+    await user.click(screen.getByRole("button", { name: "en:form.submit" }));
+    expect(onSubmit).toHaveBeenCalledWith({ show: "no" });
+  });
+
+  it("edits schema through the accessible builder controls", async () => {
+    const user = userEvent.setup();
+    function BuilderHarness() {
+      const [current, setCurrent] = useState<FormSchema>({
+        id: "builder",
+        version: 1,
+        titleKey: "title",
+        fields: [{ id: "first", type: "text", labelKey: "first.label" }]
+      });
+      return (
+        <>
+          <FormBuilder schema={current} onChange={setCurrent} />
+          <output>{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+    render(<BuilderHarness />);
+    expect(screen.getByRole("button", { name: "Delete first" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Add question" }));
+    expect(screen.getByRole("button", { name: "Move question-2 up" })).toBeEnabled();
+    const typeSelects = screen.getAllByLabelText("Type");
+    const secondType = typeSelects[1];
+    if (secondType === undefined) throw new Error("Expected second type selector");
+    await user.selectOptions(secondType, "select");
+    expect(screen.getByRole("button", { name: "Add option" })).toBeInTheDocument();
+    const secondCondition = screen.getAllByLabelText("Display condition")[1];
+    if (secondCondition === undefined) throw new Error("Expected second condition selector");
+    await user.selectOptions(secondCondition, "first");
+    expect(screen.getByLabelText("Condition operator")).toBeInTheDocument();
+    expect(screen.getByText(/displayCondition/)).toBeInTheDocument();
   });
 });
