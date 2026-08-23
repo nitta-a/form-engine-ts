@@ -6,21 +6,21 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 
 ### What's included
 
-| Workspace | Purpose |
-| --- | --- |
-| `@form-engine/core` | Pure schema, visibility, validation, submission, analytics, and CSV functions plus JSON-friendly types |
-| `@form-engine/react` | SSR-safe `FormProvider`, conditional renderer, accessible visual builder, hooks, overrides, and base styles |
-| `@form-engine/storage-memory` | Process-local form/submission storage factory with defensive copying and duplicate protection |
-| `@form-engine/storage-localstorage` | Prefix-isolated browser persistence factory with injectable storage for tests and SSR callers |
-| `@form-engine/translator-mock` | English/Japanese synchronous translation adapter with interpolation and fallback |
-| `@form-engine/translator-azure` | Server-side Azure AI Translator REST API v3.0 adapter with optional regional routing |
-| `@form-engine/translator-deepl` | Server-side asynchronous DeepL Free/Pro text translation using injectable `fetch` |
-| `@form-engine/translator-google` | Server-side Google Cloud Translation Basic v2 adapter with API Key or Bearer authentication |
-| `@form-engine/storage-mongodb` | MongoDB Native Driver storage factory implementing the complete form storage contract |
-| `@form-engine/zod` | Pure `FormSchema` to Zod 3 answer-validator generation with Core-compatible issues |
-| `@form-engine/preview` | Three-tab Vite sandbox for building, responding, switching storage, analytics, and CSV export |
+| Area | Package | Purpose |
+| --- | --- | --- |
+| Core | `@form-engine/core` | Schema, visibility, validation, submissions, analytics, CSV, and shared adapter types |
+| React renderer / builder | `@form-engine/react` | SSR-safe provider, conditional renderer, accessible visual builder, hooks, overrides, and base styles |
+| Storage adapter | `@form-engine/storage-memory` | Process-local form/submission storage with defensive copying and duplicate protection |
+| Storage adapter | `@form-engine/storage-localstorage` | Prefix-isolated browser persistence with injectable storage for tests and SSR callers |
+| Storage adapter | `@form-engine/storage-mongodb` | MongoDB Native Driver implementation of the complete form storage contract |
+| Translator adapter | `@form-engine/translator-mock` | English/Japanese synchronous translations with interpolation and fallback |
+| Translator adapter | `@form-engine/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
+| Translator adapter | `@form-engine/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
+| Translator adapter | `@form-engine/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
+| Zod validator | `@form-engine/zod` | `FormSchema` to Zod 3 answer-validator generation with Core-compatible issues |
+| Demo app | `@form-engine/preview` | Private Vite sandbox for building, responding, switching storage, analytics, and CSV export |
 
-The library packages build as public ESM packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
+The library packages build as public dual ESM/CommonJS packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
 
 ### Requirements and commands
 
@@ -46,10 +46,15 @@ pnpm test
 
 ### Define and render a form
 
+```bash
+pnpm add @form-engine/core @form-engine/react @form-engine/translator-mock react react-dom
+```
+
 ```tsx
 import type { FormSchema } from "@form-engine/core";
 import { FormProvider, FormRenderer } from "@form-engine/react";
 import "@form-engine/react/styles.css";
+import { mockTranslator } from "@form-engine/translator-mock";
 
 const schema = {
   id: "contact",
@@ -104,8 +109,8 @@ export function ContactForm() {
     <FormProvider
       schema={schema}
       locale="en"
-      translator={translator}
-      onSubmit={async (values) => save(values)}
+      translator={mockTranslator}
+      onSubmit={async (values) => console.log(values)}
       resetOnSuccess
     >
       <FormRenderer successMessageKey="contact.success" />
@@ -266,21 +271,21 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 
 ### 含まれるもの
 
-| ワークスペース | 目的 |
-| --- | --- |
-| `@form-engine/core` | JSON互換型と、スキーマ・表示条件・検証・回答・集計・CSVの純粋関数 |
-| `@form-engine/react` | SSR対応のProvider、条件付きレンダラー、アクセシブルなビルダー、フック、標準CSS |
-| `@form-engine/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージファクトリ |
-| `@form-engine/storage-localstorage` | prefix分離とテスト用storage注入に対応するブラウザ永続化ファクトリ |
-| `@form-engine/translator-mock` | 補間とフォールバックに対応した、英語・日本語の同期翻訳アダプター |
-| `@form-engine/translator-azure` | region指定に対応した、サーバー向けAzure AI Translator REST API v3.0アダプター |
-| `@form-engine/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用するサーバー向け非同期翻訳 |
-| `@form-engine/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2アダプター |
-| `@form-engine/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージファクトリ |
-| `@form-engine/zod` | Core互換issueを返す、`FormSchema`からZod 3検証器への純粋な変換 |
-| `@form-engine/preview` | Builder・回答・集計/CSVの3タブを備えたViteサンドボックス |
+| 分類 | パッケージ | 用途 |
+| --- | --- | --- |
+| Core | `@form-engine/core` | JSON互換型とスキーマ・表示条件・検証・回答・集計・CSVの純粋関数 |
+| React Renderer / Builder | `@form-engine/react` | SSR対応Provider、条件付きRenderer、アクセシブルなBuilder、フック、標準CSS |
+| Storage Adapter | `@form-engine/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージ |
+| Storage Adapter | `@form-engine/storage-localstorage` | prefix分離とstorage注入に対応するブラウザ永続化 |
+| Storage Adapter | `@form-engine/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージ |
+| Translator Adapter | `@form-engine/translator-mock` | 補間とフォールバックに対応する英語・日本語の同期翻訳 |
+| Translator Adapter | `@form-engine/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
+| Translator Adapter | `@form-engine/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
+| Translator Adapter | `@form-engine/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
+| Zod Validator | `@form-engine/zod` | Core互換issueを返す`FormSchema`からZod 3検証器への変換 |
+| デモアプリ | `@form-engine/preview` | Builder・回答・集計/CSVの3タブを備えた非公開Viteサンドボックス |
 
-ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESMパッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
+ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESM/CommonJS両対応パッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
 
 ### 必要な環境とコマンド
 
@@ -306,10 +311,15 @@ pnpm test
 
 ### フォームの定義とレンダリング
 
+```bash
+pnpm add @form-engine/core @form-engine/react @form-engine/translator-mock react react-dom
+```
+
 ```tsx
 import type { FormSchema } from "@form-engine/core";
 import { FormProvider, FormRenderer } from "@form-engine/react";
 import "@form-engine/react/styles.css";
+import { mockTranslator } from "@form-engine/translator-mock";
 
 const schema = {
   id: "contact",
@@ -344,9 +354,9 @@ export function ContactForm() {
   return (
     <FormProvider
       schema={schema}
-      locale="en"
-      translator={translator}
-      onSubmit={async (values) => save(values)}
+      locale="ja"
+      translator={mockTranslator}
+      onSubmit={async (values) => console.log(values)}
       resetOnSuccess
     >
       <FormRenderer successMessageKey="contact.success" />

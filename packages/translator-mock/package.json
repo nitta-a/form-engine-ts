@@ -1,22 +1,45 @@
 {
   "name": "@form-engine/translator-mock",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitta-a/form-engine-ts.git",
+    "directory": "packages/translator-mock"
+  },
+  "bugs": {
+    "url": "https://github.com/nitta-a/form-engine-ts/issues"
+  },
+  "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
+  "keywords": [
+    "form",
+    "translation",
+    "mock",
+    "i18n",
+    "typescript"
+  ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external @form-engine/core",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine/core",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
