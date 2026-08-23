@@ -1,0 +1,24 @@
+{
+  "name": "@form-engine/translator-mock",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external @form-engine/core",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@form-engine/core": "workspace:*"
+  }
+}

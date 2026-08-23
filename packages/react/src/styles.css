@@ -1,0 +1,91 @@
+.fe-form {
+  color: #17202a;
+  display: grid;
+  gap: 1.5rem;
+}
+.fe-header h1 {
+  margin: 0 0 0.4rem;
+}
+.fe-header p {
+  color: #56606b;
+  margin: 0;
+}
+.fe-fields {
+  display: grid;
+  gap: 1.15rem;
+}
+.fe-field {
+  border: 0;
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+}
+.fe-label {
+  font-weight: 650;
+  padding: 0;
+}
+.fe-required {
+  color: #b42318;
+}
+.fe-field input[type="text"],
+.fe-field input[type="number"],
+.fe-field select,
+.fe-field textarea {
+  border: 1px solid #aab2bd;
+  border-radius: 0.45rem;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 0.68rem 0.75rem;
+  width: 100%;
+}
+.fe-field textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+.fe-field [aria-invalid="true"] {
+  border-color: #d92d20;
+  outline-color: #d92d20;
+}
+.fe-help {
+  color: #667085;
+  font-size: 0.875rem;
+}
+.fe-error {
+  color: #b42318;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.fe-check-label {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.55rem;
+  margin: 0.2rem 0;
+}
+.fe-check-label input {
+  margin-top: 0.22rem;
+}
+.fe-submit {
+  background: #3056d3;
+  border: 0;
+  border-radius: 0.5rem;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  justify-self: start;
+  padding: 0.72rem 1.2rem;
+}
+.fe-submit:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.fe-status {
+  min-height: 1.5rem;
+}
+.fe-status [role="status"] {
+  color: #067647;
+}
+.fe-status [role="alert"] {
+  color: #b42318;
+}

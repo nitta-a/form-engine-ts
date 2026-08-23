@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "ignoreDeprecations": "6.0",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "paths": {
+      "@form-engine/core": ["./packages/core/src/index.ts"],
+      "@form-engine/react": ["./packages/react/src/index.ts"],
+      "@form-engine/storage-memory": ["./packages/storage-memory/src/index.ts"],
+      "@form-engine/translator-mock": ["./packages/translator-mock/src/index.ts"]
+    },
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "useDefineForClassFields": true
+  }
+}

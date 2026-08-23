@@ -1,0 +1,20 @@
+{
+  "name": "@form-engine/preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@form-engine/core": "workspace:*",
+    "@form-engine/react": "workspace:*",
+    "@form-engine/storage-memory": "workspace:*",
+    "@form-engine/translator-mock": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  }
+}
