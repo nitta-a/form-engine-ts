@@ -14,7 +14,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | `@form-engine/translator-mock` | English/Japanese synchronous translation adapter with interpolation and fallback |
 | `@form-engine/preview` | Vite application demonstrating every field, locale switching, submission, reset, and analytics |
 
-The library packages build as ESM with declarations and explicit `exports`. They remain `private` for this MVP; remove that flag and add your registry metadata when publishing.
+The library packages build as public ESM packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
 
 ### Requirements and commands
 
@@ -153,7 +153,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | `@form-engine/translator-mock` | 補間とフォールバックに対応した、英語・日本語の同期翻訳アダプター |
 | `@form-engine/preview` | 全フィールド、ロケール切り替え、回答送信、リセット、分析を確認できるViteアプリ |
 
-ライブラリパッケージは、宣言ファイルと明示的な`exports`を含むESMとしてビルドされます。現在はMVPのため`private`のままです。公開する場合はこのフラグを外し、レジストリ向けのメタデータを追加してください。
+ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESMパッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
 
 ### 必要な環境とコマンド
 

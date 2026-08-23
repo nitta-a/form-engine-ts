@@ -1,4 +1,5 @@
-import type { FormSubmission, FormValue, FormValues, StorageAdapter } from "@form-engine/core";
+import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue, FormValues } from "@form-engine/core";
+import { assertValidFormSchema } from "@form-engine/core";
 
 function cloneValue(value: FormValue): FormValue {
   return Array.isArray(value) ? [...value] : value;
@@ -9,42 +10,57 @@ function cloneValues(values: FormValues): FormValues {
 }
 
 function cloneSubmission(submission: FormSubmission): FormSubmission {
+  return { ...submission, values: cloneValues(submission.values) };
+}
+
+function cloneSchema(schema: FormSchema): FormSchema {
+  return JSON.parse(JSON.stringify(schema)) as FormSchema;
+}
+
+function schemaKey(formId: string, formVersion: number): string {
+  return `${formId}@${formVersion}`;
+}
+
+export function createMemoryStorageAdapter(): FormStorageAdapter {
+  const submissions = new Map<string, FormSubmission>();
+  const schemas = new Map<string, FormSchema>();
+
   return {
-    id: submission.id,
-    formId: submission.formId,
-    formVersion: submission.formVersion,
-    locale: submission.locale,
-    values: cloneValues(submission.values),
-    submittedAt: submission.submittedAt
+    async saveSchema(schema) {
+      assertValidFormSchema(schema);
+      schemas.set(schemaKey(schema.id, schema.version), cloneSchema(schema));
+    },
+    async getSchema(formId, formVersion) {
+      const schema = schemas.get(schemaKey(formId, formVersion));
+      return schema === undefined ? null : cloneSchema(schema);
+    },
+    async listSchemas() {
+      return [...schemas.values()]
+        .sort((left, right) => left.id.localeCompare(right.id) || left.version - right.version)
+        .map(cloneSchema);
+    },
+    async deleteSchema(formId, formVersion) {
+      schemas.delete(schemaKey(formId, formVersion));
+    },
+    async saveSubmission(submission) {
+      if (submissions.has(submission.id)) throw new Error(`A submission with ID "${submission.id}" already exists.`);
+      submissions.set(submission.id, cloneSubmission(submission));
+    },
+    async listSubmissions(formId, formVersion) {
+      return [...submissions.values()]
+        .filter(
+          (submission) =>
+            submission.formId === formId && (formVersion === undefined || submission.formVersion === formVersion)
+        )
+        .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt))
+        .map(cloneSubmission);
+    },
+    async deleteSubmission(submissionId) {
+      submissions.delete(submissionId);
+    },
+    async clear() {
+      schemas.clear();
+      submissions.clear();
+    }
   };
-}
-
-export class DuplicateSubmissionError extends Error {
-  constructor(id: string) {
-    super(`A submission with ID "${id}" already exists.`);
-    this.name = "DuplicateSubmissionError";
-  }
-}
-
-export class MemoryStorageAdapter implements StorageAdapter {
-  readonly #submissions = new Map<string, FormSubmission>();
-
-  async saveSubmission(submission: FormSubmission): Promise<void> {
-    if (this.#submissions.has(submission.id)) throw new DuplicateSubmissionError(submission.id);
-    this.#submissions.set(submission.id, cloneSubmission(submission));
-  }
-
-  async listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]> {
-    return [...this.#submissions.values()]
-      .filter(
-        (submission) =>
-          submission.formId === formId && (formVersion === undefined || submission.formVersion === formVersion)
-      )
-      .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt))
-      .map(cloneSubmission);
-  }
-
-  async clear(): Promise<void> {
-    this.#submissions.clear();
-  }
 }

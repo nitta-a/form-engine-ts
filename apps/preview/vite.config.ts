@@ -19,6 +19,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL("../../packages/react/src/styles.css", import.meta.url))
       },
       {
+        find: /^@form-engine\/storage-localstorage$/,
+        replacement: fileURLToPath(new URL("../../packages/storage-localstorage/src/index.ts", import.meta.url))
+      },
+      {
         find: /^@form-engine\/storage-memory$/,
         replacement: fileURLToPath(new URL("../../packages/storage-memory/src/index.ts", import.meta.url))
       },

@@ -1,6 +1,14 @@
-import type { FieldOption, FormField, FormSchema, SchemaIssue, SchemaValidationResult } from "./types";
+import type {
+  DisplayCondition,
+  FieldOption,
+  FormField,
+  FormSchema,
+  SchemaIssue,
+  SchemaValidationResult
+} from "./types";
 
-const FIELD_TYPES = new Set(["text", "textarea", "number", "select", "multi-select", "checkbox", "radio"]);
+const FIELD_TYPES = new Set(["text", "textarea", "number", "rating", "select", "multi-select", "checkbox", "radio"]);
+const CONDITION_OPERATORS = new Set(["equals", "not_equals", "contains", "not_empty"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -53,6 +61,31 @@ function validateOptions(value: unknown, path: string, issues: SchemaIssue[]): v
   return true;
 }
 
+function validateDisplayCondition(value: unknown, path: string, issues: SchemaIssue[]): value is DisplayCondition {
+  if (!isRecord(value)) {
+    issue(issues, path, "invalid_condition", "Expected a display condition object.");
+    return false;
+  }
+  if (!isNonEmptyString(value.questionId)) {
+    issue(issues, `${path}.questionId`, "invalid_condition_source", "Expected a question ID.");
+  }
+  if (typeof value.operator !== "string" || !CONDITION_OPERATORS.has(value.operator)) {
+    issue(issues, `${path}.operator`, "invalid_condition_operator", "Unsupported condition operator.");
+    return false;
+  }
+  const hasValue = Object.hasOwn(value, "value") && value.value !== undefined;
+  if (value.operator === "not_empty") {
+    if (hasValue) issue(issues, `${path}.value`, "unexpected_condition_value", "not_empty does not accept a value.");
+  } else if (!hasValue) {
+    issue(issues, `${path}.value`, "missing_condition_value", `${value.operator} requires a value.`);
+  } else if (!["string", "number", "boolean"].includes(typeof value.value)) {
+    issue(issues, `${path}.value`, "invalid_condition_value", "Expected a string, number, or boolean.");
+  } else if (typeof value.value === "number" && !Number.isFinite(value.value)) {
+    issue(issues, `${path}.value`, "invalid_condition_value", "Expected a finite number.");
+  }
+  return true;
+}
+
 function validateField(value: unknown, path: string, issues: SchemaIssue[]): value is FormField {
   if (!isRecord(value)) {
     issue(issues, path, "invalid_field", "Expected a field object.");
@@ -67,6 +100,9 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
   }
   if (value.required !== undefined && typeof value.required !== "boolean") {
     issue(issues, `${path}.required`, "invalid_required", "Expected a boolean.");
+  }
+  if (value.displayCondition !== undefined) {
+    validateDisplayCondition(value.displayCondition, `${path}.displayCondition`, issues);
   }
   if (typeof value.type !== "string" || !FIELD_TYPES.has(value.type)) {
     issue(issues, `${path}.type`, "invalid_field_type", "Unsupported field type.");
@@ -111,6 +147,18 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
     if (typeof value.min === "number" && typeof value.max === "number" && value.min > value.max) {
       issue(issues, path, "contradictory_bounds", "min cannot exceed max.");
     }
+  }
+
+  if (value.type === "rating") {
+    for (const key of ["min", "max"] as const) {
+      const bound = value[key];
+      if (bound !== undefined && (!Number.isInteger(bound) || !Number.isFinite(bound))) {
+        issue(issues, `${path}.${key}`, "invalid_bound", "Expected a finite integer.");
+      }
+    }
+    const min = typeof value.min === "number" ? value.min : 1;
+    const max = typeof value.max === "number" ? value.max : 5;
+    if (min > max) issue(issues, path, "contradictory_bounds", "min cannot exceed max.");
   }
 
   if (value.type === "select" || value.type === "radio" || value.type === "multi-select") {
@@ -167,23 +215,71 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
         ids.add(field.id);
       }
     });
+    input.fields.forEach((field, index) => {
+      if (!isRecord(field) || !isRecord(field.displayCondition) || !isNonEmptyString(field.id)) return;
+      const sourceId = field.displayCondition.questionId;
+      if (!isNonEmptyString(sourceId)) return;
+      if (sourceId === field.id) {
+        issue(
+          issues,
+          `fields[${index}].displayCondition.questionId`,
+          "self_condition",
+          "A field cannot depend on itself."
+        );
+      } else if (!ids.has(sourceId)) {
+        issue(
+          issues,
+          `fields[${index}].displayCondition.questionId`,
+          "unknown_condition_source",
+          "The condition source does not exist."
+        );
+      }
+    });
+
+    const fieldById = new Map(
+      input.fields
+        .filter((field): field is Record<string, unknown> => isRecord(field) && isNonEmptyString(field.id))
+        .map((field) => [field.id as string, field])
+    );
+    const resolved = new Set<string>();
+    const resolving = new Set<string>();
+    const reported = new Set<string>();
+    const visit = (id: string): void => {
+      if (resolved.has(id)) return;
+      if (resolving.has(id)) {
+        if (!reported.has(id)) {
+          const cycleIndex = input.fields.findIndex((field) => isRecord(field) && field.id === id);
+          issue(
+            issues,
+            `fields[${cycleIndex}].displayCondition`,
+            "condition_cycle",
+            "Display conditions cannot cycle."
+          );
+          reported.add(id);
+        }
+        return;
+      }
+      resolving.add(id);
+      const field = fieldById.get(id);
+      const condition = field?.displayCondition;
+      if (isRecord(condition) && isNonEmptyString(condition.questionId) && fieldById.has(condition.questionId)) {
+        visit(condition.questionId);
+      }
+      resolving.delete(id);
+      resolved.add(id);
+    };
+    for (const id of fieldById.keys()) visit(id);
   }
   return issues.length === 0
     ? { valid: true, value: input as unknown as FormSchema, issues: [] }
     : { valid: false, issues };
 }
 
-export class InvalidFormSchemaError extends Error {
-  readonly issues: readonly SchemaIssue[];
-
-  constructor(issues: readonly SchemaIssue[]) {
-    super(`Invalid form schema: ${issues.map((item) => `${item.path}: ${item.message}`).join("; ")}`);
-    this.name = "InvalidFormSchemaError";
-    this.issues = issues;
-  }
-}
-
 export function assertValidFormSchema(input: unknown): asserts input is FormSchema {
   const result = validateFormSchema(input);
-  if (!result.valid) throw new InvalidFormSchemaError(result.issues);
+  if (!result.valid) {
+    throw new TypeError(
+      `Invalid form schema: ${result.issues.map((item) => `${item.path}: ${item.message}`).join("; ")}`
+    );
+  }
 }

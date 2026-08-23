@@ -12,6 +12,7 @@
   "dependencies": {
     "@form-engine/core": "workspace:*",
     "@form-engine/react": "workspace:*",
+    "@form-engine/storage-localstorage": "workspace:*",
     "@form-engine/storage-memory": "workspace:*",
     "@form-engine/translator-mock": "workspace:*",
     "react": "^19.2.3",

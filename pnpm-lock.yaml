@@ -65,6 +65,9 @@ importers:
       '@form-engine/react':
         specifier: workspace:*
         version: link:../../packages/react
+      '@form-engine/storage-localstorage':
+        specifier: workspace:*
+        version: link:../../packages/storage-localstorage
       '@form-engine/storage-memory':
         specifier: workspace:*
         version: link:../../packages/storage-memory
@@ -91,6 +94,12 @@ importers:
       react-dom:
         specifier: '>=18.2 <20'
         version: 19.2.8(react@19.2.8)
+
+  packages/storage-localstorage:
+    dependencies:
+      '@form-engine/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/storage-memory:
     dependencies:

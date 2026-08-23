@@ -1,4 +1,13 @@
-export type FieldType = "text" | "textarea" | "number" | "select" | "multi-select" | "checkbox" | "radio";
+export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
+
+export type ConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
+export type ConditionValue = string | number | boolean;
+
+export interface DisplayCondition {
+  readonly questionId: string;
+  readonly operator: ConditionOperator;
+  readonly value?: ConditionValue;
+}
 
 export type ValidationCode =
   | "required"
@@ -26,6 +35,7 @@ export interface BaseField {
   readonly helpTextKey?: string;
   readonly required?: boolean;
   readonly messages?: Partial<Record<ValidationCode, string>>;
+  readonly displayCondition?: DisplayCondition;
 }
 
 export interface TextField extends BaseField {
@@ -44,6 +54,12 @@ export interface NumberField extends BaseField {
   readonly step?: number;
 }
 
+export interface RatingField extends BaseField {
+  readonly type: "rating";
+  readonly min?: number;
+  readonly max?: number;
+}
+
 export interface SelectField extends BaseField {
   readonly type: "select" | "radio";
   readonly options: readonly FieldOption[];
@@ -60,7 +76,7 @@ export interface CheckboxField extends BaseField {
   readonly type: "checkbox";
 }
 
-export type FormField = TextField | NumberField | SelectField | MultiSelectField | CheckboxField;
+export type FormField = TextField | NumberField | RatingField | SelectField | MultiSelectField | CheckboxField;
 
 export interface FormSchema {
   readonly id: string;
@@ -114,6 +130,14 @@ export interface StorageAdapter {
   clear(): Promise<void>;
 }
 
+export interface FormStorageAdapter extends StorageAdapter {
+  saveSchema(schema: FormSchema): Promise<void>;
+  getSchema(formId: string, formVersion: number): Promise<FormSchema | null>;
+  listSchemas(): Promise<readonly FormSchema[]>;
+  deleteSchema(formId: string, formVersion: number): Promise<void>;
+  deleteSubmission(submissionId: string): Promise<void>;
+}
+
 interface BaseQuestionAggregate {
   readonly fieldId: string;
   readonly answeredCount: number;
@@ -125,10 +149,11 @@ export interface TextQuestionAggregate extends BaseQuestionAggregate {
 }
 
 export interface NumberQuestionAggregate extends BaseQuestionAggregate {
-  readonly kind: "number";
+  readonly kind: "number" | "rating";
   readonly minimum: number | null;
   readonly maximum: number | null;
   readonly average: number | null;
+  readonly total: number;
 }
 
 export interface OptionAggregate {
@@ -162,3 +187,8 @@ export interface FormAnalytics {
   readonly submissionCount: number;
   readonly questions: readonly QuestionAggregate[];
 }
+
+export type Question = FormField;
+export type QuestionType = FieldType;
+export type ChoiceOption = FieldOption;
+export type FormResponse = FormSubmission;

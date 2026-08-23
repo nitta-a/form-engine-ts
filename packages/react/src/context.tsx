@@ -1,14 +1,16 @@
 import {
   assertValidFormSchema,
+  calculateFieldVisibility,
   type FormField,
   type FormSchema,
   type FormValue,
   type FormValues,
+  selectVisibleAnswers,
   type TranslationAdapter,
   type ValidationIssue,
   validateAnswers
 } from "@form-engine/core";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -17,6 +19,7 @@ export interface FormContextValue {
   readonly locale: string;
   readonly translator: TranslationAdapter;
   readonly values: FormValues;
+  readonly visibility: Readonly<Record<string, boolean>>;
   readonly errors: Readonly<Record<string, ValidationIssue | undefined>>;
   readonly submitStatus: SubmitStatus;
   readonly submitError: Error | null;
@@ -62,18 +65,21 @@ export function FormProvider({
   const [errors, setErrors] = useState<Record<string, ValidationIssue | undefined>>({});
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [submitError, setSubmitError] = useState<Error | null>(null);
+  const visibility = useMemo(() => calculateFieldVisibility(validSchema, values), [validSchema, values]);
+
+  useEffect(() => {
+    const fieldIds = new Set(validSchema.fields.map((field) => field.id));
+    setValues((current) => Object.fromEntries(Object.entries(current).filter(([fieldId]) => fieldIds.has(fieldId))));
+  }, [validSchema]);
 
   const setValue = useCallback(
     (fieldId: string, value: FormValue) => {
       setValues((current) => {
         const next = { ...current, [fieldId]: value };
         setErrors((currentErrors) => {
-          if (currentErrors[fieldId] === undefined) return currentErrors;
+          if (Object.keys(currentErrors).length === 0) return currentErrors;
           const result = validateAnswers(validSchema, next);
-          const nextIssue = result.issues.find((item) => item.fieldId === fieldId);
-          const nextErrors = { ...currentErrors, [fieldId]: nextIssue };
-          if (nextIssue === undefined) delete nextErrors[fieldId];
-          return nextErrors;
+          return issuesByField(result.issues);
         });
         return next;
       });
@@ -102,7 +108,7 @@ export function FormProvider({
     setSubmitStatus("submitting");
     setSubmitError(null);
     try {
-      await onSubmit(values);
+      await onSubmit(selectVisibleAnswers(validSchema, values) as FormValues);
       if (resetOnSuccess) setValues({ ...initialValues });
       setSubmitStatus("success");
       return true;
@@ -124,6 +130,7 @@ export function FormProvider({
       locale,
       translator,
       values,
+      visibility,
       errors,
       submitStatus,
       submitError,
@@ -133,7 +140,20 @@ export function FormProvider({
       submit,
       translate
     }),
-    [errors, locale, reset, setValue, submit, submitError, submitStatus, translate, translator, validSchema, values]
+    [
+      errors,
+      locale,
+      reset,
+      setValue,
+      submit,
+      submitError,
+      submitStatus,
+      translate,
+      translator,
+      validSchema,
+      values,
+      visibility
+    ]
   );
 
   return <FormContext.Provider value={contextValue}>{children}</FormContext.Provider>;

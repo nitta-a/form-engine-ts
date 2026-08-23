@@ -47,7 +47,7 @@ function fieldRuleParams(field: FormField): Readonly<Record<string, string | num
   if (field.type === "text" || field.type === "textarea") {
     if (field.minLength !== undefined) params.min = field.minLength;
     if (field.maxLength !== undefined) params.max = field.maxLength;
-  } else if (field.type === "number") {
+  } else if (field.type === "number" || field.type === "rating") {
     if (field.min !== undefined) params.min = field.min;
     if (field.max !== undefined) params.max = field.max;
     if (field.step !== undefined) params.step = field.step;
@@ -137,6 +137,38 @@ function DefaultField(props: FieldComponentProps) {
             </label>
           );
         })}
+        <FieldMessage props={props} />
+      </fieldset>
+    );
+  }
+
+  if (field.type === "rating") {
+    const min = field.min ?? 1;
+    const max = field.max ?? 5;
+    return (
+      <fieldset className="fe-field fe-field--rating" data-field-id={field.id} {...ariaProps}>
+        <legend className="fe-label">
+          {translate(field.labelKey)}
+          <RequiredMark required={field.required} />
+        </legend>
+        <div className="fe-rating-options">
+          {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((rating) => {
+            const optionId = `${inputId}-${rating}`;
+            return (
+              <label className="fe-rating-label" htmlFor={optionId} key={rating}>
+                <input
+                  id={optionId}
+                  name={field.id}
+                  type="radio"
+                  value={rating}
+                  checked={value === rating}
+                  onChange={() => setValue(rating)}
+                />
+                <span>{rating}</span>
+              </label>
+            );
+          })}
+        </div>
         <FieldMessage props={props} />
       </fieldset>
     );
@@ -233,12 +265,13 @@ export function FormRenderer({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const formElement = event.currentTarget;
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
     const valid = await form.submit();
     if (!valid && firstInvalidFieldId !== undefined) {
       queueMicrotask(() => {
-        const fieldContainer = [...(globalThis.document?.querySelectorAll<HTMLElement>("[data-field-id]") ?? [])].find(
+        const fieldContainer = [...formElement.querySelectorAll<HTMLElement>("[data-field-id]")].find(
           (element) => element.dataset.fieldId === firstInvalidFieldId
         );
         fieldContainer?.querySelector<HTMLElement>("input, select, textarea")?.focus();
@@ -253,24 +286,26 @@ export function FormRenderer({
         {form.schema.descriptionKey === undefined ? null : <p>{form.translate(form.schema.descriptionKey)}</p>}
       </header>
       <div className="fe-fields">
-        {form.schema.fields.map((field) => {
-          const props: FieldComponentProps = {
-            field,
-            value: form.values[field.id],
-            error: form.errors[field.id],
-            setValue: (value) => form.setValue(field.id, value),
-            translate: form.translate,
-            inputId: `${prefix}-${field.id}`,
-            errorId: `${prefix}-${field.id}-error`,
-            helpId: `${prefix}-${field.id}-help`
-          };
-          const Component = components[field.type];
-          return Component === undefined ? (
-            <DefaultField key={field.id} {...props} />
-          ) : (
-            <Component key={field.id} {...props} />
-          );
-        })}
+        {form.schema.fields
+          .filter((field) => form.visibility[field.id] === true)
+          .map((field) => {
+            const props: FieldComponentProps = {
+              field,
+              value: form.values[field.id],
+              error: form.errors[field.id],
+              setValue: (value) => form.setValue(field.id, value),
+              translate: form.translate,
+              inputId: `${prefix}-${field.id}`,
+              errorId: `${prefix}-${field.id}-error`,
+              helpId: `${prefix}-${field.id}-help`
+            };
+            const Component = components[field.type];
+            return Component === undefined ? (
+              <DefaultField key={field.id} {...props} />
+            ) : (
+              <Component key={field.id} {...props} />
+            );
+          })}
       </div>
       <button className="fe-submit" type="submit" disabled={form.isSubmitting}>
         {form.translate(form.schema.submitLabelKey ?? "form.submit")}

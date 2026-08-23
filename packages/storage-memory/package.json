@@ -1,7 +1,9 @@
 {
   "name": "@form-engine/storage-memory",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [

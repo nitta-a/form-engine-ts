@@ -17,6 +17,7 @@
     "paths": {
       "@form-engine/core": ["./packages/core/src/index.ts"],
       "@form-engine/react": ["./packages/react/src/index.ts"],
+      "@form-engine/storage-localstorage": ["./packages/storage-localstorage/src/index.ts"],
       "@form-engine/storage-memory": ["./packages/storage-memory/src/index.ts"],
       "@form-engine/translator-mock": ["./packages/translator-mock/src/index.ts"]
     },

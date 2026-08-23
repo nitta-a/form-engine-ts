@@ -7,6 +7,7 @@ import type {
   ValidationCode,
   ValidationIssue
 } from "./types";
+import { calculateFieldVisibility } from "./visibility";
 
 const DEFAULT_MESSAGES: Record<ValidationCode, string> = {
   required: "validation.required",
@@ -72,14 +73,18 @@ function validateField(field: FormField, value: FormValue, issues: ValidationIss
     return;
   }
 
-  if (field.type === "number") {
+  if (field.type === "number" || field.type === "rating") {
     if (typeof value !== "number" || !Number.isFinite(value)) {
       addIssue(issues, field, "invalid_type");
       return;
     }
-    if (field.min !== undefined && value < field.min) addIssue(issues, field, "min", { min: field.min });
-    if (field.max !== undefined && value > field.max) addIssue(issues, field, "max", { max: field.max });
-    if (field.step !== undefined) {
+    const min = field.type === "rating" ? (field.min ?? 1) : field.min;
+    const max = field.type === "rating" ? (field.max ?? 5) : field.max;
+    if (min !== undefined && value < min) addIssue(issues, field, "min", { min });
+    if (max !== undefined && value > max) addIssue(issues, field, "max", { max });
+    if (field.type === "rating" && !Number.isInteger(value)) {
+      addIssue(issues, field, "step", { step: 1 });
+    } else if (field.type === "number" && field.step !== undefined) {
       const origin = field.min ?? 0;
       const quotient = (value - origin) / field.step;
       if (Math.abs(quotient - Math.round(quotient)) > 1e-9) {
@@ -137,6 +142,9 @@ export function validateAnswers(schema: FormSchema, values: FormValues): AnswerV
       });
     }
   }
-  for (const field of schema.fields) validateField(field, values[field.id], issues);
+  const visibility = calculateFieldVisibility(schema, values);
+  for (const field of schema.fields) {
+    if (visibility[field.id] === true) validateField(field, values[field.id], issues);
+  }
   return issues.length === 0 ? { valid: true, issues: [] } : { valid: false, issues };
 }

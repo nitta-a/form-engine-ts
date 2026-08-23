@@ -1,21 +1,12 @@
 import { assertValidFormSchema } from "./schema";
-import type { FormSchema, FormSubmission, FormValues, ValidationIssue } from "./types";
+import type { FormSchema, FormSubmission, FormValues } from "./types";
 import { validateAnswers } from "./validation";
+import { selectVisibleAnswers } from "./visibility";
 
 export interface CreateSubmissionOptions {
   readonly id: string;
   readonly locale: string;
-  readonly submittedAt?: string | Date;
-}
-
-export class InvalidAnswersError extends Error {
-  readonly issues: readonly ValidationIssue[];
-
-  constructor(issues: readonly ValidationIssue[]) {
-    super(`Invalid form answers: ${issues.map((item) => `${item.fieldId}:${item.code}`).join(", ")}`);
-    this.name = "InvalidAnswersError";
-    this.issues = issues;
-  }
+  readonly submittedAt: string;
 }
 
 function cloneValues(values: FormValues): FormValues {
@@ -33,15 +24,21 @@ export function createSubmission(
   if (options.id.trim().length === 0) throw new TypeError("Submission ID must not be empty.");
   if (options.locale.trim().length === 0) throw new TypeError("Submission locale must not be empty.");
   const result = validateAnswers(schema, values);
-  if (!result.valid) throw new InvalidAnswersError(result.issues);
-  const date = options.submittedAt instanceof Date ? options.submittedAt : new Date(options.submittedAt ?? Date.now());
-  if (Number.isNaN(date.getTime())) throw new TypeError("submittedAt must be a valid date.");
+  if (!result.valid) {
+    throw new TypeError(
+      `Invalid form answers: ${result.issues.map((item) => `${item.fieldId}:${item.code}`).join(", ")}`
+    );
+  }
+  if (options.submittedAt.trim().length === 0 || !Number.isFinite(Date.parse(options.submittedAt))) {
+    throw new TypeError("submittedAt must be a valid date string.");
+  }
+  const visibleValues = selectVisibleAnswers(schema, values) as FormValues;
   return Object.freeze({
     id: options.id,
     formId: schema.id,
     formVersion: schema.version,
     locale: options.locale,
-    values: Object.freeze(cloneValues(values)),
-    submittedAt: date.toISOString()
+    values: Object.freeze(cloneValues(visibleValues)),
+    submittedAt: options.submittedAt
   });
 }
