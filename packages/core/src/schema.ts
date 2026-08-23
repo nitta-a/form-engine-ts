@@ -23,6 +23,36 @@ function issue(issues: SchemaIssue[], path: string, code: string, message: strin
   issues.push({ path, code, message });
 }
 
+function validateLocalizedTextMap(value: unknown, path: string, issues: SchemaIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, "invalid_translations", "Expected a locale-to-translation object.");
+    return;
+  }
+  for (const [locale, translation] of Object.entries(value)) {
+    if (!isNonEmptyString(locale) || !isRecord(translation)) {
+      issue(issues, `${path}.${locale}`, "invalid_translation", "Expected a translation object.");
+      continue;
+    }
+    for (const key of ["title", "description"] as const) {
+      if (translation[key] !== undefined && !isNonEmptyString(translation[key])) {
+        issue(issues, `${path}.${locale}.${key}`, "invalid_translation", "Expected non-empty translated text.");
+      }
+    }
+  }
+}
+
+function validateOptionTranslations(value: unknown, path: string, issues: SchemaIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, "invalid_translations", "Expected a locale-to-label object.");
+    return;
+  }
+  for (const [locale, label] of Object.entries(value)) {
+    if (!isNonEmptyString(locale) || !isNonEmptyString(label)) {
+      issue(issues, `${path}.${locale}`, "invalid_translation", "Expected a non-empty translated label.");
+    }
+  }
+}
+
 function rejectLegacyProperties(
   value: Record<string, unknown>,
   path: string,
@@ -77,6 +107,8 @@ function validateOptions(value: unknown, path: string, issues: SchemaIssue[]): v
     if (!isNonEmptyString(option.label)) {
       issue(issues, `${optionPath}.label`, "invalid_label", "Expected a non-empty option label.");
     }
+    if (option.translations !== undefined)
+      validateOptionTranslations(option.translations, `${optionPath}.translations`, issues);
   });
   return true;
 }
@@ -128,6 +160,7 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
   if (value.displayCondition !== undefined) {
     validateDisplayCondition(value.displayCondition, `${path}.displayCondition`, issues);
   }
+  if (value.translations !== undefined) validateLocalizedTextMap(value.translations, `${path}.translations`, issues);
   if (typeof value.type !== "string" || !FIELD_TYPES.has(value.type)) {
     issue(issues, `${path}.type`, "invalid_field_type", "Unsupported field type.");
     return false;
@@ -234,6 +267,26 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
       );
     }
   }
+  if (input.defaultLocale !== undefined && !isNonEmptyString(input.defaultLocale)) {
+    issue(issues, "defaultLocale", "invalid_locale", "Expected a non-empty default locale.");
+  }
+  if (input.supportedLocales !== undefined) {
+    if (!Array.isArray(input.supportedLocales) || input.supportedLocales.length === 0) {
+      issue(issues, "supportedLocales", "invalid_locales", "Expected at least one supported locale.");
+    } else {
+      const locales = new Set<string>();
+      input.supportedLocales.forEach((locale, index) => {
+        if (!isNonEmptyString(locale)) {
+          issue(issues, `supportedLocales[${index}]`, "invalid_locale", "Expected a non-empty locale.");
+        } else if (locales.has(locale)) {
+          issue(issues, `supportedLocales[${index}]`, "duplicate_locale", "Locales must be unique.");
+        } else {
+          locales.add(locale);
+        }
+      });
+    }
+  }
+  if (input.translations !== undefined) validateLocalizedTextMap(input.translations, "translations", issues);
   if (!Array.isArray(input.fields) || input.fields.length === 0) {
     issue(issues, "fields", "invalid_fields", "Expected at least one field.");
   } else {
@@ -268,6 +321,81 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
             ? "self_condition"
             : "condition_cycle";
       issue(issues, `fields[${fieldIndex}].displayCondition`, code, structuralIssue.message);
+    }
+
+    if (input.pages !== undefined) {
+      if (!Array.isArray(input.pages) || input.pages.length === 0) {
+        issue(issues, "pages", "invalid_pages", "Expected at least one page when pages is defined.");
+      } else {
+        const pageIds = new Set<string>();
+        const assigned = new Map<string, number>();
+        input.pages.forEach((page, pageIndex) => {
+          const pagePath = `pages[${pageIndex}]`;
+          if (!isRecord(page)) {
+            issue(issues, pagePath, "invalid_page", "Expected a page object.");
+            return;
+          }
+          if (!isNonEmptyString(page.id)) {
+            issue(issues, `${pagePath}.id`, "invalid_page_id", "Expected a non-empty page ID.");
+          } else if (pageIds.has(page.id)) {
+            issue(issues, `${pagePath}.id`, "duplicate_page", "Page IDs must be unique.");
+          } else {
+            pageIds.add(page.id);
+          }
+          for (const key of ["title", "description"] as const) {
+            if (page[key] !== undefined && !isNonEmptyString(page[key])) {
+              issue(issues, `${pagePath}.${key}`, "invalid_page_text", "Expected non-empty page text.");
+            }
+          }
+          if (page.translations !== undefined) {
+            validateLocalizedTextMap(page.translations, `${pagePath}.translations`, issues);
+          }
+          if (page.displayCondition !== undefined) {
+            validateDisplayCondition(page.displayCondition, `${pagePath}.displayCondition`, issues);
+          }
+          if (!Array.isArray(page.questionIds) || page.questionIds.length === 0) {
+            issue(issues, `${pagePath}.questionIds`, "invalid_page_questions", "Expected at least one question ID.");
+            return;
+          }
+          page.questionIds.forEach((questionId, questionIndex) => {
+            const questionPath = `${pagePath}.questionIds[${questionIndex}]`;
+            if (!isNonEmptyString(questionId)) {
+              issue(issues, questionPath, "invalid_question_reference", "Expected a question ID.");
+            } else if (!ids.has(questionId)) {
+              issue(issues, questionPath, "unknown_page_question", "Page references an unknown question.");
+            } else if (assigned.has(questionId)) {
+              issue(issues, questionPath, "duplicate_page_question", "A question may belong to only one page.");
+            } else {
+              assigned.set(questionId, pageIndex);
+            }
+          });
+        });
+        for (const fieldId of ids) {
+          if (!assigned.has(fieldId))
+            issue(issues, "pages", "unassigned_page_question", `Question ${fieldId} has no page.`);
+        }
+        input.pages.forEach((page, pageIndex) => {
+          if (!isRecord(page) || !isRecord(page.displayCondition)) return;
+          const sourceId = page.displayCondition.questionId;
+          if (typeof sourceId !== "string") return;
+          const sourcePageIndex = assigned.get(sourceId);
+          if (sourcePageIndex === undefined) {
+            issue(
+              issues,
+              `pages[${pageIndex}].displayCondition.questionId`,
+              "unknown_page_condition_source",
+              "Page condition references an unknown question."
+            );
+          } else if (sourcePageIndex >= pageIndex) {
+            issue(
+              issues,
+              `pages[${pageIndex}].displayCondition.questionId`,
+              "forward_page_condition",
+              "Page conditions must reference a question on an earlier page."
+            );
+          }
+        });
+      }
     }
   }
   return issues.length === 0

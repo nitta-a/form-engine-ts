@@ -186,6 +186,99 @@ describe("React form engine", () => {
     expect(onSubmit).toHaveBeenCalledWith({ show: "no" });
   });
 
+  it("navigates pages, blocks invalid steps, updates progress, and preserves answers on Back", async () => {
+    const user = userEvent.setup();
+    const paged: FormSchema = {
+      id: "wizard",
+      version: 1,
+      title: "Wizard",
+      fields: [
+        { id: "first", type: "text", title: "First", required: true },
+        { id: "second", type: "text", title: "Second", required: true },
+        { id: "conditional", type: "text", title: "Conditional", required: false }
+      ],
+      pages: [
+        { id: "one", title: "One", questionIds: ["first"] },
+        { id: "two", title: "Two", questionIds: ["second"] },
+        {
+          id: "three",
+          title: "Three",
+          questionIds: ["conditional"],
+          displayCondition: { questionId: "first", operator: "equals", value: "show" }
+        }
+      ]
+    };
+    render(
+      <FormProvider schema={paged} locale="en" translator={translator} onSubmit={() => undefined}>
+        <FormRenderer />
+      </FormProvider>
+    );
+    expect(screen.getByLabelText(/^First/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Second/)).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "2");
+    await user.click(screen.getByRole("button", { name: "en:form.next" }));
+    expect(screen.getByLabelText(/^First/)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByLabelText(/^Second/)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText(/^First/), "kept");
+    await user.click(screen.getByRole("button", { name: "en:form.next" }));
+    expect(screen.getByLabelText(/^Second/)).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
+    await user.click(screen.getByRole("button", { name: "en:form.back" }));
+    expect(screen.getByLabelText(/^First/)).toHaveValue("kept");
+  });
+
+  it("resolves static localized schema text through the provider", () => {
+    const localized: FormSchema = {
+      id: "localized",
+      version: 1,
+      title: "English title",
+      defaultLocale: "en",
+      translations: { ja: { title: "日本語タイトル" } },
+      fields: [
+        {
+          id: "name",
+          type: "text",
+          title: "Name",
+          required: false,
+          translations: { ja: { title: "名前" } }
+        }
+      ]
+    };
+    render(
+      <FormProvider schema={localized} locale="ja" translator={translator} onSubmit={() => undefined}>
+        <FormRenderer />
+      </FormProvider>
+    );
+    expect(screen.getByRole("heading", { name: "日本語タイトル" })).toBeInTheDocument();
+    expect(screen.getByLabelText("名前")).toBeInTheDocument();
+  });
+
+  it("restores, debounces, and clears local drafts after submission", async () => {
+    const user = userEvent.setup();
+    globalThis.localStorage.setItem(
+      "draft-test",
+      JSON.stringify({
+        formId: schema.id,
+        formVersion: schema.version,
+        values: { name: "Ada" },
+        savedAt: "2026-01-01T00:00:00.000Z"
+      })
+    );
+    render(
+      <FormProvider schema={schema} locale="en" translator={translator} onSubmit={() => undefined}>
+        <FormRenderer autoSaveKey="draft-test" />
+      </FormProvider>
+    );
+    await waitFor(() => expect(screen.getByLabelText(/Name/)).toHaveValue("Ada"));
+    expect(screen.getByText("en:form.draftRestored")).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/Name/), " Lovelace");
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 550));
+    expect(JSON.parse(globalThis.localStorage.getItem("draft-test") ?? "{}").values.name).toBe("Ada Lovelace");
+    await user.click(screen.getByRole("button", { name: "en:submit" }));
+    await waitFor(() => expect(globalThis.localStorage.getItem("draft-test")).toBeNull());
+  });
+
   it("edits schema through the accessible builder controls", async () => {
     const user = userEvent.setup();
     function BuilderHarness() {
@@ -221,6 +314,52 @@ describe("React form engine", () => {
     await user.selectOptions(secondCondition, "q_12345678");
     expect(screen.getByLabelText("Condition operator")).toBeInTheDocument();
     expect(screen.getByText(/displayCondition/)).toBeInTheDocument();
+  });
+
+  it("manages page membership and stored translations in the builder", async () => {
+    const user = userEvent.setup();
+    const translationAdapter = {
+      translateText: vi.fn(),
+      translateBatch: vi.fn(async (texts: readonly string[], targetLocale: string) =>
+        texts.map((text) => `${targetLocale}:${text}`)
+      )
+    };
+    function BuilderHarness() {
+      const [current, setCurrent] = useState<FormSchema>({
+        id: "page-builder",
+        version: 1,
+        title: "title",
+        defaultLocale: "en",
+        supportedLocales: ["en", "ja"],
+        fields: [
+          { id: "first", type: "text", title: "first", required: false },
+          { id: "second", type: "text", title: "second", required: false }
+        ]
+      });
+      return (
+        <>
+          <FormBuilder schema={current} onChange={setCurrent} translationAdapter={translationAdapter} />
+          <output data-testid="page-builder-schema">{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+    vi.spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("aaaaaaaa-1234-1234-1234-123456789012")
+      .mockReturnValueOnce("bbbbbbbb-1234-1234-1234-123456789012");
+    render(<BuilderHarness />);
+    await user.click(screen.getByRole("button", { name: "Enable multi-step pages" }));
+    await user.selectOptions(screen.getByLabelText("Question to move to the new page"), "second");
+    await user.click(screen.getByRole("button", { name: "Add page" }));
+    expect(screen.getByTestId("page-builder-schema")).toHaveTextContent('"questionIds":["second"]');
+    await user.selectOptions(screen.getByLabelText("Edit locale"), "ja");
+    const localizedTitles = screen.getAllByLabelText("質問文 / Question Title");
+    const formTranslation = localizedTitles.find((input) => input.getAttribute("value") === "");
+    if (formTranslation === undefined) throw new Error("Expected translation input.");
+    await user.type(formTranslation, "翻訳タイトル");
+    expect(screen.getByTestId("page-builder-schema")).toHaveTextContent("翻訳タイトル");
+    await user.click(screen.getByRole("button", { name: "Translate all text" }));
+    await waitFor(() => expect(translationAdapter.translateBatch).toHaveBeenCalled());
+    expect(screen.getByTestId("page-builder-schema")).toHaveTextContent("ja:title");
   });
 
   it("hides generated IDs and keeps them stable while natural-language labels change", () => {

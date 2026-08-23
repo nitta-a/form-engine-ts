@@ -1,4 +1,4 @@
-import type { FormField, FormSchema } from "./types";
+import type { FormField, FormPage, FormSchema } from "./types";
 
 export type SchemaStructureIssueType =
   | "dangling_condition_reference"
@@ -107,18 +107,52 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
 export function sanitizeSchema(schema: FormSchema): FormSchema {
   const existingQuestionIds = new Set(schema.fields.map((field) => field.id));
   const cyclic = cyclicQuestionIds(schema.fields);
-  return {
+  const sanitizedFields = schema.fields.map((field) => {
+    const sourceId = field.displayCondition?.questionId;
+    if (
+      sourceId === undefined ||
+      (existingQuestionIds.has(sourceId) && sourceId !== field.id && !cyclic.has(field.id))
+    ) {
+      return field;
+    }
+    const { displayCondition: _displayCondition, ...sanitized } = field;
+    return sanitized as FormField;
+  });
+  const base: FormSchema = {
     ...schema,
-    fields: schema.fields.map((field) => {
-      const sourceId = field.displayCondition?.questionId;
-      if (
-        sourceId === undefined ||
-        (existingQuestionIds.has(sourceId) && sourceId !== field.id && !cyclic.has(field.id))
-      ) {
-        return field;
-      }
-      const { displayCondition: _displayCondition, ...sanitized } = field;
-      return sanitized as FormField;
-    })
+    fields: sanitizedFields
   };
+  if (schema.pages === undefined) return base;
+
+  const assigned = new Set<string>();
+  const pages: FormPage[] = schema.pages
+    .map((page) => ({
+      ...page,
+      questionIds: page.questionIds.filter((id) => {
+        if (!existingQuestionIds.has(id) || assigned.has(id)) return false;
+        assigned.add(id);
+        return true;
+      })
+    }))
+    .filter((page) => page.questionIds.length > 0);
+  if (pages.length === 0) {
+    const { pages: _pages, ...singlePage } = base;
+    return singlePage;
+  }
+  const unassigned = schema.fields.map((field) => field.id).filter((id) => !assigned.has(id));
+  const completePages = pages.map(
+    (page, index): FormPage =>
+      index === pages.length - 1 ? { ...page, questionIds: [...page.questionIds, ...unassigned] } : page
+  );
+  const pageIndexByQuestion = new Map(
+    completePages.flatMap((page, pageIndex) => page.questionIds.map((id) => [id, pageIndex] as const))
+  );
+  const safePages = completePages.map((page, pageIndex): FormPage => {
+    const sourceIndex =
+      page.displayCondition === undefined ? undefined : pageIndexByQuestion.get(page.displayCondition.questionId);
+    if (page.displayCondition === undefined || (sourceIndex !== undefined && sourceIndex < pageIndex)) return page;
+    const { displayCondition: _displayCondition, ...safePage } = page;
+    return safePage;
+  });
+  return { ...base, pages: safePages };
 }

@@ -16,7 +16,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Storage adapter | `@form-engine-ts/storage-postgres` | PostgreSQL storage through an injected node-postgres-compatible query client |
 | Storage adapter | `@form-engine-ts/storage-sqlite` | Driver-neutral SQLite storage through synchronous or asynchronous executors |
 | Storage adapter | `@form-engine-ts/storage-d1` | Cloudflare D1 storage using prepared statements and transactional batches |
-| Translator adapter | `@form-engine-ts/translator-mock` | English/Japanese synchronous translations with interpolation and fallback |
+| Translator adapter | `@form-engine-ts/translator-mock` | English/Japanese synchronous catalogs plus deterministic async batch translation for demos |
 | Translator adapter | `@form-engine-ts/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
 | Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
@@ -46,6 +46,15 @@ pnpm test
 ```
 
 `pnpm lint` uses Biome to verify formatting, recommended lint rules, and import organization.
+
+### Authoring and respondent experience
+
+Optional `pages` turn a schema into a validated wizard with conditional page skipping and accessible progress. The React
+renderer can debounce versioned drafts to `localStorage` with `autoSaveKey`. Authoring-time translations are stored in the
+schema, populated in batches through `populateSchemaTranslations`, and applied synchronously by `resolveLocalizedSchema`.
+The builder exposes page membership and locale override controls. Core also provides `calculateCrossTabulation` for
+two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
+an optional `{ pageIndex }` for step-scoped validation.
 
 ### Define and render a form
 
@@ -305,7 +314,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Storage Adapter | `@form-engine-ts/storage-postgres` | node-postgres互換query clientを注入するPostgreSQLストレージ |
 | Storage Adapter | `@form-engine-ts/storage-sqlite` | 同期・非同期executorに対応するdriver非依存SQLiteストレージ |
 | Storage Adapter | `@form-engine-ts/storage-d1` | prepared statementとtransactional batchを使うCloudflare D1ストレージ |
-| Translator Adapter | `@form-engine-ts/translator-mock` | 補間とフォールバックに対応する英語・日本語の同期翻訳 |
+| Translator Adapter | `@form-engine-ts/translator-mock` | 英語・日本語の同期カタログとデモ用の決定的な非同期バッチ翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
@@ -335,6 +344,15 @@ pnpm test
 ```
 
 `pnpm lint`では、Biomeによりフォーマット、推奨リントルール、インポート順を検証します。
+
+### 編集・回答体験
+
+任意の`pages`を定義すると、条件付きページの自動スキップ、ページ検証、アクセシブルな進捗表示を備えた
+ウィザードになります。React Rendererは`autoSaveKey`によりversion付き下書きを500ms debounceで`localStorage`へ
+保存・復元できます。編集時翻訳はスキーマへ保持され、`populateSchemaTranslations`で一括生成し、
+`resolveLocalizedSchema`でAPI通信なしに同期解決します。Builderはページ所属と各言語の手動訳文を編集できます。
+Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
+`dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
 ### フォームの定義とレンダリング
 

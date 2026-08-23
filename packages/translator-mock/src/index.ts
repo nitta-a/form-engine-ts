@@ -1,4 +1,4 @@
-import type { TranslationAdapter } from "@form-engine-ts/core";
+import type { AsyncTranslationAdapter, TranslationAdapter } from "@form-engine-ts/core";
 
 export type TranslationCatalog = Readonly<Record<string, string>>;
 export type TranslationCatalogs = Readonly<Record<string, TranslationCatalog>>;
@@ -7,6 +7,10 @@ const sharedEnglish: TranslationCatalog = {
   "form.title": "Customer feedback",
   "form.description": "Tell us about your experience. Required fields are marked.",
   "form.submit": "Send response",
+  "form.back": "Back",
+  "form.next": "Next",
+  "form.step": "Step {{current}} of {{total}}",
+  "form.draftRestored": "Draft restored",
   "field.name.label": "Your name",
   "field.name.help": "Enter at least {{min}} characters.",
   "field.name.placeholder": "Ada Lovelace",
@@ -74,6 +78,14 @@ const sharedEnglish: TranslationCatalog = {
   "preview.resetSuccess": "All responses for this form were deleted.",
   "preview.resetError": "Responses could not be deleted.",
   "preview.resetUnavailable": "The selected storage does not support response reset.",
+  "preview.crossTab": "Cross tabulation",
+  "preview.rowQuestion": "Row question",
+  "preview.colQuestion": "Column question",
+  "preview.webhook": "Webhook simulation",
+  "preview.webhookUrl": "Webhook URL",
+  "preview.simulateWebhook": "Send simulated event",
+  "preview.webhookSuccess": "The simulated webhook was accepted.",
+  "preview.webhookError": "The simulated webhook failed.",
   "builder.formBuilder": "Form builder",
   "builder.moveUp": "Move {{title}} up",
   "builder.moveDown": "Move {{title}} down",
@@ -99,6 +111,22 @@ const sharedEnglish: TranslationCatalog = {
   "builder.conditionTrue": "true",
   "builder.conditionFalse": "false",
   "builder.addQuestion": "Add question",
+  "builder.pages": "Page manager",
+  "builder.enablePages": "Enable multi-step pages",
+  "builder.addPage": "Add page",
+  "builder.newPage": "New page",
+  "builder.pageTitle": "Page title",
+  "builder.pageDescription": "Page description",
+  "builder.pageQuestion": "Question to move to the new page",
+  "builder.questionPage": "Page",
+  "builder.pageCondition": "Page display condition",
+  "builder.localization": "Localization",
+  "builder.defaultLocale": "Default locale",
+  "builder.supportedLocales": "Supported locales",
+  "builder.addLocale": "Add locale",
+  "builder.editLocale": "Edit locale",
+  "builder.autoTranslate": "Translate all text",
+  "builder.translationUnavailable": "Provide an async translation adapter to enable automatic translation.",
   "builder.fieldType.text": "Text",
   "builder.fieldType.textarea": "Textarea",
   "builder.fieldType.number": "Number",
@@ -117,6 +145,10 @@ const sharedJapanese: TranslationCatalog = {
   "form.title": "お客様アンケート",
   "form.description": "ご利用体験についてお聞かせください。必須項目には印があります。",
   "form.submit": "回答を送信",
+  "form.back": "戻る",
+  "form.next": "次へ",
+  "form.step": "ステップ {{current}} / {{total}}",
+  "form.draftRestored": "下書きを復元しました",
   "field.name.label": "お名前",
   "field.name.help": "{{min}}文字以上で入力してください。",
   "field.name.placeholder": "山田 太郎",
@@ -184,6 +216,14 @@ const sharedJapanese: TranslationCatalog = {
   "preview.resetSuccess": "このフォームの回答をすべて削除しました。",
   "preview.resetError": "回答を削除できませんでした。",
   "preview.resetUnavailable": "選択中のストレージは回答リセットに対応していません。",
+  "preview.crossTab": "クロス集計",
+  "preview.rowQuestion": "行の質問",
+  "preview.colQuestion": "列の質問",
+  "preview.webhook": "Webhookシミュレーション",
+  "preview.webhookUrl": "Webhook URL",
+  "preview.simulateWebhook": "イベントを模擬送信",
+  "preview.webhookSuccess": "Webhookの模擬送信に成功しました。",
+  "preview.webhookError": "Webhookの模擬送信に失敗しました。",
   "builder.formBuilder": "フォームビルダー",
   "builder.moveUp": "「{{title}}」を上へ移動",
   "builder.moveDown": "「{{title}}」を下へ移動",
@@ -209,6 +249,22 @@ const sharedJapanese: TranslationCatalog = {
   "builder.conditionTrue": "はい",
   "builder.conditionFalse": "いいえ",
   "builder.addQuestion": "質問を追加",
+  "builder.pages": "ページ管理",
+  "builder.enablePages": "マルチステップを有効化",
+  "builder.addPage": "ページを追加",
+  "builder.newPage": "新しいページ",
+  "builder.pageTitle": "ページタイトル",
+  "builder.pageDescription": "説明",
+  "builder.pageQuestion": "新しいページへ移動する質問",
+  "builder.questionPage": "所属ページ",
+  "builder.pageCondition": "ページ表示条件",
+  "builder.localization": "多言語管理",
+  "builder.defaultLocale": "デフォルト言語",
+  "builder.supportedLocales": "対応言語",
+  "builder.addLocale": "言語を追加",
+  "builder.editLocale": "編集する言語",
+  "builder.autoTranslate": "すべて自動翻訳",
+  "builder.translationUnavailable": "自動翻訳を有効にするには非同期翻訳アダプターを指定してください。",
   "builder.fieldType.text": "テキスト",
   "builder.fieldType.textarea": "テキストエリア",
   "builder.fieldType.number": "数値",
@@ -240,3 +296,16 @@ export function createMockTranslationAdapter(
 }
 
 export const mockTranslator = createMockTranslationAdapter();
+
+export function createMockAsyncTranslationAdapter(): AsyncTranslationAdapter {
+  return {
+    async translateText(text, targetLocale) {
+      return `[${targetLocale}] ${text}`;
+    },
+    async translateBatch(texts, targetLocale) {
+      return texts.map((text) => `[${targetLocale}] ${text}`);
+    }
+  };
+}
+
+export const mockAsyncTranslator = createMockAsyncTranslationAdapter();

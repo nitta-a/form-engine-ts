@@ -38,3 +38,15 @@ export function ContactForm() {
 ```
 
 Use any compatible `TranslationAdapter` in place of the mock translator.
+
+Define `schema.pages` to enable Back/Next navigation, page validation, conditional page skipping, and an accessible
+progress indicator. Pass `autoSaveKey` to persist a versioned draft in `localStorage` after a 500ms debounce and restore it
+on the next mount:
+
+```tsx
+<FormRenderer autoSaveKey={`contact-draft:${schema.version}`} />
+```
+
+`FormProvider` resolves authoring-time translations synchronously whenever `locale` changes. `FormBuilder` includes page
+membership controls and localization editors; pass an `AsyncTranslationAdapter` as `translationAdapter` to enable its
+batch-translation action.

@@ -23,3 +23,9 @@ const schema: FormSchema = {
 
 const result = createZodFormSchema(schema).safeParse({ name: "Ada" });
 ```
+
+Generate a validator for one wizard page while preserving passthrough values from other pages:
+
+```ts
+const firstPageResult = createZodFormSchema(schema, { pageIndex: 0 }).safeParse(values);
+```

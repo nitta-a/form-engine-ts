@@ -4,14 +4,16 @@ import App from "./App";
 
 async function submitCompleteResponse(user: ReturnType<typeof userEvent.setup>) {
   const respondent = within(screen.getByRole("tabpanel"));
-  await user.type(respondent.getByLabelText(/^お名前/), "Ada");
-  await user.type(respondent.getByLabelText(/^参照コード/), "ABC123");
-  await user.type(respondent.getByLabelText(/^年齢/), "36");
-  await user.selectOptions(respondent.getByLabelText(/^担当チーム/), "opt_a1b2c3d4");
-  await user.click(respondent.getByLabelText("メール"));
-  await user.click(respondent.getByLabelText(/この回答を分析/));
-  await user.click(respondent.getByLabelText("はい"));
+  await user.type(respondent.getByLabelText(/^Your name/), "Ada");
+  await user.type(respondent.getByLabelText(/^Reference code/), "ABC123");
+  await user.type(respondent.getByLabelText(/^Age/), "36");
+  await user.click(respondent.getByRole("button", { name: "Next" }));
+  await user.selectOptions(respondent.getByLabelText(/^Team/), "opt_a1b2c3d4");
+  await user.click(respondent.getByLabelText("Email"));
+  await user.click(respondent.getByLabelText("Yes"));
   await user.click(respondent.getByLabelText("5"));
+  await user.click(respondent.getByRole("button", { name: "Next" }));
+  await user.click(respondent.getByLabelText(/I agree that this response/));
   await user.click(respondent.getByRole("button", { name: "Send response" }));
   await waitFor(() => expect(respondent.getByRole("status")).toHaveTextContent("Response saved"));
 }
@@ -54,7 +56,7 @@ describe("preview application", () => {
     await waitFor(() => expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("0"));
     expect(screen.getByRole("status")).toHaveTextContent("All responses");
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
-    expect(within(screen.getByRole("tabpanel")).getByLabelText(/^お名前/)).toHaveValue("");
+    expect(within(screen.getByRole("tabpanel")).getByLabelText(/^Your name/)).toHaveValue("");
   });
 
   it("switches storage and keeps builder JSON synchronized", async () => {
@@ -101,6 +103,17 @@ describe("preview application", () => {
       Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
       Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
     }
+  });
+
+  it("renders cross-tabulation controls and simulates a webhook without network access", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+    expect(screen.getByRole("heading", { name: "Cross tabulation" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Row question")).toBeInTheDocument();
+    expect(screen.getByLabelText("Column question")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Send simulated event" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("simulated webhook was accepted"));
   });
 
   it("clears LocalStorage responses from the respondent tab", async () => {

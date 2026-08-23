@@ -1,4 +1,4 @@
-import type { FormField, FormSchema, FormValues } from "./types";
+import type { DisplayCondition, FormField, FormSchema, FormValues } from "./types";
 
 function isEmpty(value: unknown): boolean {
   if (value === undefined || value === null) return true;
@@ -19,7 +19,13 @@ function valuesEqual(left: unknown, right: unknown): boolean {
 }
 
 export function isQuestionVisible(question: FormField, currentAnswers: Readonly<Record<string, unknown>>): boolean {
-  const condition = question.displayCondition;
+  return isDisplayConditionSatisfied(question.displayCondition, currentAnswers);
+}
+
+export function isDisplayConditionSatisfied(
+  condition: DisplayCondition | undefined,
+  currentAnswers: Readonly<Record<string, unknown>>
+): boolean {
   if (condition === undefined) return true;
   const answer = currentAnswers[condition.questionId];
   if (isEmpty(answer)) return false;
@@ -34,14 +40,13 @@ export function isQuestionVisible(question: FormField, currentAnswers: Readonly<
   return Array.isArray(answer) && answer.some((item) => valuesEqual(item, condition.value));
 }
 
-export function calculateFieldVisibility(
+function calculateBaseFieldVisibility(
   schema: FormSchema,
   currentAnswers: Readonly<Record<string, unknown>>
 ): Readonly<Record<string, boolean>> {
   const fields = new Map(schema.fields.map((field) => [field.id, field]));
   const resolved = new Map<string, boolean>();
   const resolving = new Set<string>();
-
   const resolve = (field: FormField): boolean => {
     const existing = resolved.get(field.id);
     if (existing !== undefined) return existing;
@@ -55,9 +60,45 @@ export function calculateFieldVisibility(
     resolved.set(field.id, visible);
     return visible;
   };
-
   for (const field of schema.fields) resolve(field);
-  return Object.freeze(Object.fromEntries(resolved));
+  return Object.fromEntries(resolved);
+}
+
+export function calculatePageVisibility(
+  schema: FormSchema,
+  currentAnswers: Readonly<Record<string, unknown>>
+): Readonly<Record<string, boolean>> {
+  if (schema.pages === undefined || schema.pages.length === 0) return {};
+  const baseFieldVisibility = calculateBaseFieldVisibility(schema, currentAnswers);
+  const pageByQuestion = new Map(schema.pages.flatMap((page) => page.questionIds.map((id) => [id, page.id] as const)));
+  const pageVisibility: Record<string, boolean> = {};
+  for (const page of schema.pages) {
+    const sourceId = page.displayCondition?.questionId;
+    const sourcePageId = sourceId === undefined ? undefined : pageByQuestion.get(sourceId);
+    const sourceVisible =
+      sourceId === undefined ||
+      (baseFieldVisibility[sourceId] === true && sourcePageId !== undefined && pageVisibility[sourcePageId] === true);
+    pageVisibility[page.id] = sourceVisible && isDisplayConditionSatisfied(page.displayCondition, currentAnswers);
+  }
+  return Object.freeze(pageVisibility);
+}
+
+export function calculateFieldVisibility(
+  schema: FormSchema,
+  currentAnswers: Readonly<Record<string, unknown>>
+): Readonly<Record<string, boolean>> {
+  const baseVisibility = calculateBaseFieldVisibility(schema, currentAnswers);
+  if (schema.pages === undefined || schema.pages.length === 0) return Object.freeze(baseVisibility);
+  const pageVisibility = calculatePageVisibility(schema, currentAnswers);
+  const pageByQuestion = new Map(schema.pages.flatMap((page) => page.questionIds.map((id) => [id, page.id] as const)));
+  return Object.freeze(
+    Object.fromEntries(
+      schema.fields.map((field) => {
+        const pageId = pageByQuestion.get(field.id);
+        return [field.id, baseVisibility[field.id] === true && pageId !== undefined && pageVisibility[pageId] === true];
+      })
+    )
+  );
 }
 
 export function selectVisibleAnswers(schema: FormSchema, currentAnswers: FormValues): FormValues {

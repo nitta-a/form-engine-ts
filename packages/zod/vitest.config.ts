@@ -6,9 +6,5 @@ export default defineConfig({
     alias: {
       "@form-engine-ts/core": fileURLToPath(new URL("../core/src/index.ts", import.meta.url))
     }
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./test/setup.ts"]
   }
 });

@@ -147,4 +147,30 @@ describe("createZodFormSchema", () => {
   it("rejects a malformed FormSchema when creating the validator", () => {
     expect(() => createZodFormSchema({ ...schema, fields: [] })).toThrow(TypeError);
   });
+
+  it("creates a page-scoped validator without rejecting answers from other pages", () => {
+    const paged: FormSchema = {
+      id: "paged",
+      version: 1,
+      title: "paged",
+      fields: [
+        { id: "first", type: "text", title: "first", required: true },
+        { id: "second", type: "text", title: "second", required: true }
+      ],
+      pages: [
+        { id: "one", questionIds: ["first"] },
+        { id: "two", questionIds: ["second"] }
+      ]
+    };
+    const firstPage = createZodFormSchema(paged, { pageIndex: 0 });
+    expect(hasCoreIssue(firstPage.safeParse({ second: "kept" }), "required")).toBe(true);
+    expect(firstPage.safeParse({ first: "done", second: "kept", external: true })).toEqual({
+      success: true,
+      data: { first: "done", second: "kept", external: true }
+    });
+    expect(createZodFormSchema(paged, { pageIndex: 99 }).safeParse({ external: true })).toEqual({
+      success: true,
+      data: { external: true }
+    });
+  });
 });

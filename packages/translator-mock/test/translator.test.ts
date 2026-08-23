@@ -1,4 +1,4 @@
-import { createMockTranslationAdapter, mockTranslator } from "../src";
+import { createMockAsyncTranslationAdapter, createMockTranslationAdapter, mockTranslator } from "../src";
 
 describe("createMockTranslationAdapter", () => {
   it("serves complete English and Japanese form catalogs", () => {
@@ -14,5 +14,13 @@ describe("createMockTranslationAdapter", () => {
     const translator = createMockTranslationAdapter({ en: { greeting: "Hello" }, ja: {} });
     expect(translator.translate("greeting", "ja")).toBe("Hello");
     expect(translator.translate("missing", "ja")).toBe("missing");
+  });
+});
+
+describe("createMockAsyncTranslationAdapter", () => {
+  it("returns deterministic single and batch translations", async () => {
+    const translator = createMockAsyncTranslationAdapter();
+    await expect(translator.translateText("Hello", "ja")).resolves.toBe("[ja] Hello");
+    await expect(translator.translateBatch(["One", "Two"], "ja")).resolves.toEqual(["[ja] One", "[ja] Two"]);
   });
 });

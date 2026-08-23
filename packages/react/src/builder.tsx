@@ -1,14 +1,17 @@
-import type {
-  ConditionOperator,
-  ConditionValue,
-  DisplayCondition,
-  FieldOption,
-  FieldType,
-  FormField,
-  FormSchema,
-  TranslationAdapter
+import {
+  type AsyncTranslationAdapter,
+  type ConditionOperator,
+  type ConditionValue,
+  type DisplayCondition,
+  type FieldOption,
+  type FieldType,
+  type FormField,
+  type FormSchema,
+  populateSchemaTranslations,
+  sanitizeSchema,
+  type TranslationAdapter
 } from "@form-engine-ts/core";
-import { sanitizeSchema } from "@form-engine-ts/core";
+import { useState } from "react";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",
@@ -47,6 +50,22 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.conditionTrue": "true",
   "builder.conditionFalse": "false",
   "builder.addQuestion": "Add question",
+  "builder.pages": "Page manager",
+  "builder.enablePages": "Enable multi-step pages",
+  "builder.addPage": "Add page",
+  "builder.newPage": "New page",
+  "builder.pageTitle": "Page title",
+  "builder.pageDescription": "Page description",
+  "builder.pageQuestion": "Question to move to the new page",
+  "builder.questionPage": "Page",
+  "builder.pageCondition": "Page display condition",
+  "builder.localization": "Localization",
+  "builder.defaultLocale": "Default locale",
+  "builder.supportedLocales": "Supported locales",
+  "builder.addLocale": "Add locale",
+  "builder.editLocale": "Edit locale",
+  "builder.autoTranslate": "Translate all text",
+  "builder.translationUnavailable": "Provide an async translation adapter to enable automatic translation.",
   "builder.fieldType.text": "Text",
   "builder.fieldType.textarea": "Textarea",
   "builder.fieldType.number": "Number",
@@ -75,7 +94,7 @@ function operatorKey(operator: ConditionOperator): string {
   return `builder.operator.${operator}`;
 }
 
-function createUniqueId(prefix: "q" | "opt", existingIds: ReadonlySet<string>): string {
+function createUniqueId(prefix: "q" | "opt" | "page", existingIds: ReadonlySet<string>): string {
   let id: string;
   do {
     id = `${prefix}_${globalThis.crypto.randomUUID().slice(0, 8)}`;
@@ -131,14 +150,23 @@ function withoutDisplayCondition(field: FormField): FormField {
 function sanitizeBuilderSchema(schema: FormSchema): FormSchema {
   const sanitized = sanitizeSchema(schema);
   const indexById = new Map(sanitized.fields.map((field, index) => [field.id, index]));
+  const fields = sanitized.fields.map((field, index) => {
+    const sourceId = field.displayCondition?.questionId;
+    if (sourceId === undefined) return field;
+    const sourceIndex = indexById.get(sourceId);
+    return sourceIndex !== undefined && sourceIndex < index ? field : withoutDisplayCondition(field);
+  });
   return {
     ...sanitized,
-    fields: sanitized.fields.map((field, index) => {
-      const sourceId = field.displayCondition?.questionId;
-      if (sourceId === undefined) return field;
-      const sourceIndex = indexById.get(sourceId);
-      return sourceIndex !== undefined && sourceIndex < index ? field : withoutDisplayCondition(field);
-    })
+    fields,
+    ...(sanitized.pages === undefined
+      ? {}
+      : {
+          pages: sanitized.pages.map((page) => ({
+            ...page,
+            questionIds: fields.filter((field) => page.questionIds.includes(field.id)).map((field) => field.id)
+          }))
+        })
   };
 }
 
@@ -203,9 +231,15 @@ export interface FormBuilderProps {
   readonly onChange: (newSchema: FormSchema) => void;
   readonly locale?: string;
   readonly translator?: TranslationAdapter;
+  readonly translationAdapter?: AsyncTranslationAdapter;
 }
 
-export function FormBuilder({ schema, onChange, locale = "en", translator }: FormBuilderProps) {
+export function FormBuilder({ schema, onChange, locale = "en", translator, translationAdapter }: FormBuilderProps) {
+  const [newPageQuestionId, setNewPageQuestionId] = useState("");
+  const [newLocale, setNewLocale] = useState("");
+  const [editingLocale, setEditingLocale] = useState("");
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
   const translate = (key: string, params: Readonly<Record<string, string | number>> = {}) => {
     const translated = translator?.translate(key, locale, params);
     return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
@@ -251,14 +285,449 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
 
   const addField = () => {
     const id = createUniqueId("q", new Set(schema.fields.map((field) => field.id)));
-    emitSchema({
+    const nextSchema: FormSchema = {
       ...schema,
       fields: [...schema.fields, { id, type: "text", title: translate("builder.newQuestionTitle"), required: false }]
+    };
+    emitSchema(
+      schema.pages === undefined
+        ? nextSchema
+        : {
+            ...nextSchema,
+            pages: schema.pages.map((page, index) =>
+              index === (schema.pages?.length ?? 0) - 1 ? { ...page, questionIds: [...page.questionIds, id] } : page
+            )
+          }
+    );
+  };
+
+  const enablePages = () => {
+    if (schema.pages !== undefined) return;
+    emitSchema({
+      ...schema,
+      pages: [
+        {
+          id: createUniqueId("page", new Set()),
+          title: translate("builder.newPage"),
+          questionIds: schema.fields.map((field) => field.id)
+        }
+      ]
+    });
+  };
+
+  const pageForField = (fieldId: string) => schema.pages?.find((page) => page.questionIds.includes(fieldId));
+  const movablePageQuestions =
+    schema.pages?.flatMap((page) => (page.questionIds.length > 1 ? page.questionIds : [])) ?? [];
+
+  const addPage = () => {
+    if (schema.pages === undefined) {
+      enablePages();
+      return;
+    }
+    const questionId = movablePageQuestions.includes(newPageQuestionId) ? newPageQuestionId : movablePageQuestions[0];
+    if (questionId === undefined) return;
+    const pageId = createUniqueId("page", new Set(schema.pages.map((page) => page.id)));
+    emitSchema({
+      ...schema,
+      pages: [
+        ...schema.pages.map((page) => ({
+          ...page,
+          questionIds: page.questionIds.filter((id) => id !== questionId)
+        })),
+        { id: pageId, title: translate("builder.newPage"), questionIds: [questionId] }
+      ]
+    });
+    setNewPageQuestionId("");
+  };
+
+  const removePage = (pageIndex: number) => {
+    if (schema.pages === undefined) return;
+    const removed = schema.pages[pageIndex];
+    if (removed === undefined) return;
+    if (schema.pages.length === 1) {
+      const { pages: _pages, ...singlePage } = schema;
+      emitSchema(singlePage);
+      return;
+    }
+    const targetIndex = pageIndex === 0 ? 1 : pageIndex - 1;
+    emitSchema({
+      ...schema,
+      pages: schema.pages
+        .map((page, index) =>
+          index === targetIndex ? { ...page, questionIds: [...page.questionIds, ...removed.questionIds] } : page
+        )
+        .filter((_page, index) => index !== pageIndex)
+    });
+  };
+
+  const movePage = (pageIndex: number, offset: -1 | 1) => {
+    if (schema.pages === undefined) return;
+    const target = pageIndex + offset;
+    if (target < 0 || target >= schema.pages.length) return;
+    const pages = [...schema.pages];
+    const current = pages[pageIndex];
+    const other = pages[target];
+    if (current === undefined || other === undefined) return;
+    pages[pageIndex] = other;
+    pages[target] = current;
+    emitSchema({ ...schema, pages });
+  };
+
+  const updatePage = (
+    pageId: string,
+    update: (page: NonNullable<FormSchema["pages"]>[number]) => NonNullable<FormSchema["pages"]>[number]
+  ) => {
+    if (schema.pages === undefined) return;
+    emitSchema({ ...schema, pages: schema.pages.map((page) => (page.id === pageId ? update(page) : page)) });
+  };
+
+  const assignFieldToPage = (fieldId: string, pageId: string) => {
+    if (schema.pages === undefined) return;
+    emitSchema({
+      ...schema,
+      pages: schema.pages
+        .map((page) => ({
+          ...page,
+          questionIds:
+            page.id === pageId
+              ? schema.fields
+                  .filter((field) => page.questionIds.includes(field.id) || field.id === fieldId)
+                  .map((field) => field.id)
+              : page.questionIds.filter((id) => id !== fieldId)
+        }))
+        .filter((page) => page.questionIds.length > 0)
+    });
+  };
+
+  const addLocale = () => {
+    const normalized = newLocale.trim();
+    if (normalized.length === 0) return;
+    const supportedLocales = [
+      ...new Set([
+        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+        ...(schema.supportedLocales ?? []),
+        normalized
+      ])
+    ];
+    emitSchema({ ...schema, supportedLocales });
+    setEditingLocale(normalized);
+    setNewLocale("");
+  };
+
+  const translateAll = async () => {
+    if (translationAdapter === undefined || editingLocale.length === 0) return;
+    setIsTranslating(true);
+    setTranslationError(null);
+    try {
+      onChange(await populateSchemaTranslations(schema, [editingLocale], translationAdapter));
+    } catch (cause) {
+      setTranslationError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const updateFormTranslation = (key: "title" | "description", value: string) => {
+    if (editingLocale.length === 0) return;
+    const current = schema.translations?.[editingLocale];
+    const next =
+      key === "title"
+        ? value.length === 0
+          ? { description: current?.description }
+          : { ...current, title: value }
+        : value.length === 0
+          ? { title: current?.title }
+          : { ...current, description: value };
+    emitSchema({
+      ...schema,
+      translations: {
+        ...schema.translations,
+        [editingLocale]: {
+          ...(next.title === undefined ? {} : { title: next.title }),
+          ...(next.description === undefined ? {} : { description: next.description })
+        }
+      }
     });
   };
 
   return (
     <section className="form-engine-builder" aria-label={translate("builder.formBuilder")}>
+      <section className="form-engine-builder__pages" aria-labelledby="builder-pages-heading">
+        <h2 id="builder-pages-heading">{translate("builder.pages")}</h2>
+        {schema.pages === undefined ? (
+          <button type="button" onClick={enablePages}>
+            {translate("builder.enablePages")}
+          </button>
+        ) : (
+          <>
+            {schema.pages.map((page, pageIndex) => {
+              const priorQuestionIds = new Set(schema.pages?.slice(0, pageIndex).flatMap((item) => item.questionIds));
+              const availableSources = schema.fields.filter((field) => priorQuestionIds.has(field.id));
+              const source = schema.fields.find((field) => field.id === page.displayCondition?.questionId);
+              return (
+                <fieldset className="form-engine-builder__page" key={page.id}>
+                  <legend>{page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}</legend>
+                  <div className="form-engine-builder__toolbar">
+                    <button
+                      type="button"
+                      disabled={pageIndex === 0}
+                      aria-label={translate("builder.moveUp", { title: page.title ?? page.id })}
+                      onClick={() => movePage(pageIndex, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pageIndex === (schema.pages?.length ?? 0) - 1}
+                      aria-label={translate("builder.moveDown", { title: page.title ?? page.id })}
+                      onClick={() => movePage(pageIndex, 1)}
+                    >
+                      ↓
+                    </button>
+                    <button type="button" onClick={() => removePage(pageIndex)}>
+                      {translate("builder.deleteAction")}
+                    </button>
+                  </div>
+                  <div className="form-engine-builder__grid">
+                    <label>
+                      {translate("builder.pageTitle")}
+                      <input
+                        value={page.title ?? ""}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          updatePage(page.id, (current) => {
+                            if (value.length > 0) return { ...current, title: value };
+                            const { title: _title, ...withoutTitle } = current;
+                            return withoutTitle;
+                          });
+                        }}
+                      />
+                    </label>
+                    <label>
+                      {translate("builder.pageDescription")}
+                      <input
+                        value={page.description ?? ""}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          updatePage(page.id, (current) => {
+                            if (value.length > 0) return { ...current, description: value };
+                            const { description: _description, ...withoutDescription } = current;
+                            return withoutDescription;
+                          });
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {editingLocale.length === 0 ? null : (
+                    <div className="form-engine-builder__translation-editor">
+                      <strong>{editingLocale}</strong>
+                      <div className="form-engine-builder__grid">
+                        <label>
+                          {translate("builder.pageTitle")}
+                          <input
+                            value={page.translations?.[editingLocale]?.title ?? ""}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              updatePage(page.id, (current) => ({
+                                ...current,
+                                translations: {
+                                  ...current.translations,
+                                  [editingLocale]: {
+                                    ...(value.length === 0 ? {} : { title: value }),
+                                    ...(current.translations?.[editingLocale]?.description === undefined
+                                      ? {}
+                                      : { description: current.translations[editingLocale]?.description })
+                                  }
+                                }
+                              }));
+                            }}
+                          />
+                        </label>
+                        <label>
+                          {translate("builder.pageDescription")}
+                          <input
+                            value={page.translations?.[editingLocale]?.description ?? ""}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              updatePage(page.id, (current) => ({
+                                ...current,
+                                translations: {
+                                  ...current.translations,
+                                  [editingLocale]: {
+                                    ...(current.translations?.[editingLocale]?.title === undefined
+                                      ? {}
+                                      : { title: current.translations[editingLocale]?.title }),
+                                    ...(value.length === 0 ? {} : { description: value })
+                                  }
+                                }
+                              }));
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                  <div className="form-engine-builder__condition">
+                    <label>
+                      {translate("builder.pageCondition")}
+                      <select
+                        value={page.displayCondition?.questionId ?? ""}
+                        onChange={(event) => {
+                          const selected = schema.fields.find((field) => field.id === event.currentTarget.value);
+                          updatePage(page.id, (current) => {
+                            if (selected === undefined) {
+                              const { displayCondition: _condition, ...withoutCondition } = current;
+                              return withoutCondition;
+                            }
+                            return {
+                              ...current,
+                              displayCondition: conditionWithValue(
+                                selected.id,
+                                conditionOperators(selected)[0] ?? "not_empty",
+                                defaultConditionValue(selected)
+                              )
+                            };
+                          });
+                        }}
+                      >
+                        <option value="">{translate("builder.alwaysVisible")}</option>
+                        {availableSources.map((field) => (
+                          <option value={field.id} key={field.id}>
+                            {field.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {page.displayCondition !== undefined && source !== undefined ? (
+                      <>
+                        <select
+                          aria-label={translate("builder.conditionOperator")}
+                          value={page.displayCondition.operator}
+                          onChange={(event) => {
+                            const operator = event.currentTarget.value as ConditionOperator;
+                            updatePage(page.id, (current) => ({
+                              ...current,
+                              displayCondition: conditionWithValue(source.id, operator, defaultConditionValue(source))
+                            }));
+                          }}
+                        >
+                          {conditionOperators(source).map((operator) => (
+                            <option key={operator} value={operator}>
+                              {translate(operatorKey(operator))}
+                            </option>
+                          ))}
+                        </select>
+                        <ConditionValueEditor
+                          source={source}
+                          condition={page.displayCondition}
+                          onChange={(condition) =>
+                            updatePage(page.id, (current) => ({ ...current, displayCondition: condition }))
+                          }
+                          translate={translate}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                </fieldset>
+              );
+            })}
+            <div className="form-engine-builder__page-add">
+              <label>
+                {translate("builder.pageQuestion")}
+                <select
+                  value={newPageQuestionId}
+                  disabled={movablePageQuestions.length === 0}
+                  onChange={(event) => setNewPageQuestionId(event.currentTarget.value)}
+                >
+                  <option value="">—</option>
+                  {schema.fields
+                    .filter((field) => movablePageQuestions.includes(field.id))
+                    .map((field) => (
+                      <option key={field.id} value={field.id}>
+                        {field.title}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button type="button" disabled={movablePageQuestions.length === 0} onClick={addPage}>
+                {translate("builder.addPage")}
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className="form-engine-builder__localization" aria-labelledby="builder-localization-heading">
+        <h2 id="builder-localization-heading">{translate("builder.localization")}</h2>
+        <div className="form-engine-builder__grid">
+          <label>
+            {translate("builder.defaultLocale")}
+            <input
+              value={schema.defaultLocale ?? ""}
+              onChange={(event) => {
+                const value = event.currentTarget.value.trim();
+                emitSchema(
+                  value.length === 0
+                    ? schema
+                    : {
+                        ...schema,
+                        defaultLocale: value,
+                        supportedLocales: [...new Set([value, ...(schema.supportedLocales ?? [])])]
+                      }
+                );
+              }}
+            />
+          </label>
+          <label>
+            {translate("builder.addLocale")}
+            <input value={newLocale} onChange={(event) => setNewLocale(event.currentTarget.value)} />
+          </label>
+          <button type="button" onClick={addLocale}>
+            {translate("builder.addLocale")}
+          </button>
+          <label>
+            {translate("builder.editLocale")}
+            <select value={editingLocale} onChange={(event) => setEditingLocale(event.currentTarget.value)}>
+              <option value="">—</option>
+              {(schema.supportedLocales ?? [])
+                .filter((item) => item !== schema.defaultLocale)
+                .map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={translationAdapter === undefined || editingLocale.length === 0 || isTranslating}
+            onClick={() => void translateAll()}
+          >
+            {translate("builder.autoTranslate")}
+          </button>
+        </div>
+        {translationAdapter === undefined ? <p>{translate("builder.translationUnavailable")}</p> : null}
+        {translationError === null ? null : <p className="form-engine-builder__error">{translationError}</p>}
+        {editingLocale.length === 0 ? null : (
+          <div className="form-engine-builder__grid">
+            <label>
+              {translate("builder.questionTitle")}
+              <input
+                value={schema.translations?.[editingLocale]?.title ?? ""}
+                onChange={(event) => updateFormTranslation("title", event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              {translate("builder.pageDescription")}
+              <input
+                value={schema.translations?.[editingLocale]?.description ?? ""}
+                onChange={(event) => updateFormTranslation("description", event.currentTarget.value)}
+              />
+            </label>
+          </div>
+        )}
+      </section>
+
       <div className="form-engine-builder__list">
         {schema.fields.map((field, index) => {
           const condition = field.displayCondition;
@@ -332,6 +801,104 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
                   {translate("builder.required")}
                 </label>
               </div>
+
+              {schema.pages === undefined ? null : (
+                <label>
+                  {translate("builder.questionPage")}
+                  <select
+                    value={pageForField(field.id)?.id ?? ""}
+                    onChange={(event) => assignFieldToPage(field.id, event.currentTarget.value)}
+                  >
+                    {schema.pages.map((page, pageIndex) => (
+                      <option key={page.id} value={page.id}>
+                        {page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {editingLocale.length === 0 ? null : (
+                <div className="form-engine-builder__translation-editor">
+                  <strong>{editingLocale}</strong>
+                  <div className="form-engine-builder__grid">
+                    <label>
+                      {translate("builder.questionTitle")}
+                      <input
+                        value={field.translations?.[editingLocale]?.title ?? ""}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          updateField(field.id, (current) => ({
+                            ...current,
+                            translations: {
+                              ...current.translations,
+                              [editingLocale]: {
+                                ...(value.length === 0 ? {} : { title: value }),
+                                ...(current.translations?.[editingLocale]?.description === undefined
+                                  ? {}
+                                  : { description: current.translations[editingLocale]?.description })
+                              }
+                            }
+                          }));
+                        }}
+                      />
+                    </label>
+                    <label>
+                      {translate("builder.pageDescription")}
+                      <input
+                        value={field.translations?.[editingLocale]?.description ?? ""}
+                        onChange={(event) => {
+                          const value = event.currentTarget.value;
+                          updateField(field.id, (current) => ({
+                            ...current,
+                            translations: {
+                              ...current.translations,
+                              [editingLocale]: {
+                                ...(current.translations?.[editingLocale]?.title === undefined
+                                  ? {}
+                                  : { title: current.translations[editingLocale]?.title }),
+                                ...(value.length === 0 ? {} : { description: value })
+                              }
+                            }
+                          }));
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {"options" in field
+                    ? field.options.map((option, optionIndex) => (
+                        <label key={option.id}>
+                          {translate("builder.optionLabel", { index: optionIndex + 1 })} ({editingLocale})
+                          <input
+                            value={option.translations?.[editingLocale] ?? ""}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              updateField(field.id, (current) => {
+                                if (!("options" in current)) return current;
+                                return {
+                                  ...current,
+                                  options: current.options.map((candidate) =>
+                                    candidate.id === option.id
+                                      ? {
+                                          ...candidate,
+                                          translations: Object.fromEntries([
+                                            ...Object.entries(candidate.translations ?? {}).filter(
+                                              ([localeKey]) => localeKey !== editingLocale
+                                            ),
+                                            ...(value.length === 0 ? [] : [[editingLocale, value] as const])
+                                          ])
+                                        }
+                                      : candidate
+                                  )
+                                };
+                              });
+                            }}
+                          />
+                        </label>
+                      ))
+                    : null}
+                </div>
+              )}
 
               {field.type === "rating" ? (
                 <div className="form-engine-builder__grid">

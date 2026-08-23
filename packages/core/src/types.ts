@@ -9,6 +9,13 @@ export interface DisplayCondition {
   readonly value?: ConditionValue;
 }
 
+export interface LocalizedText {
+  readonly title?: string;
+  readonly description?: string;
+}
+
+export type SchemaTranslations = Readonly<Record<string, LocalizedText>>;
+
 export type ValidationCode =
   | "required"
   | "invalid_type"
@@ -26,6 +33,7 @@ export type ValidationCode =
 export interface FieldOption {
   readonly id: string;
   readonly label: string;
+  readonly translations?: Readonly<Record<string, string>>;
 }
 
 export interface BaseField {
@@ -37,6 +45,7 @@ export interface BaseField {
   readonly required: boolean;
   readonly messages?: Partial<Record<ValidationCode, string>>;
   readonly displayCondition?: DisplayCondition;
+  readonly translations?: SchemaTranslations;
 }
 
 export interface TextField extends BaseField {
@@ -79,13 +88,26 @@ export interface CheckboxField extends BaseField {
 
 export type FormField = TextField | NumberField | RatingField | SelectField | MultiSelectField | CheckboxField;
 
+export interface FormPage {
+  readonly id: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly questionIds: readonly string[];
+  readonly displayCondition?: DisplayCondition;
+  readonly translations?: SchemaTranslations;
+}
+
 export interface FormSchema {
   readonly id: string;
   readonly version: number;
   readonly title: string;
   readonly description?: string;
   readonly submitLabelKey?: string;
+  readonly defaultLocale?: string;
+  readonly supportedLocales?: readonly string[];
+  readonly translations?: SchemaTranslations;
   readonly fields: readonly FormField[];
+  readonly pages?: readonly FormPage[];
 }
 
 export type FormValue = string | number | boolean | readonly string[] | undefined;
@@ -208,3 +230,12 @@ export type Question = FormField;
 export type QuestionType = FieldType;
 export type ChoiceOption = FieldOption;
 export type FormResponse = FormSubmission;
+
+export interface CrossTabulationResult {
+  readonly rowQuestionId: string;
+  readonly colQuestionId: string;
+  readonly matrix: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  readonly rowTotals: Readonly<Record<string, number>>;
+  readonly colTotals: Readonly<Record<string, number>>;
+  readonly grandTotal: number;
+}

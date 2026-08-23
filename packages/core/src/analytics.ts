@@ -1,6 +1,7 @@
 import { assertValidFormSchema } from "./schema";
 import type {
   ChoiceQuestionAggregate,
+  CrossTabulationResult,
   FormAnalytics,
   FormField,
   FormSchema,
@@ -52,6 +53,28 @@ export function calculateNumericSummary(responses: readonly FormSubmission[], qu
     min: numbers.length === 0 ? null : Math.min(...numbers),
     max: numbers.length === 0 ? null : Math.max(...numbers)
   };
+}
+
+export function calculateCrossTabulation(
+  responses: readonly FormSubmission[],
+  rowQuestionId: string,
+  colQuestionId: string
+): CrossTabulationResult {
+  const matrix: Record<string, Record<string, number>> = {};
+  const rowTotals: Record<string, number> = {};
+  const colTotals: Record<string, number> = {};
+  let grandTotal = 0;
+  for (const response of responses) {
+    const row = response.values[rowQuestionId];
+    const col = response.values[colQuestionId];
+    if (typeof row !== "string" || row.length === 0 || typeof col !== "string" || col.length === 0) continue;
+    matrix[row] ??= {};
+    matrix[row][col] = (matrix[row][col] ?? 0) + 1;
+    rowTotals[row] = (rowTotals[row] ?? 0) + 1;
+    colTotals[col] = (colTotals[col] ?? 0) + 1;
+    grandTotal += 1;
+  }
+  return { rowQuestionId, colQuestionId, matrix, rowTotals, colTotals, grandTotal };
 }
 
 function valueIsValid(field: FormField, value: FormValue): boolean {

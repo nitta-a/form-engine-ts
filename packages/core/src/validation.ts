@@ -148,3 +148,16 @@ export function validateAnswers(schema: FormSchema, values: FormValues): AnswerV
   }
   return issues.length === 0 ? { valid: true, issues: [] } : { valid: false, issues };
 }
+
+export function validatePageAnswers(schema: FormSchema, pageIndex: number, values: FormValues): AnswerValidationResult {
+  if (schema.pages === undefined || schema.pages.length === 0) return validateAnswers(schema, values);
+  const page = schema.pages[pageIndex];
+  if (page === undefined) return { valid: true, issues: [] };
+  const targetIds = new Set(page.questionIds);
+  const visibility = calculateFieldVisibility(schema, values);
+  const issues: ValidationIssue[] = [];
+  for (const field of schema.fields) {
+    if (targetIds.has(field.id) && visibility[field.id] === true) validateField(field, values[field.id], issues);
+  }
+  return issues.length === 0 ? { valid: true, issues: [] } : { valid: false, issues };
+}

@@ -1,19 +1,23 @@
 import {
   aggregateResponses,
+  calculateCrossTabulation,
   calculateFieldVisibility,
   createSubmission,
+  dispatchWebhook,
   exportResponsesToCsv,
   type FormAnalytics,
+  type FormEvent,
   type FormSchema,
   type FormStorageAdapter,
   type FormSubmission,
   type FormValues,
-  type QuestionAggregate
+  type QuestionAggregate,
+  type SelectField
 } from "@form-engine-ts/core";
 import { FormBuilder, FormProvider, FormRenderer } from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
-import { mockTranslator } from "@form-engine-ts/translator-mock";
+import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { customerFeedbackSchema } from "./schema";
 
@@ -137,6 +141,37 @@ function AnalyticsPanel({
 }) {
   const t = (key: string) => mockTranslator.translate(key, locale);
   const textFields = schema.fields.filter((field) => field.type === "text" || field.type === "textarea");
+  const singleChoiceFields = schema.fields.filter(
+    (field): field is SelectField => field.type === "select" || field.type === "radio"
+  );
+  const [rowQuestionId, setRowQuestionId] = useState(singleChoiceFields[0]?.id ?? "");
+  const [colQuestionId, setColQuestionId] = useState(singleChoiceFields[1]?.id ?? "");
+  const [webhookUrl, setWebhookUrl] = useState("https://example.test/form-engine-webhook");
+  const [webhookStatus, setWebhookStatus] = useState<string | null>(null);
+  const effectiveRowId = singleChoiceFields.some((field) => field.id === rowQuestionId)
+    ? rowQuestionId
+    : (singleChoiceFields[0]?.id ?? "");
+  const effectiveColId = singleChoiceFields.some((field) => field.id === colQuestionId)
+    ? colQuestionId
+    : (singleChoiceFields[1]?.id ?? singleChoiceFields[0]?.id ?? "");
+  const crossTab = useMemo(
+    () => calculateCrossTabulation(submissions, effectiveRowId, effectiveColId),
+    [effectiveColId, effectiveRowId, submissions]
+  );
+  const rowField = singleChoiceFields.find((field) => field.id === effectiveRowId);
+  const colField = singleChoiceFields.find((field) => field.id === effectiveColId);
+
+  const simulateWebhook = async () => {
+    const event: FormEvent = {
+      id: globalThis.crypto.randomUUID(),
+      type: "response.submitted",
+      formId: schema.id,
+      timestamp: new Date().toISOString(),
+      payload: { submissionCount: submissions.length }
+    };
+    const result = await dispatchWebhook(event, { url: webhookUrl }, async () => new Response(null, { status: 202 }));
+    setWebhookStatus(result.success ? t("preview.webhookSuccess") : (result.error ?? t("preview.webhookError")));
+  };
   return (
     <section className="workspace-card analytics-card" aria-labelledby="analytics-heading">
       <div className="analytics-heading">
@@ -155,6 +190,79 @@ function AnalyticsPanel({
         </button>
         {resetControl}
       </div>
+      <section className="analytics-tool" aria-labelledby="cross-tab-heading">
+        <h3 id="cross-tab-heading">{t("preview.crossTab")}</h3>
+        <div className="analytics-tool-controls">
+          <label>
+            {t("preview.rowQuestion")}
+            <select value={effectiveRowId} onChange={(event) => setRowQuestionId(event.currentTarget.value)}>
+              {singleChoiceFields.map((field) => (
+                <option key={field.id} value={field.id}>
+                  {field.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {t("preview.colQuestion")}
+            <select value={effectiveColId} onChange={(event) => setColQuestionId(event.currentTarget.value)}>
+              {singleChoiceFields.map((field) => (
+                <option key={field.id} value={field.id}>
+                  {field.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {rowField === undefined || colField === undefined ? null : (
+          <div className="cross-tab-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">{rowField.title}</th>
+                  {colField.options.map((option) => (
+                    <th scope="col" key={option.id}>
+                      {option.label}
+                    </th>
+                  ))}
+                  <th scope="col">{t("preview.total")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rowField.options.map((rowOption) => (
+                  <tr key={rowOption.id}>
+                    <th scope="row">{rowOption.label}</th>
+                    {colField.options.map((colOption) => (
+                      <td key={colOption.id}>{crossTab.matrix[rowOption.id]?.[colOption.id] ?? 0}</td>
+                    ))}
+                    <td>{crossTab.rowTotals[rowOption.id] ?? 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row">{t("preview.total")}</th>
+                  {colField.options.map((option) => (
+                    <td key={option.id}>{crossTab.colTotals[option.id] ?? 0}</td>
+                  ))}
+                  <td>{crossTab.grandTotal}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </section>
+      <section className="analytics-tool" aria-labelledby="webhook-heading">
+        <h3 id="webhook-heading">{t("preview.webhook")}</h3>
+        <label>
+          {t("preview.webhookUrl")}
+          <input value={webhookUrl} onChange={(event) => setWebhookUrl(event.currentTarget.value)} />
+        </label>
+        <button type="button" onClick={() => void simulateWebhook()}>
+          {t("preview.simulateWebhook")}
+        </button>
+        {webhookStatus === null ? null : <p role="status">{webhookStatus}</p>}
+      </section>
       {analytics.submissionCount === 0 ? (
         <p className="empty-state">{t("preview.noResponses")}</p>
       ) : (
@@ -412,7 +520,13 @@ export default function App() {
         <div id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden={activeTab !== "builder"}>
           <div className="builder-grid">
             <section className="workspace-card">
-              <FormBuilder schema={schema} locale={locale} translator={mockTranslator} onChange={changeSchema} />
+              <FormBuilder
+                schema={schema}
+                locale={locale}
+                translator={mockTranslator}
+                translationAdapter={mockAsyncTranslator}
+                onChange={changeSchema}
+              />
             </section>
             <section className="workspace-card json-card">
               <h2>{t("preview.schemaJson")}</h2>
@@ -431,7 +545,11 @@ export default function App() {
               onReset={resetResponses}
             />
             <FormProvider schema={schema} locale={locale} translator={mockTranslator} onSubmit={submit} resetOnSuccess>
-              <FormRenderer successMessageKey="preview.success" errorMessageKey="preview.error" />
+              <FormRenderer
+                successMessageKey="preview.success"
+                errorMessageKey="preview.error"
+                autoSaveKey={`form-engine-preview-draft:${schema.id}:${schema.version}`}
+              />
             </FormProvider>
           </section>
         </div>

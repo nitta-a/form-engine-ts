@@ -1,6 +1,6 @@
 # @form-engine-ts/translator-mock
 
-Synchronous English/Japanese translation adapter for form-engine-ts demos and tests, with interpolation and locale fallback.
+English/Japanese synchronous catalogs and deterministic asynchronous batch translation for form-engine-ts demos and tests.
 
 ## Install
 
@@ -20,3 +20,6 @@ const translator = createMockTranslationAdapter({
 
 translator.translate("greeting", "ja", { name: "Ada" });
 ```
+
+`mockAsyncTranslator` and `createMockAsyncTranslationAdapter()` provide deterministic batch output for exercising the
+FormBuilder pre-translation workflow without network access.
