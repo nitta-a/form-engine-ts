@@ -414,7 +414,7 @@ export default function App() {
         <div id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden={activeTab !== "builder"}>
           <div className="builder-grid">
             <section className="workspace-card">
-              <FormBuilder schema={schema} onChange={changeSchema} />
+              <FormBuilder schema={schema} locale={locale} translator={mockTranslator} onChange={changeSchema} />
             </section>
             <section className="workspace-card json-card">
               <h2>{t("preview.schemaJson")}</h2>

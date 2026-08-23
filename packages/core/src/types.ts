@@ -124,6 +124,11 @@ export interface TranslationAdapter {
   translate(key: string, locale: string, params?: Readonly<Record<string, string | number>>): string;
 }
 
+export interface AsyncTranslationAdapter {
+  translateText(text: string, targetLocale: string, sourceLocale?: string): Promise<string>;
+  translateBatch(texts: readonly string[], targetLocale: string, sourceLocale?: string): Promise<readonly string[]>;
+}
+
 export interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
   listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;

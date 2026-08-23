@@ -1,0 +1,28 @@
+{
+  "name": "@form-engine/zod",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external @form-engine/core --external zod",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@form-engine/core": "workspace:*",
+    "zod": "^3.23.0"
+  }
+}

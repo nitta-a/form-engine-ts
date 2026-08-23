@@ -52,7 +52,10 @@ jobs:
             "packages/core/package.json",
             "packages/react/package.json",
             "packages/storage-memory/package.json",
-            "packages/translator-mock/package.json"
+            "packages/storage-mongodb/package.json",
+            "packages/translator-deepl/package.json",
+            "packages/translator-mock/package.json",
+            "packages/zod/package.json"
           ];
 
           for (const path of packages) {

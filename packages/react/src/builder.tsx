@@ -5,7 +5,8 @@ import type {
   FieldOption,
   FieldType,
   FormField,
-  FormSchema
+  FormSchema,
+  TranslationAdapter
 } from "@form-engine/core";
 import { sanitizeSchema } from "@form-engine/core";
 import { useEffect, useId, useState } from "react";
@@ -20,6 +21,60 @@ const FIELD_TYPES: readonly FieldType[] = [
   "checkbox",
   "radio"
 ];
+
+const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
+  "builder.formBuilder": "Form builder",
+  "builder.questionId": "Question ID",
+  "builder.questionIdRequired": "Question ID is required.",
+  "builder.questionIdDuplicate": 'Question ID "{{id}}" is already in use.',
+  "builder.moveUp": "Move {{id}} up",
+  "builder.moveDown": "Move {{id}} down",
+  "builder.delete": "Delete {{id}}",
+  "builder.deleteAction": "Delete",
+  "builder.titleKey": "Title key",
+  "builder.type": "Type",
+  "builder.required": "Required",
+  "builder.minimum": "Minimum",
+  "builder.maximum": "Maximum",
+  "builder.options": "Options",
+  "builder.optionValue": "Option value {{index}}",
+  "builder.optionLabel": "Option label {{index}}",
+  "builder.remove": "Remove",
+  "builder.addOption": "Add option",
+  "builder.displayCondition": "Display condition",
+  "builder.alwaysVisible": "Always visible",
+  "builder.conditionOperator": "Condition operator",
+  "builder.conditionValue": "Condition value",
+  "builder.conditionTrue": "true",
+  "builder.conditionFalse": "false",
+  "builder.addQuestion": "Add question",
+  "builder.fieldType.text": "Text",
+  "builder.fieldType.textarea": "Textarea",
+  "builder.fieldType.number": "Number",
+  "builder.fieldType.rating": "Rating",
+  "builder.fieldType.select": "Select",
+  "builder.fieldType.multi-select": "Multi-select",
+  "builder.fieldType.checkbox": "Checkbox",
+  "builder.fieldType.radio": "Radio",
+  "builder.operator.equals": "equals",
+  "builder.operator.not_equals": "does not equal",
+  "builder.operator.contains": "contains",
+  "builder.operator.not_empty": "is not empty"
+};
+
+function interpolate(template: string, params: Readonly<Record<string, string | number>>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (token, name: string) =>
+    Object.hasOwn(params, name) ? String(params[name]) : token
+  );
+}
+
+function fieldTypeKey(type: FieldType): string {
+  return `builder.fieldType.${type}`;
+}
+
+function operatorKey(operator: ConditionOperator): string {
+  return `builder.operator.${operator}`;
+}
 
 function nextId(schema: FormSchema): string {
   let index = schema.fields.length + 1;
@@ -99,26 +154,28 @@ function conditionWithValue(questionId: string, operator: ConditionOperator, val
 function ConditionValueEditor({
   source,
   condition,
-  onChange
+  onChange,
+  translate
 }: {
   readonly source: FormField;
   readonly condition: DisplayCondition;
   readonly onChange: (condition: DisplayCondition) => void;
+  readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }) {
   if (condition.operator === "not_empty") return null;
   const update = (value: ConditionValue) => onChange({ ...condition, value });
   if (source.type === "checkbox") {
     return (
       <select value={String(condition.value)} onChange={(event) => update(event.currentTarget.value === "true")}>
-        <option value="true">true</option>
-        <option value="false">false</option>
+        <option value="true">{translate("builder.conditionTrue")}</option>
+        <option value="false">{translate("builder.conditionFalse")}</option>
       </select>
     );
   }
   if (source.type === "number" || source.type === "rating") {
     return (
       <input
-        aria-label="Condition value"
+        aria-label={translate("builder.conditionValue")}
         type="number"
         value={typeof condition.value === "number" ? condition.value : ""}
         onChange={(event) => update(event.currentTarget.value === "" ? 0 : event.currentTarget.valueAsNumber)}
@@ -138,7 +195,7 @@ function ConditionValueEditor({
   }
   return (
     <input
-      aria-label="Condition value"
+      aria-label={translate("builder.conditionValue")}
       type="text"
       value={typeof condition.value === "string" ? condition.value : ""}
       onChange={(event) => update(event.currentTarget.value)}
@@ -149,11 +206,13 @@ function ConditionValueEditor({
 function QuestionIdEditor({
   fieldId,
   existingIds,
-  onCommit
+  onCommit,
+  translate
 }: {
   readonly fieldId: string;
   readonly existingIds: ReadonlySet<string>;
   readonly onCommit: (nextId: string) => void;
+  readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }) {
   const [draft, setDraft] = useState(fieldId);
   const [error, setError] = useState<string | null>(null);
@@ -167,11 +226,11 @@ function QuestionIdEditor({
   const commit = () => {
     const nextId = draft.trim();
     if (nextId.length === 0) {
-      setError("Question ID is required.");
+      setError(translate("builder.questionIdRequired"));
       return;
     }
     if (nextId !== fieldId && existingIds.has(nextId)) {
-      setError(`Question ID "${nextId}" is already in use.`);
+      setError(translate("builder.questionIdDuplicate", { id: nextId }));
       return;
     }
     setError(null);
@@ -181,7 +240,7 @@ function QuestionIdEditor({
 
   return (
     <label>
-      Question ID
+      {translate("builder.questionId")}
       <input
         value={draft}
         aria-invalid={error === null ? undefined : true}
@@ -213,9 +272,15 @@ function QuestionIdEditor({
 export interface FormBuilderProps {
   readonly schema: FormSchema;
   readonly onChange: (newSchema: FormSchema) => void;
+  readonly locale?: string;
+  readonly translator?: TranslationAdapter;
 }
 
-export function FormBuilder({ schema, onChange }: FormBuilderProps) {
+export function FormBuilder({ schema, onChange, locale = "en", translator }: FormBuilderProps) {
+  const translate = (key: string, params: Readonly<Record<string, string | number>> = {}) => {
+    const translated = translator?.translate(key, locale, params);
+    return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
+  };
   const emitSchema = (candidate: FormSchema) => onChange(sanitizeBuilderSchema(candidate));
 
   const updateField = (fieldId: string, update: (field: FormField) => FormField) => {
@@ -266,7 +331,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
   };
 
   return (
-    <section className="form-engine-builder" aria-label="Form builder">
+    <section className="form-engine-builder" aria-label={translate("builder.formBuilder")}>
       <div className="form-engine-builder__list">
         {schema.fields.map((field, index) => {
           const condition = field.displayCondition;
@@ -281,7 +346,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                   type="button"
                   disabled={index === 0}
                   onClick={() => moveField(index, -1)}
-                  aria-label={`Move ${field.id} up`}
+                  aria-label={translate("builder.moveUp", { id: field.id })}
                 >
                   ↑
                 </button>
@@ -289,7 +354,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                   type="button"
                   disabled={index === schema.fields.length - 1}
                   onClick={() => moveField(index, 1)}
-                  aria-label={`Move ${field.id} down`}
+                  aria-label={translate("builder.moveDown", { id: field.id })}
                 >
                   ↓
                 </button>
@@ -297,9 +362,9 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                   type="button"
                   disabled={schema.fields.length === 1}
                   onClick={() => removeField(field.id)}
-                  aria-label={`Delete ${field.id}`}
+                  aria-label={translate("builder.delete", { id: field.id })}
                 >
-                  Delete
+                  {translate("builder.deleteAction")}
                 </button>
               </div>
               <div className="form-engine-builder__grid">
@@ -307,9 +372,10 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                   fieldId={field.id}
                   existingIds={new Set(schema.fields.map((item) => item.id))}
                   onCommit={(nextId) => renameField(field.id, nextId)}
+                  translate={translate}
                 />
                 <label>
-                  Title key
+                  {translate("builder.titleKey")}
                   <input
                     value={field.labelKey}
                     onChange={(event) =>
@@ -322,14 +388,14 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                   />
                 </label>
                 <label>
-                  Type
+                  {translate("builder.type")}
                   <select
                     value={field.type}
                     onChange={(event) => changeType(field.id, event.currentTarget.value as FieldType)}
                   >
                     {FIELD_TYPES.map((type) => (
                       <option key={type} value={type}>
-                        {type}
+                        {translate(fieldTypeKey(type))}
                       </option>
                     ))}
                   </select>
@@ -342,14 +408,14 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                       updateField(field.id, (current) => ({ ...current, required: event.currentTarget.checked }))
                     }
                   />
-                  Required
+                  {translate("builder.required")}
                 </label>
               </div>
 
               {field.type === "rating" ? (
                 <div className="form-engine-builder__grid">
                   <label>
-                    Minimum
+                    {translate("builder.minimum")}
                     <input
                       type="number"
                       value={field.min ?? 1}
@@ -365,7 +431,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                     />
                   </label>
                   <label>
-                    Maximum
+                    {translate("builder.maximum")}
                     <input
                       type="number"
                       value={field.max ?? 5}
@@ -385,11 +451,11 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
 
               {"options" in field ? (
                 <div className="form-engine-builder__options">
-                  <strong>Options</strong>
+                  <strong>{translate("builder.options")}</strong>
                   {field.options.map((option, optionIndex) => (
                     <div className="form-engine-builder__option" key={`${field.id}-${option.value}-${option.labelKey}`}>
                       <input
-                        aria-label={`${field.id} option value ${optionIndex + 1}`}
+                        aria-label={`${field.id} ${translate("builder.optionValue", { index: optionIndex + 1 })}`}
                         value={option.value}
                         onChange={(event) =>
                           updateField(field.id, (current) => {
@@ -413,7 +479,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                         }
                       />
                       <input
-                        aria-label={`${field.id} option label ${optionIndex + 1}`}
+                        aria-label={`${field.id} ${translate("builder.optionLabel", { index: optionIndex + 1 })}`}
                         value={option.labelKey}
                         onChange={(event) =>
                           updateField(field.id, (current) => {
@@ -443,7 +509,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                           )
                         }
                       >
-                        Remove
+                        {translate("builder.remove")}
                       </button>
                     </div>
                   ))}
@@ -469,14 +535,14 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                       )
                     }
                   >
-                    Add option
+                    {translate("builder.addOption")}
                   </button>
                 </div>
               ) : null}
 
               <div className="form-engine-builder__condition">
                 <label>
-                  Display condition
+                  {translate("builder.displayCondition")}
                   <select
                     value={condition?.questionId ?? ""}
                     onChange={(event) => {
@@ -494,7 +560,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                       });
                     }}
                   >
-                    <option value="">Always visible</option>
+                    <option value="">{translate("builder.alwaysVisible")}</option>
                     {availableSources.map((candidate) => (
                       <option key={candidate.id} value={candidate.id}>
                         {candidate.id}
@@ -505,7 +571,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                 {condition !== undefined && source !== undefined ? (
                   <>
                     <select
-                      aria-label="Condition operator"
+                      aria-label={translate("builder.conditionOperator")}
                       value={condition.operator}
                       onChange={(event) => {
                         const operator = event.currentTarget.value as ConditionOperator;
@@ -517,7 +583,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                     >
                       {conditionOperators(source).map((operator) => (
                         <option key={operator} value={operator}>
-                          {operator}
+                          {translate(operatorKey(operator))}
                         </option>
                       ))}
                     </select>
@@ -525,6 +591,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                       source={source}
                       condition={condition}
                       onChange={(next) => updateField(field.id, (current) => ({ ...current, displayCondition: next }))}
+                      translate={translate}
                     />
                   </>
                 ) : null}
@@ -534,7 +601,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
         })}
       </div>
       <button className="form-engine-builder__add" type="button" onClick={addField}>
-        Add question
+        {translate("builder.addQuestion")}
       </button>
     </section>
   );

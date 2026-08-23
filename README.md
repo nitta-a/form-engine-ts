@@ -13,6 +13,9 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | `@form-engine/storage-memory` | Process-local form/submission storage factory with defensive copying and duplicate protection |
 | `@form-engine/storage-localstorage` | Prefix-isolated browser persistence factory with injectable storage for tests and SSR callers |
 | `@form-engine/translator-mock` | English/Japanese synchronous translation adapter with interpolation and fallback |
+| `@form-engine/translator-deepl` | Server-side asynchronous DeepL Free/Pro text translation using injectable `fetch` |
+| `@form-engine/storage-mongodb` | MongoDB Native Driver storage factory implementing the complete form storage contract |
+| `@form-engine/zod` | Pure `FormSchema` to Zod 3 answer-validator generation with Core-compatible issues |
 | `@form-engine/preview` | Three-tab Vite sandbox for building, responding, switching storage, analytics, and CSV export |
 
 The library packages build as public ESM packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
@@ -121,6 +124,27 @@ interface TranslationAdapter {
 }
 ```
 
+Network translation uses a separate asynchronous contract so React rendering remains synchronous:
+
+```ts
+interface AsyncTranslationAdapter {
+  translateText(text: string, targetLocale: string, sourceLocale?: string): Promise<string>;
+  translateBatch(
+    texts: readonly string[],
+    targetLocale: string,
+    sourceLocale?: string
+  ): Promise<readonly string[]>;
+}
+
+const deepl = createDeeplTranslator({
+  apiKey: process.env.DEEPL_API_KEY,
+  apiType: "pro"
+});
+const japanese = await deepl.translateText("Thank you", "JA", "EN");
+```
+
+DeepL credentials must remain on a trusted server. The adapter uses POST JSON with the authorization header, supports an injected `fetchFn`, and reports HTTP/API errors without automatic retries.
+
 Storage is asynchronous so the same form can later use a database or HTTP-backed implementation:
 
 ```ts
@@ -156,6 +180,25 @@ const analytics = aggregateResponses(schema, responses);
 
 Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and `createMockTranslationAdapter()` to create adapters. Adapter classes are no longer exported. Duplicate submission IDs are rejected globally within an adapter. `clearResponses(formId)` removes every response version for that form while retaining schemas and other forms; `clear()` resets the entire adapter. Aggregation and CSV export reject a different form ID/version; values removed from or incompatible with the current schema are treated as unanswered.
 
+MongoDB callers create and own the connection, then inject its `Db` object. Documents remain scoped to the configured collections; `clear()` deletes their documents without dropping collections or indexes.
+
+```ts
+const storage = createMongoDbStorage({
+  db: mongoClient.db("forms"),
+  schemasCollectionName: "form_schemas",
+  responsesCollectionName: "form_responses"
+});
+```
+
+Generate a Zod 3 validator without duplicating the Core validation rules:
+
+```ts
+const answerSchema = createZodFormSchema(schema);
+const result = answerSchema.safeParse(candidateAnswers);
+```
+
+Zod failures use the field ID as their path and expose the Core validation code, translation message key, and interpolation values in custom issue parameters. Hidden answers are ignored during validation but are not transformed out of successful parse results.
+
 ### Analytics semantics
 
 - Percentages use all valid submissions as the denominator.
@@ -172,7 +215,7 @@ Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and `createMo
 
 The published libraries do not read DOM or browser-only globals during rendering. The default renderer uses its submitted form element only from event handling to focus the first invalid control. LocalStorage is resolved when `createLocalStorageAdapter()` is called, never on import; pass a `StorageLike` implementation outside a browser. The Vite preview owns browser-only UUID, timestamp, Blob, and download behavior.
 
-This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, remote persistence, and network translation loading. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
+This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, DeepL retry/caching, MongoDB migrations/transactions, and Zod answer transforms. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
 
 ## 日本語
 
@@ -187,6 +230,9 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | `@form-engine/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージファクトリ |
 | `@form-engine/storage-localstorage` | prefix分離とテスト用storage注入に対応するブラウザ永続化ファクトリ |
 | `@form-engine/translator-mock` | 補間とフォールバックに対応した、英語・日本語の同期翻訳アダプター |
+| `@form-engine/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用するサーバー向け非同期翻訳 |
+| `@form-engine/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージファクトリ |
+| `@form-engine/zod` | Core互換issueを返す、`FormSchema`からZod 3検証器への純粋な変換 |
 | `@form-engine/preview` | Builder・回答・集計/CSVの3タブを備えたViteサンドボックス |
 
 ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESMパッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
@@ -278,6 +324,27 @@ interface TranslationAdapter {
 }
 ```
 
+ネットワーク翻訳には別の非同期契約を使用し、Reactの同期レンダリングを維持します。
+
+```ts
+interface AsyncTranslationAdapter {
+  translateText(text: string, targetLocale: string, sourceLocale?: string): Promise<string>;
+  translateBatch(
+    texts: readonly string[],
+    targetLocale: string,
+    sourceLocale?: string
+  ): Promise<readonly string[]>;
+}
+
+const deepl = createDeeplTranslator({
+  apiKey: process.env.DEEPL_API_KEY,
+  apiType: "pro"
+});
+const japanese = await deepl.translateText("Thank you", "JA", "EN");
+```
+
+DeepLの認証情報は信頼できるサーバーだけで扱ってください。このアダプターは認証ヘッダー付きPOST JSON、`fetchFn`注入、HTTP/APIエラー通知に対応し、自動再試行は行いません。
+
 ストレージは非同期処理です。そのため、同じフォームを後からデータベースやHTTPベースの実装に切り替えられます。
 
 ```ts
@@ -305,6 +372,25 @@ const analytics = aggregateResponses(schema, responses);
 
 `createMemoryStorageAdapter()`、`createLocalStorageAdapter()`、`createMockTranslationAdapter()`でアダプターを生成します。従来のクラスexportは廃止されました。`clearResponses(formId)`は指定フォームの全version回答だけを削除し、スキーマと他フォームを保持します。`clear()`はアダプター全体を初期化します。PreviewではRespondent/Analytics両タブから確認付きで回答をクリアできます。
 
+MongoDB接続は呼び出し側が所有し、`Db`をファクトリへ注入します。`clear()`は設定されたコレクション内のドキュメントだけを削除し、コレクションとindexは保持します。
+
+```ts
+const storage = createMongoDbStorage({
+  db: mongoClient.db("forms"),
+  schemasCollectionName: "form_schemas",
+  responsesCollectionName: "form_responses"
+});
+```
+
+Coreの検証規則を重複実装せず、Zod 3の回答検証器を生成できます。
+
+```ts
+const answerSchema = createZodFormSchema(schema);
+const result = answerSchema.safeParse(candidateAnswers);
+```
+
+Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補間値をcustom paramsに保持します。非表示回答は検証対象外ですが、成功したparse結果からは削除されません。
+
 ### 分析の仕様
 
 - パーセンテージの分母には、すべての有効な回答を使用します。
@@ -320,4 +406,4 @@ const analytics = aggregateResponses(schema, responses);
 
 公開ライブラリはレンダリング中にDOMやブラウザ専用グローバルへアクセスしません。LocalStorageはファクトリ呼び出し時にだけ解決され、SSRでは`StorageLike`を注入できます。UUID、現在時刻、Blob、CSVダウンロードはPreviewのイベント処理に限定しています。
 
-複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、リモート永続化、ネットワーク翻訳は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。
+複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、DeepLの再試行・キャッシュ、MongoDB migration・transaction、Zodによる回答変換は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。

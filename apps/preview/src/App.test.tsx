@@ -20,6 +20,19 @@ describe("preview application", () => {
     globalThis.localStorage.clear();
   });
 
+  it("localizes form builder controls when Japanese is selected", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "日本語" }));
+
+    expect(screen.getByRole("region", { name: "フォームビルダー" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "質問を追加" })).toBeInTheDocument();
+    expect(screen.getAllByLabelText("種類")).not.toHaveLength(0);
+    expect(screen.getAllByText("必須")).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Add question" })).not.toBeInTheDocument();
+  });
+
   it("switches locale and completes submission-to-analytics flow", async () => {
     const user = userEvent.setup();
     render(<App />);

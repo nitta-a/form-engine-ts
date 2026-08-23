@@ -1,0 +1,33 @@
+{
+  "name": "@form-engine/storage-mongodb",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external @form-engine/core --external mongodb",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@form-engine/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "mongodb": "^6.0.0"
+  },
+  "devDependencies": {
+    "mongodb": "^6.0.0"
+  }
+}
