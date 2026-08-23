@@ -59,19 +59,19 @@ importers:
 
   apps/preview:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@form-engine/react':
+      '@form-engine-ts/react':
         specifier: workspace:*
         version: link:../../packages/react
-      '@form-engine/storage-localstorage':
+      '@form-engine-ts/storage-localstorage':
         specifier: workspace:*
         version: link:../../packages/storage-localstorage
-      '@form-engine/storage-memory':
+      '@form-engine-ts/storage-memory':
         specifier: workspace:*
         version: link:../../packages/storage-memory
-      '@form-engine/translator-mock':
+      '@form-engine-ts/translator-mock':
         specifier: workspace:*
         version: link:../../packages/translator-mock
       react:
@@ -85,7 +85,7 @@ importers:
 
   packages/react:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
       react:
@@ -97,19 +97,19 @@ importers:
 
   packages/storage-localstorage:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/storage-memory:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/storage-mongodb:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -119,31 +119,31 @@ importers:
 
   packages/translator-azure:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/translator-deepl:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/translator-google:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/translator-mock:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
 
   packages/zod:
     dependencies:
-      '@form-engine/core':
+      '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
       zod:

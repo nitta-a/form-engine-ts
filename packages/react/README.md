@@ -1,20 +1,20 @@
-# @form-engine/react
+# @form-engine-ts/react
 
 SSR-safe React renderer, visual form builder, provider, hooks, component overrides, and base styles for form-engine-ts.
 
 ## Install
 
 ```bash
-pnpm add @form-engine/core @form-engine/react @form-engine/translator-mock react react-dom
+pnpm add @form-engine-ts/core @form-engine-ts/react @form-engine-ts/translator-mock react react-dom
 ```
 
 ## Quick start
 
 ```tsx
-import type { FormSchema } from "@form-engine/core";
-import { FormProvider, FormRenderer } from "@form-engine/react";
-import "@form-engine/react/styles.css";
-import { mockTranslator } from "@form-engine/translator-mock";
+import type { FormSchema } from "@form-engine-ts/core";
+import { FormProvider, FormRenderer } from "@form-engine-ts/react";
+import "@form-engine-ts/react/styles.css";
+import { mockTranslator } from "@form-engine-ts/translator-mock";
 
 const schema: FormSchema = {
   id: "contact",

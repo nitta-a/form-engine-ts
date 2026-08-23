@@ -9,11 +9,11 @@ import {
   type FormSubmission,
   type FormValues,
   type QuestionAggregate
-} from "@form-engine/core";
-import { FormBuilder, FormProvider, FormRenderer } from "@form-engine/react";
-import { createLocalStorageAdapter } from "@form-engine/storage-localstorage";
-import { createMemoryStorageAdapter } from "@form-engine/storage-memory";
-import { mockTranslator } from "@form-engine/translator-mock";
+} from "@form-engine-ts/core";
+import { FormBuilder, FormProvider, FormRenderer } from "@form-engine-ts/react";
+import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
+import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
+import { mockTranslator } from "@form-engine-ts/translator-mock";
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { customerFeedbackSchema } from "./schema";
 

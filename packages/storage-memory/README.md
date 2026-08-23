@@ -1,17 +1,17 @@
-# @form-engine/storage-memory
+# @form-engine-ts/storage-memory
 
 In-process implementation of the form-engine-ts storage contract. It is useful for tests, demos, and ephemeral server workloads.
 
 ## Install
 
 ```bash
-pnpm add @form-engine/core @form-engine/storage-memory
+pnpm add @form-engine-ts/core @form-engine-ts/storage-memory
 ```
 
 ## Quick start
 
 ```ts
-import { createMemoryStorageAdapter } from "@form-engine/storage-memory";
+import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 
 const storage = createMemoryStorageAdapter();
 await storage.saveSchema(schema);

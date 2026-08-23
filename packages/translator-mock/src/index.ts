@@ -1,4 +1,4 @@
-import type { TranslationAdapter } from "@form-engine/core";
+import type { TranslationAdapter } from "@form-engine-ts/core";
 
 export type TranslationCatalog = Readonly<Record<string, string>>;
 export type TranslationCatalogs = Readonly<Record<string, TranslationCatalog>>;

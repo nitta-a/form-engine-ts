@@ -1,5 +1,5 @@
 {
-  "name": "@form-engine/translator-google",
+  "name": "@form-engine-ts/translator-google",
   "version": "1.0.0",
   "publishConfig": {
     "access": "public"
@@ -39,12 +39,12 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine/core",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@form-engine/core": "workspace:*"
+    "@form-engine-ts/core": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-import type { AsyncTranslationAdapter } from "@form-engine/core";
+import type { AsyncTranslationAdapter } from "@form-engine-ts/core";
 
 export interface DeeplTranslatorOptions {
   readonly apiKey: string;

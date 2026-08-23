@@ -1,17 +1,17 @@
-# @form-engine/core
+# @form-engine-ts/core
 
 Framework-independent schemas, validation, submissions, analytics, CSV export, and adapter contracts for form-engine-ts.
 
 ## Install
 
 ```bash
-pnpm add @form-engine/core
+pnpm add @form-engine-ts/core
 ```
 
 ## Quick start
 
 ```ts
-import { type FormSchema, validateAnswers } from "@form-engine/core";
+import { type FormSchema, validateAnswers } from "@form-engine-ts/core";
 
 const schema: FormSchema = {
   id: "contact",

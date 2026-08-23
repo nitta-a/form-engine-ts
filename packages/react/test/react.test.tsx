@@ -1,4 +1,4 @@
-import type { FormSchema, FormValues, TranslationAdapter } from "@form-engine/core";
+import type { FormSchema, FormValues, TranslationAdapter } from "@form-engine-ts/core";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";

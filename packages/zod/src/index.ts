@@ -1,4 +1,4 @@
-import { assertValidFormSchema, type FormSchema, type FormValues, validateAnswers } from "@form-engine/core";
+import { assertValidFormSchema, type FormSchema, type FormValues, validateAnswers } from "@form-engine-ts/core";
 import { z } from "zod";
 
 function cloneSchema(schema: FormSchema): FormSchema {

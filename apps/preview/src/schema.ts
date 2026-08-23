@@ -1,4 +1,4 @@
-import type { FormSchema } from "@form-engine/core";
+import type { FormSchema } from "@form-engine-ts/core";
 
 export const customerFeedbackSchema = {
   id: "customer-feedback",

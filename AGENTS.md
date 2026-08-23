@@ -9,7 +9,7 @@ This file applies to the entire repository. Keep changes focused on the requeste
 This is a pnpm/Turborepo monorepo for a schema-driven form engine written in strict TypeScript.
 
 - `packages/core`: framework-independent schemas, validation, visibility, submissions, translation contracts, sanitization, analytics, and CSV helpers.
-- `packages/react`: React provider, renderer, builder, hooks, and base styles. It depends on `@form-engine/core` and must remain SSR-safe and accessible.
+- `packages/react`: React provider, renderer, builder, hooks, and base styles. It depends on `@form-engine-ts/core` and must remain SSR-safe and accessible.
 - `packages/storage-*`: storage adapters implementing the contracts exported by Core.
 - `packages/translator-*`: translation adapters implementing the contracts exported by Core.
 - `packages/zod`: Zod integration for Core schemas and validation issues.
@@ -22,7 +22,7 @@ Package source lives in `src/`, tests live in `test/` (except the preview app's 
 - Use Node.js `>=22.22.2` and pnpm `11` as declared in the root `package.json`.
 - Install dependencies with `pnpm install --frozen-lockfile` when the lockfile is expected to be current.
 - Start the preview with `pnpm dev`.
-- Run a package test directly with `pnpm --filter @form-engine/core test`, replacing the package name as needed.
+- Run a package test directly with `pnpm --filter @form-engine-ts/core test`, replacing the package name as needed.
 - Run repository checks with:
 
 ```bash
@@ -43,7 +43,7 @@ Do not commit generated `dist/`, Turbo cache output, or Vite cache output. Updat
 - Use `import type` for type-only imports.
 - Let Biome enforce formatting and import organization: two-space indentation, double quotes, semicolons, no trailing commas, and a 120-column line width.
 - Keep Core framework-independent. Browser, React, database, and vendor-specific behavior belongs in the corresponding adapter or UI package.
-- Import workspace packages through their public `@form-engine/*` entry point. Export new public APIs from that package's `src/index.ts`; avoid cross-package deep imports.
+- Import workspace packages through their public `@form-engine-ts/*` entry point. Export new public APIs from that package's `src/index.ts`; avoid cross-package deep imports.
 - Use `workspace:*` for internal package dependencies and keep runtime, peer, and development dependencies in the appropriate manifest section.
 - Treat schema fields, serialized submissions, adapter contracts, and package exports as public API. Avoid accidental breaking changes; update all consumers and documentation when a deliberate change is required.
 - Keep environment-dependent services injectable. Tests must not call live translation services, browsers, or databases.

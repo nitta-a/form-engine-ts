@@ -1,17 +1,17 @@
-# @form-engine/translator-google
+# @form-engine-ts/translator-google
 
 Server-side Google Cloud Translation Basic v2 adapter for form-engine-ts with API Key or Bearer authentication.
 
 ## Install
 
 ```bash
-pnpm add @form-engine/core @form-engine/translator-google
+pnpm add @form-engine-ts/core @form-engine-ts/translator-google
 ```
 
 ## Quick start
 
 ```ts
-import { createGoogleTranslator } from "@form-engine/translator-google";
+import { createGoogleTranslator } from "@form-engine-ts/translator-google";
 
 const translator = createGoogleTranslator({
   apiKey: process.env.GOOGLE_TRANSLATE_API_KEY!

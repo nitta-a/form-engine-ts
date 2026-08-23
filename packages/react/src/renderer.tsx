@@ -4,7 +4,7 @@ import {
   type FormValue,
   type ValidationIssue,
   validateAnswers
-} from "@form-engine/core";
+} from "@form-engine-ts/core";
 import { type ComponentType, type FormEvent, type ReactNode, useId } from "react";
 import { useForm } from "./context";
 

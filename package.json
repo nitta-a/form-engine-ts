@@ -10,7 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "check": "turbo run check",
-    "dev": "turbo run dev --filter=@form-engine/preview",
+    "dev": "turbo run dev --filter=@form-engine-ts/preview",
     "format": "biome format .",
     "format:fix": "biome format . --write",
     "lint": "biome check .",

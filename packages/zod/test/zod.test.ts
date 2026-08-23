@@ -1,4 +1,4 @@
-import type { FormSchema, FormValues } from "@form-engine/core";
+import type { FormSchema, FormValues } from "@form-engine-ts/core";
 import type { SafeParseReturnType, ZodIssue } from "zod";
 import { createZodFormSchema } from "../src";
 

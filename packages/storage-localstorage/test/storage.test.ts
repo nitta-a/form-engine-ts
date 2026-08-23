@@ -1,4 +1,4 @@
-import type { FormSchema, FormSubmission } from "@form-engine/core";
+import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
 import { createLocalStorageAdapter, type StorageLike } from "../src";
 
 function createStorage(): StorageLike {

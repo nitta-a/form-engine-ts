@@ -9,7 +9,7 @@ import {
   type TranslationAdapter,
   type ValidationIssue,
   validateAnswers
-} from "@form-engine/core";
+} from "@form-engine-ts/core";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";

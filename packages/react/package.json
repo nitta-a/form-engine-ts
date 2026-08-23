@@ -1,5 +1,5 @@
 {
-  "name": "@form-engine/react",
+  "name": "@form-engine-ts/react",
   "version": "1.0.0",
   "publishConfig": {
     "access": "public"
@@ -42,13 +42,13 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/styles.css --format esm,cjs --dts --clean --external react --external react/jsx-runtime --external @form-engine/core",
+    "build": "tsup src/index.ts src/styles.css --format esm,cjs --dts --clean --external react --external react/jsx-runtime --external @form-engine-ts/core",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@form-engine/core": "workspace:*"
+    "@form-engine-ts/core": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18.2 <20",

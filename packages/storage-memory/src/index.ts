@@ -1,5 +1,5 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue, FormValues } from "@form-engine/core";
-import { assertValidFormSchema } from "@form-engine/core";
+import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue, FormValues } from "@form-engine-ts/core";
+import { assertValidFormSchema } from "@form-engine-ts/core";
 
 function cloneValue(value: FormValue): FormValue {
   return Array.isArray(value) ? [...value] : value;

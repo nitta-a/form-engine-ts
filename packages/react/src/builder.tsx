@@ -7,8 +7,8 @@ import type {
   FormField,
   FormSchema,
   TranslationAdapter
-} from "@form-engine/core";
-import { sanitizeSchema } from "@form-engine/core";
+} from "@form-engine-ts/core";
+import { sanitizeSchema } from "@form-engine-ts/core";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",

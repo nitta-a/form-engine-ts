@@ -1,5 +1,5 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine/core";
-import { assertValidFormSchema } from "@form-engine/core";
+import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine-ts/core";
+import { assertValidFormSchema } from "@form-engine-ts/core";
 import type { Db, Document } from "mongodb";
 
 export interface MongoDbStorageOptions {

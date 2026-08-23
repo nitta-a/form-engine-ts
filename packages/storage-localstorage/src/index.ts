@@ -1,5 +1,5 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission } from "@form-engine/core";
-import { assertValidFormSchema } from "@form-engine/core";
+import type { FormSchema, FormStorageAdapter, FormSubmission } from "@form-engine-ts/core";
+import { assertValidFormSchema } from "@form-engine-ts/core";
 
 export interface StorageLike {
   readonly length: number;

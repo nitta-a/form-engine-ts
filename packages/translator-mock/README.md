@@ -1,17 +1,17 @@
-# @form-engine/translator-mock
+# @form-engine-ts/translator-mock
 
 Synchronous English/Japanese translation adapter for form-engine-ts demos and tests, with interpolation and locale fallback.
 
 ## Install
 
 ```bash
-pnpm add @form-engine/core @form-engine/translator-mock
+pnpm add @form-engine-ts/core @form-engine-ts/translator-mock
 ```
 
 ## Quick start
 
 ```ts
-import { createMockTranslationAdapter } from "@form-engine/translator-mock";
+import { createMockTranslationAdapter } from "@form-engine-ts/translator-mock";
 
 const translator = createMockTranslationAdapter({
   en: { greeting: "Hello, {{name}}!" },

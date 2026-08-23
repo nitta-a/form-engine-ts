@@ -1,5 +1,5 @@
 {
-  "name": "@form-engine/zod",
+  "name": "@form-engine-ts/zod",
   "version": "1.0.0",
   "publishConfig": {
     "access": "public"
@@ -39,13 +39,13 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine/core --external zod",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core --external zod",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@form-engine/core": "workspace:*",
+    "@form-engine-ts/core": "workspace:*",
     "zod": "^3.23.0"
   }
 }

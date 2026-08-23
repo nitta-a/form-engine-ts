@@ -1,4 +1,4 @@
-import type { FormSchema, FormSubmission } from "@form-engine/core";
+import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
 import type { Db } from "mongodb";
 import { createMongoDbStorage } from "../src";
 

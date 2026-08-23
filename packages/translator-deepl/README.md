@@ -1,17 +1,17 @@
-# @form-engine/translator-deepl
+# @form-engine-ts/translator-deepl
 
 Server-side DeepL Free/Pro asynchronous translation adapter for form-engine-ts.
 
 ## Install
 
 ```bash
-pnpm add @form-engine/core @form-engine/translator-deepl
+pnpm add @form-engine-ts/core @form-engine-ts/translator-deepl
 ```
 
 ## Quick start
 
 ```ts
-import { createDeeplTranslator } from "@form-engine/translator-deepl";
+import { createDeeplTranslator } from "@form-engine-ts/translator-deepl";
 
 const translator = createDeeplTranslator({
   apiKey: process.env.DEEPL_API_KEY!,

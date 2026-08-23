@@ -1,5 +1,5 @@
 {
-  "name": "@form-engine/preview",
+  "name": "@form-engine-ts/preview",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@form-engine/core": "workspace:*",
-    "@form-engine/react": "workspace:*",
-    "@form-engine/storage-localstorage": "workspace:*",
-    "@form-engine/storage-memory": "workspace:*",
-    "@form-engine/translator-mock": "workspace:*",
+    "@form-engine-ts/core": "workspace:*",
+    "@form-engine-ts/react": "workspace:*",
+    "@form-engine-ts/storage-localstorage": "workspace:*",
+    "@form-engine-ts/storage-memory": "workspace:*",
+    "@form-engine-ts/translator-mock": "workspace:*",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   }

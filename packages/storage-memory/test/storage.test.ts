@@ -1,4 +1,4 @@
-import type { FormSubmission } from "@form-engine/core";
+import type { FormSubmission } from "@form-engine-ts/core";
 import { createMemoryStorageAdapter } from "../src";
 
 function submission(id: string, version = 1, formId = "form"): FormSubmission {
