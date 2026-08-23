@@ -17,9 +17,12 @@
     "paths": {
       "@form-engine-ts/core": ["./packages/core/src/index.ts"],
       "@form-engine-ts/react": ["./packages/react/src/index.ts"],
+      "@form-engine-ts/storage-d1": ["./packages/storage-d1/src/index.ts"],
       "@form-engine-ts/storage-localstorage": ["./packages/storage-localstorage/src/index.ts"],
       "@form-engine-ts/storage-memory": ["./packages/storage-memory/src/index.ts"],
       "@form-engine-ts/storage-mongodb": ["./packages/storage-mongodb/src/index.ts"],
+      "@form-engine-ts/storage-postgres": ["./packages/storage-postgres/src/index.ts"],
+      "@form-engine-ts/storage-sqlite": ["./packages/storage-sqlite/src/index.ts"],
       "@form-engine-ts/translator-azure": ["./packages/translator-azure/src/index.ts"],
       "@form-engine-ts/translator-deepl": ["./packages/translator-deepl/src/index.ts"],
       "@form-engine-ts/translator-google": ["./packages/translator-google/src/index.ts"],

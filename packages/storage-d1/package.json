@@ -1,0 +1,63 @@
+{
+  "name": "@form-engine-ts/storage-d1",
+  "version": "1.0.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitta-a/form-engine-ts.git",
+    "directory": "packages/storage-d1"
+  },
+  "bugs": {
+    "url": "https://github.com/nitta-a/form-engine-ts/issues"
+  },
+  "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
+  "keywords": [
+    "form",
+    "survey",
+    "storage",
+    "cloudflare",
+    "d1",
+    "edge",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@form-engine-ts/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@cloudflare/workers-types": "^4.20240000.0"
+  },
+  "peerDependenciesMeta": {
+    "@cloudflare/workers-types": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240000.0"
+  }
+}

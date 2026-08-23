@@ -8,12 +8,29 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function property(document: TestDocument, path: string): unknown {
+  return path.split(".").reduce<unknown>((value, key) => {
+    return typeof value === "object" && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+  }, document);
+}
+
 function matches(document: TestDocument, filter: Record<string, unknown>): boolean {
-  return Object.entries(filter).every(([key, value]) => document[key] === value);
+  return Object.entries(filter).every(([key, value]) => {
+    const actual = property(document, key);
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return actual === value;
+    const operators = value as Record<string, unknown>;
+    const minimum = operators.$gte;
+    const maximum = operators.$lte;
+    return (
+      (minimum === undefined || (typeof actual === "string" && typeof minimum === "string" && actual >= minimum)) &&
+      (maximum === undefined || (typeof actual === "string" && typeof maximum === "string" && actual <= maximum))
+    );
+  });
 }
 
 function createDbStub() {
   const collections = new Map<string, Map<string, TestDocument>>();
+  const indexes = new Map<string, unknown[]>();
   const collection = (name: string) => {
     const documents = collections.get(name) ?? new Map<string, TestDocument>();
     collections.set(name, documents);
@@ -33,11 +50,31 @@ function createDbStub() {
         return found === undefined ? null : clone(found);
       },
       find(filter: Record<string, unknown>) {
-        return {
+        const result = {
+          sort(specification: Record<string, 1 | -1>) {
+            const entries = Object.entries(specification);
+            const sorted = [...documents.values()]
+              .filter((document) => matches(document, filter))
+              .sort((left, right) => {
+                for (const [key, direction] of entries) {
+                  const leftValue = String(property(left, key));
+                  const rightValue = String(property(right, key));
+                  const compared = leftValue.localeCompare(rightValue) * direction;
+                  if (compared !== 0) return compared;
+                }
+                return 0;
+              });
+            return {
+              async toArray() {
+                return sorted.map(clone);
+              }
+            };
+          },
           async toArray() {
             return [...documents.values()].filter((document) => matches(document, filter)).map(clone);
           }
         };
+        return result;
       },
       async deleteOne(filter: Record<string, unknown>) {
         const found = [...documents.values()].find((document) => matches(document, filter));
@@ -54,10 +91,13 @@ function createDbStub() {
       },
       async countDocuments(filter: Record<string, unknown>) {
         return [...documents.values()].filter((document) => matches(document, filter)).length;
+      },
+      async createIndexes(specifications: unknown[]) {
+        indexes.set(name, clone(specifications));
       }
     };
   };
-  return { db: { collection } as unknown as Db, collections };
+  return { db: { collection } as unknown as Db, collections, indexes };
 }
 
 function schema(id = "form", version = 1, title = "title"): FormSchema {
@@ -117,6 +157,33 @@ describe("createMongoDbStorage", () => {
     expect((await adapter.listSubmissions("form", 1))[0]?.values.answer).toBe("yes");
     await adapter.deleteSubmission("earlier");
     expect((await adapter.listSubmissions("form", 1)).map(({ id }) => id)).toEqual(["later"]);
+  });
+
+  it("filters inclusive submittedAt ranges in MongoDB and composes them with versions", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.saveSubmission(submission("z", "form", 1, "2025-01-02T00:00:00.000Z"));
+    await adapter.saveSubmission(submission("a", "form", 1, "2025-01-02T00:00:00.000Z"));
+    await adapter.saveSubmission(submission("early", "form", 1, "2025-01-01T00:00:00.000Z"));
+    await adapter.saveSubmission(submission("late", "form", 2, "2025-01-03T00:00:00.000Z"));
+    expect(
+      (
+        await adapter.listSubmissions("form", 1, {
+          since: "2025-01-02T00:00:00.000Z",
+          until: "2025-01-02T00:00:00.000Z"
+        })
+      ).map(({ id }) => id)
+    ).toEqual(["a", "z"]);
+  });
+
+  it("creates the form/timestamp and locale indexes", async () => {
+    const { db, indexes } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.createIndexes();
+    expect(indexes.get("form_responses")).toEqual([
+      { key: { formId: 1, submittedAt: 1 }, name: "form_responses_form_submitted_at" },
+      { key: { "submission.locale": 1 }, name: "form_responses_locale" }
+    ]);
   });
 
   it("clears one form across versions without deleting schemas or other forms", async () => {

@@ -17,7 +17,10 @@ const storage = createLocalStorageAdapter("my-app:");
 await storage.saveSchema(schema);
 await storage.saveSubmission(submission);
 
-const responses = await storage.listSubmissions(schema.id, schema.version);
+const responses = await storage.listSubmissions(schema.id, schema.version, {
+  since: "2026-01-01T00:00:00.000Z",
+  until: "2026-01-31T23:59:59.999Z"
+});
 ```
 
-Outside a browser, pass a compatible `StorageLike` object as the second argument.
+Date boundaries are inclusive, and results are ordered by submission time and then ID. Outside a browser, pass a compatible `StorageLike` object as the second argument.

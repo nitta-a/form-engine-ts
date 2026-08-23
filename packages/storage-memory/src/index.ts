@@ -46,13 +46,16 @@ export function createMemoryStorageAdapter(): FormStorageAdapter {
       if (submissions.has(submission.id)) throw new Error(`A submission with ID "${submission.id}" already exists.`);
       submissions.set(submission.id, cloneSubmission(submission));
     },
-    async listSubmissions(formId, formVersion) {
+    async listSubmissions(formId, formVersion, options) {
       return [...submissions.values()]
         .filter(
           (submission) =>
-            submission.formId === formId && (formVersion === undefined || submission.formVersion === formVersion)
+            submission.formId === formId &&
+            (formVersion === undefined || submission.formVersion === formVersion) &&
+            (options?.since === undefined || submission.submittedAt >= options.since) &&
+            (options?.until === undefined || submission.submittedAt <= options.until)
         )
-        .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt))
+        .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id))
         .map(cloneSubmission);
     },
     async deleteSubmission(submissionId) {

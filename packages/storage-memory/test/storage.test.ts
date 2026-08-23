@@ -1,14 +1,14 @@
 import type { FormSubmission } from "@form-engine-ts/core";
 import { createMemoryStorageAdapter } from "../src";
 
-function submission(id: string, version = 1, formId = "form"): FormSubmission {
+function submission(id: string, version = 1, formId = "form", submittedAt?: string): FormSubmission {
   return {
     id,
     formId,
     formVersion: version,
     locale: "en",
     values: { choices: ["a"] },
-    submittedAt: `2025-01-0${version}T00:00:00.000Z`
+    submittedAt: submittedAt ?? `2025-01-0${version}T00:00:00.000Z`
   };
 }
 
@@ -40,6 +40,25 @@ describe("createMemoryStorageAdapter", () => {
     const storage = createMemoryStorageAdapter();
     await storage.saveSubmission(submission("one"));
     await expect(storage.saveSubmission(submission("one", 2))).rejects.toThrow(/already exists/);
+  });
+
+  it("filters inclusive time ranges with versions and deterministic ID tie-breaking", async () => {
+    const storage = createMemoryStorageAdapter();
+    await storage.saveSubmission(submission("z", 1, "form", "2025-01-02T00:00:00.000Z"));
+    await storage.saveSubmission(submission("a", 1, "form", "2025-01-02T00:00:00.000Z"));
+    await storage.saveSubmission(submission("early", 1, "form", "2025-01-01T00:00:00.000Z"));
+    await storage.saveSubmission(submission("late", 2, "form", "2025-01-03T00:00:00.000Z"));
+    expect(
+      (
+        await storage.listSubmissions("form", 1, {
+          since: "2025-01-02T00:00:00.000Z",
+          until: "2025-01-02T00:00:00.000Z"
+        })
+      ).map(({ id }) => id)
+    ).toEqual(["a", "z"]);
+    expect(
+      (await storage.listSubmissions("form", undefined, { since: "2025-01-02T00:00:00.000Z" })).map(({ id }) => id)
+    ).toEqual(["a", "z", "late"]);
   });
 
   it("stores, lists, updates, and deletes schemas", async () => {

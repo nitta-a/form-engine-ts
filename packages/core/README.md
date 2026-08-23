@@ -24,4 +24,18 @@ const result = validateAnswers(schema, { name: "Ada" });
 if (!result.valid) console.error(result.issues);
 ```
 
+Storage adapters share inclusive ISO 8601 submission-range filtering:
+
+```ts
+import type { SubmissionQueryOptions } from "@form-engine-ts/core";
+
+const range: SubmissionQueryOptions = {
+  since: "2026-01-01T00:00:00.000Z",
+  until: "2026-01-31T23:59:59.999Z"
+};
+const submissions = await storage.listSubmissions("contact", 1, range);
+```
+
+Results are ordered by `submittedAt`, then submission ID. Both boundaries are inclusive.
+
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.

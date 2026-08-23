@@ -13,6 +13,9 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Storage adapter | `@form-engine-ts/storage-memory` | Process-local form/submission storage with defensive copying and duplicate protection |
 | Storage adapter | `@form-engine-ts/storage-localstorage` | Prefix-isolated browser persistence with injectable storage for tests and SSR callers |
 | Storage adapter | `@form-engine-ts/storage-mongodb` | MongoDB Native Driver implementation of the complete form storage contract |
+| Storage adapter | `@form-engine-ts/storage-postgres` | PostgreSQL storage through an injected node-postgres-compatible query client |
+| Storage adapter | `@form-engine-ts/storage-sqlite` | Driver-neutral SQLite storage through synchronous or asynchronous executors |
+| Storage adapter | `@form-engine-ts/storage-d1` | Cloudflare D1 storage using prepared statements and transactional batches |
 | Translator adapter | `@form-engine-ts/translator-mock` | English/Japanese synchronous translations with interpolation and fallback |
 | Translator adapter | `@form-engine-ts/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
@@ -196,9 +199,18 @@ Keep Azure credentials on a trusted server. The adapter preserves custom endpoin
 Storage is asynchronous so the same form can later use a database or HTTP-backed implementation:
 
 ```ts
+interface SubmissionQueryOptions {
+  readonly since?: string;
+  readonly until?: string;
+}
+
 interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
-  listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;
+  listSubmissions(
+    formId: string,
+    formVersion?: number,
+    options?: SubmissionQueryOptions
+  ): Promise<readonly FormSubmission[]>;
   clearResponses?(formId: string): Promise<void>;
   clear(): Promise<void>;
 }
@@ -222,13 +234,16 @@ const submission = createSubmission(schema, values, {
 });
 
 await storage.saveSubmission(submission);
-const responses = await storage.listSubmissions(schema.id, schema.version);
+const responses = await storage.listSubmissions(schema.id, schema.version, {
+  since: "2026-01-01T00:00:00.000Z",
+  until: "2026-01-31T23:59:59.999Z"
+});
 const analytics = aggregateResponses(schema, responses);
 ```
 
-Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and `createMockTranslationAdapter()` to create adapters. Adapter classes are no longer exported. Duplicate submission IDs are rejected globally within an adapter. `clearResponses(formId)` removes every response version for that form while retaining schemas and other forms; `clear()` resets the entire adapter. Aggregation and CSV export reject a different form ID/version; values removed from or incompatible with the current schema are treated as unanswered.
+`since` and `until` are inclusive ISO 8601 boundaries. They can be combined with a form version, and every adapter returns results by `submittedAt`, then submission ID. Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and the database factories to create storage adapters. Duplicate submission IDs are rejected globally within an adapter. `clearResponses(formId)` removes every response version for that form while retaining schemas and other forms; `clear()` resets only the adapter's configured data. Aggregation and CSV export reject a different form ID/version; values removed from or incompatible with the current schema are treated as unanswered.
 
-MongoDB callers create and own the connection, then inject its `Db` object. Documents remain scoped to the configured collections; `clear()` deletes their documents without dropping collections or indexes.
+MongoDB callers create and own the connection, then inject its `Db` object. Call `createIndexes()` to create named form/timestamp and locale indexes. Documents remain scoped to the configured collections; `clear()` deletes their documents without dropping collections or indexes.
 
 ```ts
 const storage = createMongoDbStorage({
@@ -236,6 +251,15 @@ const storage = createMongoDbStorage({
   schemasCollectionName: "form_schemas",
   responsesCollectionName: "form_responses"
 });
+await storage.createIndexes();
+```
+
+Postgres accepts a `Pool`, `Client`, or compatible query wrapper. SQLite accepts a thin synchronous or asynchronous `run/get/all` executor, allowing applications to adapt `better-sqlite3`, `bun:sqlite`, libSQL, or another driver without adding one as a library dependency. D1 accepts the Worker API's structural `prepare/bind/first/all/run/batch` surface. All SQL adapters default `autoMigrate` to `false`; enabling it lazily creates the current tables and indexes once, while production connection, transaction, and migration lifecycles remain application responsibilities.
+
+```ts
+const postgresStorage = createPostgresStorage({ client: pool, autoMigrate: true });
+const sqliteStorage = createSqliteStorage({ db: sqliteExecutor });
+const d1Storage = createD1Storage({ db: env.DB });
 ```
 
 Generate a Zod 3 validator without duplicating the Core validation rules:
@@ -263,7 +287,7 @@ Zod failures use the field ID as their path and expose the Core validation code,
 
 The published libraries do not read DOM or browser-only globals during rendering. The default renderer uses its submitted form element only from event handling to focus the first invalid control. LocalStorage is resolved when `createLocalStorageAdapter()` is called, never on import; pass a `StorageLike` implementation outside a browser. Builder UUIDs are generated only from user-event handlers; the Vite preview owns timestamp, Blob, and download behavior.
 
-This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, network translator retry/caching, MongoDB migrations/transactions, and Zod answer transforms. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
+This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, network translator retry/caching, database connection management, production migration frameworks, automatic transactions/retries, pgvector columns, and Zod answer transforms. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
 
 ## 日本語
 
@@ -278,6 +302,9 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Storage Adapter | `@form-engine-ts/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージ |
 | Storage Adapter | `@form-engine-ts/storage-localstorage` | prefix分離とstorage注入に対応するブラウザ永続化 |
 | Storage Adapter | `@form-engine-ts/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージ |
+| Storage Adapter | `@form-engine-ts/storage-postgres` | node-postgres互換query clientを注入するPostgreSQLストレージ |
+| Storage Adapter | `@form-engine-ts/storage-sqlite` | 同期・非同期executorに対応するdriver非依存SQLiteストレージ |
+| Storage Adapter | `@form-engine-ts/storage-d1` | prepared statementとtransactional batchを使うCloudflare D1ストレージ |
 | Translator Adapter | `@form-engine-ts/translator-mock` | 補間とフォールバックに対応する英語・日本語の同期翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
@@ -442,9 +469,18 @@ Azureの認証情報も信頼できるサーバーだけで扱ってください
 ストレージは非同期処理です。そのため、同じフォームを後からデータベースやHTTPベースの実装に切り替えられます。
 
 ```ts
+interface SubmissionQueryOptions {
+  readonly since?: string;
+  readonly until?: string;
+}
+
 interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
-  listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;
+  listSubmissions(
+    formId: string,
+    formVersion?: number,
+    options?: SubmissionQueryOptions
+  ): Promise<readonly FormSubmission[]>;
   clearResponses?(formId: string): Promise<void>;
   clear(): Promise<void>;
 }
@@ -460,13 +496,16 @@ const submission = createSubmission(schema, values, {
 });
 
 await storage.saveSubmission(submission);
-const responses = await storage.listSubmissions(schema.id, schema.version);
+const responses = await storage.listSubmissions(schema.id, schema.version, {
+  since: "2026-01-01T00:00:00.000Z",
+  until: "2026-01-31T23:59:59.999Z"
+});
 const analytics = aggregateResponses(schema, responses);
 ```
 
-`createMemoryStorageAdapter()`、`createLocalStorageAdapter()`、`createMockTranslationAdapter()`でアダプターを生成します。従来のクラスexportは廃止されました。`clearResponses(formId)`は指定フォームの全version回答だけを削除し、スキーマと他フォームを保持します。`clear()`はアダプター全体を初期化します。PreviewではRespondent/Analytics両タブから確認付きで回答をクリアできます。
+`since`と`until`は包含境界となるISO 8601文字列です。form versionと併用でき、すべてのアダプターが`submittedAt`、同値時はsubmission ID順で返します。`createMemoryStorageAdapter()`、`createLocalStorageAdapter()`、各データベースのファクトリでストレージを生成します。重複submission IDはアダプター内でグローバルに拒否されます。`clearResponses(formId)`は指定フォームの全version回答だけを削除し、スキーマと他フォームを保持します。`clear()`は設定されたアダプターデータだけを初期化します。PreviewではRespondent/Analytics両タブから確認付きで回答をクリアできます。
 
-MongoDB接続は呼び出し側が所有し、`Db`をファクトリへ注入します。`clear()`は設定されたコレクション内のドキュメントだけを削除し、コレクションとindexは保持します。
+MongoDB接続は呼び出し側が所有し、`Db`をファクトリへ注入します。`createIndexes()`は名前付きのform/timestamp複合indexとlocale indexを作成します。`clear()`は設定されたコレクション内のドキュメントだけを削除し、コレクションとindexは保持します。
 
 ```ts
 const storage = createMongoDbStorage({
@@ -474,6 +513,15 @@ const storage = createMongoDbStorage({
   schemasCollectionName: "form_schemas",
   responsesCollectionName: "form_responses"
 });
+await storage.createIndexes();
+```
+
+Postgresは`Pool`、`Client`、互換query wrapperを受け取ります。SQLiteは同期または非同期の`run/get/all` executorを受け取るため、`better-sqlite3`、`bun:sqlite`、libSQLなどをライブラリのruntime依存にせず薄くラップできます。D1はWorker APIの構造的な`prepare/bind/first/all/run/batch`を利用します。全SQLアダプターの`autoMigrate`既定値は`false`です。有効時は現在のテーブルとindexを最初の操作前に一度だけ遅延作成しますが、本番の接続、transaction、migration lifecycleはアプリケーション側が管理します。
+
+```ts
+const postgresStorage = createPostgresStorage({ client: pool, autoMigrate: true });
+const sqliteStorage = createSqliteStorage({ db: sqliteExecutor });
+const d1Storage = createD1Storage({ db: env.DB });
 ```
 
 Coreの検証規則を重複実装せず、Zod 3の回答検証器を生成できます。
@@ -500,4 +548,4 @@ Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補�
 
 公開ライブラリはレンダリング中にDOMやブラウザ専用グローバルへアクセスしません。LocalStorageはファクトリ呼び出し時にだけ解決され、SSRでは`StorageLike`を注入できます。BuilderのUUIDはユーザー操作イベント内だけで生成し、現在時刻、Blob、CSVダウンロードはPreviewのイベント処理に限定しています。
 
-複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、ネットワーク翻訳の再試行・キャッシュ、MongoDB migration・transaction、Zodによる回答変換は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。
+複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、ネットワーク翻訳の再試行・キャッシュ、データベース接続管理、本番migration framework、自動transaction/retry、pgvector列、Zodによる回答変換は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。

@@ -21,14 +21,19 @@ const schema: FormSchema = {
   fields: [{ id: "answer", type: "text", title: "answer", required: false }]
 };
 
-function submission(id: string, version = 1, formId = "form"): FormSubmission {
+function submission(
+  id: string,
+  version = 1,
+  formId = "form",
+  submittedAt = "2025-01-01T00:00:00.000Z"
+): FormSubmission {
   return {
     id,
     formId,
     formVersion: version,
     locale: "en",
     values: { answer: "yes" },
-    submittedAt: "2025-01-01T00:00:00.000Z"
+    submittedAt
   };
 }
 
@@ -71,6 +76,25 @@ describe("createLocalStorageAdapter", () => {
     storage.setItem("pf_schema:form:1", "{");
     const adapter = createLocalStorageAdapter("pf_", storage);
     await expect(adapter.listSchemas()).rejects.toThrow(/invalid/);
+  });
+
+  it("filters inclusive time ranges and sorts equal timestamps by submission ID", async () => {
+    const adapter = createLocalStorageAdapter("range_", createStorage());
+    await adapter.saveSubmission(submission("z", 1, "form", "2025-01-02T00:00:00.000Z"));
+    await adapter.saveSubmission(submission("a", 1, "form", "2025-01-02T00:00:00.000Z"));
+    await adapter.saveSubmission(submission("early", 1, "form", "2025-01-01T00:00:00.000Z"));
+    await adapter.saveSubmission(submission("late", 2, "form", "2025-01-03T00:00:00.000Z"));
+    expect(
+      (
+        await adapter.listSubmissions("form", 1, {
+          since: "2025-01-02T00:00:00.000Z",
+          until: "2025-01-02T00:00:00.000Z"
+        })
+      ).map(({ id }) => id)
+    ).toEqual(["a", "z"]);
+    expect(
+      (await adapter.listSubmissions("form", undefined, { until: "2025-01-02T00:00:00.000Z" })).map(({ id }) => id)
+    ).toEqual(["early", "a", "z"]);
   });
 
   it("clears every version for one form while retaining schemas, prefixes, and other forms", async () => {

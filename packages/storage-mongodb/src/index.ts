@@ -8,6 +8,10 @@ export interface MongoDbStorageOptions {
   readonly responsesCollectionName?: string;
 }
 
+export interface MongoDbStorageAdapter extends FormStorageAdapter {
+  createIndexes(): Promise<void>;
+}
+
 interface StoredSchemaDocument extends Document {
   readonly _id: string;
   readonly formId: string;
@@ -96,7 +100,7 @@ function collectionName(value: string | undefined, fallback: string, optionName:
   return value;
 }
 
-export function createMongoDbStorage(options: MongoDbStorageOptions): FormStorageAdapter {
+export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter {
   if (options?.db === undefined) throw new TypeError("db is required.");
   const schemasCollectionName = collectionName(options.schemasCollectionName, "form_schemas", "schemasCollectionName");
   const responsesCollectionName = collectionName(
@@ -140,13 +144,23 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): FormStorag
         submission: stored
       });
     },
-    async listSubmissions(formId, formVersion) {
+    async listSubmissions(formId, formVersion, options) {
+      const submittedAt =
+        options?.since === undefined && options?.until === undefined
+          ? undefined
+          : {
+              ...(options.since === undefined ? {} : { $gte: options.since }),
+              ...(options.until === undefined ? {} : { $lte: options.until })
+            };
       const documents = await submissions
-        .find({ formId, ...(formVersion === undefined ? {} : { formVersion }) })
+        .find({
+          formId,
+          ...(formVersion === undefined ? {} : { formVersion }),
+          ...(submittedAt === undefined ? {} : { submittedAt })
+        })
+        .sort({ submittedAt: 1, _id: 1 })
         .toArray();
-      return documents
-        .map(parseSubmissionDocument)
-        .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id));
+      return documents.map(parseSubmissionDocument);
     },
     async deleteSubmission(submissionId) {
       await submissions.deleteOne({ _id: submissionId });
@@ -156,6 +170,12 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): FormStorag
     },
     async clear() {
       await Promise.all([schemas.deleteMany({}), submissions.deleteMany({})]);
+    },
+    async createIndexes() {
+      await submissions.createIndexes([
+        { key: { formId: 1, submittedAt: 1 }, name: "form_responses_form_submitted_at" },
+        { key: { "submission.locale": 1 }, name: "form_responses_locale" }
+      ]);
     }
   };
 }

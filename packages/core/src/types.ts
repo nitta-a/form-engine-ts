@@ -130,9 +130,18 @@ export interface AsyncTranslationAdapter {
   translateBatch(texts: readonly string[], targetLocale: string, sourceLocale?: string): Promise<readonly string[]>;
 }
 
+export interface SubmissionQueryOptions {
+  readonly since?: string;
+  readonly until?: string;
+}
+
 export interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
-  listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;
+  listSubmissions(
+    formId: string,
+    formVersion?: number,
+    options?: SubmissionQueryOptions
+  ): Promise<readonly FormSubmission[]>;
   clearResponses?(formId: string): Promise<void>;
   clear(): Promise<void>;
 }
