@@ -54,6 +54,7 @@ jobs:
             "packages/storage-memory/package.json",
             "packages/storage-mongodb/package.json",
             "packages/translator-deepl/package.json",
+            "packages/translator-google/package.json",
             "packages/translator-mock/package.json",
             "packages/zod/package.json"
           ];

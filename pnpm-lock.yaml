@@ -123,6 +123,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/translator-google:
+    dependencies:
+      '@form-engine/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/translator-mock:
     dependencies:
       '@form-engine/core':

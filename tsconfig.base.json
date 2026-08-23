@@ -21,6 +21,7 @@
       "@form-engine/storage-memory": ["./packages/storage-memory/src/index.ts"],
       "@form-engine/storage-mongodb": ["./packages/storage-mongodb/src/index.ts"],
       "@form-engine/translator-deepl": ["./packages/translator-deepl/src/index.ts"],
+      "@form-engine/translator-google": ["./packages/translator-google/src/index.ts"],
       "@form-engine/translator-mock": ["./packages/translator-mock/src/index.ts"],
       "@form-engine/zod": ["./packages/zod/src/index.ts"]
     },

@@ -14,6 +14,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | `@form-engine/storage-localstorage` | Prefix-isolated browser persistence factory with injectable storage for tests and SSR callers |
 | `@form-engine/translator-mock` | English/Japanese synchronous translation adapter with interpolation and fallback |
 | `@form-engine/translator-deepl` | Server-side asynchronous DeepL Free/Pro text translation using injectable `fetch` |
+| `@form-engine/translator-google` | Server-side Google Cloud Translation Basic v2 adapter with API Key or Bearer authentication |
 | `@form-engine/storage-mongodb` | MongoDB Native Driver storage factory implementing the complete form storage contract |
 | `@form-engine/zod` | Pure `FormSchema` to Zod 3 answer-validator generation with Core-compatible issues |
 | `@form-engine/preview` | Three-tab Vite sandbox for building, responding, switching storage, analytics, and CSV export |
@@ -145,6 +146,22 @@ const japanese = await deepl.translateText("Thank you", "JA", "EN");
 
 DeepL credentials must remain on a trusted server. The adapter uses POST JSON with the authorization header, supports an injected `fetchFn`, and reports HTTP/API errors without automatic retries.
 
+Google Cloud Translation Basic v2 supports exactly one authentication strategy per adapter. API Key credentials are sent as the `key` query parameter; OAuth2 or Service Account callers inject a fresh Bearer token provider:
+
+```ts
+const googleWithApiKey = createGoogleTranslator({
+  apiKey: process.env.GOOGLE_TRANSLATE_API_KEY
+});
+
+const googleWithBearer = createGoogleTranslator({
+  getAccessToken: async () => credentials.getAccessToken()
+});
+
+const german = await googleWithBearer.translateBatch(["Hello", "Goodbye"], "de", "en");
+```
+
+Google credentials must also remain on a trusted server. The adapter sends plain-text translation requests, decodes HTML entities in returned text, accepts up to 128 texts per request, and reports HTTP/API errors without automatic retries. Token creation, refresh, ADC, and Service Account signing remain the caller's responsibility.
+
 Storage is asynchronous so the same form can later use a database or HTTP-backed implementation:
 
 ```ts
@@ -215,7 +232,7 @@ Zod failures use the field ID as their path and expose the Core validation code,
 
 The published libraries do not read DOM or browser-only globals during rendering. The default renderer uses its submitted form element only from event handling to focus the first invalid control. LocalStorage is resolved when `createLocalStorageAdapter()` is called, never on import; pass a `StorageLike` implementation outside a browser. The Vite preview owns browser-only UUID, timestamp, Blob, and download behavior.
 
-This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, DeepL retry/caching, MongoDB migrations/transactions, and Zod answer transforms. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
+This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, network translator retry/caching, MongoDB migrations/transactions, and Zod answer transforms. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
 
 ## 日本語
 
@@ -231,6 +248,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | `@form-engine/storage-localstorage` | prefix分離とテスト用storage注入に対応するブラウザ永続化ファクトリ |
 | `@form-engine/translator-mock` | 補間とフォールバックに対応した、英語・日本語の同期翻訳アダプター |
 | `@form-engine/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用するサーバー向け非同期翻訳 |
+| `@form-engine/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2アダプター |
 | `@form-engine/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージファクトリ |
 | `@form-engine/zod` | Core互換issueを返す、`FormSchema`からZod 3検証器への純粋な変換 |
 | `@form-engine/preview` | Builder・回答・集計/CSVの3タブを備えたViteサンドボックス |
@@ -345,6 +363,22 @@ const japanese = await deepl.translateText("Thank you", "JA", "EN");
 
 DeepLの認証情報は信頼できるサーバーだけで扱ってください。このアダプターは認証ヘッダー付きPOST JSON、`fetchFn`注入、HTTP/APIエラー通知に対応し、自動再試行は行いません。
 
+Google Cloud Translation Basic v2では、アダプターごとにAPI KeyまたはBearer token providerのどちらか一方だけを使用します。API Keyは`key` query parameterへ設定し、OAuth2／Service Account利用者は更新可能なBearer token providerを注入します。
+
+```ts
+const googleWithApiKey = createGoogleTranslator({
+  apiKey: process.env.GOOGLE_TRANSLATE_API_KEY
+});
+
+const googleWithBearer = createGoogleTranslator({
+  getAccessToken: async () => credentials.getAccessToken()
+});
+
+const german = await googleWithBearer.translateBatch(["Hello", "Goodbye"], "de", "en");
+```
+
+Googleの認証情報も信頼できるサーバーだけで扱ってください。このアダプターはplain text翻訳、返却テキストのHTML entityデコード、1リクエスト最大128テキスト、HTTP/APIエラー通知に対応し、自動再試行は行いません。token生成・更新、ADC、Service Account署名は呼び出し側の責務です。
+
 ストレージは非同期処理です。そのため、同じフォームを後からデータベースやHTTPベースの実装に切り替えられます。
 
 ```ts
@@ -406,4 +440,4 @@ Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補�
 
 公開ライブラリはレンダリング中にDOMやブラウザ専用グローバルへアクセスしません。LocalStorageはファクトリ呼び出し時にだけ解決され、SSRでは`StorageLike`を注入できます。UUID、現在時刻、Blob、CSVダウンロードはPreviewのイベント処理に限定しています。
 
-複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、DeepLの再試行・キャッシュ、MongoDB migration・transaction、Zodによる回答変換は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。
+複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、ネットワーク翻訳の再試行・キャッシュ、MongoDB migration・transaction、Zodによる回答変換は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。
