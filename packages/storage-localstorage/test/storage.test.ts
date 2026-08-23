@@ -21,10 +21,10 @@ const schema: FormSchema = {
   fields: [{ id: "answer", type: "text", labelKey: "answer" }]
 };
 
-function submission(id: string, version = 1): FormSubmission {
+function submission(id: string, version = 1, formId = "form"): FormSubmission {
   return {
     id,
-    formId: "form",
+    formId,
     formVersion: version,
     locale: "en",
     values: { answer: "yes" },
@@ -71,5 +71,31 @@ describe("createLocalStorageAdapter", () => {
     storage.setItem("pf_schema:form:1", "{");
     const adapter = createLocalStorageAdapter("pf_", storage);
     await expect(adapter.listSchemas()).rejects.toThrow(/invalid/);
+  });
+
+  it("clears every version for one form while retaining schemas, prefixes, and other forms", async () => {
+    const storage = createStorage();
+    const first = createLocalStorageAdapter("a_", storage);
+    const second = createLocalStorageAdapter("b_", storage);
+    await first.saveSchema(schema);
+    await first.saveSubmission(submission("one", 1));
+    await first.saveSubmission(submission("two", 2));
+    await first.saveSubmission(submission("other", 1, "other-form"));
+    await second.saveSubmission(submission("prefixed"));
+    await first.clearResponses?.("form");
+    expect(await first.listSubmissions("form")).toEqual([]);
+    expect(await first.listSubmissions("other-form")).toHaveLength(1);
+    expect(await first.getSchema("form", 1)).toEqual(schema);
+    expect(await second.listSubmissions("form")).toHaveLength(1);
+  });
+
+  it("does not partially delete when a stored submission is corrupt", async () => {
+    const storage = createStorage();
+    const adapter = createLocalStorageAdapter("pf_", storage);
+    await adapter.saveSubmission(submission("valid"));
+    storage.setItem("pf_submission:corrupt", "{");
+    await expect(adapter.clearResponses?.("form")).rejects.toThrow(/invalid/);
+    storage.removeItem("pf_submission:corrupt");
+    expect(await adapter.listSubmissions("form")).toHaveLength(1);
   });
 });

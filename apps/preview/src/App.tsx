@@ -14,7 +14,7 @@ import { FormBuilder, FormProvider, FormRenderer } from "@form-engine/react";
 import { createLocalStorageAdapter } from "@form-engine/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine/storage-memory";
 import { mockTranslator } from "@form-engine/translator-mock";
-import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { customerFeedbackSchema } from "./schema";
 
 type TabId = "builder" | "respondent" | "analytics";
@@ -127,13 +127,15 @@ function AnalyticsPanel({
   schema,
   submissions,
   locale,
-  onExport
+  onExport,
+  resetControl
 }: {
   readonly analytics: FormAnalytics;
   readonly schema: FormSchema;
   readonly submissions: readonly FormSubmission[];
   readonly locale: string;
   readonly onExport: () => void;
+  readonly resetControl: ReactNode;
 }) {
   const t = (key: string) => mockTranslator.translate(key, locale);
   const textFields = schema.fields.filter((field) => field.type === "text" || field.type === "textarea");
@@ -149,9 +151,12 @@ function AnalyticsPanel({
           <span>{t("preview.responses")}</span>
         </div>
       </div>
-      <button className="primary-action" type="button" onClick={onExport}>
-        {t("preview.export")}
-      </button>
+      <div className="dashboard-actions">
+        <button className="primary-action" type="button" onClick={onExport}>
+          {t("preview.export")}
+        </button>
+        {resetControl}
+      </div>
       {analytics.submissionCount === 0 ? (
         <p className="empty-state">{t("preview.noResponses")}</p>
       ) : (
@@ -222,6 +227,45 @@ function StorageSwitch({
   );
 }
 
+function ResetResponsesControl({
+  locale,
+  disabled,
+  onReset
+}: {
+  readonly locale: string;
+  readonly disabled: boolean;
+  readonly onReset: () => Promise<void>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const t = (key: string) => mockTranslator.translate(key, locale);
+  if (!confirming) {
+    return (
+      <button className="danger-action" type="button" disabled={disabled} onClick={() => setConfirming(true)}>
+        {t("preview.resetResponses")}
+      </button>
+    );
+  }
+  return (
+    <fieldset className="reset-confirmation">
+      <legend>{t("preview.resetConfirmation")}</legend>
+      <button
+        className="danger-action"
+        type="button"
+        disabled={disabled}
+        onClick={async () => {
+          await onReset();
+          setConfirming(false);
+        }}
+      >
+        {t("preview.confirmReset")}
+      </button>
+      <button type="button" disabled={disabled} onClick={() => setConfirming(false)}>
+        {t("preview.cancel")}
+      </button>
+    </fieldset>
+  );
+}
+
 export default function App() {
   const memoryStorage = useMemo(() => createMemoryStorageAdapter(), []);
   const localStorage = useMemo(() => createLocalStorageAdapter("form-engine-preview_"), []);
@@ -231,6 +275,11 @@ export default function App() {
   const [locale, setLocale] = useState("en");
   const [activeTab, setActiveTab] = useState<TabId>("builder");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
+  const [resetStatus, setResetStatus] = useState<{
+    readonly kind: "success" | "error";
+    readonly message: string;
+  } | null>(null);
   const storage: FormStorageAdapter = storageKind === "memory" ? memoryStorage : localStorage;
   const analytics = useMemo(() => aggregateResponses(schema, submissions), [schema, submissions]);
   const t = (key: string) => mockTranslator.translate(key, locale);
@@ -244,6 +293,7 @@ export default function App() {
       setSchema(nextSchema);
       setSubmissions(nextSubmissions);
       setLoadError(null);
+      setResetStatus(null);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -255,12 +305,14 @@ export default function App() {
 
   const changeSchema = (nextSchema: FormSchema) => {
     setSchema(nextSchema);
+    setResetStatus(null);
     void storage
       .saveSchema(nextSchema)
       .catch((cause: unknown) => setLoadError(cause instanceof Error ? cause.message : String(cause)));
   };
 
   const submit = async (values: FormValues) => {
+    setResetStatus(null);
     const submission = createSubmission(schema, values, {
       id: globalThis.crypto.randomUUID(),
       locale,
@@ -278,6 +330,27 @@ export default function App() {
     link.download = `${schema.id}-${schema.version}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const resetResponses = async () => {
+    const previousSubmissions = submissions;
+    setIsClearing(true);
+    setResetStatus(null);
+    setSubmissions([]);
+    try {
+      if (storage.clearResponses === undefined) throw new Error(t("preview.resetUnavailable"));
+      await storage.clearResponses(schema.id);
+      setSubmissions(await storage.listSubmissions(schema.id, schema.version));
+      setResetStatus({ kind: "success", message: t("preview.resetSuccess") });
+    } catch (cause) {
+      setSubmissions(previousSubmissions);
+      setResetStatus({
+        kind: "error",
+        message: `${t("preview.resetError")}${cause instanceof Error ? ` ${cause.message}` : ""}`
+      });
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: TabId) => {
@@ -330,6 +403,14 @@ export default function App() {
             {loadError}
           </p>
         )}
+        {resetStatus === null ? null : (
+          <p
+            className={`reset-status reset-status--${resetStatus.kind}`}
+            role={resetStatus.kind === "error" ? "alert" : "status"}
+          >
+            {resetStatus.message}
+          </p>
+        )}
         <div id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden={activeTab !== "builder"}>
           <div className="builder-grid">
             <section className="workspace-card">
@@ -346,6 +427,11 @@ export default function App() {
         <div id="panel-respondent" role="tabpanel" aria-labelledby="tab-respondent" hidden={activeTab !== "respondent"}>
           <section className="workspace-card respondent-card">
             <StorageSwitch value={storageKind} locale={locale} onChange={setStorageKind} />
+            <ResetResponsesControl
+              locale={locale}
+              disabled={isClearing || storage.clearResponses === undefined}
+              onReset={resetResponses}
+            />
             <FormProvider schema={schema} locale={locale} translator={mockTranslator} onSubmit={submit} resetOnSuccess>
               <FormRenderer successMessageKey="preview.success" errorMessageKey="preview.error" />
             </FormProvider>
@@ -358,6 +444,13 @@ export default function App() {
             submissions={submissions}
             locale={locale}
             onExport={downloadCsv}
+            resetControl={
+              <ResetResponsesControl
+                locale={locale}
+                disabled={isClearing || storage.clearResponses === undefined}
+                onReset={resetResponses}
+              />
+            }
           />
         </div>
       </div>

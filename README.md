@@ -103,7 +103,9 @@ export function ContactForm() {
 }
 ```
 
-`FormProvider` validates the schema at runtime. Conditions update as answers change, hidden controls and errors leave the DOM, and retained hidden values are removed from the submitted values. Changing the controlled `locale` prop does not clear answers. `useForm` exposes the complete form state and actions, while `useField(id)` provides one field's definition, value, error, and setter. `FormRenderer.components` can replace any default field renderer. `FormBuilder` is a controlled component that edits the same `FormSchema` data.
+`FormProvider` validates the schema at runtime. Conditions update as answers change, hidden controls and errors leave the DOM, and retained hidden values are removed from the submitted values. Changing the controlled `locale` prop does not clear answers. `useForm` exposes the complete form state and actions, while `useField(id)` provides one field's definition, value, error, and setter. `FormRenderer.components` can replace any default field renderer. `FormBuilder` is a controlled component that edits the same `FormSchema` data. It commits non-empty, unique question IDs and permits display conditions to reference prior questions only.
+
+Use `validateSchemaStructure(schema)` for focused duplicate/dangling/self/cycle diagnostics and `sanitizeSchema(schema)` to return a new schema without unsafe condition references. Sanitization never guesses how duplicate question or choice IDs should be renamed, so duplicates are reported but preserved.
 
 ### Adapter contracts
 
@@ -125,6 +127,7 @@ Storage is asynchronous so the same form can later use a database or HTTP-backed
 interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
   listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;
+  clearResponses?(formId: string): Promise<void>;
   clear(): Promise<void>;
 }
 
@@ -151,7 +154,7 @@ const responses = await storage.listSubmissions(schema.id, schema.version);
 const analytics = aggregateResponses(schema, responses);
 ```
 
-Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and `createMockTranslationAdapter()` to create adapters. Adapter classes are no longer exported. Duplicate submission IDs are rejected globally within an adapter. Aggregation and CSV export reject a different form ID/version; values removed from or incompatible with the current schema are treated as unanswered.
+Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and `createMockTranslationAdapter()` to create adapters. Adapter classes are no longer exported. Duplicate submission IDs are rejected globally within an adapter. `clearResponses(formId)` removes every response version for that form while retaining schemas and other forms; `clear()` resets the entire adapter. Aggregation and CSV export reject a different form ID/version; values removed from or incompatible with the current schema are treated as unanswered.
 
 ### Analytics semantics
 
@@ -163,6 +166,7 @@ Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and `createMo
 - Select, radio, multi-select, and checkbox fields expose counts and percentages.
 - `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
 - `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV with CRLF rows, metadata columns, schema-order field columns, and JSON-encoded arrays.
+- `escapeCsvCell` is exported for custom CSV producers and quotes commas, double quotes, CR, and LF while doubling embedded quotes.
 
 ### SSR and MVP boundaries
 
@@ -256,7 +260,9 @@ export function ContactForm() {
 }
 ```
 
-`FormProvider`はスキーマを実行時に検証します。表示条件は回答変更時に再計算され、非表示のコントロールとエラーはDOMから除外されます。回答値は再表示に備えてUI内に保持されますが、送信値からは除外されます。`FormBuilder`は同じ`FormSchema`を編集する制御コンポーネントです。
+`FormProvider`はスキーマを実行時に検証します。表示条件は回答変更時に再計算され、非表示のコントロールとエラーはDOMから除外されます。回答値は再表示に備えてUI内に保持されますが、送信値からは除外されます。`FormBuilder`は同じ`FormSchema`を編集する制御コンポーネントで、空でない一意な質問IDと、先行質問だけを参照する表示条件を保証します。
+
+`validateSchemaStructure(schema)`は重複・dangling・自己参照・循環参照を診断します。`sanitizeSchema(schema)`は危険な条件参照を除去した新しいスキーマを返します。重複IDの安全な改名方法は推測できないため、重複質問・選択肢は診断されますが自動削除されません。
 
 ### アダプターの契約
 
@@ -278,6 +284,7 @@ interface TranslationAdapter {
 interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
   listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;
+  clearResponses?(formId: string): Promise<void>;
   clear(): Promise<void>;
 }
 ```
@@ -296,7 +303,7 @@ const responses = await storage.listSubmissions(schema.id, schema.version);
 const analytics = aggregateResponses(schema, responses);
 ```
 
-`createMemoryStorageAdapter()`、`createLocalStorageAdapter()`、`createMockTranslationAdapter()`でアダプターを生成します。従来のクラスexportは廃止されました。回答IDの重複は拒否され、form ID/versionの不一致は集計とCSV変換で拒否されます。現行スキーマから削除された値や型不一致の値は未回答として扱われます。
+`createMemoryStorageAdapter()`、`createLocalStorageAdapter()`、`createMockTranslationAdapter()`でアダプターを生成します。従来のクラスexportは廃止されました。`clearResponses(formId)`は指定フォームの全version回答だけを削除し、スキーマと他フォームを保持します。`clear()`はアダプター全体を初期化します。PreviewではRespondent/Analytics両タブから確認付きで回答をクリアできます。
 
 ### 分析の仕様
 
@@ -307,6 +314,7 @@ const analytics = aggregateResponses(schema, responses);
 - ratingは既定で1～5の整数を扱い、numberと同じ数値集計を行います。
 - select、radio、multi-select、checkboxフィールドでは件数とパーセンテージを公開します。
 - CSVはUTF-8 BOM、CRLF、RFC 4180形式で、配列値をJSON文字列として出力します。
+- `escapeCsvCell`はカンマ、引用符、CR、LFを含むセルを引用し、内部引用符を二重化する公開純粋関数です。
 
 ### SSRとMVPの範囲
 

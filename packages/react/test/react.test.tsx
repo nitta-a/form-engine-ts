@@ -202,4 +202,85 @@ describe("React form engine", () => {
     expect(screen.getByLabelText("Condition operator")).toBeInTheDocument();
     expect(screen.getByText(/displayCondition/)).toBeInTheDocument();
   });
+
+  it("commits valid question IDs, sanitizes dependents, and rejects duplicate IDs", async () => {
+    const user = userEvent.setup();
+    function BuilderHarness() {
+      const [current, setCurrent] = useState<FormSchema>({
+        id: "builder-ids",
+        version: 1,
+        titleKey: "title",
+        fields: [
+          { id: "first", type: "text", labelKey: "first" },
+          {
+            id: "second",
+            type: "text",
+            labelKey: "second",
+            displayCondition: { questionId: "first", operator: "not_empty" }
+          }
+        ]
+      });
+      return (
+        <>
+          <FormBuilder schema={current} onChange={setCurrent} />
+          <output data-testid="builder-schema">{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+    render(<BuilderHarness />);
+    const firstId = screen.getAllByLabelText("Question ID")[0];
+    if (firstId === undefined) throw new Error("Expected first ID input");
+    await user.clear(firstId);
+    await user.type(firstId, "renamed{Enter}");
+    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"id":"renamed"');
+    expect(screen.getByTestId("builder-schema")).not.toHaveTextContent("displayCondition");
+
+    const secondId = screen.getAllByLabelText("Question ID")[1];
+    if (secondId === undefined) throw new Error("Expected second ID input");
+    await user.clear(secondId);
+    await user.type(secondId, "renamed");
+    await user.tab();
+    expect(screen.getByText(/already in use/)).toBeInTheDocument();
+    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"id":"second"');
+  });
+
+  it("offers only prior condition sources and removes conditions made forward by reordering", async () => {
+    const user = userEvent.setup();
+    function BuilderHarness() {
+      const [current, setCurrent] = useState<FormSchema>({
+        id: "builder-order",
+        version: 1,
+        titleKey: "title",
+        fields: [
+          { id: "first", type: "text", labelKey: "first" },
+          {
+            id: "second",
+            type: "text",
+            labelKey: "second",
+            displayCondition: { questionId: "first", operator: "not_empty" }
+          },
+          { id: "third", type: "text", labelKey: "third" }
+        ]
+      });
+      return (
+        <>
+          <FormBuilder schema={current} onChange={setCurrent} />
+          <output data-testid="ordered-schema">{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+    render(<BuilderHarness />);
+    const conditionSelects = screen.getAllByLabelText("Display condition") as HTMLSelectElement[];
+    const firstCondition = conditionSelects[0];
+    const secondCondition = conditionSelects[1];
+    const thirdCondition = conditionSelects[2];
+    if (firstCondition === undefined || secondCondition === undefined || thirdCondition === undefined) {
+      throw new Error("Expected three condition selectors");
+    }
+    expect([...firstCondition.options].map((option) => option.value)).toEqual([""]);
+    expect([...secondCondition.options].map((option) => option.value)).toEqual(["", "first"]);
+    expect([...thirdCondition.options].map((option) => option.value)).toEqual(["", "first", "second"]);
+    await user.click(screen.getByRole("button", { name: "Move second up" }));
+    expect(screen.getByTestId("ordered-schema")).not.toHaveTextContent("displayCondition");
+  });
 });

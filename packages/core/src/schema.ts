@@ -1,3 +1,4 @@
+import { validateSchemaStructure } from "./sanitization";
 import type {
   DisplayCondition,
   FieldOption,
@@ -216,60 +217,29 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
         ids.add(field.id);
       }
     });
-    inputFields.forEach((field, index) => {
-      if (!isRecord(field) || !isRecord(field.displayCondition) || !isNonEmptyString(field.id)) return;
-      const sourceId = field.displayCondition.questionId;
-      if (!isNonEmptyString(sourceId)) return;
-      if (sourceId === field.id) {
-        issue(
-          issues,
-          `fields[${index}].displayCondition.questionId`,
-          "self_condition",
-          "A field cannot depend on itself."
-        );
-      } else if (!ids.has(sourceId)) {
-        issue(
-          issues,
-          `fields[${index}].displayCondition.questionId`,
-          "unknown_condition_source",
-          "The condition source does not exist."
-        );
-      }
-    });
-
-    const fieldById = new Map(
-      inputFields
-        .filter((field): field is Record<string, unknown> => isRecord(field) && isNonEmptyString(field.id))
-        .map((field) => [field.id as string, field])
-    );
-    const resolved = new Set<string>();
-    const resolving = new Set<string>();
-    const reported = new Set<string>();
-    const visit = (id: string): void => {
-      if (resolved.has(id)) return;
-      if (resolving.has(id)) {
-        if (!reported.has(id)) {
-          const cycleIndex = inputFields.findIndex((field) => isRecord(field) && field.id === id);
-          issue(
-            issues,
-            `fields[${cycleIndex}].displayCondition`,
-            "condition_cycle",
-            "Display conditions cannot cycle."
-          );
-          reported.add(id);
-        }
-        return;
-      }
-      resolving.add(id);
-      const field = fieldById.get(id);
-      const condition = field?.displayCondition;
-      if (isRecord(condition) && isNonEmptyString(condition.questionId) && fieldById.has(condition.questionId)) {
-        visit(condition.questionId);
-      }
-      resolving.delete(id);
-      resolved.add(id);
+    const structuralSchema = {
+      id: typeof input.id === "string" ? input.id : "invalid",
+      version: typeof input.version === "number" ? input.version : 1,
+      titleKey: typeof input.titleKey === "string" ? input.titleKey : "invalid",
+      fields: inputFields.filter((field): field is FormField => isRecord(field) && isNonEmptyString(field.id))
     };
-    for (const id of fieldById.keys()) visit(id);
+    for (const structuralIssue of validateSchemaStructure(structuralSchema)) {
+      if (
+        structuralIssue.type !== "dangling_condition_reference" &&
+        structuralIssue.type !== "self_condition_reference" &&
+        structuralIssue.type !== "cyclic_condition_reference"
+      ) {
+        continue;
+      }
+      const fieldIndex = inputFields.findIndex((field) => isRecord(field) && field.id === structuralIssue.questionId);
+      const code =
+        structuralIssue.type === "dangling_condition_reference"
+          ? "unknown_condition_source"
+          : structuralIssue.type === "self_condition_reference"
+            ? "self_condition"
+            : "condition_cycle";
+      issue(issues, `fields[${fieldIndex}].displayCondition`, code, structuralIssue.message);
+    }
   }
   return issues.length === 0
     ? { valid: true, value: input as unknown as FormSchema, issues: [] }

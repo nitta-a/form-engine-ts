@@ -127,6 +127,7 @@ export interface TranslationAdapter {
 export interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
   listSubmissions(formId: string, formVersion?: number): Promise<readonly FormSubmission[]>;
+  clearResponses?(formId: string): Promise<void>;
   clear(): Promise<void>;
 }
 

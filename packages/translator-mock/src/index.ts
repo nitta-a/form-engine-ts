@@ -66,7 +66,14 @@ const sharedEnglish: TranslationCatalog = {
   "preview.storage": "Storage",
   "preview.memory": "Memory",
   "preview.localStorage": "LocalStorage",
-  "preview.freeText": "Free-text responses"
+  "preview.freeText": "Free-text responses",
+  "preview.resetResponses": "Reset responses",
+  "preview.resetConfirmation": "Delete every response for this form?",
+  "preview.confirmReset": "Confirm reset",
+  "preview.cancel": "Cancel",
+  "preview.resetSuccess": "All responses for this form were deleted.",
+  "preview.resetError": "Responses could not be deleted.",
+  "preview.resetUnavailable": "The selected storage does not support response reset."
 };
 
 const sharedJapanese: TranslationCatalog = {
@@ -132,7 +139,14 @@ const sharedJapanese: TranslationCatalog = {
   "preview.storage": "ストレージ",
   "preview.memory": "メモリ",
   "preview.localStorage": "LocalStorage",
-  "preview.freeText": "自由記述回答"
+  "preview.freeText": "自由記述回答",
+  "preview.resetResponses": "回答データを全件クリア",
+  "preview.resetConfirmation": "このフォームの回答をすべて削除しますか？",
+  "preview.confirmReset": "削除を確定",
+  "preview.cancel": "キャンセル",
+  "preview.resetSuccess": "このフォームの回答をすべて削除しました。",
+  "preview.resetError": "回答を削除できませんでした。",
+  "preview.resetUnavailable": "選択中のストレージは回答リセットに対応していません。"
 };
 
 export const mockCatalogs: TranslationCatalogs = { en: sharedEnglish, ja: sharedJapanese };

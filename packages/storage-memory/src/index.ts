@@ -58,6 +58,11 @@ export function createMemoryStorageAdapter(): FormStorageAdapter {
     async deleteSubmission(submissionId) {
       submissions.delete(submissionId);
     },
+    async clearResponses(formId) {
+      for (const [submissionId, submission] of submissions) {
+        if (submission.formId === formId) submissions.delete(submissionId);
+      }
+    },
     async clear() {
       schemas.clear();
       submissions.clear();

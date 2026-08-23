@@ -7,6 +7,8 @@ import type {
   FormField,
   FormSchema
 } from "@form-engine/core";
+import { sanitizeSchema } from "@form-engine/core";
+import { useEffect, useId, useState } from "react";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",
@@ -71,16 +73,23 @@ function conditionOperators(field: FormField): readonly ConditionOperator[] {
   return ["equals", "not_equals", "not_empty"];
 }
 
-function createsCycle(schema: FormSchema, targetId: string, sourceId: string): boolean {
-  const fields = new Map(schema.fields.map((field) => [field.id, field]));
-  let current: string | undefined = sourceId;
-  const visited = new Set<string>();
-  while (current !== undefined && !visited.has(current)) {
-    if (current === targetId) return true;
-    visited.add(current);
-    current = fields.get(current)?.displayCondition?.questionId;
-  }
-  return false;
+function withoutDisplayCondition(field: FormField): FormField {
+  const { displayCondition: _displayCondition, ...rest } = field;
+  return rest as FormField;
+}
+
+function sanitizeBuilderSchema(schema: FormSchema): FormSchema {
+  const sanitized = sanitizeSchema(schema);
+  const indexById = new Map(sanitized.fields.map((field, index) => [field.id, index]));
+  return {
+    ...sanitized,
+    fields: sanitized.fields.map((field, index) => {
+      const sourceId = field.displayCondition?.questionId;
+      if (sourceId === undefined) return field;
+      const sourceIndex = indexById.get(sourceId);
+      return sourceIndex !== undefined && sourceIndex < index ? field : withoutDisplayCondition(field);
+    })
+  };
 }
 
 function conditionWithValue(questionId: string, operator: ConditionOperator, value: ConditionValue): DisplayCondition {
@@ -137,18 +146,84 @@ function ConditionValueEditor({
   );
 }
 
+function QuestionIdEditor({
+  fieldId,
+  existingIds,
+  onCommit
+}: {
+  readonly fieldId: string;
+  readonly existingIds: ReadonlySet<string>;
+  readonly onCommit: (nextId: string) => void;
+}) {
+  const [draft, setDraft] = useState(fieldId);
+  const [error, setError] = useState<string | null>(null);
+  const errorId = useId();
+
+  useEffect(() => {
+    setDraft(fieldId);
+    setError(null);
+  }, [fieldId]);
+
+  const commit = () => {
+    const nextId = draft.trim();
+    if (nextId.length === 0) {
+      setError("Question ID is required.");
+      return;
+    }
+    if (nextId !== fieldId && existingIds.has(nextId)) {
+      setError(`Question ID "${nextId}" is already in use.`);
+      return;
+    }
+    setError(null);
+    setDraft(nextId);
+    if (nextId !== fieldId) onCommit(nextId);
+  };
+
+  return (
+    <label>
+      Question ID
+      <input
+        value={draft}
+        aria-invalid={error === null ? undefined : true}
+        aria-describedby={error === null ? undefined : errorId}
+        onChange={(event) => {
+          setDraft(event.currentTarget.value);
+          setError(null);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          } else if (event.key === "Escape") {
+            setDraft(fieldId);
+            setError(null);
+          }
+        }}
+      />
+      {error === null ? null : (
+        <span className="form-engine-builder__error" id={errorId}>
+          {error}
+        </span>
+      )}
+    </label>
+  );
+}
+
 export interface FormBuilderProps {
   readonly schema: FormSchema;
   readonly onChange: (newSchema: FormSchema) => void;
 }
 
 export function FormBuilder({ schema, onChange }: FormBuilderProps) {
+  const emitSchema = (candidate: FormSchema) => onChange(sanitizeBuilderSchema(candidate));
+
   const updateField = (fieldId: string, update: (field: FormField) => FormField) => {
-    onChange({ ...schema, fields: schema.fields.map((field) => (field.id === fieldId ? update(field) : field)) });
+    emitSchema({ ...schema, fields: schema.fields.map((field) => (field.id === fieldId ? update(field) : field)) });
   };
 
   const changeType = (fieldId: string, type: FieldType) => {
-    onChange({
+    emitSchema({
       ...schema,
       fields: schema.fields.map((field) => {
         if (field.id === fieldId) return normalizeField(field, type);
@@ -163,15 +238,13 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
 
   const removeField = (fieldId: string) => {
     if (schema.fields.length === 1) return;
-    onChange({
+    emitSchema({ ...schema, fields: schema.fields.filter((field) => field.id !== fieldId) });
+  };
+
+  const renameField = (fieldId: string, nextId: string) => {
+    emitSchema({
       ...schema,
-      fields: schema.fields
-        .filter((field) => field.id !== fieldId)
-        .map((field) => {
-          if (field.displayCondition?.questionId !== fieldId) return field;
-          const { displayCondition: _condition, ...withoutCondition } = field;
-          return withoutCondition as FormField;
-        })
+      fields: schema.fields.map((field) => (field.id === fieldId ? { ...field, id: nextId } : field))
     });
   };
 
@@ -184,12 +257,12 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
     if (current === undefined || other === undefined) return;
     fields[index] = other;
     fields[target] = current;
-    onChange({ ...schema, fields });
+    emitSchema({ ...schema, fields });
   };
 
   const addField = () => {
     const id = nextId(schema);
-    onChange({ ...schema, fields: [...schema.fields, { id, type: "text", labelKey: `${id}.label` }] });
+    emitSchema({ ...schema, fields: [...schema.fields, { id, type: "text", labelKey: `${id}.label` }] });
   };
 
   return (
@@ -199,9 +272,7 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
           const condition = field.displayCondition;
           const source =
             condition === undefined ? undefined : schema.fields.find((item) => item.id === condition.questionId);
-          const availableSources = schema.fields.filter(
-            (candidate) => candidate.id !== field.id && !createsCycle(schema, field.id, candidate.id)
-          );
+          const availableSources = schema.fields.slice(0, index);
           return (
             <fieldset className="form-engine-builder__question" key={field.id}>
               <legend>{field.id}</legend>
@@ -232,6 +303,11 @@ export function FormBuilder({ schema, onChange }: FormBuilderProps) {
                 </button>
               </div>
               <div className="form-engine-builder__grid">
+                <QuestionIdEditor
+                  fieldId={field.id}
+                  existingIds={new Set(schema.fields.map((item) => item.id))}
+                  onCommit={(nextId) => renameField(field.id, nextId)}
+                />
                 <label>
                   Title key
                   <input

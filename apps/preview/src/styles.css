@@ -174,6 +174,63 @@ textarea {
   margin-top: 1rem;
   padding: 0.7rem 1rem;
 }
+.dashboard-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.danger-action {
+  background: #fff;
+  border: 1px solid #d92d20;
+  border-radius: 0.5rem;
+  color: #b42318;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.65rem 0.9rem;
+}
+.danger-action:disabled,
+.reset-confirmation button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.respondent-card > .danger-action {
+  margin-bottom: 1.5rem;
+}
+.reset-confirmation {
+  align-items: center;
+  background: #fff5f4;
+  border: 1px solid #fecdca;
+  border-radius: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.65rem;
+}
+.reset-confirmation legend {
+  color: #912018;
+  font-weight: 650;
+  padding: 0 0.3rem;
+}
+.reset-confirmation button:not(.danger-action) {
+  background: white;
+  border: 1px solid #aab2bd;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  padding: 0.65rem 0.9rem;
+}
+.reset-status {
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+.reset-status--success {
+  background: #ecfdf3;
+  color: #067647;
+}
+.reset-status--error {
+  background: #fee4e2;
+  color: #b42318;
+}
 .empty-state {
   color: #697386;
   line-height: 1.6;

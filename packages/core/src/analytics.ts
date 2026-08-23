@@ -161,8 +161,10 @@ export function aggregateResponses(schema: FormSchema, submissions: readonly For
   };
 }
 
-function csvCell(value: string): string {
-  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+export function escapeCsvCell(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const stringValue = String(value);
+  return /[",\r\n]/.test(stringValue) ? `"${stringValue.replaceAll('"', '""')}"` : stringValue;
 }
 
 function serializeValue(value: FormValue): string {
@@ -190,5 +192,5 @@ export function exportResponsesToCsv(schema: FormSchema, responses: readonly For
       ];
     })
   ];
-  return `\uFEFF${rows.map((row) => row.map((cell) => csvCell(cell)).join(",")).join("\r\n")}`;
+  return `\uFEFF${rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(",")).join("\r\n")}`;
 }

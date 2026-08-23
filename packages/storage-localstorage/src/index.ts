@@ -121,6 +121,14 @@ export function createLocalStorageAdapter(storagePrefix = "pf_", injectedStorage
     async deleteSubmission(submissionId) {
       storage.removeItem(submissionKey(submissionId));
     },
+    async clearResponses(formId) {
+      const matchingKeys = prefixedKeys(submissionPrefix).filter((key) => {
+        const value = storage.getItem(key);
+        if (value === null) throw new Error(`Stored submission at "${key}" disappeared during reading.`);
+        return parseSubmission(value, key).formId === formId;
+      });
+      for (const key of matchingKeys) storage.removeItem(key);
+    },
     async clear() {
       for (const key of prefixedKeys(storagePrefix)) storage.removeItem(key);
     }

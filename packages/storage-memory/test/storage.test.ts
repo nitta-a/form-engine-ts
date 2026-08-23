@@ -1,10 +1,10 @@
 import type { FormSubmission } from "@form-engine/core";
 import { createMemoryStorageAdapter } from "../src";
 
-function submission(id: string, version = 1): FormSubmission {
+function submission(id: string, version = 1, formId = "form"): FormSubmission {
   return {
     id,
-    formId: "form",
+    formId,
     formVersion: version,
     locale: "en",
     values: { choices: ["a"] },
@@ -56,5 +56,23 @@ describe("createMemoryStorageAdapter", () => {
     expect((await storage.listSchemas())[0]?.titleKey).toBe("updated");
     await storage.deleteSchema("form", 1);
     expect(await storage.listSchemas()).toEqual([]);
+  });
+
+  it("clears every version for one form without deleting schemas or other forms", async () => {
+    const storage = createMemoryStorageAdapter();
+    const schema = {
+      id: "form",
+      version: 1,
+      titleKey: "title",
+      fields: [{ id: "answer", type: "text", labelKey: "answer" }]
+    } as const;
+    await storage.saveSchema(schema);
+    await storage.saveSubmission(submission("one", 1));
+    await storage.saveSubmission(submission("two", 2));
+    await storage.saveSubmission(submission("other", 1, "other-form"));
+    await storage.clearResponses?.("form");
+    expect(await storage.listSubmissions("form")).toEqual([]);
+    expect(await storage.listSubmissions("other-form")).toHaveLength(1);
+    expect(await storage.getSchema("form", 1)).toEqual(schema);
   });
 });
