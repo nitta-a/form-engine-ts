@@ -10,42 +10,43 @@ import {
 const schema = {
   id: "survey",
   version: 1,
-  titleKey: "survey.title",
+  title: "survey.title",
   fields: [
-    { id: "text", type: "text", labelKey: "text", required: true, minLength: 2, maxLength: 4, pattern: "^[A-Z]+$" },
-    { id: "notes", type: "textarea", labelKey: "notes", maxLength: 10 },
-    { id: "number", type: "number", labelKey: "number", required: true, min: 2, max: 10, step: 2 },
+    { id: "text", type: "text", title: "text", required: true, minLength: 2, maxLength: 4, pattern: "^[A-Z]+$" },
+    { id: "notes", type: "textarea", title: "notes", required: false, maxLength: 10 },
+    { id: "number", type: "number", title: "number", required: true, min: 2, max: 10, step: 2 },
     {
       id: "select",
       type: "select",
-      labelKey: "select",
+      title: "select",
       required: true,
       options: [
-        { value: "a", labelKey: "a" },
-        { value: "b", labelKey: "b" }
+        { id: "a", label: "a" },
+        { id: "b", label: "b" }
       ]
     },
     {
       id: "multi",
       type: "multi-select",
-      labelKey: "multi",
+      title: "multi",
       required: true,
       minSelections: 2,
       maxSelections: 2,
       options: [
-        { value: "x", labelKey: "x" },
-        { value: "y", labelKey: "y" },
-        { value: "z", labelKey: "z" }
+        { id: "x", label: "x" },
+        { id: "y", label: "y" },
+        { id: "z", label: "z" }
       ]
     },
-    { id: "check", type: "checkbox", labelKey: "check", required: true },
+    { id: "check", type: "checkbox", title: "check", required: true },
     {
       id: "radio",
       type: "radio",
-      labelKey: "radio",
+      title: "radio",
+      required: false,
       options: [
-        { value: "yes", labelKey: "yes" },
-        { value: "no", labelKey: "no" }
+        { id: "yes", label: "yes" },
+        { id: "no", label: "no" }
       ]
     }
   ]
@@ -66,10 +67,62 @@ describe("schema validation", () => {
     expect(validateFormSchema(schema)).toMatchObject({ valid: true });
   });
 
+  it("requires natural-language properties and an explicit required flag", () => {
+    const legacy = {
+      id: "legacy",
+      version: 1,
+      titleKey: "legacy.title",
+      fields: [{ id: "question", type: "text", labelKey: "legacy.question" }]
+    };
+    const result = validateFormSchema(legacy);
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "title", code: "invalid_title" }),
+        expect.objectContaining({ path: "titleKey", code: "legacy_property" }),
+        expect.objectContaining({ path: "fields[0].title", code: "invalid_title" }),
+        expect.objectContaining({ path: "fields[0].labelKey", code: "legacy_property" }),
+        expect.objectContaining({ path: "fields[0].required", code: "invalid_required" })
+      ])
+    );
+  });
+
+  it("rejects legacy properties even when the new schema properties are also present", () => {
+    const result = validateFormSchema({
+      ...schema,
+      titleKey: "legacy.form",
+      fields: [
+        {
+          id: "choice",
+          type: "select",
+          title: "Choice",
+          titleKey: "legacy.choice",
+          required: false,
+          options: [{ id: "yes", value: "yes", label: "Yes", labelKey: "legacy.yes" }]
+        }
+      ]
+    });
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: "titleKey", code: "legacy_property" }),
+        expect.objectContaining({ path: "fields[0].titleKey", code: "legacy_property" }),
+        expect.objectContaining({ path: "fields[0].options[0].value", code: "legacy_property" }),
+        expect.objectContaining({ path: "fields[0].options[0].labelKey", code: "legacy_property" })
+      ])
+    );
+  });
+
   it.each([
     [{ ...schema, fields: [...schema.fields, schema.fields[0]] }, "duplicate_field"],
-    [{ ...schema, fields: [{ id: "bad", type: "text", labelKey: "bad", pattern: "[" }] }, "invalid_pattern"],
-    [{ ...schema, fields: [{ id: "bad", type: "number", labelKey: "bad", min: 5, max: 1 }] }, "contradictory_bounds"],
+    [
+      { ...schema, fields: [{ id: "bad", type: "text", title: "bad", required: false, pattern: "[" }] },
+      "invalid_pattern"
+    ],
+    [
+      { ...schema, fields: [{ id: "bad", type: "number", title: "bad", required: false, min: 5, max: 1 }] },
+      "contradictory_bounds"
+    ],
     [
       {
         ...schema,
@@ -77,10 +130,11 @@ describe("schema validation", () => {
           {
             id: "bad",
             type: "select",
-            labelKey: "bad",
+            title: "bad",
+            required: false,
             options: [
-              { value: "x", labelKey: "x" },
-              { value: "x", labelKey: "x2" }
+              { id: "x", label: "x" },
+              { id: "x", label: "x2" }
             ]
           }
         ]
@@ -94,12 +148,13 @@ describe("schema validation", () => {
           {
             id: "bad",
             type: "multi-select",
-            labelKey: "bad",
+            title: "bad",
+            required: false,
             minSelections: 2,
             maxSelections: 1,
             options: [
-              { value: "x", labelKey: "x" },
-              { value: "y", labelKey: "y" }
+              { id: "x", label: "x" },
+              { id: "y", label: "y" }
             ]
           }
         ]
@@ -189,8 +244,8 @@ describe("submissions and analytics", () => {
     });
     expect(result.questions.find((item) => item.fieldId === "select")).toMatchObject({
       options: [
-        { value: "a", count: 1, percentageOfSubmissions: 50 },
-        { value: "b", count: 1, percentageOfSubmissions: 50 }
+        { id: "a", count: 1, percentageOfSubmissions: 50 },
+        { id: "b", count: 1, percentageOfSubmissions: 50 }
       ]
     });
     expect(JSON.stringify(result)).not.toContain("Fine");

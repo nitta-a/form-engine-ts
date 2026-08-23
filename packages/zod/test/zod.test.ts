@@ -5,42 +5,45 @@ import { createZodFormSchema } from "../src";
 const schema = {
   id: "survey",
   version: 1,
-  titleKey: "title",
+  title: "title",
   fields: [
-    { id: "text", type: "text", labelKey: "text", required: true, minLength: 2, maxLength: 4, pattern: "^[A-Z]+$" },
-    { id: "textarea", type: "textarea", labelKey: "textarea", maxLength: 5 },
-    { id: "number", type: "number", labelKey: "number", min: 2, max: 10, step: 2 },
-    { id: "rating", type: "rating", labelKey: "rating", min: 1, max: 5 },
+    { id: "text", type: "text", title: "text", required: true, minLength: 2, maxLength: 4, pattern: "^[A-Z]+$" },
+    { id: "textarea", type: "textarea", title: "textarea", required: false, maxLength: 5 },
+    { id: "number", type: "number", title: "number", required: false, min: 2, max: 10, step: 2 },
+    { id: "rating", type: "rating", title: "rating", required: false, min: 1, max: 5 },
     {
       id: "select",
       type: "select",
-      labelKey: "select",
+      title: "select",
+      required: false,
       options: [
-        { value: "a", labelKey: "a" },
-        { value: "b", labelKey: "b" }
+        { id: "a", label: "a" },
+        { id: "b", label: "b" }
       ]
     },
     {
       id: "radio",
       type: "radio",
-      labelKey: "radio",
+      title: "radio",
+      required: false,
       options: [
-        { value: "yes", labelKey: "yes" },
-        { value: "no", labelKey: "no" }
+        { id: "yes", label: "yes" },
+        { id: "no", label: "no" }
       ]
     },
     {
       id: "multi",
       type: "multi-select",
-      labelKey: "multi",
+      title: "multi",
+      required: false,
       minSelections: 2,
       maxSelections: 2,
       options: [
-        { value: "x", labelKey: "x" },
-        { value: "y", labelKey: "y" }
+        { id: "x", label: "x" },
+        { id: "y", label: "y" }
       ]
     },
-    { id: "checkbox", type: "checkbox", labelKey: "checkbox", required: true }
+    { id: "checkbox", type: "checkbox", title: "checkbox", required: true }
   ]
 } as const satisfies FormSchema;
 
@@ -105,28 +108,29 @@ describe("createZodFormSchema", () => {
     const conditional: FormSchema = {
       id: "conditional",
       version: 1,
-      titleKey: "title",
+      title: "title",
       fields: [
         {
           id: "choice",
           type: "select",
-          labelKey: "choice",
+          title: "choice",
+          required: false,
           options: [
-            { value: "yes", labelKey: "yes" },
-            { value: "no", labelKey: "no" }
+            { id: "yes", label: "yes" },
+            { id: "no", label: "no" }
           ]
         },
         {
           id: "details",
           type: "text",
-          labelKey: "details",
+          title: "details",
           required: true,
           displayCondition: { questionId: "choice", operator: "equals", value: "yes" }
         },
         {
           id: "nested",
           type: "text",
-          labelKey: "nested",
+          title: "nested",
           required: true,
           displayCondition: { questionId: "details", operator: "not_empty" }
         }

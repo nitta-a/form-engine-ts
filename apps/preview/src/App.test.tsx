@@ -1,18 +1,19 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
 async function submitCompleteResponse(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/Your name/), "Ada");
-  await user.type(screen.getByLabelText(/Reference code/), "ABC123");
-  await user.type(screen.getByLabelText(/Your age/), "36");
-  await user.selectOptions(screen.getByLabelText(/Team/), "product");
-  await user.click(screen.getByLabelText("Email"));
-  await user.click(screen.getByLabelText(/I agree/));
-  await user.click(screen.getByLabelText("Yes"));
-  await user.click(screen.getByLabelText("5"));
-  await user.click(screen.getByRole("button", { name: "Send response" }));
-  await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Response saved"));
+  const respondent = within(screen.getByRole("tabpanel"));
+  await user.type(respondent.getByLabelText(/^お名前/), "Ada");
+  await user.type(respondent.getByLabelText(/^参照コード/), "ABC123");
+  await user.type(respondent.getByLabelText(/^年齢/), "36");
+  await user.selectOptions(respondent.getByLabelText(/^担当チーム/), "opt_a1b2c3d4");
+  await user.click(respondent.getByLabelText("メール"));
+  await user.click(respondent.getByLabelText(/この回答を分析/));
+  await user.click(respondent.getByLabelText("はい"));
+  await user.click(respondent.getByLabelText("5"));
+  await user.click(respondent.getByRole("button", { name: "Send response" }));
+  await waitFor(() => expect(respondent.getByRole("status")).toHaveTextContent("Response saved"));
 }
 
 describe("preview application", () => {
@@ -39,7 +40,7 @@ describe("preview application", () => {
     expect(screen.getByRole("tab", { name: "Form Builder" })).toHaveAttribute("aria-selected", "true");
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByRole("button", { name: "日本語" }));
-    expect(screen.getByRole("heading", { name: "お客様アンケート" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "サービスの満足度" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "EN" }));
     await submitCompleteResponse(user);
     await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
@@ -53,7 +54,7 @@ describe("preview application", () => {
     await waitFor(() => expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("0"));
     expect(screen.getByRole("status")).toHaveTextContent("All responses");
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
-    expect(screen.getByLabelText(/Your name/)).toHaveValue("");
+    expect(within(screen.getByRole("tabpanel")).getByLabelText(/^お名前/)).toHaveValue("");
   });
 
   it("switches storage and keeps builder JSON synchronized", async () => {
@@ -65,7 +66,41 @@ describe("preview application", () => {
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
     await user.click(screen.getByRole("tab", { name: "Form Builder" }));
     await user.click(screen.getByRole("button", { name: "Add question" }));
-    expect(screen.getByText(/"question-11"/)).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "New question" })).toBeInTheDocument();
+  });
+
+  it("downloads an Excel-compatible BOM CSV blob", async () => {
+    const user = userEvent.setup();
+    let capturedBlob: Blob | undefined;
+    const originalCreateObjectUrl = URL.createObjectURL;
+    const originalRevokeObjectUrl = URL.revokeObjectURL;
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn((blob: Blob) => {
+        capturedBlob = blob;
+        return "blob:test";
+      })
+    });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    try {
+      render(<App />);
+      await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+      await user.click(screen.getByRole("button", { name: "Download CSV" }));
+      expect(capturedBlob).toBeDefined();
+      expect(capturedBlob?.type).toBe("text/csv;charset=utf-8;");
+      const bytes = await new Promise<Uint8Array>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+        reader.readAsArrayBuffer(capturedBlob as Blob);
+      });
+      expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    } finally {
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+      Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+    }
   });
 
   it("clears LocalStorage responses from the respondent tab", async () => {

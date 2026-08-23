@@ -1,5 +1,5 @@
 import type { FormSchema, FormValues, TranslationAdapter } from "@form-engine/core";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { FormBuilder, FormProvider, FormRenderer, useField } from "../src";
@@ -7,17 +7,25 @@ import { FormBuilder, FormProvider, FormRenderer, useField } from "../src";
 const schema = {
   id: "test",
   version: 1,
-  titleKey: "title",
+  title: "Test form",
+  description: "A natural-language form description.",
   submitLabelKey: "submit",
   fields: [
-    { id: "name", type: "text", labelKey: "name", required: true, minLength: 2 },
-    { id: "age", type: "number", labelKey: "age", min: 1 },
-    { id: "rating", type: "rating", labelKey: "rating" },
-    { id: "team", type: "select", labelKey: "team", options: [{ value: "a", labelKey: "option.a" }] },
-    { id: "tags", type: "multi-select", labelKey: "tags", options: [{ value: "x", labelKey: "option.x" }] },
-    { id: "agree", type: "checkbox", labelKey: "agree" },
-    { id: "choice", type: "radio", labelKey: "choice", options: [{ value: "yes", labelKey: "yes" }] },
-    { id: "notes", type: "textarea", labelKey: "notes" }
+    {
+      id: "name",
+      type: "text",
+      title: "Name",
+      description: "Enter your full name.",
+      required: true,
+      minLength: 2
+    },
+    { id: "age", type: "number", title: "Age", required: false, min: 1 },
+    { id: "rating", type: "rating", title: "Rating", required: false },
+    { id: "team", type: "select", title: "Team", required: false, options: [{ id: "a", label: "Team A" }] },
+    { id: "tags", type: "multi-select", title: "Tags", required: false, options: [{ id: "x", label: "Tag X" }] },
+    { id: "agree", type: "checkbox", title: "Agree", required: false },
+    { id: "choice", type: "radio", title: "Choice", required: false, options: [{ id: "yes", label: "Yes" }] },
+    { id: "notes", type: "textarea", title: "Notes", required: false }
   ]
 } as const satisfies FormSchema;
 
@@ -52,32 +60,36 @@ function Harness({
 }
 
 describe("React form engine", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("renders every control with accessible labels", () => {
     render(<Harness onSubmit={() => undefined} />);
-    expect(screen.getByRole("heading", { name: "en:title" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/en:name/)).toHaveAttribute("type", "text");
-    expect(screen.getByLabelText("en:age")).toHaveAttribute("type", "number");
+    expect(screen.getByRole("heading", { name: "Test form" })).toBeInTheDocument();
+    expect(screen.getByText("A natural-language form description.")).toBeInTheDocument();
+    expect(screen.getByText("Enter your full name.")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Name/)).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Age")).toHaveAttribute("type", "number");
     expect(screen.getByLabelText("1")).toHaveAttribute("type", "radio");
-    expect(screen.getByLabelText("en:team").tagName).toBe("SELECT");
-    expect(screen.getByLabelText("en:option.x")).toHaveAttribute("type", "checkbox");
-    expect(screen.getByLabelText("en:agree")).toHaveAttribute("type", "checkbox");
-    expect(screen.getByLabelText("en:yes")).toHaveAttribute("type", "radio");
-    expect(screen.getByLabelText("en:notes").tagName).toBe("TEXTAREA");
+    expect(screen.getByLabelText("Team").tagName).toBe("SELECT");
+    expect(screen.getByLabelText("Tag X")).toHaveAttribute("type", "checkbox");
+    expect(screen.getByLabelText("Agree")).toHaveAttribute("type", "checkbox");
+    expect(screen.getByLabelText("Yes")).toHaveAttribute("type", "radio");
+    expect(screen.getByLabelText("Notes").tagName).toBe("TEXTAREA");
   });
 
   it("preserves answers across controlled locale changes", async () => {
     const user = userEvent.setup();
     render(<Harness onSubmit={() => undefined} />);
-    await user.type(screen.getByLabelText(/en:name/), "Ada");
+    await user.type(screen.getByLabelText(/Name/), "Ada");
     await user.click(screen.getByText("Japanese"));
-    expect(screen.getByLabelText(/ja:name/)).toHaveValue("Ada");
+    expect(screen.getByLabelText(/Name/)).toHaveValue("Ada");
   });
 
   it("validates, associates errors, focuses the first failure, and revalidates on change", async () => {
     const user = userEvent.setup();
     render(<Harness onSubmit={() => undefined} />);
     await user.click(screen.getByRole("button", { name: "en:submit" }));
-    const input = screen.getByLabelText(/en:name/);
+    const input = screen.getByLabelText(/Name/);
     await waitFor(() => expect(input).toHaveFocus());
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("en:validation.required")).toBeInTheDocument();
@@ -89,15 +101,15 @@ describe("React form engine", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(async () => undefined);
     const { unmount } = render(<Harness onSubmit={onSubmit} resetOnSuccess />);
-    await user.type(screen.getByLabelText(/en:name/), "Ada");
+    await user.type(screen.getByLabelText(/Name/), "Ada");
     await user.click(screen.getByRole("button", { name: "en:submit" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("en:success"));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: "Ada" }));
-    expect(screen.getByLabelText(/en:name/)).toHaveValue("");
+    expect(screen.getByLabelText(/Name/)).toHaveValue("");
     unmount();
 
     render(<Harness onSubmit={() => Promise.reject(new Error("nope"))} />);
-    await user.type(screen.getByLabelText(/en:name/), "Ada");
+    await user.type(screen.getByLabelText(/Name/), "Ada");
     const form = screen.getByRole("button", { name: "en:submit" }).closest("form");
     if (form === null) throw new Error("Expected a form element.");
     fireEvent.submit(form);
@@ -127,27 +139,30 @@ describe("React form engine", () => {
     const conditional = {
       id: "conditional",
       version: 1,
-      titleKey: "title",
+      title: "title",
       fields: [
         {
           id: "show",
           type: "select",
-          labelKey: "show",
+          title: "show",
+          required: false,
           options: [
-            { value: "yes", labelKey: "yes" },
-            { value: "no", labelKey: "no" }
+            { id: "yes", label: "yes" },
+            { id: "no", label: "no" }
           ]
         },
         {
           id: "details",
           type: "text",
-          labelKey: "details",
+          title: "details",
+          required: false,
           displayCondition: { questionId: "show", operator: "equals", value: "yes" }
         },
         {
           id: "nested",
           type: "text",
-          labelKey: "nested",
+          title: "nested",
+          required: false,
           displayCondition: { questionId: "details", operator: "not_empty" }
         }
       ]
@@ -158,15 +173,15 @@ describe("React form engine", () => {
         <FormRenderer />
       </FormProvider>
     );
-    expect(screen.queryByLabelText("en:details")).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("en:show"), "yes");
-    await user.type(screen.getByLabelText("en:details"), "kept");
-    expect(screen.getByLabelText("en:nested")).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("en:show"), "no");
-    expect(screen.queryByLabelText("en:details")).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("en:show"), "yes");
-    expect(screen.getByLabelText("en:details")).toHaveValue("kept");
-    await user.selectOptions(screen.getByLabelText("en:show"), "no");
+    expect(screen.queryByLabelText("details")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("show"), "yes");
+    await user.type(screen.getByLabelText("details"), "kept");
+    expect(screen.getByLabelText("nested")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("show"), "no");
+    expect(screen.queryByLabelText("details")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("show"), "yes");
+    expect(screen.getByLabelText("details")).toHaveValue("kept");
+    await user.selectOptions(screen.getByLabelText("show"), "no");
     await user.click(screen.getByRole("button", { name: "en:form.submit" }));
     expect(onSubmit).toHaveBeenCalledWith({ show: "no" });
   });
@@ -177,8 +192,8 @@ describe("React form engine", () => {
       const [current, setCurrent] = useState<FormSchema>({
         id: "builder",
         version: 1,
-        titleKey: "title",
-        fields: [{ id: "first", type: "text", labelKey: "first.label" }]
+        title: "title",
+        fields: [{ id: "q_12345678", type: "text", title: "first.label", required: false }]
       });
       return (
         <>
@@ -187,36 +202,40 @@ describe("React form engine", () => {
         </>
       );
     }
+    vi.spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("12345678-1234-1234-1234-123456789012")
+      .mockReturnValue("87654321-1234-1234-1234-123456789012");
     render(<BuilderHarness />);
-    expect(screen.getByRole("button", { name: "Delete first" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete first.label" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Add question" }));
-    expect(screen.getByRole("button", { name: "Move question-2 up" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Move New question up" })).toBeEnabled();
+    expect(screen.getByText(/"q_87654321"/)).toBeInTheDocument();
     const typeSelects = screen.getAllByLabelText("Type");
     const secondType = typeSelects[1];
     if (secondType === undefined) throw new Error("Expected second type selector");
     await user.selectOptions(secondType, "select");
     expect(screen.getByRole("button", { name: "Add option" })).toBeInTheDocument();
+    expect(screen.getByText(/"opt_87654321"/)).toBeInTheDocument();
     const secondCondition = screen.getAllByLabelText("Display condition")[1];
     if (secondCondition === undefined) throw new Error("Expected second condition selector");
-    await user.selectOptions(secondCondition, "first");
+    await user.selectOptions(secondCondition, "q_12345678");
     expect(screen.getByLabelText("Condition operator")).toBeInTheDocument();
     expect(screen.getByText(/displayCondition/)).toBeInTheDocument();
   });
 
-  it("commits valid question IDs, sanitizes dependents, and rejects duplicate IDs", async () => {
-    const user = userEvent.setup();
+  it("hides generated IDs and keeps them stable while natural-language labels change", () => {
     function BuilderHarness() {
       const [current, setCurrent] = useState<FormSchema>({
         id: "builder-ids",
         version: 1,
-        titleKey: "title",
+        title: "title",
         fields: [
-          { id: "first", type: "text", labelKey: "first" },
           {
-            id: "second",
-            type: "text",
-            labelKey: "second",
-            displayCondition: { questionId: "first", operator: "not_empty" }
+            id: "q_aaaaaaaa",
+            type: "select",
+            title: "Satisfaction",
+            required: false,
+            options: [{ id: "opt_bbbbbbbb", label: "Satisfied" }]
           }
         ]
       });
@@ -228,20 +247,18 @@ describe("React form engine", () => {
       );
     }
     render(<BuilderHarness />);
-    const firstId = screen.getAllByLabelText("Question ID")[0];
-    if (firstId === undefined) throw new Error("Expected first ID input");
-    await user.clear(firstId);
-    await user.type(firstId, "renamed{Enter}");
-    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"id":"renamed"');
-    expect(screen.getByTestId("builder-schema")).not.toHaveTextContent("displayCondition");
-
-    const secondId = screen.getAllByLabelText("Question ID")[1];
-    if (secondId === undefined) throw new Error("Expected second ID input");
-    await user.clear(secondId);
-    await user.type(secondId, "renamed");
-    await user.tab();
-    expect(screen.getByText(/already in use/)).toBeInTheDocument();
-    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"id":"second"');
+    const builder = screen.getByRole("region", { name: "Form builder" });
+    expect(within(builder).queryByLabelText(/ID/)).not.toBeInTheDocument();
+    expect(within(builder).queryByText("q_aaaaaaaa")).not.toBeInTheDocument();
+    expect(within(builder).queryByText("opt_bbbbbbbb")).not.toBeInTheDocument();
+    const questionTitle = screen.getByLabelText("質問文 / Question Title");
+    fireEvent.change(questionTitle, { target: { value: "Overall satisfaction" } });
+    const optionLabel = screen.getByLabelText("選択肢 / Option Label 1");
+    fireEvent.change(optionLabel, { target: { value: "Very satisfied" } });
+    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"id":"q_aaaaaaaa"');
+    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"id":"opt_bbbbbbbb"');
+    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"title":"Overall satisfaction"');
+    expect(screen.getByTestId("builder-schema")).toHaveTextContent('"label":"Very satisfied"');
   });
 
   it("offers only prior condition sources and removes conditions made forward by reordering", async () => {
@@ -250,16 +267,17 @@ describe("React form engine", () => {
       const [current, setCurrent] = useState<FormSchema>({
         id: "builder-order",
         version: 1,
-        titleKey: "title",
+        title: "title",
         fields: [
-          { id: "first", type: "text", labelKey: "first" },
+          { id: "first", type: "text", title: "first", required: false },
           {
             id: "second",
             type: "text",
-            labelKey: "second",
+            title: "second",
+            required: false,
             displayCondition: { questionId: "first", operator: "not_empty" }
           },
-          { id: "third", type: "text", labelKey: "third" }
+          { id: "third", type: "text", title: "third", required: false }
         ]
       });
       return (

@@ -16,32 +16,33 @@ import {
 const conditionalSchema = {
   id: "conditional",
   version: 1,
-  titleKey: "title",
+  title: "title",
   fields: [
     {
       id: "choice",
       type: "select",
-      labelKey: "choice",
+      title: "choice",
+      required: false,
       options: [
-        { value: "yes", labelKey: "yes" },
-        { value: "no", labelKey: "no" }
+        { id: "yes", label: "yes" },
+        { id: "no", label: "no" }
       ]
     },
     {
       id: "details",
       type: "text",
-      labelKey: "details",
+      title: "details",
       required: true,
       displayCondition: { questionId: "choice", operator: "equals", value: "yes" }
     },
     {
       id: "nested",
       type: "text",
-      labelKey: "nested",
+      title: "nested",
       required: true,
       displayCondition: { questionId: "details", operator: "not_empty" }
     },
-    { id: "rating", type: "rating", labelKey: "rating", min: 1, max: 5 }
+    { id: "rating", type: "rating", title: "rating", required: false, min: 1, max: 5 }
   ]
 } as const satisfies FormSchema;
 
@@ -75,6 +76,40 @@ describe("conditional visibility", () => {
     expect(isQuestionVisible(field, { choice: answer })).toBe(expected);
   });
 
+  it("normalizes Japanese-compatible strings for conditions while preserving primitive types", () => {
+    const field = conditionalSchema.fields[1];
+    expect(
+      isQuestionVisible(
+        { ...field, displayCondition: { questionId: "choice", operator: "equals", value: "abc123" } },
+        { choice: "  ＡＢＣ１２３  " }
+      )
+    ).toBe(true);
+    expect(
+      isQuestionVisible(
+        { ...field, displayCondition: { questionId: "choice", operator: "contains", value: "カタカナ" } },
+        { choice: "  ｶﾀｶﾅ入力  " }
+      )
+    ).toBe(true);
+    expect(
+      isQuestionVisible(
+        { ...field, displayCondition: { questionId: "choice", operator: "contains", value: "ABC" } },
+        { choice: ["ａｂｃ", "other"] }
+      )
+    ).toBe(true);
+    expect(
+      isQuestionVisible(
+        { ...field, displayCondition: { questionId: "choice", operator: "not_equals", value: "ABC" } },
+        { choice: "ａｂｃ" }
+      )
+    ).toBe(false);
+    expect(
+      isQuestionVisible(
+        { ...field, displayCondition: { questionId: "choice", operator: "equals", value: 1 } },
+        { choice: "1" }
+      )
+    ).toBe(false);
+  });
+
   it("resolves chains, skips hidden validation, and strips hidden answers", () => {
     const values = { choice: "no", details: "retained", nested: "stale" };
     expect(calculateFieldVisibility(conditionalSchema, values)).toMatchObject({ details: false, nested: false });
@@ -96,8 +131,20 @@ describe("conditional visibility", () => {
     const cyclic: FormSchema = {
       ...conditionalSchema,
       fields: [
-        { id: "a", type: "text", labelKey: "a", displayCondition: { questionId: "b", operator: "not_empty" } },
-        { id: "b", type: "text", labelKey: "b", displayCondition: { questionId: "a", operator: "not_empty" } }
+        {
+          id: "a",
+          type: "text",
+          title: "a",
+          required: false,
+          displayCondition: { questionId: "b", operator: "not_empty" }
+        },
+        {
+          id: "b",
+          type: "text",
+          title: "b",
+          required: false,
+          displayCondition: { questionId: "a", operator: "not_empty" }
+        }
       ]
     };
     expect(validateFormSchema(cyclic).issues.some((issue) => issue.code === "condition_cycle")).toBe(true);
@@ -133,6 +180,9 @@ describe("phase two analytics and export", () => {
     const csv = exportResponsesToCsv(conditionalSchema, responses);
     expect(csv.startsWith("\uFEFFsubmissionId,submittedAt,locale,choice,details,nested,rating\r\n")).toBe(true);
     expect(csv).toContain('"A, ""quote"""');
+    expect(exportResponsesToCsv(conditionalSchema, responses, {}).startsWith("\uFEFF")).toBe(true);
+    expect(exportResponsesToCsv(conditionalSchema, responses, { withBom: true }).startsWith("\uFEFF")).toBe(true);
+    expect(exportResponsesToCsv(conditionalSchema, responses, { withBom: false }).startsWith("\uFEFF")).toBe(false);
     const first = responses[0];
     if (first === undefined) throw new Error("Expected a response");
     expect(() => exportResponsesToCsv(conditionalSchema, [{ ...first, formVersion: 2 }])).toThrow(/does not match/);

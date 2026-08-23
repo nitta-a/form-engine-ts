@@ -47,13 +47,13 @@ describe("createMemoryStorageAdapter", () => {
     const schema = {
       id: "form",
       version: 1,
-      titleKey: "title",
-      fields: [{ id: "answer", type: "text", labelKey: "answer" }]
+      title: "title",
+      fields: [{ id: "answer", type: "text", title: "answer", required: false }]
     } as const;
     await storage.saveSchema(schema);
     expect(await storage.getSchema("form", 1)).toEqual(schema);
-    await storage.saveSchema({ ...schema, titleKey: "updated" });
-    expect((await storage.listSchemas())[0]?.titleKey).toBe("updated");
+    await storage.saveSchema({ ...schema, title: "updated" });
+    expect((await storage.listSchemas())[0]?.title).toBe("updated");
     await storage.deleteSchema("form", 1);
     expect(await storage.listSchemas()).toEqual([]);
   });
@@ -63,8 +63,8 @@ describe("createMemoryStorageAdapter", () => {
     const schema = {
       id: "form",
       version: 1,
-      titleKey: "title",
-      fields: [{ id: "answer", type: "text", labelKey: "answer" }]
+      title: "title",
+      fields: [{ id: "answer", type: "text", title: "answer", required: false }]
     } as const;
     await storage.saveSchema(schema);
     await storage.saveSubmission(submission("one", 1));

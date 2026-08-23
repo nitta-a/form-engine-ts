@@ -76,7 +76,7 @@ function valueIsValid(field: FormField, value: FormValue): boolean {
   }
   if (field.type === "checkbox") return typeof value === "boolean";
   if (!("options" in field)) return false;
-  const allowed = new Set(field.options.map((option) => option.value));
+  const allowed = new Set(field.options.map((option) => option.id));
   if (field.type === "multi-select") {
     return (
       Array.isArray(value) &&
@@ -130,7 +130,7 @@ function aggregateField(
   }
 
   if (!("options" in field)) throw new TypeError(`Field ${field.id} cannot be aggregated.`);
-  const optionCounts = new Map(field.options.map((option) => [option.value, 0]));
+  const optionCounts = new Map(field.options.map((option) => [option.id, 0]));
   for (const value of values) {
     const selections = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
     for (const selection of selections) optionCounts.set(selection, (optionCounts.get(selection) ?? 0) + 1);
@@ -139,8 +139,8 @@ function aggregateField(
     ...base,
     kind: field.type,
     options: field.options.map((option) => {
-      const count = optionCounts.get(option.value) ?? 0;
-      return { value: option.value, count, percentageOfSubmissions: percentage(count, submissions.length) };
+      const count = optionCounts.get(option.id) ?? 0;
+      return { id: option.id, count, percentageOfSubmissions: percentage(count, submissions.length) };
     })
   };
   return aggregate;
@@ -173,7 +173,15 @@ function serializeValue(value: FormValue): string {
   return String(value);
 }
 
-export function exportResponsesToCsv(schema: FormSchema, responses: readonly FormSubmission[]): string {
+export interface CsvExportOptions {
+  readonly withBom?: boolean;
+}
+
+export function exportResponsesToCsv(
+  schema: FormSchema,
+  responses: readonly FormSubmission[],
+  options: CsvExportOptions = {}
+): string {
   assertValidFormSchema(schema);
   for (const response of responses) {
     if (response.formId !== schema.id || response.formVersion !== schema.version) {
@@ -192,5 +200,6 @@ export function exportResponsesToCsv(schema: FormSchema, responses: readonly For
       ];
     })
   ];
-  return `\uFEFF${rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(",")).join("\r\n")}`;
+  const csv = rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(",")).join("\r\n");
+  return (options.withBom ?? true) ? `\uFEFF${csv}` : csv;
 }

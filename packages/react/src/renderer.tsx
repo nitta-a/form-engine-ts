@@ -27,7 +27,7 @@ function describedBy(
   helpId: string,
   errorId: string
 ): string | undefined {
-  const ids = [field.helpTextKey === undefined ? undefined : helpId, error === undefined ? undefined : errorId].filter(
+  const ids = [field.description === undefined ? undefined : helpId, error === undefined ? undefined : errorId].filter(
     Boolean
   );
   return ids.length === 0 ? undefined : ids.join(" ");
@@ -42,28 +42,12 @@ function RequiredMark({ required }: { readonly required: boolean | undefined }) 
   ) : null;
 }
 
-function fieldRuleParams(field: FormField): Readonly<Record<string, string | number>> {
-  const params: Record<string, string | number> = {};
-  if (field.type === "text" || field.type === "textarea") {
-    if (field.minLength !== undefined) params.min = field.minLength;
-    if (field.maxLength !== undefined) params.max = field.maxLength;
-  } else if (field.type === "number" || field.type === "rating") {
-    if (field.min !== undefined) params.min = field.min;
-    if (field.max !== undefined) params.max = field.max;
-    if (field.type === "number" && field.step !== undefined) params.step = field.step;
-  } else if (field.type === "multi-select") {
-    if (field.minSelections !== undefined) params.min = field.minSelections;
-    if (field.maxSelections !== undefined) params.max = field.maxSelections;
-  }
-  return params;
-}
-
 function FieldMessage({ props }: { readonly props: FieldComponentProps }) {
   return (
     <>
-      {props.field.helpTextKey === undefined ? null : (
+      {props.field.description === undefined ? null : (
         <div id={props.helpId} className="fe-help">
-          {props.translate(props.field.helpTextKey, fieldRuleParams(props.field))}
+          {props.field.description}
         </div>
       )}
       {props.error === undefined ? null : (
@@ -95,7 +79,7 @@ function DefaultField(props: FieldComponentProps) {
             onChange={(event) => setValue(event.currentTarget.checked)}
           />
           <span>
-            {translate(field.labelKey)}
+            {field.title}
             <RequiredMark required={field.required} />
           </span>
         </label>
@@ -109,31 +93,31 @@ function DefaultField(props: FieldComponentProps) {
     return (
       <fieldset className={`fe-field fe-field--${field.type}`} data-field-id={field.id} {...ariaProps}>
         <legend className="fe-label">
-          {translate(field.labelKey)}
+          {field.title}
           <RequiredMark required={field.required} />
         </legend>
         {field.options.map((option, index) => {
           const optionId = `${inputId}-${index}`;
-          const checked = field.type === "radio" ? value === option.value : selected.includes(option.value);
+          const checked = field.type === "radio" ? value === option.id : selected.includes(option.id);
           return (
-            <label className="fe-check-label" htmlFor={optionId} key={option.value}>
+            <label className="fe-check-label" htmlFor={optionId} key={option.id}>
               <input
                 id={optionId}
                 name={field.id}
                 type={field.type === "radio" ? "radio" : "checkbox"}
-                value={option.value}
+                value={option.id}
                 checked={checked}
                 onChange={(event) => {
-                  if (field.type === "radio") setValue(option.value);
+                  if (field.type === "radio") setValue(option.id);
                   else
                     setValue(
                       event.currentTarget.checked
-                        ? [...selected, option.value]
-                        : selected.filter((item) => item !== option.value)
+                        ? [...selected, option.id]
+                        : selected.filter((item) => item !== option.id)
                     );
                 }}
               />
-              <span>{translate(option.labelKey)}</span>
+              <span>{option.label}</span>
             </label>
           );
         })}
@@ -148,7 +132,7 @@ function DefaultField(props: FieldComponentProps) {
     return (
       <fieldset className="fe-field fe-field--rating" data-field-id={field.id} {...ariaProps}>
         <legend className="fe-label">
-          {translate(field.labelKey)}
+          {field.title}
           <RequiredMark required={field.required} />
         </legend>
         <div className="fe-rating-options">
@@ -176,7 +160,7 @@ function DefaultField(props: FieldComponentProps) {
 
   const label = (
     <label className="fe-label" htmlFor={inputId}>
-      {translate(field.labelKey)}
+      {field.title}
       <RequiredMark required={field.required} />
     </label>
   );
@@ -218,8 +202,8 @@ function DefaultField(props: FieldComponentProps) {
       >
         <option value="">—</option>
         {field.options.map((option) => (
-          <option value={option.value} key={option.value}>
-            {translate(option.labelKey)}
+          <option value={option.id} key={option.id}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -282,8 +266,8 @@ export function FormRenderer({
   return (
     <form className={`fe-form ${className}`.trim()} noValidate onSubmit={handleSubmit}>
       <header className="fe-header">
-        <h1>{form.translate(form.schema.titleKey)}</h1>
-        {form.schema.descriptionKey === undefined ? null : <p>{form.translate(form.schema.descriptionKey)}</p>}
+        <h1>{form.schema.title}</h1>
+        {form.schema.description === undefined ? null : <p>{form.schema.description}</p>}
       </header>
       <div className="fe-fields">
         {form.schema.fields

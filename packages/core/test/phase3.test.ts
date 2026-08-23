@@ -3,21 +3,80 @@ import {
   exportResponsesToCsv,
   type FormSchema,
   type FormSubmission,
+  resolveFormTranslation,
   sanitizeSchema,
   validateSchemaStructure
 } from "../src";
 
+describe("natural-language schema translation", () => {
+  it("translates display text in one stable batch without changing identifiers or metadata", async () => {
+    const adapter = {
+      translateText: vi.fn(),
+      translateBatch: vi.fn(async (texts: readonly string[]) => texts.map((text) => `translated:${text}`))
+    };
+    const schema: FormSchema = {
+      id: "translation",
+      version: 1,
+      title: "フォーム",
+      description: "説明",
+      fields: [
+        {
+          id: "q_one",
+          type: "select",
+          title: "質問",
+          description: "補足",
+          translationKey: "question.one",
+          required: true,
+          options: [{ id: "opt_one", label: "選択肢" }]
+        }
+      ]
+    };
+
+    const result = await resolveFormTranslation(schema, adapter, "en", "ja");
+    expect(adapter.translateBatch).toHaveBeenCalledWith(["フォーム", "説明", "質問", "補足", "選択肢"], "en", "ja");
+    expect(result).toMatchObject({
+      id: "translation",
+      title: "translated:フォーム",
+      description: "translated:説明",
+      fields: [
+        {
+          id: "q_one",
+          title: "translated:質問",
+          description: "translated:補足",
+          translationKey: "question.one",
+          options: [{ id: "opt_one", label: "translated:選択肢" }]
+        }
+      ]
+    });
+    expect(schema.title).toBe("フォーム");
+  });
+
+  it("propagates adapter failures and rejects incomplete batches", async () => {
+    const failed = {
+      translateText: vi.fn(),
+      translateBatch: vi.fn(async () => {
+        throw new Error("offline");
+      })
+    };
+    await expect(resolveFormTranslation(validSchema, failed, "en")).rejects.toThrow("offline");
+    await expect(
+      resolveFormTranslation(validSchema, { translateText: vi.fn(), translateBatch: vi.fn(async () => []) }, "en")
+    ).rejects.toThrow(/returned 0 texts/);
+  });
+});
+
 const validSchema: FormSchema = {
   id: "structure",
   version: 1,
-  titleKey: "title",
+  title: "title",
   fields: [
-    { id: "first", type: "text", labelKey: "first" },
+    { id: "first", type: "text", title: "first", required: false },
     {
       id: "second",
       type: "select",
-      labelKey: "second",
-      options: [{ value: "yes", labelKey: "yes" }],
+      title: "second",
+      required: false,
+      options: [{ id: "yes", label: "yes" }],
       displayCondition: { questionId: "first", operator: "not_empty" }
     }
   ]
@@ -35,23 +94,26 @@ describe("schema structure validation and sanitization", () => {
         {
           id: "duplicate",
           type: "select",
-          labelKey: "duplicate",
+          title: "duplicate",
+          required: false,
           options: [
-            { value: "same", labelKey: "same" },
-            { value: "same", labelKey: "same-again" }
+            { id: "same", label: "same" },
+            { id: "same", label: "same-again" }
           ]
         },
-        { id: "duplicate", type: "text", labelKey: "duplicate-again" },
+        { id: "duplicate", type: "text", title: "duplicate-again", required: false },
         {
           id: "dangling",
           type: "text",
-          labelKey: "dangling",
+          title: "dangling",
+          required: false,
           displayCondition: { questionId: "missing", operator: "not_empty" }
         },
         {
           id: "self",
           type: "text",
-          labelKey: "self",
+          title: "self",
+          required: false,
           displayCondition: { questionId: "self", operator: "not_empty" }
         }
       ]
@@ -68,16 +130,29 @@ describe("schema structure validation and sanitization", () => {
     const invalid = {
       ...validSchema,
       fields: [
-        { id: "a", type: "text", labelKey: "a", displayCondition: { questionId: "b", operator: "not_empty" } },
-        { id: "b", type: "text", labelKey: "b", displayCondition: { questionId: "a", operator: "not_empty" } },
+        {
+          id: "a",
+          type: "text",
+          title: "a",
+          required: false,
+          displayCondition: { questionId: "b", operator: "not_empty" }
+        },
+        {
+          id: "b",
+          type: "text",
+          title: "b",
+          required: false,
+          displayCondition: { questionId: "a", operator: "not_empty" }
+        },
         {
           id: "dangling",
           type: "text",
-          labelKey: "dangling",
+          title: "dangling",
+          required: false,
           displayCondition: { questionId: "missing", operator: "not_empty" }
         },
-        { id: "duplicate", type: "text", labelKey: "one" },
-        { id: "duplicate", type: "text", labelKey: "two" }
+        { id: "duplicate", type: "text", title: "one", required: false },
+        { id: "duplicate", type: "text", title: "two", required: false }
       ]
     } as FormSchema;
     expect(validateSchemaStructure(invalid).filter((issue) => issue.type === "cyclic_condition_reference")).toEqual([
@@ -112,8 +187,8 @@ describe("RFC 4180 CSV escaping", () => {
     const schema: FormSchema = {
       id: "csv",
       version: 1,
-      titleKey: "title",
-      fields: [{ id: "text", type: "textarea", labelKey: "text" }]
+      title: "title",
+      fields: [{ id: "text", type: "textarea", title: "text", required: false }]
     };
     const response: FormSubmission = {
       id: "one",

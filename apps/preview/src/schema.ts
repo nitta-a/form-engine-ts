@@ -3,40 +3,45 @@ import type { FormSchema } from "@form-engine/core";
 export const customerFeedbackSchema = {
   id: "customer-feedback",
   version: 1,
-  titleKey: "form.title",
-  descriptionKey: "form.description",
+  title: "サービスの満足度",
+  description: "ご利用いただいたサービスについてお聞かせください。",
   submitLabelKey: "form.submit",
   fields: [
     {
-      id: "name",
+      id: "q_a1b2c3d4",
       type: "text",
-      labelKey: "field.name.label",
-      helpTextKey: "field.name.help",
+      title: "お名前",
+      description: "2文字以上で入力してください。",
+      translationKey: "field.name.label",
       placeholderKey: "field.name.placeholder",
       required: true,
       minLength: 2,
       maxLength: 80
     },
     {
-      id: "reference",
+      id: "q_b2c3d4e5",
       type: "text",
-      labelKey: "field.reference.label",
-      helpTextKey: "field.reference.help",
+      title: "参照コード",
+      description: "英大文字3文字と数字3桁で入力してください。",
+      translationKey: "field.reference.label",
       placeholderKey: "field.reference.placeholder",
       required: true,
       pattern: "^[A-Z]{3}\\d{3}$"
     },
     {
-      id: "comments",
+      id: "q_c3d4e5f6",
       type: "textarea",
-      labelKey: "field.comments.label",
+      title: "改善してほしい点",
+      translationKey: "field.comments.label",
+      required: false,
       placeholderKey: "field.comments.placeholder",
       maxLength: 200
     },
     {
-      id: "age",
+      id: "q_d4e5f6a7",
       type: "number",
-      labelKey: "field.age.label",
+      title: "年齢",
+      translationKey: "field.age.label",
       placeholderKey: "field.age.placeholder",
       required: true,
       min: 18,
@@ -44,61 +49,68 @@ export const customerFeedbackSchema = {
       step: 1
     },
     {
-      id: "team",
+      id: "q_e5f6a7b8",
       type: "select",
-      labelKey: "field.team.label",
-      helpTextKey: "field.team.help",
+      title: "担当チーム",
+      description: "ご利用になったチームを選択してください。",
+      translationKey: "field.team.label",
       required: true,
       options: [
-        { value: "product", labelKey: "option.team.product" },
-        { value: "support", labelKey: "option.team.support" },
-        { value: "sales", labelKey: "option.team.sales" }
+        { id: "opt_a1b2c3d4", label: "製品" },
+        { id: "opt_b2c3d4e5", label: "サポート" },
+        { id: "opt_c3d4e5f6", label: "営業" }
       ]
     },
     {
-      id: "channels",
+      id: "q_f6a7b8c9",
       type: "multi-select",
-      labelKey: "field.channels.label",
-      helpTextKey: "field.channels.help",
+      title: "お問い合わせ方法",
+      description: "1つまたは2つ選択してください。",
+      translationKey: "field.channels.label",
       required: true,
       minSelections: 1,
       maxSelections: 2,
       options: [
-        { value: "email", labelKey: "option.channel.email" },
-        { value: "chat", labelKey: "option.channel.chat" },
-        { value: "phone", labelKey: "option.channel.phone" }
+        { id: "opt_d4e5f6a7", label: "メール" },
+        { id: "opt_e5f6a7b8", label: "チャット" },
+        { id: "opt_f6a7b8c9", label: "電話" }
       ]
     },
     {
-      id: "consent",
+      id: "q_a7b8c9d0",
       type: "checkbox",
-      labelKey: "field.consent.label",
+      title: "この回答を分析に利用することに同意します。",
+      translationKey: "field.consent.label",
       required: true
     },
     {
-      id: "recommend",
+      id: "q_b8c9d0e1",
       type: "radio",
-      labelKey: "field.recommend.label",
+      title: "他の方におすすめしますか？",
+      translationKey: "field.recommend.label",
       required: true,
       options: [
-        { value: "yes", labelKey: "option.yes" },
-        { value: "no", labelKey: "option.no" }
+        { id: "opt_a7b8c9d0", label: "はい" },
+        { id: "opt_b8c9d0e1", label: "いいえ" }
       ]
     },
     {
-      id: "rating",
+      id: "q_c9d0e1f2",
       type: "rating",
-      labelKey: "field.rating.label",
+      title: "今回の体験を評価してください",
+      translationKey: "field.rating.label",
       required: true,
       min: 1,
       max: 5
     },
     {
-      id: "followup",
+      id: "q_d0e1f2a3",
       type: "textarea",
-      labelKey: "field.followup.label",
+      title: "残念だった理由を教えてください",
+      translationKey: "field.followup.label",
+      required: false,
       maxLength: 200,
-      displayCondition: { questionId: "recommend", operator: "equals", value: "no" }
+      displayCondition: { questionId: "q_b8c9d0e1", operator: "equals", value: "opt_b8c9d0e1" }
     }
   ]
 } as const satisfies FormSchema;

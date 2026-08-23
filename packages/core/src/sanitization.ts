@@ -61,15 +61,15 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
     if (!("options" in field) || !Array.isArray(field.options)) continue;
     const choiceIds = new Set<string>();
     for (const option of field.options) {
-      if (choiceIds.has(option.value)) {
+      if (choiceIds.has(option.id)) {
         issues.push({
           type: "duplicate_choice_id",
           questionId: field.id,
-          choiceId: option.value,
-          message: `Choice ID "${option.value}" is duplicated in question "${field.id}".`
+          choiceId: option.id,
+          message: `Choice ID "${option.id}" is duplicated in question "${field.id}".`
         });
       } else {
-        choiceIds.add(option.value);
+        choiceIds.add(option.id);
       }
     }
   }

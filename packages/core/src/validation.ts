@@ -103,7 +103,7 @@ function validateField(field: FormField, value: FormValue, issues: ValidationIss
     addIssue(issues, field, "invalid_type");
     return;
   }
-  const allowed = new Set(field.options.map((option) => option.value));
+  const allowed = new Set(field.options.map((option) => option.id));
   if (field.type === "multi-select") {
     if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
       addIssue(issues, field, "invalid_type");

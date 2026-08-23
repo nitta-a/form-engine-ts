@@ -8,6 +8,16 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
+function normalizeString(value: string): string {
+  return value.trim().normalize("NFKC").toLowerCase();
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  return typeof left === "string" && typeof right === "string"
+    ? normalizeString(left) === normalizeString(right)
+    : left === right;
+}
+
 export function isQuestionVisible(question: FormField, currentAnswers: Readonly<Record<string, unknown>>): boolean {
   const condition = question.displayCondition;
   if (condition === undefined) return true;
@@ -16,12 +26,12 @@ export function isQuestionVisible(question: FormField, currentAnswers: Readonly<
 
   if (condition.operator === "not_empty") return true;
   if (condition.value === undefined) return false;
-  if (condition.operator === "equals") return answer === condition.value;
-  if (condition.operator === "not_equals") return answer !== condition.value;
+  if (condition.operator === "equals") return valuesEqual(answer, condition.value);
+  if (condition.operator === "not_equals") return !valuesEqual(answer, condition.value);
   if (typeof answer === "string" && typeof condition.value === "string") {
-    return answer.includes(condition.value);
+    return normalizeString(answer).includes(normalizeString(condition.value));
   }
-  return Array.isArray(answer) && answer.some((item) => item === condition.value);
+  return Array.isArray(answer) && answer.some((item) => valuesEqual(item, condition.value));
 }
 
 export function calculateFieldVisibility(

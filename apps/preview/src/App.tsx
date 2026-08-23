@@ -104,13 +104,11 @@ function AnalyticsDetails({
       <div className="option-bars">
         {aggregate.options.map((option) => {
           const schemaOption =
-            field !== undefined && "options" in field
-              ? field.options.find((item) => item.value === option.value)
-              : undefined;
+            field !== undefined && "options" in field ? field.options.find((item) => item.id === option.id) : undefined;
           return (
             <OptionBar
-              key={option.value}
-              label={schemaOption === undefined ? option.value : t(schemaOption.labelKey)}
+              key={option.id}
+              label={schemaOption === undefined ? option.id : schemaOption.label}
               count={option.count}
               percentage={option.percentageOfSubmissions}
             />
@@ -166,7 +164,7 @@ function AnalyticsPanel({
               const field = schema.fields.find((item) => item.id === aggregate.fieldId);
               return (
                 <section className="question-result" key={aggregate.fieldId}>
-                  <h3>{field === undefined ? aggregate.fieldId : t(field.labelKey)}</h3>
+                  <h3>{field === undefined ? aggregate.fieldId : field.title}</h3>
                   <p className="answer-counts">
                     {t("preview.answered")}: {aggregate.answeredCount} · {t("preview.unanswered")}:{" "}
                     {aggregate.unansweredCount}
@@ -186,7 +184,7 @@ function AnalyticsPanel({
               });
               return answers.length === 0 ? null : (
                 <div key={field.id}>
-                  <h4>{t(field.labelKey)}</h4>
+                  <h4>{field.title}</h4>
                   <ul>
                     {answers.map((answer) => (
                       <li key={`${field.id}-${answer.id}`}>{answer.value}</li>
@@ -324,7 +322,7 @@ export default function App() {
 
   const downloadCsv = () => {
     const csv = exportResponsesToCsv(schema, submissions);
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = `${schema.id}-${schema.version}.csv`;

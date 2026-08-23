@@ -60,12 +60,12 @@ function createDbStub() {
   return { db: { collection } as unknown as Db, collections };
 }
 
-function schema(id = "form", version = 1, titleKey = "title"): FormSchema {
+function schema(id = "form", version = 1, title = "title"): FormSchema {
   return {
     id,
     version,
-    titleKey,
-    fields: [{ id: "answer", type: "text", labelKey: "answer" }]
+    title,
+    fields: [{ id: "answer", type: "text", title: "answer", required: false }]
   };
 }
 
@@ -96,8 +96,8 @@ describe("createMongoDbStorage", () => {
     ]);
     const loaded = await adapter.getSchema("form", 1);
     if (loaded === null) throw new Error("Expected schema");
-    (loaded.fields[0] as { labelKey: string }).labelKey = "mutated";
-    expect((await adapter.getSchema("form", 1))?.fields[0]?.labelKey).toBe("answer");
+    (loaded.fields[0] as { title: string }).title = "mutated";
+    expect((await adapter.getSchema("form", 1))?.fields[0]?.title).toBe("answer");
     await adapter.deleteSchema("form", 1);
     expect(await adapter.getSchema("form", 1)).toBeNull();
   });

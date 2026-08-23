@@ -9,7 +9,6 @@ import type {
   TranslationAdapter
 } from "@form-engine/core";
 import { sanitizeSchema } from "@form-engine/core";
-import { useEffect, useId, useState } from "react";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",
@@ -24,21 +23,21 @@ const FIELD_TYPES: readonly FieldType[] = [
 
 const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.formBuilder": "Form builder",
-  "builder.questionId": "Question ID",
-  "builder.questionIdRequired": "Question ID is required.",
-  "builder.questionIdDuplicate": 'Question ID "{{id}}" is already in use.',
-  "builder.moveUp": "Move {{id}} up",
-  "builder.moveDown": "Move {{id}} down",
-  "builder.delete": "Delete {{id}}",
+  "builder.moveUp": "Move {{title}} up",
+  "builder.moveDown": "Move {{title}} down",
+  "builder.delete": "Delete {{title}}",
   "builder.deleteAction": "Delete",
-  "builder.titleKey": "Title key",
+  "builder.questionTitle": "質問文 / Question Title",
+  "builder.questionTitlePlaceholder": "Example: Tell us what we could improve",
+  "builder.newQuestionTitle": "New question",
   "builder.type": "Type",
   "builder.required": "Required",
   "builder.minimum": "Minimum",
   "builder.maximum": "Maximum",
   "builder.options": "Options",
-  "builder.optionValue": "Option value {{index}}",
-  "builder.optionLabel": "Option label {{index}}",
+  "builder.optionLabel": "選択肢 / Option Label {{index}}",
+  "builder.optionLabelPlaceholder": "Example: Very satisfied",
+  "builder.newOptionLabel": "Option {{index}}",
   "builder.remove": "Remove",
   "builder.addOption": "Add option",
   "builder.displayCondition": "Display condition",
@@ -76,31 +75,27 @@ function operatorKey(operator: ConditionOperator): string {
   return `builder.operator.${operator}`;
 }
 
-function nextId(schema: FormSchema): string {
-  let index = schema.fields.length + 1;
-  const ids = new Set(schema.fields.map((field) => field.id));
-  while (ids.has(`question-${index}`)) index += 1;
-  return `question-${index}`;
-}
-
-function nextOptionValue(options: readonly FieldOption[]): string {
-  const values = new Set(options.map((option) => option.value));
-  let index = options.length + 1;
-  while (values.has(`option-${index}`)) index += 1;
-  return `option-${index}`;
+function createUniqueId(prefix: "q" | "opt", existingIds: ReadonlySet<string>): string {
+  let id: string;
+  do {
+    id = `${prefix}_${globalThis.crypto.randomUUID().slice(0, 8)}`;
+  } while (existingIds.has(id));
+  return id;
 }
 
 function baseField(field: FormField, type: FieldType) {
   return {
     id: field.id,
     type,
-    labelKey: field.labelKey,
-    ...(field.required === undefined ? {} : { required: field.required }),
+    title: field.title,
+    ...(field.description === undefined ? {} : { description: field.description }),
+    ...(field.translationKey === undefined ? {} : { translationKey: field.translationKey }),
+    required: field.required,
     ...(field.displayCondition === undefined ? {} : { displayCondition: field.displayCondition })
   };
 }
 
-function normalizeField(field: FormField, type: FieldType): FormField {
+function normalizeField(field: FormField, type: FieldType, newOptionLabel: string): FormField {
   const base = baseField(field, type);
   if (type === "text" || type === "textarea") return { ...base, type };
   if (type === "number") return { ...base, type };
@@ -109,14 +104,14 @@ function normalizeField(field: FormField, type: FieldType): FormField {
   const options: readonly FieldOption[] =
     "options" in field && field.options.length > 0
       ? field.options
-      : [{ value: "option-1", labelKey: `${field.id}.option-1` }];
+      : [{ id: createUniqueId("opt", new Set()), label: newOptionLabel }];
   return { ...base, type, options };
 }
 
 function defaultConditionValue(field: FormField): ConditionValue {
   if (field.type === "checkbox") return true;
   if (field.type === "number" || field.type === "rating") return field.min ?? 1;
-  if ("options" in field) return field.options[0]?.value ?? "";
+  if ("options" in field) return field.options[0]?.id ?? "";
   return "";
 }
 
@@ -186,8 +181,8 @@ function ConditionValueEditor({
     return (
       <select value={String(condition.value ?? "")} onChange={(event) => update(event.currentTarget.value)}>
         {source.options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.value}
+          <option key={option.id} value={option.id}>
+            {option.label}
           </option>
         ))}
       </select>
@@ -200,72 +195,6 @@ function ConditionValueEditor({
       value={typeof condition.value === "string" ? condition.value : ""}
       onChange={(event) => update(event.currentTarget.value)}
     />
-  );
-}
-
-function QuestionIdEditor({
-  fieldId,
-  existingIds,
-  onCommit,
-  translate
-}: {
-  readonly fieldId: string;
-  readonly existingIds: ReadonlySet<string>;
-  readonly onCommit: (nextId: string) => void;
-  readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
-}) {
-  const [draft, setDraft] = useState(fieldId);
-  const [error, setError] = useState<string | null>(null);
-  const errorId = useId();
-
-  useEffect(() => {
-    setDraft(fieldId);
-    setError(null);
-  }, [fieldId]);
-
-  const commit = () => {
-    const nextId = draft.trim();
-    if (nextId.length === 0) {
-      setError(translate("builder.questionIdRequired"));
-      return;
-    }
-    if (nextId !== fieldId && existingIds.has(nextId)) {
-      setError(translate("builder.questionIdDuplicate", { id: nextId }));
-      return;
-    }
-    setError(null);
-    setDraft(nextId);
-    if (nextId !== fieldId) onCommit(nextId);
-  };
-
-  return (
-    <label>
-      {translate("builder.questionId")}
-      <input
-        value={draft}
-        aria-invalid={error === null ? undefined : true}
-        aria-describedby={error === null ? undefined : errorId}
-        onChange={(event) => {
-          setDraft(event.currentTarget.value);
-          setError(null);
-        }}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commit();
-          } else if (event.key === "Escape") {
-            setDraft(fieldId);
-            setError(null);
-          }
-        }}
-      />
-      {error === null ? null : (
-        <span className="form-engine-builder__error" id={errorId}>
-          {error}
-        </span>
-      )}
-    </label>
   );
 }
 
@@ -291,7 +220,9 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
     emitSchema({
       ...schema,
       fields: schema.fields.map((field) => {
-        if (field.id === fieldId) return normalizeField(field, type);
+        if (field.id === fieldId) {
+          return normalizeField(field, type, translate("builder.newOptionLabel", { index: 1 }));
+        }
         if (field.displayCondition?.questionId === fieldId) {
           const { displayCondition: _condition, ...withoutCondition } = field;
           return withoutCondition as FormField;
@@ -304,13 +235,6 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
   const removeField = (fieldId: string) => {
     if (schema.fields.length === 1) return;
     emitSchema({ ...schema, fields: schema.fields.filter((field) => field.id !== fieldId) });
-  };
-
-  const renameField = (fieldId: string, nextId: string) => {
-    emitSchema({
-      ...schema,
-      fields: schema.fields.map((field) => (field.id === fieldId ? { ...field, id: nextId } : field))
-    });
   };
 
   const moveField = (index: number, offset: -1 | 1) => {
@@ -326,8 +250,11 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
   };
 
   const addField = () => {
-    const id = nextId(schema);
-    emitSchema({ ...schema, fields: [...schema.fields, { id, type: "text", labelKey: `${id}.label` }] });
+    const id = createUniqueId("q", new Set(schema.fields.map((field) => field.id)));
+    emitSchema({
+      ...schema,
+      fields: [...schema.fields, { id, type: "text", title: translate("builder.newQuestionTitle"), required: false }]
+    });
   };
 
   return (
@@ -340,13 +267,13 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
           const availableSources = schema.fields.slice(0, index);
           return (
             <fieldset className="form-engine-builder__question" key={field.id}>
-              <legend>{field.id}</legend>
+              <legend>{field.title}</legend>
               <div className="form-engine-builder__toolbar">
                 <button
                   type="button"
                   disabled={index === 0}
                   onClick={() => moveField(index, -1)}
-                  aria-label={translate("builder.moveUp", { id: field.id })}
+                  aria-label={translate("builder.moveUp", { title: field.title })}
                 >
                   ↑
                 </button>
@@ -354,7 +281,7 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
                   type="button"
                   disabled={index === schema.fields.length - 1}
                   onClick={() => moveField(index, 1)}
-                  aria-label={translate("builder.moveDown", { id: field.id })}
+                  aria-label={translate("builder.moveDown", { title: field.title })}
                 >
                   ↓
                 </button>
@@ -362,27 +289,21 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
                   type="button"
                   disabled={schema.fields.length === 1}
                   onClick={() => removeField(field.id)}
-                  aria-label={translate("builder.delete", { id: field.id })}
+                  aria-label={translate("builder.delete", { title: field.title })}
                 >
                   {translate("builder.deleteAction")}
                 </button>
               </div>
               <div className="form-engine-builder__grid">
-                <QuestionIdEditor
-                  fieldId={field.id}
-                  existingIds={new Set(schema.fields.map((item) => item.id))}
-                  onCommit={(nextId) => renameField(field.id, nextId)}
-                  translate={translate}
-                />
                 <label>
-                  {translate("builder.titleKey")}
+                  {translate("builder.questionTitle")}
                   <input
-                    value={field.labelKey}
+                    value={field.title}
+                    placeholder={translate("builder.questionTitlePlaceholder")}
                     onChange={(event) =>
                       updateField(field.id, (current) => ({
                         ...current,
-                        labelKey:
-                          event.currentTarget.value.trim().length === 0 ? current.labelKey : event.currentTarget.value
+                        title: event.currentTarget.value.trim().length === 0 ? current.title : event.currentTarget.value
                       }))
                     }
                   />
@@ -453,43 +374,20 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
                 <div className="form-engine-builder__options">
                   <strong>{translate("builder.options")}</strong>
                   {field.options.map((option, optionIndex) => (
-                    <div className="form-engine-builder__option" key={`${field.id}-${option.value}-${option.labelKey}`}>
+                    <div className="form-engine-builder__option" key={option.id}>
                       <input
-                        aria-label={`${field.id} ${translate("builder.optionValue", { index: optionIndex + 1 })}`}
-                        value={option.value}
+                        aria-label={translate("builder.optionLabel", { index: optionIndex + 1 })}
+                        value={option.label}
+                        placeholder={translate("builder.optionLabelPlaceholder")}
                         onChange={(event) =>
                           updateField(field.id, (current) => {
                             if (!("options" in current)) return current;
-                            const value = event.currentTarget.value;
-                            if (
-                              value.trim().length === 0 ||
-                              current.options.some(
-                                (item, itemIndex) => itemIndex !== optionIndex && item.value === value
-                              )
-                            ) {
-                              return current;
-                            }
+                            const label = event.currentTarget.value;
+                            if (label.trim().length === 0) return current;
                             return {
                               ...current,
                               options: current.options.map((item, itemIndex) =>
-                                itemIndex === optionIndex ? { ...item, value } : item
-                              )
-                            };
-                          })
-                        }
-                      />
-                      <input
-                        aria-label={`${field.id} ${translate("builder.optionLabel", { index: optionIndex + 1 })}`}
-                        value={option.labelKey}
-                        onChange={(event) =>
-                          updateField(field.id, (current) => {
-                            if (!("options" in current)) return current;
-                            const labelKey = event.currentTarget.value;
-                            if (labelKey.trim().length === 0) return current;
-                            return {
-                              ...current,
-                              options: current.options.map((item, itemIndex) =>
-                                itemIndex === optionIndex ? { ...item, labelKey } : item
+                                itemIndex === optionIndex ? { ...item, label } : item
                               )
                             };
                           })
@@ -519,14 +417,14 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
                       updateField(field.id, (current) =>
                         "options" in current
                           ? (() => {
-                              const value = nextOptionValue(current.options);
+                              const id = createUniqueId("opt", new Set(current.options.map((option) => option.id)));
                               return {
                                 ...current,
                                 options: [
                                   ...current.options,
                                   {
-                                    value,
-                                    labelKey: `${current.id}.${value}`
+                                    id,
+                                    label: translate("builder.newOptionLabel", { index: current.options.length + 1 })
                                   }
                                 ]
                               };
@@ -563,7 +461,7 @@ export function FormBuilder({ schema, onChange, locale = "en", translator }: For
                     <option value="">{translate("builder.alwaysVisible")}</option>
                     {availableSources.map((candidate) => (
                       <option key={candidate.id} value={candidate.id}>
-                        {candidate.id}
+                        {candidate.title}
                       </option>
                     ))}
                   </select>

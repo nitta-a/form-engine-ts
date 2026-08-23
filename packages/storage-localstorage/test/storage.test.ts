@@ -17,8 +17,8 @@ function createStorage(): StorageLike {
 const schema: FormSchema = {
   id: "form",
   version: 1,
-  titleKey: "title",
-  fields: [{ id: "answer", type: "text", labelKey: "answer" }]
+  title: "title",
+  fields: [{ id: "answer", type: "text", title: "answer", required: false }]
 };
 
 function submission(id: string, version = 1, formId = "form"): FormSubmission {
@@ -39,8 +39,8 @@ describe("createLocalStorageAdapter", () => {
     expect(await adapter.getSchema("form", 1)).toEqual(schema);
     const loaded = await adapter.getSchema("form", 1);
     if (loaded === null) throw new Error("Expected schema");
-    (loaded.fields[0] as { labelKey: string }).labelKey = "mutated";
-    expect((await adapter.getSchema("form", 1))?.fields[0]?.labelKey).toBe("answer");
+    (loaded.fields[0] as { title: string }).title = "mutated";
+    expect((await adapter.getSchema("form", 1))?.fields[0]?.title).toBe("answer");
     await adapter.saveSubmission(submission("one"));
     const responses = await adapter.listSubmissions("form", 1);
     expect(responses).toHaveLength(1);

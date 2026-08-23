@@ -23,6 +23,24 @@ function issue(issues: SchemaIssue[], path: string, code: string, message: strin
   issues.push({ path, code, message });
 }
 
+function rejectLegacyProperties(
+  value: Record<string, unknown>,
+  path: string,
+  properties: readonly string[],
+  issues: SchemaIssue[]
+): void {
+  for (const property of properties) {
+    if (Object.hasOwn(value, property)) {
+      issue(
+        issues,
+        path.length === 0 ? property : `${path}.${property}`,
+        "legacy_property",
+        `${property} is not supported by the natural-language schema.`
+      );
+    }
+  }
+}
+
 function validateOptionalNonNegativeInteger(
   value: unknown,
   path: string,
@@ -48,15 +66,16 @@ function validateOptions(value: unknown, path: string, issues: SchemaIssue[]): v
       issue(issues, optionPath, "invalid_option", "Expected an option object.");
       return;
     }
-    if (!isNonEmptyString(option.value)) {
-      issue(issues, `${optionPath}.value`, "invalid_option_value", "Expected a non-empty value.");
-    } else if (seen.has(option.value)) {
-      issue(issues, `${optionPath}.value`, "duplicate_option", "Option values must be unique.");
+    rejectLegacyProperties(option, optionPath, ["value", "labelKey"], issues);
+    if (!isNonEmptyString(option.id)) {
+      issue(issues, `${optionPath}.id`, "invalid_option_id", "Expected a non-empty option ID.");
+    } else if (seen.has(option.id)) {
+      issue(issues, `${optionPath}.id`, "duplicate_option", "Option IDs must be unique.");
     } else {
-      seen.add(option.value);
+      seen.add(option.id);
     }
-    if (!isNonEmptyString(option.labelKey)) {
-      issue(issues, `${optionPath}.labelKey`, "invalid_translation_key", "Expected a translation key.");
+    if (!isNonEmptyString(option.label)) {
+      issue(issues, `${optionPath}.label`, "invalid_label", "Expected a non-empty option label.");
     }
   });
   return true;
@@ -92,14 +111,18 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
     issue(issues, path, "invalid_field", "Expected a field object.");
     return false;
   }
+  rejectLegacyProperties(value, path, ["titleKey", "labelKey", "helpTextKey", "descriptionKey"], issues);
   if (!isNonEmptyString(value.id)) issue(issues, `${path}.id`, "invalid_id", "Expected a non-empty ID.");
-  if (!isNonEmptyString(value.labelKey)) {
-    issue(issues, `${path}.labelKey`, "invalid_translation_key", "Expected a translation key.");
+  if (!isNonEmptyString(value.title)) {
+    issue(issues, `${path}.title`, "invalid_title", "Expected a non-empty question title.");
   }
-  if (value.helpTextKey !== undefined && !isNonEmptyString(value.helpTextKey)) {
-    issue(issues, `${path}.helpTextKey`, "invalid_translation_key", "Expected a translation key.");
+  if (value.description !== undefined && !isNonEmptyString(value.description)) {
+    issue(issues, `${path}.description`, "invalid_description", "Expected a non-empty question description.");
   }
-  if (value.required !== undefined && typeof value.required !== "boolean") {
+  if (value.translationKey !== undefined && !isNonEmptyString(value.translationKey)) {
+    issue(issues, `${path}.translationKey`, "invalid_translation_key", "Expected a translation key.");
+  }
+  if (typeof value.required !== "boolean") {
     issue(issues, `${path}.required`, "invalid_required", "Expected a boolean.");
   }
   if (value.displayCondition !== undefined) {
@@ -193,16 +216,22 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
   if (!isRecord(input)) {
     return { valid: false, issues: [{ path: "$", code: "invalid_schema", message: "Expected a schema object." }] };
   }
+  rejectLegacyProperties(input, "", ["titleKey", "descriptionKey"], issues);
   if (!isNonEmptyString(input.id)) issue(issues, "id", "invalid_id", "Expected a non-empty ID.");
   if (!Number.isInteger(input.version) || (input.version as number) < 1) {
     issue(issues, "version", "invalid_version", "Expected a positive integer version.");
   }
-  if (!isNonEmptyString(input.titleKey)) {
-    issue(issues, "titleKey", "invalid_translation_key", "Expected a translation key.");
+  if (!isNonEmptyString(input.title)) {
+    issue(issues, "title", "invalid_title", "Expected a non-empty form title.");
   }
-  for (const key of ["descriptionKey", "submitLabelKey"] as const) {
+  for (const key of ["description", "submitLabelKey"] as const) {
     if (input[key] !== undefined && !isNonEmptyString(input[key])) {
-      issue(issues, key, "invalid_translation_key", "Expected a translation key.");
+      issue(
+        issues,
+        key,
+        key === "description" ? "invalid_description" : "invalid_translation_key",
+        key === "description" ? "Expected a non-empty form description." : "Expected a translation key."
+      );
     }
   }
   if (!Array.isArray(input.fields) || input.fields.length === 0) {
@@ -220,9 +249,9 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
     const structuralSchema = {
       id: typeof input.id === "string" ? input.id : "invalid",
       version: typeof input.version === "number" ? input.version : 1,
-      titleKey: typeof input.titleKey === "string" ? input.titleKey : "invalid",
+      title: typeof input.title === "string" ? input.title : "invalid",
       fields: inputFields.filter((field): field is FormField => isRecord(field) && isNonEmptyString(field.id))
-    };
+    } as FormSchema;
     for (const structuralIssue of validateSchemaStructure(structuralSchema)) {
       if (
         structuralIssue.type !== "dangling_condition_reference" &&

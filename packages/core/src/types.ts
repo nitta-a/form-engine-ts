@@ -24,16 +24,17 @@ export type ValidationCode =
   | "unknown_field";
 
 export interface FieldOption {
-  readonly value: string;
-  readonly labelKey: string;
+  readonly id: string;
+  readonly label: string;
 }
 
 export interface BaseField {
   readonly id: string;
   readonly type: FieldType;
-  readonly labelKey: string;
-  readonly helpTextKey?: string;
-  readonly required?: boolean;
+  readonly title: string;
+  readonly description?: string;
+  readonly translationKey?: string;
+  readonly required: boolean;
   readonly messages?: Partial<Record<ValidationCode, string>>;
   readonly displayCondition?: DisplayCondition;
 }
@@ -81,8 +82,8 @@ export type FormField = TextField | NumberField | RatingField | SelectField | Mu
 export interface FormSchema {
   readonly id: string;
   readonly version: number;
-  readonly titleKey: string;
-  readonly descriptionKey?: string;
+  readonly title: string;
+  readonly description?: string;
   readonly submitLabelKey?: string;
   readonly fields: readonly FormField[];
 }
@@ -163,7 +164,7 @@ export interface NumberQuestionAggregate extends BaseQuestionAggregate {
 }
 
 export interface OptionAggregate {
-  readonly value: string;
+  readonly id: string;
   readonly count: number;
   readonly percentageOfSubmissions: number;
 }
