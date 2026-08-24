@@ -66,13 +66,17 @@ function isNotFound(result) {
   );
 }
 
+function npmViewArgs(identifier) {
+  return ["view", identifier, "version", "--json", "--prefer-online", "--registry=https://registry.npmjs.org/"];
+}
+
 export async function publishUnpublishedPackages(packages, options = {}) {
   const execute = options.runCommand ?? runCommand;
   const published = [];
   const skipped = [];
   for (const pkg of packages) {
     const identifier = `${pkg.manifest.name}@${pkg.manifest.version}`;
-    const lookup = await execute("npm", ["view", identifier, "version", "--json"], { capture: true });
+    const lookup = await execute("npm", npmViewArgs(identifier), { capture: true });
     if (lookup.code === 0) {
       skipped.push(identifier);
       options.onStatus?.(`skip ${identifier} (already published)`);
@@ -105,7 +109,7 @@ export async function waitForPublishedPackages(packages, options = {}) {
     const checks = await Promise.all(
       unavailable.map(async (pkg) => {
         const identifier = `${pkg.manifest.name}@${pkg.manifest.version}`;
-        const result = await execute("npm", ["view", identifier, "version", "--json"], { capture: true });
+        const result = await execute("npm", npmViewArgs(identifier), { capture: true });
         if (result.code !== 0) return pkg;
         try {
           return JSON.parse(result.stdout) === pkg.manifest.version ? null : pkg;

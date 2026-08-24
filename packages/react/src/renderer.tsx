@@ -26,6 +26,7 @@ import type { SubmissionReceipt } from "./receipt";
 import type {
   BeforeSubmit,
   FormRendererSlots,
+  FormSubmitHandler,
   FormSubmitState,
   SubmissionGuard,
   SubmissionProtectionProps,
@@ -290,7 +291,7 @@ export interface StandaloneFormRendererProps extends FormRendererPresentationPro
   readonly translator?: TranslationAdapter;
   readonly initialValues?: FormValues;
   readonly resetOnSuccess?: boolean;
-  readonly onSubmit: (answers: FormValues) => Promise<void> | void;
+  readonly onSubmit: FormSubmitHandler;
 }
 
 export type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
@@ -379,6 +380,7 @@ function ContextFormRenderer({
   const activePage = pages?.[currentPageIndex];
   const activeVisibleIndex = visiblePageIndexes.indexOf(currentPageIndex);
   const fieldIds = activePage === undefined ? undefined : new Set(activePage.questionIds);
+  const visibleValues = useMemo(() => selectVisibleAnswers(form.schema, form.values), [form.schema, form.values]);
   const submitState: FormSubmitState = confirmation === null ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
 
@@ -486,7 +488,7 @@ function ContextFormRenderer({
     let confirmationMessage: string | undefined;
     let requiresConfirmation = false;
     for (const guard of guards) {
-      const result = await guard(form.schema, selectVisibleAnswers(form.schema, form.values));
+      const result = await guard(form.schema, visibleValues);
       if (result.status === "allow") continue;
       findings.push(...result.findings);
       if (result.status === "block") {
@@ -519,7 +521,7 @@ function ContextFormRenderer({
       try {
         const guardResult = await runSubmissionGuards(submissionGuards);
         if (guardResult.status === "block") {
-          setGuardMessage(guardResult.message ?? "Submission blocked because sensitive data was detected.");
+          setGuardMessage(guardResult.message ?? form.translate("form.submissionBlocked"));
           return { status: "cancelled" };
         }
         if (guardResult.status === "confirm") {
@@ -548,10 +550,12 @@ function ContextFormRenderer({
       }
       if (result.status !== "success") return result;
       if (receiptStore !== undefined) {
+        const response = result.response;
         const storedReceipt: SubmissionReceipt = {
           formId: form.schema.id,
           formVersion: form.schema.version,
-          submittedAt: new Date().toISOString()
+          submittedAt: response?.submittedAt ?? new Date().toISOString(),
+          ...(response?.submissionId === undefined ? {} : { submissionId: response.submissionId })
         };
         await receiptStore.save(storedReceipt);
         setReceipt(storedReceipt);
@@ -608,10 +612,10 @@ function ContextFormRenderer({
           ...(receiptStore === undefined ? {} : { onReset: () => void resetReceipt() })
         }) ?? (
           <div role="status">
-            Already submitted.
+            {form.translate("form.alreadySubmitted")}
             {receiptStore === undefined ? null : (
               <button type="button" onClick={() => void resetReceipt()}>
-                Submit another response
+                {form.translate("form.submitAnother")}
               </button>
             )}
           </div>
@@ -708,16 +712,19 @@ function ContextFormRenderer({
         ? null
         : (slots.renderSubmissionConfirmation?.({
             findings: confirmation.findings,
+            message: confirmation.message ?? form.translate("form.confirmSensitiveData"),
+            schema: form.schema,
+            visibleValues,
             onConfirm: confirmSubmission,
             onCancel: cancelSubmission
           }) ?? (
             <div className="fe-submission-confirmation" role="dialog" aria-modal="true">
-              <p>{confirmation.message ?? "Sensitive data may be included. Confirm before submitting."}</p>
+              <p>{confirmation.message ?? form.translate("form.confirmSensitiveData")}</p>
               <button type="button" onClick={confirmSubmission}>
-                Confirm submission
+                {form.translate("form.confirmSubmission")}
               </button>
               <button type="button" onClick={cancelSubmission}>
-                Cancel
+                {form.translate("form.cancelSubmission")}
               </button>
             </div>
           ))}
@@ -801,6 +808,12 @@ const RENDERER_MESSAGES: Readonly<Record<string, string>> = {
   "form.next": "Next",
   "form.step": "Step {{current}} / {{total}}",
   "form.draftRestored": "Draft restored",
+  "form.submissionBlocked": "Submission blocked because sensitive data was detected.",
+  "form.confirmSensitiveData": "Sensitive data may be included. Confirm before submitting.",
+  "form.confirmSubmission": "Confirm submission",
+  "form.cancelSubmission": "Cancel",
+  "form.alreadySubmitted": "Already submitted.",
+  "form.submitAnother": "Submit another response",
   "validation.required": "This field is required."
 };
 

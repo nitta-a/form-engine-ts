@@ -4,6 +4,7 @@ import type {
   FormPage,
   FormPolicy,
   FormSchema,
+  FormValues,
   JsonValue,
   TranslationReport,
   ValidationError
@@ -208,8 +209,17 @@ export interface ManualTranslationContext {
 export type SubmitResult =
   | { readonly status: "invalid"; readonly issues: readonly ValidationError[] }
   | { readonly status: "cancelled" }
-  | { readonly status: "success" }
+  | { readonly status: "success"; readonly response?: SubmitResponse }
   | { readonly status: "error"; readonly error: Error };
+
+export interface SubmitResponse {
+  readonly submissionId?: string;
+  readonly submittedAt?: string;
+}
+
+export type FormSubmitHandler = (
+  answers: FormValues
+) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
 
 export type SubmissionGuardResult =
   | { readonly status: "allow" }
@@ -222,6 +232,15 @@ export type SubmissionGuard = (
 ) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
 
 export type FormSubmitState = "idle" | "submitting" | "confirming" | "success" | "error";
+
+export interface SubmissionConfirmationSlotProps {
+  readonly findings: readonly SensitiveDataFinding[];
+  readonly message?: string;
+  readonly schema: FormSchema;
+  readonly visibleValues: Record<string, unknown>;
+  readonly onConfirm: () => void;
+  readonly onCancel: () => void;
+}
 
 export interface FormRendererSlots {
   readonly renderHeader?: (props: { readonly title: string; readonly description?: string }) => ReactNode;
@@ -248,11 +267,7 @@ export interface FormRendererSlots {
   readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
   readonly renderCompletion?: (props: { readonly message: string }) => ReactNode;
   readonly renderSubmitError?: (props: { readonly error: Error; readonly onRetry?: () => void }) => ReactNode;
-  readonly renderSubmissionConfirmation?: (props: {
-    readonly findings: readonly SensitiveDataFinding[];
-    readonly onConfirm: () => void;
-    readonly onCancel: () => void;
-  }) => ReactNode;
+  readonly renderSubmissionConfirmation?: (props: SubmissionConfirmationSlotProps) => ReactNode;
   readonly renderAlreadySubmitted?: (props: {
     readonly receipt: SubmissionReceipt;
     readonly onReset?: () => void;

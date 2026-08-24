@@ -35,3 +35,8 @@ unsupported expressions remain client-filtered with identical semantics.
 to fill the requested logical page after client-side filtering. `buildSubmissionFilter` can replace filter generation.
 The deprecated `client`, `submissionCodec`, and `toODataFilter` options remain available for compatibility. The caller
 owns table creation, credentials, retries, and client lifecycle.
+
+`listTextAnswerPage` accepts either the legacy single field ID or `TextAnswerPageQueryOptions.fieldIds`. Page size counts
+emitted text items rather than entities. Its opaque Base64 JSON cursor retains the Azure continuation token plus entity
+and field indexes, so a page can resume inside a multi-answer entity without gaps or duplicates. Empty answers do not
+consume the item limit, and scanning remains bounded by `maxScanPages`.

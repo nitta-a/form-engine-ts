@@ -34,4 +34,25 @@ describe("createStandardPrivacyDetector", () => {
       { fieldId: "freeText", type: "secret", matchedText: "SECRET" }
     ]);
   });
+
+  it("detects www URLs and merges overlapping findings of the same type", () => {
+    const detector = createStandardPrivacyDetector({
+      customDetectors: [
+        (fieldId, text) => [
+          { fieldId, type: "url", start: 6, end: 20, matchedText: text.slice(6, 20) },
+          { fieldId, type: "url", start: 6, end: 16, matchedText: text.slice(6, 16) }
+        ]
+      ]
+    });
+    const findings = detector.detect(schema, { freeText: "Visit www.google.com today" });
+    expect(findings.filter((finding) => finding.type === "url")).toEqual([
+      {
+        fieldId: "freeText",
+        type: "url",
+        start: 6,
+        end: 20,
+        matchedText: "www.google.com"
+      }
+    ]);
+  });
 });

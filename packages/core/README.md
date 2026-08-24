@@ -79,6 +79,9 @@ Results are ordered by `submittedAt`, then submission ID. Both boundaries are in
 `cloneVersionToDraft`, asynchronous `publishDraft`, and `deleteDraft` implement revision-checked version transitions as
 pure functions. `createCloneTransitionPlan`, `createPublishTransitionPlan`, and `createDeleteDraftTransitionPlan` produce
 complete persistence plans with the next state, affected records, and immutable audit events.
+Publishing when state already identifies a Published version requires its matching `currentPublishedRecord`; omission or
+a version mismatch returns the typed `missing_published_record` error. The resulting archive preserves the original
+schema, creation timestamp, and metadata.
 Clone/delete operations accept `expectedRevision`; cloning rejects non-published sources, publish validation failures are
 returned as typed `validation_failed` issues, and successful publishing archives only a supplied actual published record,
 preserving its schema and metadata. `createPublishTransitionPlan` returns complete records plus expected/next revisions for
@@ -99,5 +102,6 @@ cursor combines `submittedAt` and response ID, so equal timestamps do not produc
 and `filter` are applied before page sizing. `filter` accepts a composable `eq`/`in`/`range`/`exists` and/or AST; adapters
 may push supported nodes to their native query language while preserving identical client-side semantics. Adapters that
 implement `listTextAnswerPage` expose stable cursor pagination over individual text answers.
+`TextAnswerPageQueryOptions.fieldIds` can select multiple free-text fields for item-level paging.
 
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.

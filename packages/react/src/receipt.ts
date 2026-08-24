@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useState } from "react";
+
 export interface SubmissionReceipt {
   readonly formId: string;
   readonly formVersion: number;
@@ -5,10 +7,26 @@ export interface SubmissionReceipt {
   readonly submittedAt: string;
 }
 
+export interface SubmissionReceiptQuery {
+  readonly formId: string;
+  readonly formVersion: number;
+}
+
 export interface SubmissionReceiptStore {
   get(formId: string, formVersion: number): Promise<SubmissionReceipt | null>;
+  getBatch(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
   save(receipt: SubmissionReceipt): Promise<void>;
   remove(formId: string, formVersion: number): Promise<void>;
+}
+
+export interface UseSubmissionReceiptsResult {
+  readonly receipts: ReadonlyMap<string, SubmissionReceipt>;
+  readonly isLoading: boolean;
+  readonly error: Error | null;
+}
+
+export function submissionReceiptQueryKey(formId: string, formVersion: number): string {
+  return `${formId}:v${formVersion}`;
 }
 
 function receiptKey(namespace: string, formId: string, formVersion: number): string {
@@ -60,18 +78,27 @@ export function createLocalStorageSubmissionReceiptStore(
 ): SubmissionReceiptStore {
   const namespace = options.namespace ?? "form_engine_receipt";
   if (namespace.trim().length === 0) throw new TypeError("Receipt namespace must not be empty.");
+  const get = async (formId: string, formVersion: number): Promise<SubmissionReceipt | null> => {
+    const storage = browserStorage();
+    if (storage === null) return null;
+    try {
+      const serialized = storage.getItem(receiptKey(namespace, formId, formVersion));
+      if (serialized === null) return null;
+      const receipt = parseReceipt(serialized);
+      return receipt?.formId === formId && receipt.formVersion === formVersion ? receipt : null;
+    } catch {
+      return null;
+    }
+  };
   return {
-    async get(formId, formVersion) {
-      const storage = browserStorage();
-      if (storage === null) return null;
-      try {
-        const serialized = storage.getItem(receiptKey(namespace, formId, formVersion));
-        if (serialized === null) return null;
-        const receipt = parseReceipt(serialized);
-        return receipt?.formId === formId && receipt.formVersion === formVersion ? receipt : null;
-      } catch {
-        return null;
-      }
+    get,
+    async getBatch(queries) {
+      const receipts = await Promise.all(queries.map((query) => get(query.formId, query.formVersion)));
+      return new Map(
+        receipts.flatMap((receipt) =>
+          receipt === null ? [] : [[submissionReceiptQueryKey(receipt.formId, receipt.formVersion), receipt] as const]
+        )
+      );
     },
     async save(receipt) {
       const storage = browserStorage();
@@ -84,4 +111,55 @@ export function createLocalStorageSubmissionReceiptStore(
       storage.removeItem(receiptKey(namespace, formId, formVersion));
     }
   };
+}
+
+export function useSubmissionReceipts(
+  store: SubmissionReceiptStore,
+  queries: readonly SubmissionReceiptQuery[]
+): UseSubmissionReceiptsResult {
+  const querySignature = JSON.stringify(queries.map(({ formId, formVersion }) => [formId, formVersion]));
+  const stableQueries = useMemo<readonly SubmissionReceiptQuery[]>(() => {
+    const parsed: unknown = JSON.parse(querySignature);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((entry) =>
+      Array.isArray(entry) &&
+      typeof entry[0] === "string" &&
+      typeof entry[1] === "number" &&
+      Number.isSafeInteger(entry[1])
+        ? [{ formId: entry[0], formVersion: entry[1] }]
+        : []
+    );
+  }, [querySignature]);
+  const [state, setState] = useState<UseSubmissionReceiptsResult>({
+    receipts: new Map(),
+    isLoading: stableQueries.length > 0,
+    error: null
+  });
+  useEffect(() => {
+    let active = true;
+    if (stableQueries.length === 0) {
+      setState({ receipts: new Map(), isLoading: false, error: null });
+      return () => {
+        active = false;
+      };
+    }
+    setState((current) => ({ ...current, isLoading: true, error: null }));
+    void store
+      .getBatch(stableQueries)
+      .then((receipts) => {
+        if (active) setState({ receipts, isLoading: false, error: null });
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setState({
+          receipts: new Map(),
+          isLoading: false,
+          error: cause instanceof Error ? cause : new Error(String(cause))
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [stableQueries, store]);
+  return state;
 }

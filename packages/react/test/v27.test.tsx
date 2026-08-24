@@ -7,6 +7,7 @@ import {
   FormRenderer,
   type SubmissionGuard,
   type SubmissionReceipt,
+  type SubmissionReceiptQuery,
   type SubmissionReceiptStore
 } from "../src";
 
@@ -31,6 +32,15 @@ function createReceiptStore() {
   let receipt: SubmissionReceipt | null = null;
   const store: SubmissionReceiptStore = {
     get: vi.fn(async () => receipt),
+    getBatch: vi.fn(
+      async (queries: readonly SubmissionReceiptQuery[]) =>
+        new Map(
+          receipt === null ||
+            !queries.some((query) => query.formId === receipt?.formId && query.formVersion === receipt?.formVersion)
+            ? []
+            : [[`${receipt.formId}:v${receipt.formVersion}`, receipt]]
+        )
+    ),
     save: vi.fn(async (value) => {
       receipt = value;
     }),

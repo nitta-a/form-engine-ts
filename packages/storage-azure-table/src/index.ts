@@ -6,7 +6,10 @@ import type {
   PagedSubmissionStorageAdapter,
   SubmissionFilter,
   SubmissionPageQueryOptions,
-  SubmissionQueryOptions
+  SubmissionQueryOptions,
+  TextAnswerItem,
+  TextAnswerPage,
+  TextAnswerPageQueryOptions
 } from "@form-engine-ts/core";
 import { assertValidFormSchema, matchesSubmissionPageFilters, normalizeSubmissionPageSize } from "@form-engine-ts/core";
 
@@ -77,6 +80,100 @@ interface StoredSchemaEntity extends Record<string, unknown> {
   readonly kind: "schema";
   readonly formVersion: number;
   readonly payload: string;
+}
+
+interface AzureTextAnswerCursor {
+  readonly tableContinuationToken: string | null;
+  readonly entityIndex: number;
+  readonly fieldIndex: number;
+}
+
+const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+function encodeBase64(bytes: Uint8Array): string {
+  let result = "";
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index] ?? 0;
+    const second = bytes[index + 1] ?? 0;
+    const third = bytes[index + 2] ?? 0;
+    const combined = (first << 16) | (second << 8) | third;
+    result += BASE64_ALPHABET[(combined >> 18) & 63] ?? "";
+    result += BASE64_ALPHABET[(combined >> 12) & 63] ?? "";
+    result += index + 1 < bytes.length ? (BASE64_ALPHABET[(combined >> 6) & 63] ?? "") : "=";
+    result += index + 2 < bytes.length ? (BASE64_ALPHABET[combined & 63] ?? "") : "=";
+  }
+  return result;
+}
+
+function decodeBase64(value: string): Uint8Array {
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
+    throw new TypeError("cursor must be a valid Base64 token.");
+  }
+  const bytes: number[] = [];
+  for (let index = 0; index < value.length; index += 4) {
+    const characters = value.slice(index, index + 4);
+    const sextets = [...characters].map((character) => (character === "=" ? 0 : BASE64_ALPHABET.indexOf(character)));
+    const combined =
+      ((sextets[0] ?? 0) << 18) | ((sextets[1] ?? 0) << 12) | ((sextets[2] ?? 0) << 6) | (sextets[3] ?? 0);
+    bytes.push((combined >> 16) & 255);
+    if (characters[2] !== "=") bytes.push((combined >> 8) & 255);
+    if (characters[3] !== "=") bytes.push(combined & 255);
+  }
+  return new Uint8Array(bytes);
+}
+
+function encodeAzureTextAnswerCursor(value: AzureTextAnswerCursor): string {
+  return encodeBase64(new TextEncoder().encode(JSON.stringify(value)));
+}
+
+function decodeAzureTextAnswerCursor(cursor: string): AzureTextAnswerCursor {
+  try {
+    const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(decodeBase64(cursor))) as unknown;
+    if (
+      !isRecord(value) ||
+      (value.tableContinuationToken !== null && typeof value.tableContinuationToken !== "string") ||
+      !Number.isSafeInteger(value.entityIndex) ||
+      (value.entityIndex as number) < 0 ||
+      !Number.isSafeInteger(value.fieldIndex) ||
+      (value.fieldIndex as number) < 0
+    ) {
+      throw new TypeError("Azure text answer cursor payload is invalid.");
+    }
+    return {
+      tableContinuationToken: value.tableContinuationToken as string | null,
+      entityIndex: value.entityIndex as number,
+      fieldIndex: value.fieldIndex as number
+    };
+  } catch (cause) {
+    if (cause instanceof TypeError && cause.message === "Azure text answer cursor payload is invalid.") throw cause;
+    throw new TypeError("cursor must be a valid Azure text answer cursor.", { cause });
+  }
+}
+
+function textAnswerQuery(
+  fieldIdOrOptions: string | TextAnswerPageQueryOptions | undefined,
+  options: TextAnswerPageQueryOptions | undefined
+): { readonly query: TextAnswerPageQueryOptions; readonly fieldIds?: readonly string[] } {
+  const query = typeof fieldIdOrOptions === "string" ? (options ?? {}) : (fieldIdOrOptions ?? {});
+  const requested = typeof fieldIdOrOptions === "string" ? [fieldIdOrOptions] : query.fieldIds;
+  if (requested?.some((fieldId) => fieldId.trim().length === 0)) {
+    throw new TypeError("fieldIds must not contain empty values.");
+  }
+  const fieldIds = requested === undefined ? undefined : [...new Set(requested)];
+  return { query, ...(fieldIds === undefined ? {} : { fieldIds }) };
+}
+
+function submissionTextAnswers(
+  submission: FormSubmission,
+  fieldIds: readonly string[] | undefined
+): Array<{ readonly fieldId: string; readonly text: string }> {
+  const entries =
+    fieldIds === undefined
+      ? Object.entries(submission.values)
+      : fieldIds.map((id): [string, FormValue] => [id, submission.values[id]]);
+  return entries.flatMap(([fieldId, value]) =>
+    typeof value === "string" && value.length > 0 ? [{ fieldId, text: value }] : []
+  );
 }
 
 function cloneJson<T>(value: T): T {
@@ -433,6 +530,103 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
         items,
         hasMore: continuationToken !== undefined && continuationToken.length > 0,
         ...(continuationToken === undefined || continuationToken.length === 0 ? {} : { nextCursor: continuationToken })
+      };
+    },
+    async listTextAnswerPage(formId, fieldIdOrOptions, providedOptions): Promise<TextAnswerPage> {
+      const { query, fieldIds } = textAnswerQuery(fieldIdOrOptions, providedOptions);
+      const pageSize = normalizeSubmissionPageSize(query.pageSize);
+      const cursor = query.cursor === undefined ? undefined : decodeAzureTextAnswerCursor(query.cursor);
+      const client = await submissionClient(formId, query);
+      const items: TextAnswerItem[] = [];
+      let tableContinuationToken = cursor?.tableContinuationToken ?? undefined;
+      let entityStartIndex = cursor?.entityIndex ?? 0;
+      let fieldStartIndex = cursor?.fieldIndex ?? 0;
+      let scannedPages = 0;
+
+      while (scannedPages < maxScanPages) {
+        const requestToken = tableContinuationToken;
+        const iterator = client.listEntities({ queryOptions: { filter: queryFilter(formId, query) } }).byPage({
+          maxPageSize: pageSize,
+          ...(requestToken === undefined ? {} : { continuationToken: requestToken })
+        });
+        const result = await iterator.next();
+        if (result.done === true) break;
+        scannedPages += 1;
+        const page = result.value;
+        for (let entityIndex = entityStartIndex; entityIndex < page.length; entityIndex += 1) {
+          const raw = page[entityIndex];
+          if (raw === undefined) continue;
+          const submission = deserializeIfMatching(raw);
+          if (
+            submission === undefined ||
+            !matchesBuiltInFilters(submission, formId, query) ||
+            !matchesSubmissionPageFilters(submission, query)
+          ) {
+            fieldStartIndex = 0;
+            continue;
+          }
+          const answers = submissionTextAnswers(submission, fieldIds);
+          for (
+            let fieldIndex = entityIndex === entityStartIndex ? fieldStartIndex : 0;
+            fieldIndex < answers.length;
+            fieldIndex += 1
+          ) {
+            const answer = answers[fieldIndex];
+            if (answer === undefined) continue;
+            items.push({
+              responseId: submission.id,
+              formId: submission.formId,
+              formVersion: submission.formVersion,
+              fieldId: answer.fieldId,
+              text: answer.text,
+              locale: submission.locale,
+              submittedAt: submission.submittedAt,
+              ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+            });
+            if (items.length < pageSize) continue;
+
+            const nextFieldIndex = fieldIndex + 1;
+            const hasFieldsInEntity = nextFieldIndex < answers.length;
+            const hasEntitiesInPage = entityIndex + 1 < page.length;
+            const nextPageToken = page.continuationToken;
+            const hasMore = hasFieldsInEntity || hasEntitiesInPage || nextPageToken !== undefined;
+            if (!hasMore) return { items, hasMore: false };
+            const nextCursor: AzureTextAnswerCursor = hasFieldsInEntity
+              ? {
+                  tableContinuationToken: requestToken ?? null,
+                  entityIndex,
+                  fieldIndex: nextFieldIndex
+                }
+              : hasEntitiesInPage
+                ? {
+                    tableContinuationToken: requestToken ?? null,
+                    entityIndex: entityIndex + 1,
+                    fieldIndex: 0
+                  }
+                : {
+                    tableContinuationToken: nextPageToken ?? null,
+                    entityIndex: 0,
+                    fieldIndex: 0
+                  };
+            return { items, hasMore: true, nextCursor: encodeAzureTextAnswerCursor(nextCursor) };
+          }
+          fieldStartIndex = 0;
+        }
+        tableContinuationToken = page.continuationToken;
+        entityStartIndex = 0;
+        fieldStartIndex = 0;
+        if (tableContinuationToken === undefined) break;
+      }
+
+      if (tableContinuationToken === undefined) return { items, hasMore: false };
+      return {
+        items,
+        hasMore: true,
+        nextCursor: encodeAzureTextAnswerCursor({
+          tableContinuationToken,
+          entityIndex: 0,
+          fieldIndex: 0
+        })
       };
     },
     async deleteSubmission(submissionId) {

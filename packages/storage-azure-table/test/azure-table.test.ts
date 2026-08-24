@@ -232,6 +232,94 @@ describe("createAzureTableStorage", () => {
     );
   });
 
+  it("pages individual text answers and resumes inside the same entity", async () => {
+    const { client, filters } = createClientStub();
+    const storage = createAzureTableStorage({ client, maxScanPages: 2 });
+    await storage.saveSubmission({
+      ...submission("multi"),
+      values: { first: "one", second: "two", third: "three", empty: "" },
+      metadata: { deck: "deck-a", pii: false }
+    });
+    if (storage.listTextAnswerPage === undefined) throw new Error("Expected text answer paging");
+    const query = {
+      version: 2,
+      locale: "ja",
+      pageSize: 2,
+      fieldIds: ["first", "second", "third", "empty"],
+      metadataFilters: { deck: "deck-a" },
+      filter: { op: "eq", path: "metadata.pii", value: false } as const
+    };
+    const first = await storage.listTextAnswerPage("form", query);
+    expect(first.items).toEqual([
+      expect.objectContaining({
+        responseId: "multi",
+        fieldId: "first",
+        text: "one",
+        metadata: { deck: "deck-a", pii: false }
+      }),
+      expect.objectContaining({
+        responseId: "multi",
+        fieldId: "second",
+        text: "two",
+        metadata: { deck: "deck-a", pii: false }
+      })
+    ]);
+    expect(first.hasMore).toBe(true);
+    if (first.nextCursor === undefined) throw new Error("Expected text answer cursor");
+
+    const second = await storage.listTextAnswerPage("form", { ...query, cursor: first.nextCursor });
+    expect(second).toEqual({
+      items: [
+        {
+          responseId: "multi",
+          formId: "form",
+          formVersion: 2,
+          fieldId: "third",
+          text: "three",
+          locale: "ja",
+          submittedAt: "2026-08-24T00:00:00.000Z",
+          metadata: { deck: "deck-a", pii: false }
+        }
+      ],
+      hasMore: false
+    });
+    expect(filters.at(-1)).toContain("deck eq 'deck-a'");
+    expect(filters.at(-1)).toContain("pii eq false");
+  });
+
+  it("bounds empty-answer scans and resumes on the next native page without gaps", async () => {
+    const { client, pageRequests } = createClientStub();
+    const storage = createAzureTableStorage({ client, maxScanPages: 1 });
+    for (const id of ["empty-a", "empty-b", "empty-c"]) {
+      await storage.saveSubmission({ ...submission(id), values: { first: "", second: "", third: "" } });
+    }
+    await storage.saveSubmission({
+      ...submission("filled"),
+      values: { first: "one", second: "two", third: "three" }
+    });
+    if (storage.listTextAnswerPage === undefined) throw new Error("Expected text answer paging");
+    const query = { pageSize: 2, fieldIds: ["first", "second", "third"] };
+
+    const emptyPage = await storage.listTextAnswerPage("form", query);
+    expect(emptyPage.items).toEqual([]);
+    expect(emptyPage.hasMore).toBe(true);
+    if (emptyPage.nextCursor === undefined) throw new Error("Expected cursor after bounded scan");
+
+    const firstAnswers = await storage.listTextAnswerPage("form", { ...query, cursor: emptyPage.nextCursor });
+    expect(firstAnswers.items.map(({ fieldId, text }) => ({ fieldId, text }))).toEqual([
+      { fieldId: "first", text: "one" },
+      { fieldId: "second", text: "two" }
+    ]);
+    if (firstAnswers.nextCursor === undefined) throw new Error("Expected cursor inside the filled entity");
+
+    const finalAnswers = await storage.listTextAnswerPage("form", { ...query, cursor: firstAnswers.nextCursor });
+    expect(finalAnswers.items.map(({ fieldId, text }) => ({ fieldId, text }))).toEqual([
+      { fieldId: "third", text: "three" }
+    ]);
+    expect(finalAnswers.hasMore).toBe(false);
+    expect(pageRequests).toHaveLength(3);
+  });
+
   it("deletes individual responses, form responses, schemas, and all configured entities", async () => {
     const { client } = createClientStub();
     const storage = createAzureTableStorage({ client });

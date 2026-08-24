@@ -73,6 +73,10 @@ test("skips published versions and publishes only missing packages", async () =>
     skipped: ["@form-engine-ts/core@2.7.0"]
   });
   assert.equal(calls.filter(([command]) => command === "pnpm").length, 1);
+  assert.equal(
+    calls.filter(([command]) => command === "npm").every((call) => call.includes("--prefer-online")),
+    true
+  );
 });
 
 test("does not publish when npm availability cannot be determined", async () => {

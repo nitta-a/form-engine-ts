@@ -123,3 +123,8 @@ be created with the SSR-safe `createLocalStorageSubmissionReceiptStore`; `render
 state. Text controls forward schema `minLength`, `maxLength`, and `pattern` constraints to the DOM, and
 `renderCharacterCount` can replace the default count. Guard evaluation, confirmation, receipt persistence, and provider
 submission share an in-flight lock so rapid clicks cannot submit twice.
+
+The Builder basic-settings section edits source `title` and `description` through the same policy-aware action pipeline.
+Submission confirmation slots receive the effective message, localized schema, and visible answers. An `onSubmit` result
+may provide `submissionId` and `submittedAt`, which Renderer copies into its receipt. Receipt stores support `getBatch`,
+and `useSubmissionReceipts` loads multiple form/version receipts for list and dashboard surfaces.

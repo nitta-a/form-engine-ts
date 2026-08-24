@@ -38,6 +38,7 @@ export interface VersionTransitionEvent {
 export type VersionTransitionError =
   | { readonly type: "draft_already_exists"; readonly currentDraftVersion: number }
   | { readonly type: "draft_not_found" }
+  | { readonly type: "missing_published_record"; readonly expectedVersion: number }
   | { readonly type: "revision_conflict"; readonly expectedRevision: number; readonly actualRevision: number }
   | { readonly type: "invalid_source_version"; readonly requestedVersion: number; readonly publishedVersion?: number }
   | { readonly type: "version_immutable"; readonly status: FormVersionStatus }
@@ -220,17 +221,26 @@ export function createCloneTransitionPlan(
   };
 }
 
-function validatePublishedRecord(state: FormVersionState, record: FormVersionRecord | undefined): void {
-  if (record === undefined) return;
+function validatePublishedRecord(
+  state: FormVersionState,
+  record: FormVersionRecord | undefined
+): { readonly success: false; readonly error: VersionTransitionError } | undefined {
+  if (state.publishedVersion !== undefined && record?.version !== state.publishedVersion) {
+    return {
+      success: false,
+      error: { type: "missing_published_record", expectedVersion: state.publishedVersion }
+    };
+  }
+  if (record === undefined) return undefined;
   if (
     record.formId !== state.formId ||
-    record.version !== state.publishedVersion ||
     record.status !== "published" ||
     record.schema.id !== record.formId ||
     record.schema.version !== record.version
   ) {
     throw new TypeError("currentPublishedRecord must match the state's published version.");
   }
+  return undefined;
 }
 
 function transitionTimestamp(options: PublishDraftOptions): string {
@@ -252,7 +262,8 @@ export async function publishDraft(
   ) {
     return { success: false, error: { type: "draft_not_found" } };
   }
-  validatePublishedRecord(state, options.currentPublishedRecord);
+  const publishedRecordError = validatePublishedRecord(state, options.currentPublishedRecord);
+  if (publishedRecordError !== undefined) return publishedRecordError;
   const validation = await options.validate?.(draftSchema);
   if (validation === false || (Array.isArray(validation) && validation.length > 0)) {
     return {

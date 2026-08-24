@@ -60,7 +60,7 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security, v2 extensibility, and v2.7 domain/infrastructure APIs
+### v1.1.1 security, v2 extensibility, and v2.8 domain/infrastructure APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
@@ -113,6 +113,13 @@ text constraints. The new `@form-engine-ts/privacy` package detects common sensi
 to a privacy implementation. Translation caching now provides bounded LRU/TTL memory storage and adapter-isolated keys,
 while Google v3 skips blank API inputs and reports cache statistics. Release CI verifies public declaration snapshots and
 waits up to three minutes for npm availability before producing package-specific release notes.
+
+v2.8 guarantees that publishing an existing form version requires the complete current Published record and enforces one
+Draft and one Published record per form in MongoDB while retaining multiple Archived records. Azure Table adds bounded,
+item-level text-answer paging with cursors that resume inside an entity. React Builder edits source form text directly;
+Renderer confirmation slots receive schema and visible answers, `onSubmit` response IDs flow into receipts, and batch
+receipt hooks support dashboard views. Privacy detection recognizes `www.` URLs and merges overlapping findings. The
+translation cache adds variant/custom keys and cumulative hit, miss, eviction, and size reporting.
 
 ### Define and render a form
 
@@ -418,7 +425,7 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応、v2拡張、v2.7ドメイン／インフラAPI
+### v1.1.1セキュリティ対応、v2拡張、v2.8ドメイン／インフラAPI
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
@@ -467,6 +474,12 @@ form単位client resolverにより任意entity layoutへ対応しつつnative pa
 `@form-engine-ts/privacy`はCoreを特定実装へ結合せず、標準的な機密データpatternを検出します。翻訳cacheには
 上限付きLRU/TTL memory storageとadapter分離keyを追加し、Google v3は空文字をAPI送信せずcache統計をreportします。
 Release CIは公開宣言snapshotを検証し、npm反映を最大3分待ってpackage別release noteを生成します。
+
+v2.8では既存フォームの公開時に完全な現Published recordを必須化し、MongoDBでフォームごとにDraft/Publishedを
+各1件へ制約しつつ複数Archived recordを保持します。Azure Tableはentity内の途中から再開できるcursorを備えた、
+item単位のbounded自由記述pagingに対応しました。React Builderはフォーム原文を直接編集でき、Rendererの確認slotへ
+schemaと表示中回答を渡し、`onSubmit`の回答IDをreceiptへ保存し、batch receipt hookで一覧取得できます。Privacyは
+`www.` URLと重複finding集約に対応し、翻訳cacheはvariant/custom keyおよびhit/miss/eviction/size統計を公開します。
 
 ### フォームの定義とレンダリング
 

@@ -15,7 +15,7 @@ import {
   validatePageAnswers
 } from "@form-engine-ts/core";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { BeforeSubmit, SubmitResult } from "./types";
+import type { BeforeSubmit, FormSubmitHandler, SubmitResult } from "./types";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -52,7 +52,7 @@ export interface FormProviderProps {
   readonly translator: TranslationAdapter;
   readonly initialValues?: FormValues;
   readonly resetOnSuccess?: boolean;
-  readonly onSubmit: (values: FormValues) => void | Promise<void>;
+  readonly onSubmit: FormSubmitHandler;
   readonly children: ReactNode;
 }
 
@@ -159,10 +159,10 @@ export function FormProvider({
           setSubmitStatus("idle");
           return { status: "cancelled" };
         }
-        await onSubmit(visibleValues);
+        const response = await onSubmit(visibleValues);
         if (resetOnSuccess) setValues({ ...initialValues });
         setSubmitStatus("success");
-        return { status: "success" };
+        return response === undefined ? { status: "success" } : { status: "success", response };
       } catch (cause) {
         const error = cause instanceof Error ? cause : new Error(String(cause));
         setSubmitError(error);

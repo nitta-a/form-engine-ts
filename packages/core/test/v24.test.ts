@@ -61,6 +61,16 @@ describe("form version transitions", () => {
     nextVersion: 3,
     revision: 7
   };
+  const currentPublishedRecord: FormVersionRecord = {
+    formId: "analytics",
+    version: 2,
+    status: "published",
+    schema: { ...schema, version: 2, title: "Original published schema" },
+    revision: 4,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    publishedAt: "2026-01-02T00:00:00.000Z",
+    metadata: { retained: true }
+  };
 
   it("clones one draft, rejects another, and enforces the maximum version", () => {
     const cloned = cloneVersionToDraft(state, { ...schema, version: 2 }, { maxVersions: 3 });
@@ -100,16 +110,6 @@ describe("form version transitions", () => {
       success: false,
       error: { type: "revision_conflict", expectedRevision: 6, actualRevision: 7 }
     });
-    const currentPublishedRecord: FormVersionRecord = {
-      formId: "analytics",
-      version: 2,
-      status: "published",
-      schema: { ...schema, version: 2, title: "Original published schema" },
-      revision: 4,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      publishedAt: "2026-01-02T00:00:00.000Z",
-      metadata: { retained: true }
-    };
     const published = await publishDraft(draftState, schema, {
       expectedRevision: 7,
       currentPublishedRecord,
@@ -137,23 +137,28 @@ describe("form version transitions", () => {
     });
   });
 
-  it("does not synthesize an archived record when the current published record is omitted", async () => {
+  it("rejects publishing when the current published record is omitted", async () => {
     const published = await publishDraft({ ...state, draftVersion: 3 }, schema);
-    expect(published).toMatchObject({ success: true, value: { archivedRecords: [] } });
+    expect(published).toEqual({
+      success: false,
+      error: { type: "missing_published_record", expectedVersion: 2 }
+    });
   });
 
   it("returns typed synchronous and asynchronous validation failures without throwing", async () => {
     const issue = { path: "fields[0]", code: "invalid", message: "Invalid draft" };
     await expect(
-      publishDraft({ ...state, draftVersion: 3 }, schema, { validate: async () => [issue] })
+      publishDraft({ ...state, draftVersion: 3 }, schema, {
+        currentPublishedRecord,
+        validate: async () => [issue]
+      })
     ).resolves.toEqual({
       success: false,
       error: { type: "validation_failed", issues: [issue] }
     });
-    await expect(publishDraft({ ...state, draftVersion: 3 }, schema, { validate: () => false })).resolves.toEqual({
-      success: false,
-      error: { type: "validation_failed", issues: [] }
-    });
+    await expect(
+      publishDraft({ ...state, draftVersion: 3 }, schema, { currentPublishedRecord, validate: () => false })
+    ).resolves.toEqual({ success: false, error: { type: "validation_failed", issues: [] } });
   });
 
   it("creates a self-contained publish transition plan", async () => {
@@ -169,6 +174,7 @@ describe("form version transitions", () => {
     };
     const planned = await createPublishTransitionPlan({ ...state, draftVersion: 3 }, draftRecord, {
       expectedRevision: 7,
+      currentPublishedRecord,
       publishedAt: "2026-08-24T09:00:00.000Z"
     });
     expect(planned).toEqual({
@@ -186,8 +192,23 @@ describe("form version transitions", () => {
             revision: 3,
             publishedAt: "2026-08-24T09:00:00.000Z"
           },
-          archivedRecordsToSave: [],
+          archivedRecordsToSave: [
+            {
+              ...currentPublishedRecord,
+              status: "archived",
+              revision: 5,
+              archivedAt: "2026-08-24T09:00:00.000Z"
+            }
+          ],
           events: [
+            {
+              type: "version.archived",
+              formId: "analytics",
+              fromRevision: 7,
+              toRevision: 8,
+              affectedVersions: [2],
+              occurredAt: "2026-08-24T09:00:00.000Z"
+            },
             {
               type: "version.published",
               formId: "analytics",

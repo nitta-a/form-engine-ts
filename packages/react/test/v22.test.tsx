@@ -3,6 +3,7 @@ import { fireEvent, render, renderHook, screen, within } from "@testing-library/
 import { useState } from "react";
 import {
   type BuilderButtonProps,
+  type BuilderTextAreaProps,
   type BuilderTextInputProps,
   type BuilderTranslationActionsSlotProps,
   FormBuilder,
@@ -197,6 +198,18 @@ describe("FormBuilder v2.2", () => {
         />
       );
     }
+    function CustomTextArea({ value, onChange, disabled, id, "aria-label": ariaLabel }: BuilderTextAreaProps) {
+      return (
+        <textarea
+          id={id}
+          data-design-system="text-input"
+          disabled={disabled}
+          aria-label={ariaLabel}
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+      );
+    }
     function Harness({ readOnly = false }: { readonly readOnly?: boolean }) {
       const [current, setCurrent] = useState(schema);
       return (
@@ -205,7 +218,7 @@ describe("FormBuilder v2.2", () => {
             schema={current}
             onChange={setCurrent}
             readOnly={readOnly}
-            components={{ Button: CustomButton, TextInput: CustomTextInput }}
+            components={{ Button: CustomButton, TextArea: CustomTextArea, TextInput: CustomTextInput }}
             idFactory={(kind) => `custom-${kind}`}
           />
           <output data-testid="custom-schema">{JSON.stringify(current)}</output>

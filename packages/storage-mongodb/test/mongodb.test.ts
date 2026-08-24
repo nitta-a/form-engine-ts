@@ -58,10 +58,33 @@ function matches(document: TestDocument, filter: Record<string, unknown>): boole
 
 function createDbStub() {
   const collections = new Map<string, Map<string, TestDocument>>();
-  const indexes = new Map<string, unknown[]>();
+  const indexes = new Map<
+    string,
+    Array<{
+      key: Record<string, number>;
+      unique?: boolean;
+      partialFilterExpression?: Record<string, unknown>;
+      name?: string;
+    }>
+  >();
   const collection = (name: string) => {
     const documents = collections.get(name) ?? new Map<string, TestDocument>();
     collections.set(name, documents);
+    const assertUnique = (candidate: TestDocument, excludingId?: string) => {
+      for (const index of indexes.get(name) ?? []) {
+        if (index.unique !== true) continue;
+        if (index.partialFilterExpression !== undefined && !matches(candidate, index.partialFilterExpression)) continue;
+        const duplicate = [...documents.values()].find(
+          (document) =>
+            document._id !== excludingId &&
+            (index.partialFilterExpression === undefined || matches(document, index.partialFilterExpression)) &&
+            Object.keys(index.key).every((key) => property(document, key) === property(candidate, key))
+        );
+        if (duplicate !== undefined) {
+          throw Object.assign(new Error(`E11000 duplicate key for index ${index.name ?? "unnamed"}`), { code: 11000 });
+        }
+      }
+    };
     return {
       async updateOne(filter: Record<string, unknown>, update: Record<string, unknown>, options: { upsert?: boolean }) {
         const existing = [...documents.values()].find((document) => matches(document, filter));
@@ -69,6 +92,7 @@ function createDbStub() {
         if (existing !== undefined) {
           const next = clone({ ...existing, ...changes });
           for (const key of Object.keys((update.$unset ?? {}) as Record<string, unknown>)) delete next[key];
+          assertUnique(next, existing._id);
           documents.set(existing._id, next);
           return { matchedCount: 1, upsertedCount: 0 };
         } else if (options.upsert) {
@@ -76,6 +100,7 @@ function createDbStub() {
           if (documents.has(next._id)) {
             throw Object.assign(new Error(`E11000 duplicate key: ${next._id}`), { code: 11000 });
           }
+          assertUnique(next);
           documents.set(next._id, next);
           return { matchedCount: 0, upsertedCount: 1 };
         }
@@ -131,12 +156,20 @@ function createDbStub() {
       },
       async insertOne(document: TestDocument) {
         if (documents.has(document._id)) throw new Error(`E11000 duplicate key: ${document._id}`);
+        assertUnique(document);
         documents.set(document._id, clone(document));
       },
       async countDocuments(filter: Record<string, unknown>) {
         return [...documents.values()].filter((document) => matches(document, filter)).length;
       },
-      async createIndexes(specifications: unknown[]) {
+      async createIndexes(
+        specifications: Array<{
+          key: Record<string, number>;
+          unique?: boolean;
+          partialFilterExpression?: Record<string, unknown>;
+          name?: string;
+        }>
+      ) {
         indexes.set(name, clone(specifications));
       }
     };
@@ -235,9 +268,120 @@ describe("createMongoDbStorage", () => {
       { key: { "submission.locale": 1 }, name: "form_responses_locale" }
     ]);
     expect(indexes.get("form_versions")).toEqual([
-      { key: { formId: 1, version: 1 }, name: "form_versions_form_version", unique: true },
-      { key: { formId: 1, status: 1 }, name: "form_versions_form_status" }
+      { key: { formId: 1, version: 1 }, name: "unique_version_per_form", unique: true },
+      {
+        key: { formId: 1 },
+        name: "unique_draft_per_form",
+        unique: true,
+        partialFilterExpression: { status: "draft" }
+      },
+      {
+        key: { formId: 1 },
+        name: "unique_published_per_form",
+        unique: true,
+        partialFilterExpression: { status: "published" }
+      }
     ]);
+  });
+
+  it("rejects a second published version while allowing multiple archived versions", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.createIndexes();
+    const versionRecord = (version: number, status: "published" | "archived"): FormVersionRecord => ({
+      formId: "form",
+      version,
+      status,
+      schema: schema("form", version),
+      revision: 1,
+      createdAt: "2026-08-25T00:00:00.000Z"
+    });
+    const plan = (expectedRevision: number, record: FormVersionRecord): VersionTransitionPlan => ({
+      formId: "form",
+      expectedRevision,
+      nextRevision: expectedRevision + 1,
+      publishedRecordToSave: record,
+      archivedRecordsToSave: [],
+      events: [],
+      nextVersion: record.version + 1,
+      timestamp: "2026-08-25T00:00:00.000Z"
+    });
+    expect(await adapter.commitVersionTransition(plan(0, versionRecord(1, "published")))).toEqual({
+      success: true,
+      value: { success: true }
+    });
+    const duplicate = await adapter.commitVersionTransition(plan(1, versionRecord(2, "published")));
+    expect(duplicate).toMatchObject({ success: false, error: { type: "storage_error" } });
+    if (duplicate.success) throw new Error("Expected unique index rejection");
+    expect(String(duplicate.error.type === "storage_error" ? duplicate.error.cause : "")).toContain("E11000");
+
+    const archivedPlan: VersionTransitionPlan = {
+      formId: "archive-form",
+      expectedRevision: 0,
+      nextRevision: 1,
+      archivedRecordsToSave: [versionRecord(3, "archived"), versionRecord(4, "archived")].map((record) => ({
+        ...record,
+        formId: "archive-form",
+        schema: schema("archive-form", record.version)
+      })),
+      events: [],
+      nextVersion: 5,
+      timestamp: "2026-08-25T00:00:00.000Z"
+    };
+    expect(await adapter.commitVersionTransition(archivedPlan)).toEqual({ success: true, value: { success: true } });
+    expect(await adapter.listVersionRecords("archive-form")).toHaveLength(2);
+  });
+
+  it("archives the old published record before saving its replacement", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.createIndexes();
+    const oldPublished: FormVersionRecord = {
+      formId: "replace-form",
+      version: 1,
+      status: "published",
+      schema: schema("replace-form", 1),
+      revision: 1,
+      createdAt: "2026-08-24T00:00:00.000Z"
+    };
+    expect(
+      await adapter.commitVersionTransition({
+        formId: "replace-form",
+        expectedRevision: 0,
+        nextRevision: 1,
+        publishedRecordToSave: oldPublished,
+        events: [],
+        nextVersion: 2,
+        timestamp: "2026-08-24T00:00:00.000Z"
+      })
+    ).toEqual({ success: true, value: { success: true } });
+    const archived = {
+      ...oldPublished,
+      status: "archived" as const,
+      revision: 2,
+      archivedAt: "2026-08-25T00:00:00.000Z"
+    };
+    const replacement: FormVersionRecord = {
+      ...oldPublished,
+      version: 2,
+      schema: schema("replace-form", 2),
+      revision: 1,
+      createdFromVersion: 1,
+      createdAt: "2026-08-25T00:00:00.000Z"
+    };
+    expect(
+      await adapter.commitVersionTransition({
+        formId: "replace-form",
+        expectedRevision: 1,
+        nextRevision: 2,
+        publishedRecordToSave: replacement,
+        archivedRecordsToSave: [archived],
+        events: [],
+        nextVersion: 3,
+        timestamp: "2026-08-25T00:00:00.000Z"
+      })
+    ).toEqual({ success: true, value: { success: true } });
+    expect(await adapter.listVersionRecords("replace-form")).toEqual([archived, replacement]);
   });
 
   it("allows only one concurrent version transition for the same expected revision", async () => {

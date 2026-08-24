@@ -366,6 +366,9 @@ const FIELD_TYPES: readonly FieldType[] = [
 
 const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.formBuilder": "Form builder",
+  "builder.basicSettings": "Basic settings",
+  "builder.formTitle": "Form title",
+  "builder.formDescription": "Form description",
   "builder.moveUp": "Move {{title}} up",
   "builder.moveDown": "Move {{title}} down",
   "builder.delete": "Delete {{title}}",
@@ -573,7 +576,7 @@ export function FormBuilder({
 }: FormBuilderProps) {
   const resolvedComponents: Required<FormBuilderComponents> = { ...DEFAULT_COMPONENTS, ...componentOverrides };
   const components = GUARDED_COMPONENTS;
-  const { Button, Checkbox, ErrorMessage, Fieldset, IconButton, Section, Select, TextInput } = components;
+  const { Button, Checkbox, ErrorMessage, Fieldset, IconButton, Section, Select, TextArea, TextInput } = components;
   const ToolbarSlot = slots?.toolbar;
   const FieldEditorSlot = slots?.fieldEditor;
   const OptionEditorSlot = slots?.optionEditor;
@@ -936,6 +939,34 @@ export function FormBuilder({
         }}
       >
         <Fieldset className="form-engine-builder__controls" disabled={readOnly}>
+          <Section
+            className="form-engine-builder__basic-settings"
+            headingId="builder-basic-settings-heading"
+            title={translate("builder.basicSettings")}
+          >
+            <div className="form-engine-builder__grid">
+              <label>
+                {translate("builder.formTitle")}
+                <TextInput
+                  name="title"
+                  required
+                  error={schema.title.trim().length === 0}
+                  helperText={schema.title.trim().length === 0 ? translate("builder.required") : ""}
+                  value={schema.title}
+                  onChange={(value) => setSourceText({ kind: "form" }, "title", value)}
+                />
+              </label>
+              <label>
+                {translate("builder.formDescription")}
+                <TextArea
+                  name="description"
+                  rows={3}
+                  value={schema.description ?? ""}
+                  onChange={(value) => setSourceText({ kind: "form" }, "description", value)}
+                />
+              </label>
+            </div>
+          </Section>
           {pagesEnabled ? (
             PagesSlot === undefined ? (
               <Section

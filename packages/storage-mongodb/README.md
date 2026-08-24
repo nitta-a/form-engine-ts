@@ -33,8 +33,9 @@ Metadata filters and the generic submission-filter AST are translated to MongoDB
 Legacy predicate filters remain supported and are applied client-side. `listTextAnswerPage` returns stable cursor pages
 of individual text/textarea answers without loading every answer body at once.
 
-Version records are stored in `form_versions`, with unique `(formId, version)` and `(formId, status)` indexes. Transition
-state lives in `form_version_states`. `commitVersionTransition(plan)` compares `expectedRevision` atomically and returns
+Version records are stored in `form_versions`, with a unique `(formId, version)` index. Partial unique indexes allow at
+most one Draft and one Published record per form, while any number of Archived records remain available. Transition state
+lives in `form_version_states`. `commitVersionTransition(plan)` compares `expectedRevision` atomically and returns
 `revision_conflict` to losing concurrent publishers; on a real MongoDB client, the state and record changes are committed
 in one transaction. Clone, publish, and draft-delete plans persist complete version state, affected records, and audit
 events. State/record/list reads and typed commit errors are exposed through the full `VersionedFormStorageAdapter` API.

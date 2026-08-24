@@ -8,6 +8,7 @@ import type {
   StorageCommitError,
   SubmissionFilter,
   TextAnswerPage,
+  TextAnswerPageQueryOptions,
   VersionedFormStorageAdapter,
   VersionTransitionPlan
 } from "@form-engine-ts/core";
@@ -206,7 +207,11 @@ function parseVersionRecordDocument(document: StoredVersionDocument): FormVersio
 
 function isCasConflict(error: unknown): boolean {
   if (!isRecord(error)) return false;
-  if (error.code === 11000 || error.code === 112 || error.code === 251) return true;
+  if (error.code === 11000) {
+    const message = error instanceof Error ? error.message : String(error.message ?? "");
+    return !/unique_(?:draft|published|version)_per_form/u.test(message);
+  }
+  if (error.code === 112 || error.code === 251) return true;
   return typeof error.hasErrorLabel === "function" && error.hasErrorLabel("TransientTransactionError") === true;
 }
 
@@ -343,8 +348,8 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
       );
     }
     if (plan.draftToCreate !== undefined) await upsertVersionRecord(plan.draftToCreate, session);
-    if (plan.publishedRecordToSave !== undefined) await upsertVersionRecord(plan.publishedRecordToSave, session);
     for (const record of plan.archivedRecordsToSave ?? []) await upsertVersionRecord(record, session);
+    if (plan.publishedRecordToSave !== undefined) await upsertVersionRecord(plan.publishedRecordToSave, session);
     for (const [eventIndex, event] of plan.events.entries()) {
       await versionEvents.updateOne(
         { _id: versionEventDocumentId(plan.formId, plan.expectedRevision, eventIndex) },
@@ -456,12 +461,22 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
           : {})
       };
     },
-    async listTextAnswerPage(formId, fieldId, options = {}): Promise<TextAnswerPage> {
-      if (fieldId.trim().length === 0) throw new TypeError("fieldId must not be empty.");
+    async listTextAnswerPage(formId, fieldIdOrOptions, providedOptions): Promise<TextAnswerPage> {
+      const options: TextAnswerPageQueryOptions =
+        typeof fieldIdOrOptions === "string" ? (providedOptions ?? {}) : (fieldIdOrOptions ?? {});
+      const requestedFieldIds =
+        typeof fieldIdOrOptions === "string"
+          ? [fieldIdOrOptions]
+          : options.fieldIds === undefined
+            ? undefined
+            : [...new Set(options.fieldIds)];
+      if (requestedFieldIds?.some((fieldId) => fieldId.trim().length === 0)) {
+        throw new TypeError("fieldIds must not contain empty values.");
+      }
       const pageSize = normalizeSubmissionPageSize(options.pageSize);
       const cursor = options.cursor === undefined ? undefined : decodeTextAnswerCursor(options.cursor);
-      if (cursor !== undefined && cursor.fieldId !== fieldId) {
-        throw new TypeError("Text answer cursor fieldId does not match the query.");
+      if (cursor !== undefined && requestedFieldIds !== undefined && !requestedFieldIds.includes(cursor.fieldId)) {
+        throw new TypeError("Text answer cursor fieldId does not match the query fields.");
       }
       const submittedAt =
         options.since === undefined && options.until === undefined
@@ -475,8 +490,10 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         ...(options.version === undefined ? {} : { formVersion: options.version }),
         ...(options.locale === undefined ? {} : { "submission.locale": options.locale }),
         ...(submittedAt === undefined ? {} : { submittedAt }),
-        ...(cursor === undefined ? {} : { _id: { $gt: cursor.responseId } }),
-        [`submission.values.${fieldId}`]: { $type: "string" }
+        ...(cursor === undefined ? {} : { _id: { $gte: cursor.responseId } }),
+        ...(requestedFieldIds?.length === 1
+          ? { [`submission.values.${requestedFieldIds[0]}`]: { $type: "string" } }
+          : {})
       };
       const serverFilters: Document[] = [baseFilter];
       if (options.filter !== undefined && typeof options.filter !== "function") {
@@ -488,26 +505,36 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
       const filter: Filter<StoredSubmissionDocument> =
         serverFilters.length === 1 ? baseFilter : { $and: serverFilters };
       const sorted = submissions.find(filter).sort({ _id: 1 });
-      const documents =
-        typeof options.filter === "function" ? await sorted.toArray() : await sorted.limit(pageSize + 1).toArray();
+      const documents = await sorted.toArray();
       const candidates = documents
         .map(parseSubmissionDocument)
         .filter((submission) => matchesSubmissionPageFilters(submission, options))
         .flatMap((submission) => {
-          const text = submission.values[fieldId];
-          if (typeof text !== "string") return [];
-          return [
-            {
-              responseId: submission.id,
-              formId: submission.formId,
-              formVersion: submission.formVersion,
-              fieldId,
-              text,
-              locale: submission.locale,
-              submittedAt: submission.submittedAt,
-              ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+          const entries =
+            requestedFieldIds === undefined
+              ? Object.entries(submission.values)
+              : requestedFieldIds.map((fieldId) => [fieldId, submission.values[fieldId]] as const);
+          return entries.flatMap(([fieldId, text]) => {
+            if (typeof text !== "string" || text.length === 0) return [];
+            if (
+              cursor !== undefined &&
+              (submission.id < cursor.responseId || (submission.id === cursor.responseId && fieldId <= cursor.fieldId))
+            ) {
+              return [];
             }
-          ];
+            return [
+              {
+                responseId: submission.id,
+                formId: submission.formId,
+                formVersion: submission.formVersion,
+                fieldId,
+                text,
+                locale: submission.locale,
+                submittedAt: submission.submittedAt,
+                ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+              }
+            ];
+          });
         });
       const hasMore = candidates.length > pageSize;
       const items = candidates.slice(0, pageSize);
@@ -516,7 +543,7 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         items,
         hasMore,
         ...(hasMore && last !== undefined
-          ? { nextCursor: encodeTextAnswerCursor({ responseId: last.responseId, fieldId }) }
+          ? { nextCursor: encodeTextAnswerCursor({ responseId: last.responseId, fieldId: last.fieldId }) }
           : {})
       };
     },
@@ -606,8 +633,19 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
           { key: { "submission.locale": 1 }, name: "form_responses_locale" }
         ]),
         versions.createIndexes([
-          { key: { formId: 1, version: 1 }, name: "form_versions_form_version", unique: true },
-          { key: { formId: 1, status: 1 }, name: "form_versions_form_status" }
+          { key: { formId: 1, version: 1 }, name: "unique_version_per_form", unique: true },
+          {
+            key: { formId: 1 },
+            name: "unique_draft_per_form",
+            unique: true,
+            partialFilterExpression: { status: "draft" }
+          },
+          {
+            key: { formId: 1 },
+            name: "unique_published_per_form",
+            unique: true,
+            partialFilterExpression: { status: "published" }
+          }
         ]),
         versionEvents.createIndexes([
           { key: { formId: 1, fromRevision: 1, eventIndex: 1 }, name: "form_version_events_revision" }

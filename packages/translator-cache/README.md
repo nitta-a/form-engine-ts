@@ -25,3 +25,5 @@ const translator = withTranslationCache(baseTranslator, cache, {
 Keys isolate adapter name, source locale, target locale, and a deterministic UTF-8 hash of the source text. Batch misses
 are deduplicated, translated once in source order, cached, and restored to their original positions. The built-in memory
 cache applies both TTL expiration and bounded LRU eviction and exposes `size`, `evictionCount`, and `clear()` diagnostics.
+Use `variant` to isolate glossary/model/configuration revisions, or `buildKey` for complete key control.
+`onStatsReport` receives cumulative real cache hits, misses, evictions, and current size after successful translations.

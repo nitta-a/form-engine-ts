@@ -216,6 +216,10 @@ export interface SubmissionPageQueryOptions {
   readonly metadataFilters?: Readonly<Record<string, JsonValue>>;
 }
 
+export interface TextAnswerPageQueryOptions extends SubmissionPageQueryOptions {
+  readonly fieldIds?: readonly string[];
+}
+
 export type SubmissionFilter =
   | { readonly op: "eq"; readonly path: string; readonly value: JsonValue }
   | { readonly op: "in"; readonly path: string; readonly values: readonly JsonValue[] }
@@ -232,7 +236,11 @@ export interface SubmissionPage {
 
 export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
   listSubmissionPage(formId: string, options?: SubmissionPageQueryOptions): Promise<SubmissionPage>;
-  listTextAnswerPage?(formId: string, fieldId: string, options?: SubmissionPageQueryOptions): Promise<TextAnswerPage>;
+  listTextAnswerPage?(
+    formId: string,
+    fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
+    options?: TextAnswerPageQueryOptions
+  ): Promise<TextAnswerPage>;
 }
 
 export interface TextAnswerItem {

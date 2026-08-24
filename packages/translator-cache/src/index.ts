@@ -1,14 +1,33 @@
 import type { AsyncTranslationAdapter } from "@form-engine-ts/core";
 
 export interface TranslationCacheStorage {
+  readonly size?: number;
+  readonly evictionCount?: number;
   get(key: string): Promise<string | undefined> | string | undefined;
   set(key: string, value: string, ttlMs?: number): Promise<void> | void;
+}
+
+export interface TranslationCacheKeyContext {
+  readonly sourceText: string;
+  readonly sourceLocale: string;
+  readonly targetLocale: string;
+  readonly variant?: string;
+}
+
+export interface TranslationCacheStats {
+  readonly hits: number;
+  readonly misses: number;
+  readonly evictions: number;
+  readonly size: number;
 }
 
 export interface TranslationCacheOptions {
   readonly ttlMs?: number;
   readonly keyPrefix?: string;
   readonly adapterName?: string;
+  readonly variant?: string;
+  readonly buildKey?: (context: TranslationCacheKeyContext) => string;
+  readonly onStatsReport?: (stats: TranslationCacheStats) => void;
 }
 
 export interface MemoryTranslationCacheOptions {
@@ -121,6 +140,25 @@ export function withTranslationCache(
   if (prefix.trim().length === 0) throw new TypeError("keyPrefix must not be empty.");
   const adapterName = options.adapterName ?? "anonymous";
   if (adapterName.trim().length === 0) throw new TypeError("adapterName must not be empty.");
+  if (options.variant !== undefined && options.variant.trim().length === 0) {
+    throw new TypeError("variant must not be empty.");
+  }
+  if (options.buildKey !== undefined && typeof options.buildKey !== "function") {
+    throw new TypeError("buildKey must be a function.");
+  }
+  const initialEvictionCount = cache.evictionCount ?? 0;
+  let hits = 0;
+  let misses = 0;
+
+  const reportStats = () => {
+    const size = cache.size ?? 0;
+    options.onStatsReport?.({
+      hits,
+      misses,
+      evictions: Math.max(0, (cache.evictionCount ?? initialEvictionCount) - initialEvictionCount),
+      size
+    });
+  };
 
   const translateBatch = async (
     texts: readonly string[],
@@ -132,8 +170,22 @@ export function withTranslationCache(
     }
     const target = requireLocale(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? "auto" : requireLocale(sourceLocale, "sourceLocale");
-    const keys = texts.map((text) => `${prefix}:${adapterName}:${source}:${target}:${hashTranslationText(text)}`);
+    const keys = texts.map((text) => {
+      const context: TranslationCacheKeyContext = {
+        sourceText: text,
+        sourceLocale: source,
+        targetLocale: target,
+        ...(options.variant === undefined ? {} : { variant: options.variant })
+      };
+      const key =
+        options.buildKey?.(context) ??
+        `${prefix}:${adapterName}:${options.variant === undefined ? "" : `${options.variant}:`}${source}:${target}:${hashTranslationText(text)}`;
+      if (typeof key !== "string" || key.length === 0) throw new TypeError("Translation cache key must not be empty.");
+      return key;
+    });
     const cached = await Promise.all(keys.map((key) => cache.get(key)));
+    hits += cached.filter((value) => value !== undefined).length;
+    misses += cached.filter((value) => value === undefined).length;
     const missingByKey = new Map<string, { readonly text: string; readonly indices: number[] }>();
     for (let index = 0; index < texts.length; index += 1) {
       if (cached[index] !== undefined) continue;
@@ -163,10 +215,12 @@ export function withTranslationCache(
         })
       );
     }
-    return cached.map((value) => {
+    const result = cached.map((value) => {
       if (value === undefined) throw new Error("Translation cache result is unavailable.");
       return value;
     });
+    reportStats();
+    return result;
   };
 
   return {

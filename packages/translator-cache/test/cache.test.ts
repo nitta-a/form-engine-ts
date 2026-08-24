@@ -76,4 +76,45 @@ describe("withTranslationCache", () => {
     expect(cache.size).toBe(0);
     expect(cache.evictionCount).toBe(3);
   });
+
+  it("reports exact cumulative hits, misses, evictions, and variant-isolated keys", async () => {
+    const cache = createMemoryTranslationCache({ maxEntries: 1 });
+    const reports: Array<{ hits: number; misses: number; evictions: number; size: number }> = [];
+    const translateBatch = vi.fn(async (texts: readonly string[]) => texts.map((text) => text.toUpperCase()));
+    const base: AsyncTranslationAdapter = { translateText: async (text) => text.toUpperCase(), translateBatch };
+    const translator = withTranslationCache(base, cache, {
+      adapterName: "google-v3",
+      variant: "glossary-a",
+      onStatsReport: (stats) => reports.push(stats)
+    });
+    await translator.translateBatch(["hello"], "ja", "en");
+    await translator.translateBatch(["hello"], "ja", "en");
+    await translator.translateBatch(["other"], "ja", "en");
+    expect(reports).toEqual([
+      { hits: 0, misses: 1, evictions: 0, size: 1 },
+      { hits: 1, misses: 1, evictions: 0, size: 1 },
+      { hits: 1, misses: 2, evictions: 1, size: 1 }
+    ]);
+    expect(translateBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("supports a custom key builder with variant context", async () => {
+    const { cache, set } = createCache();
+    const buildKey = vi.fn(
+      ({ sourceText, variant }: { sourceText: string; variant?: string }) => `${variant}:${sourceText}`
+    );
+    const base: AsyncTranslationAdapter = {
+      translateText: async (text) => text,
+      translateBatch: async (texts) => texts
+    };
+    const translator = withTranslationCache(base, cache, { variant: "model-2", buildKey });
+    await translator.translateText("hello", "ja", "en");
+    expect(buildKey).toHaveBeenCalledWith({
+      sourceText: "hello",
+      sourceLocale: "en",
+      targetLocale: "ja",
+      variant: "model-2"
+    });
+    expect(set).toHaveBeenCalledWith("model-2:hello", "hello", undefined);
+  });
 });
