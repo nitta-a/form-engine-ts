@@ -148,6 +148,35 @@ describe("createGoogleV3Translator", () => {
     expect(sleep).toHaveBeenCalledWith(5);
   });
 
+  it("reports chunking, characters, retries, and total latency", async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response(429, "busy"))
+      .mockResolvedValueOnce(response(200, { translations: [{ translatedText: "ja:a" }, { translatedText: "ja:bc" }] }))
+      .mockResolvedValueOnce(response(200, { translations: [{ translatedText: "ja:d" }] }));
+    const onBatchReport = vi.fn();
+    const now = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(135);
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      fetchFn,
+      batchLimits: { maxItems: 2 },
+      retry: { maxRetries: 1, baseDelayMs: 0 },
+      random: () => 0,
+      sleep: async () => undefined,
+      now,
+      onBatchReport
+    });
+    await expect(translator.translateBatch(["a", "bc", "d"], "ja")).resolves.toEqual(["ja:a", "ja:bc", "ja:d"]);
+    expect(onBatchReport).toHaveBeenCalledOnce();
+    expect(onBatchReport).toHaveBeenCalledWith({
+      totalChunks: 2,
+      totalCharacters: 4,
+      retryAttempts: 1,
+      durationMs: 35
+    });
+  });
+
   it("does not retry non-retryable failures and redacts access tokens", async () => {
     const fetchFn = vi.fn(async () => response(400, "invalid token-value"));
     const translator = createGoogleV3Translator({

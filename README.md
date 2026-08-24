@@ -22,6 +22,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
 | Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
 | Translator adapter | `@form-engine-ts/translator-google-v3` | Google Cloud Translation Advanced v3 with glossaries, labels, chunking, and retry |
+| Translator utility | `@form-engine-ts/translator-cache` | Storage-neutral TTL cache wrapper for asynchronous translation adapters |
 | Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
 | Demo app | `@form-engine-ts/preview` | Private Vite sandbox for building, responding, switching storage, analytics, and CSV export |
 
@@ -58,7 +59,7 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security, v2 extensibility, and v2.5 domain/infrastructure APIs
+### v1.1.1 security, v2 extensibility, and v2.6 domain/infrastructure APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
@@ -96,6 +97,12 @@ The v2.5.1 release hardens version transitions with typed validation/CAS failure
 report skipped responses, and adds response-aware CSV columns plus Web/Node writable-stream piping. Paged storage can apply
 metadata filters and predicates before sizing, including the new Azure Table adapter. Google Translation Advanced batches
 by both item count and UTF-8 byte size and retries transient network/HTTP failures with `Retry-After`-aware full jitter.
+
+v2.6 makes publish plans fully persistence-ready and asynchronous, preserving the actual archived record and adding
+revision-based atomic commits to MongoDB. Azure Table paging now uses one native bounded page request with opaque service
+continuation tokens, injectable entity codecs, separate schema/submission clients, and scalar metadata-to-OData filters.
+Google Translation Advanced reports per-batch metrics, CSV custom columns may resolve asynchronously, and the new
+`@form-engine-ts/translator-cache` provides deterministic TTL caching without coupling Core to a cache vendor.
 
 ### Define and render a form
 
@@ -337,7 +344,9 @@ Zod failures use the field ID as their path and expose the Core validation code,
 
 The published libraries do not read DOM or browser-only globals during rendering. The default renderer uses its submitted form element only from event handling to focus the first invalid control. LocalStorage is resolved when `createLocalStorageAdapter()` is called, never on import; pass a `StorageLike` implementation outside a browser. Builder UUIDs are generated only from user-event handlers; the Vite preview owns timestamp, Blob, and download behavior.
 
-This phase still excludes drag-and-drop ordering, date/email controls, multiple simultaneous conditions, a publish/version workflow, behavioral telemetry, editable responses, network translator retry/caching, database connection management, production migration frameworks, automatic transactions/retries, pgvector columns, and Zod answer transforms. Builder ordering uses accessible up/down controls. The memory adapter resets whenever its JavaScript process or browser page is reloaded.
+The library remains intentionally driver-neutral: callers own database connections, production migrations, credentials,
+and cache storage. Builder ordering uses accessible up/down controls, and the memory adapter resets whenever its JavaScript
+process or browser page is reloaded.
 
 ## 日本語
 
@@ -361,6 +370,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
 | Translator Adapter | `@form-engine-ts/translator-google-v3` | 用語集・label・分割送信・retry対応のGoogle Cloud Translation Advanced v3連携 |
+| Translator Utility | `@form-engine-ts/translator-cache` | 非同期翻訳adapter向けのstorage非依存TTL cache wrapper |
 | Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
 | デモアプリ | `@form-engine-ts/preview` | Builder・回答・集計/CSVの3タブを備えた非公開Viteサンドボックス |
 
@@ -397,7 +407,7 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応、v2拡張、v2.5ドメイン／インフラAPI
+### v1.1.1セキュリティ対応、v2拡張、v2.6ドメイン／インフラAPI
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
@@ -432,6 +442,12 @@ v2.5.1では、version遷移に型付きvalidation/CAS失敗を追加し、lenie
 backpressure対応で直接出力できます。ページングはページサイズ確定前のmetadata/predicate filterに対応し、Azure
 Tableアダプターも追加しました。Google Translation Advancedは件数とUTF-8 byte数の両方でbatchを分割し、
 `Retry-After`を尊重するfull jitter付きで一時的なnetwork/HTTPエラーをretryします。
+
+v2.6ではpublish planを非同期かつそのまま永続化できる完全なrecord構成にし、実際の旧公開recordを保全して
+MongoDBへrevisionベースのatomic commitを追加しました。Azure Tableはserviceのopaque continuation tokenを使い、
+1 requestにつきnative pageを1件だけ取得します。entity codec注入、schema/submission client分離、scalar metadataの
+OData変換にも対応しました。Google Translation Advancedのbatch report、非同期CSVカスタム列、およびvendor非依存の
+TTL cache utility `@form-engine-ts/translator-cache`も追加しています。
 
 ### フォームの定義とレンダリング
 
@@ -645,4 +661,6 @@ Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補�
 
 公開ライブラリはレンダリング中にDOMやブラウザ専用グローバルへアクセスしません。LocalStorageはファクトリ呼び出し時にだけ解決され、SSRでは`StorageLike`を注入できます。BuilderのUUIDはユーザー操作イベント内だけで生成し、現在時刻、Blob、CSVダウンロードはPreviewのイベント処理に限定しています。
 
-複数条件、ドラッグ&ドロップ、date/email、公開・版管理ワークフロー、行動テレメトリー、回答編集、ネットワーク翻訳の再試行・キャッシュ、データベース接続管理、本番migration framework、自動transaction/retry、pgvector列、Zodによる回答変換は対象外です。並び替えには上下ボタンを使用します。メモリアダプターはページ再読み込み時にリセットされます。
+ライブラリはdriver非依存を維持しているため、データベース接続、production migration、credential、cache storageの
+管理は呼び出し側が担当します。Builderの並び替えにはアクセシブルな上下ボタンを使用し、memory adapterは
+JavaScript processまたはbrowser pageの再読み込み時にリセットされます。

@@ -1,4 +1,4 @@
-import type { FormSchema, SchemaIssue } from "./types";
+import type { ExtensibleNode, FormSchema, SchemaIssue, VersionTransitionPlan } from "./types";
 
 export type Result<T, E> =
   | { readonly success: true; readonly value: T }
@@ -6,11 +6,13 @@ export type Result<T, E> =
 
 export type FormVersionStatus = "draft" | "published" | "archived";
 
-export interface FormVersionRecord {
+export interface FormVersionRecord extends ExtensibleNode {
   readonly formId: string;
   readonly version: number;
   readonly status: FormVersionStatus;
   readonly schema: FormSchema;
+  readonly revision: number;
+  readonly createdFromVersion?: number;
   readonly createdAt: string;
   readonly publishedAt?: string;
   readonly archivedAt?: string;
@@ -42,8 +44,12 @@ export interface CloneVersionOptions {
 
 export interface PublishDraftOptions {
   readonly expectedRevision?: number;
-  readonly validate?: (schema: FormSchema) => boolean | readonly SchemaIssue[];
-  /** Supplies deterministic record timestamps while keeping the transition pure. */
+  readonly currentPublishedRecord?: FormVersionRecord;
+  readonly validate?: (
+    schema: FormSchema
+  ) => boolean | Promise<boolean> | readonly SchemaIssue[] | Promise<readonly SchemaIssue[]>;
+  readonly publishedAt?: string;
+  /** @deprecated Use publishedAt. */
   readonly timestamp?: string;
 }
 
@@ -129,11 +135,30 @@ export function cloneVersionToDraft(
   };
 }
 
-export function publishDraft(
+function validatePublishedRecord(state: FormVersionState, record: FormVersionRecord | undefined): void {
+  if (record === undefined) return;
+  if (
+    record.formId !== state.formId ||
+    record.version !== state.publishedVersion ||
+    record.status !== "published" ||
+    record.schema.id !== record.formId ||
+    record.schema.version !== record.version
+  ) {
+    throw new TypeError("currentPublishedRecord must match the state's published version.");
+  }
+}
+
+function transitionTimestamp(options: PublishDraftOptions): string {
+  const timestamp = options.publishedAt ?? options.timestamp ?? "1970-01-01T00:00:00.000Z";
+  if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("publishedAt must be a valid date string.");
+  return timestamp;
+}
+
+export async function publishDraft(
   state: FormVersionState,
   draftSchema: FormSchema,
   options: PublishDraftOptions = {}
-): Result<PublishDraftResult, VersionTransitionError> {
+): Promise<Result<PublishDraftResult, VersionTransitionError>> {
   validateState(state);
   const conflict = revisionConflict(state, options.expectedRevision);
   if (conflict !== undefined) return conflict;
@@ -144,27 +169,24 @@ export function publishDraft(
   ) {
     return { success: false, error: { type: "draft_not_found" } };
   }
-  const validation = options.validate?.(draftSchema);
+  validatePublishedRecord(state, options.currentPublishedRecord);
+  const validation = await options.validate?.(draftSchema);
   if (validation === false || (Array.isArray(validation) && validation.length > 0)) {
     return {
       success: false,
       error: { type: "validation_failed", issues: Array.isArray(validation) ? validation : [] }
     };
   }
-  const timestamp = options.timestamp ?? "1970-01-01T00:00:00.000Z";
-  if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("timestamp must be a valid date string.");
+  const timestamp = transitionTimestamp(options);
   const archivedVersion = state.publishedVersion;
   const archivedRecords: readonly FormVersionRecord[] =
-    archivedVersion === undefined
+    options.currentPublishedRecord === undefined
       ? []
       : [
           {
-            formId: state.formId,
-            version: archivedVersion,
+            ...options.currentPublishedRecord,
             status: "archived",
-            schema: { ...draftSchema, version: archivedVersion },
-            createdAt: timestamp,
-            publishedAt: timestamp,
+            revision: options.currentPublishedRecord.revision + 1,
             archivedAt: timestamp
           }
         ];
@@ -182,11 +204,62 @@ export function publishDraft(
         version: draftSchema.version,
         status: "published",
         schema: draftSchema,
+        revision: 1,
+        ...(archivedVersion === undefined ? {} : { createdFromVersion: archivedVersion }),
         createdAt: timestamp,
         publishedAt: timestamp
       },
       archivedRecords,
       ...(archivedVersion === undefined ? {} : { archivedVersion })
+    }
+  };
+}
+
+export async function createPublishTransitionPlan(
+  state: FormVersionState,
+  draftRecord: FormVersionRecord,
+  options: PublishDraftOptions = {}
+): Promise<
+  Result<{ readonly nextState: FormVersionState; readonly plan: VersionTransitionPlan }, VersionTransitionError>
+> {
+  if (
+    draftRecord.formId !== state.formId ||
+    draftRecord.version !== state.draftVersion ||
+    draftRecord.schema.id !== draftRecord.formId ||
+    draftRecord.schema.version !== draftRecord.version
+  ) {
+    return { success: false, error: { type: "draft_not_found" } };
+  }
+  if (draftRecord.status !== "draft") {
+    return { success: false, error: { type: "version_immutable", status: draftRecord.status } };
+  }
+  const expectedRevision = options.expectedRevision ?? state.revision;
+  const timestamp = transitionTimestamp(options);
+  const result = await publishDraft(state, draftRecord.schema, {
+    ...options,
+    expectedRevision,
+    publishedAt: timestamp
+  });
+  if (!result.success) return result;
+  const publishedRecordToSave: FormVersionRecord = {
+    ...draftRecord,
+    status: "published",
+    revision: draftRecord.revision + 1,
+    publishedAt: timestamp
+  };
+  return {
+    success: true,
+    value: {
+      nextState: result.value.nextState,
+      plan: {
+        formId: state.formId,
+        expectedRevision,
+        nextRevision: result.value.nextState.revision,
+        draftToDeleteVersion: draftRecord.version,
+        publishedRecordToSave,
+        archivedRecordsToSave: result.value.archivedRecords,
+        timestamp
+      }
     }
   };
 }

@@ -22,6 +22,7 @@ export interface GoogleV3TranslatorOptions {
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly random?: () => number;
   readonly now?: () => number;
+  readonly onBatchReport?: (report: TranslationBatchReport) => void;
 }
 
 export interface BatchSplitLimits {
@@ -34,6 +35,13 @@ export interface RetryConfig {
   readonly maxRetries?: number;
   readonly baseDelayMs?: number;
   readonly maxDelayMs?: number;
+}
+
+export interface TranslationBatchReport {
+  readonly totalChunks: number;
+  readonly totalCharacters: number;
+  readonly retryAttempts: number;
+  readonly durationMs: number;
 }
 
 const DEFAULT_ENDPOINT = "https://translation.googleapis.com/v3";
@@ -188,7 +196,7 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     texts: readonly string[],
     targetLocale: string,
     sourceLocale: string | undefined
-  ): Promise<readonly string[]> => {
+  ): Promise<{ readonly translations: readonly string[]; readonly retryAttempts: number }> => {
     const token = requireNonEmpty(await options.getAccessToken(), "accessToken");
     const body = JSON.stringify({
       contents: texts,
@@ -212,7 +220,10 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
         }
       }
       if (response?.ok === true) {
-        return parseTranslations(await response.text(), texts.length, glossaryConfig !== undefined);
+        return {
+          translations: parseTranslations(await response.text(), texts.length, glossaryConfig !== undefined),
+          retryAttempts: attempt
+        };
       }
       const retryable =
         response === undefined || response.status === 429 || (response.status >= 500 && response.status <= 599);
@@ -243,10 +254,21 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     }
     const target = requireNonEmpty(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? undefined : requireNonEmpty(sourceLocale, "sourceLocale");
+    const chunks = splitTranslationBatch(texts, batchLimits);
+    const startedAt = now();
     const translated: string[] = [];
-    for (const chunk of splitTranslationBatch(texts, batchLimits)) {
-      translated.push(...(await translateChunk(chunk, target, source)));
+    let retryAttempts = 0;
+    for (const chunk of chunks) {
+      const result = await translateChunk(chunk, target, source);
+      translated.push(...result.translations);
+      retryAttempts += result.retryAttempts;
     }
+    options.onBatchReport?.({
+      totalChunks: chunks.length,
+      totalCharacters: texts.reduce((total, text) => total + [...text].length, 0),
+      retryAttempts,
+      durationMs: Math.max(0, now() - startedAt)
+    });
     return translated;
   };
 

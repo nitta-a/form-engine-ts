@@ -162,6 +162,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/translator-cache:
+    dependencies:
+      '@form-engine-ts/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/translator-deepl:
     dependencies:
       '@form-engine-ts/core':

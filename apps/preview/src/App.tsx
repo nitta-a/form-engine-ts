@@ -3,11 +3,12 @@ import {
   calculateCrossTabulation,
   calculateFieldVisibility,
   cloneVersionToDraft,
+  createPublishTransitionPlan,
   createResponseAccumulator,
   createSubmission,
   deleteDraft,
   dispatchWebhook,
-  exportResponsesToCsv,
+  exportResponsesToCsvStream,
   type FormAnalytics,
   type FormEvent,
   type FormPolicy,
@@ -15,9 +16,9 @@ import {
   type FormStorageAdapter,
   type FormSubmission,
   type FormValues,
+  type FormVersionRecord,
   type FormVersionState,
   populateSchemaTranslations,
-  publishDraft,
   type QuestionAggregate,
   type SelectField,
   validateFormSchema
@@ -36,7 +37,7 @@ import {
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customerFeedbackSchema } from "./schema";
 
 type TabId = "builder" | "respondent" | "analytics";
@@ -189,7 +190,18 @@ function DomainApiDemo({ schema }: { readonly schema: FormSchema }) {
     revision: 0
   });
   const [draftSchema, setDraftSchema] = useState<FormSchema | null>(null);
+  const [currentPublishedRecord, setCurrentPublishedRecord] = useState<FormVersionRecord>({
+    formId: schema.id,
+    version: schema.version,
+    status: "published",
+    schema,
+    revision: 1,
+    createdAt: "2026-08-24T00:00:00.000Z",
+    publishedAt: "2026-08-24T00:00:00.000Z"
+  });
   const [transitionStatus, setTransitionStatus] = useState(`Published v${schema.version}`);
+  const [casStatus, setCasStatus] = useState("CAS simulation not run");
+  const persistedRevision = useRef(0);
   const incremental = useMemo(() => {
     const accumulator = createResponseAccumulator(schema);
     accumulator.addMany([
@@ -219,24 +231,44 @@ function DomainApiDemo({ schema }: { readonly schema: FormSchema }) {
       setTransitionStatus(result.error.type);
       return;
     }
+    persistedRevision.current = result.value.nextState.revision;
     setVersionState(result.value.nextState);
     setDraftSchema(result.value.draftSchema);
     setTransitionStatus(`Draft v${result.value.draftSchema.version}`);
   };
-  const publish = () => {
+  const publish = async () => {
     if (draftSchema === null) return;
-    const result = publishDraft(versionState, draftSchema, {
+    const draftRecord: FormVersionRecord = {
+      formId: schema.id,
+      version: draftSchema.version,
+      status: "draft",
+      schema: draftSchema,
+      revision: 1,
+      ...(versionState.publishedVersion === undefined ? {} : { createdFromVersion: versionState.publishedVersion }),
+      createdAt: "2026-08-24T08:00:00.000Z"
+    };
+    const result = await createPublishTransitionPlan(versionState, draftRecord, {
       expectedRevision: versionState.revision,
-      timestamp: "2026-08-24T09:00:00.000Z"
+      currentPublishedRecord,
+      publishedAt: "2026-08-24T09:00:00.000Z"
     });
     if (!result.success) {
       setTransitionStatus(result.error.type);
       return;
     }
+    await Promise.resolve();
+    if (persistedRevision.current !== result.value.plan.expectedRevision) {
+      setTransitionStatus("revision_conflict");
+      return;
+    }
+    persistedRevision.current = result.value.plan.nextRevision;
     setVersionState(result.value.nextState);
     setDraftSchema(null);
+    if (result.value.plan.publishedRecordToSave !== undefined) {
+      setCurrentPublishedRecord(result.value.plan.publishedRecordToSave);
+    }
     setTransitionStatus(
-      `Published v${result.value.publishedRecord.version}; archived v${result.value.archivedVersion ?? "none"}`
+      `Published v${result.value.plan.publishedRecordToSave?.version ?? "none"}; archived v${result.value.plan.archivedRecordsToSave?.[0]?.version ?? "none"}`
     );
   };
   const discard = () => {
@@ -249,22 +281,39 @@ function DomainApiDemo({ schema }: { readonly schema: FormSchema }) {
     setDraftSchema(null);
     setTransitionStatus("Draft deleted");
   };
+  const runCasSimulation = async () => {
+    const state = { revision: 0 };
+    const attempt = async () => {
+      await Promise.resolve();
+      if (state.revision !== 0) return "revision_conflict";
+      state.revision = 1;
+      return "success";
+    };
+    const results = await Promise.all([attempt(), attempt()]);
+    setCasStatus(
+      `CAS: ${results.filter((result) => result === "success").length} success / ${results.filter((result) => result === "revision_conflict").length} revision_conflict`
+    );
+  };
 
   return (
     <fieldset className="domain-api-demo">
-      <legend>v2.4 Versioning &amp; incremental analytics</legend>
+      <legend>v2.6 Versioning, CAS &amp; incremental analytics</legend>
       <div className="domain-api-actions">
         <button type="button" disabled={draftSchema !== null} onClick={cloneDraft}>
           Clone published version to draft
         </button>
-        <button type="button" disabled={draftSchema === null} onClick={publish}>
+        <button type="button" disabled={draftSchema === null} onClick={() => void publish()}>
           Publish draft
         </button>
         <button type="button" disabled={draftSchema === null} onClick={discard}>
           Delete draft
         </button>
+        <button type="button" onClick={() => void runCasSimulation()}>
+          Run concurrent CAS simulation
+        </button>
       </div>
       <output>{transitionStatus}</output>
+      <output>{casStatus}</output>
       <output>Incremental submissions: {incremental.submissionCount}</output>
     </fieldset>
   );
@@ -380,7 +429,7 @@ function AnalyticsPanel({
   readonly schema: FormSchema;
   readonly submissions: readonly FormSubmission[];
   readonly locale: string;
-  readonly onExport: () => void;
+  readonly onExport: () => Promise<void>;
   readonly resetControl: ReactNode;
 }) {
   const t = (key: string) => mockTranslator.translate(key, locale);
@@ -429,7 +478,7 @@ function AnalyticsPanel({
         </div>
       </div>
       <div className="dashboard-actions">
-        <button className="primary-action" type="button" onClick={onExport}>
+        <button className="primary-action" type="button" onClick={() => void onExport()}>
           {t("preview.export")}
         </button>
         {resetControl}
@@ -686,8 +735,25 @@ export default function App() {
     setSubmissions(await storage.listSubmissions(schema.id, schema.version));
   };
 
-  const downloadCsv = () => {
-    const csv = exportResponsesToCsv(schema, submissions);
+  const downloadCsv = async () => {
+    async function* submissionStream() {
+      for (const submission of submissions) yield submission;
+    }
+    const chunks: string[] = [];
+    for await (const chunk of exportResponsesToCsvStream(schema, submissionStream(), {
+      columns: [
+        {
+          header: "asyncReview",
+          getValue: async ({ submission }) => {
+            await Promise.resolve();
+            return submission.metadata?.source === "preview" ? "reviewed" : "external";
+          }
+        }
+      ]
+    })) {
+      chunks.push(chunk);
+    }
+    const csv = chunks.join("");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const link = document.createElement("a");
     link.href = url;

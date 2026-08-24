@@ -3,11 +3,13 @@ import {
   aggregateResponses,
   assertVersionMutable,
   cloneVersionToDraft,
+  createPublishTransitionPlan,
   createResponseAccumulator,
   deleteDraft,
   exportResponsesToCsvStream,
   type FormSchema,
   type FormSubmission,
+  type FormVersionRecord,
   type FormVersionState,
   pipeResponsesToCsvStream,
   publishDraft
@@ -92,15 +94,26 @@ describe("form version transitions", () => {
     expect(cloneVersionToDraft(state, schema, { allowedSourceVersions: [3] }).success).toBe(true);
   });
 
-  it("detects revision conflicts and records the replaced published version", () => {
+  it("detects revision conflicts and archives the real published record without schema contamination", async () => {
     const draftState = { ...state, draftVersion: 3 };
-    expect(publishDraft(draftState, schema, { expectedRevision: 6 })).toEqual({
+    await expect(publishDraft(draftState, schema, { expectedRevision: 6 })).resolves.toEqual({
       success: false,
       error: { type: "revision_conflict", expectedRevision: 6, actualRevision: 7 }
     });
-    const published = publishDraft(draftState, schema, {
+    const currentPublishedRecord: FormVersionRecord = {
+      formId: "analytics",
+      version: 2,
+      status: "published",
+      schema: { ...schema, version: 2, title: "Original published schema" },
+      revision: 4,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      publishedAt: "2026-01-02T00:00:00.000Z",
+      metadata: { retained: true }
+    };
+    const published = await publishDraft(draftState, schema, {
       expectedRevision: 7,
-      timestamp: "2026-08-24T09:00:00.000Z"
+      currentPublishedRecord,
+      publishedAt: "2026-08-24T09:00:00.000Z"
     });
     expect(published).toMatchObject({
       success: true,
@@ -111,6 +124,11 @@ describe("form version transitions", () => {
           {
             version: 2,
             status: "archived",
+            revision: 5,
+            schema: { title: "Original published schema" },
+            metadata: { retained: true },
+            createdAt: "2026-01-01T00:00:00.000Z",
+            publishedAt: "2026-01-02T00:00:00.000Z",
             archivedAt: "2026-08-24T09:00:00.000Z"
           }
         ],
@@ -119,15 +137,59 @@ describe("form version transitions", () => {
     });
   });
 
-  it("returns typed validation failures without throwing", () => {
+  it("does not synthesize an archived record when the current published record is omitted", async () => {
+    const published = await publishDraft({ ...state, draftVersion: 3 }, schema);
+    expect(published).toMatchObject({ success: true, value: { archivedRecords: [] } });
+  });
+
+  it("returns typed synchronous and asynchronous validation failures without throwing", async () => {
     const issue = { path: "fields[0]", code: "invalid", message: "Invalid draft" };
-    expect(publishDraft({ ...state, draftVersion: 3 }, schema, { validate: () => [issue] })).toEqual({
+    await expect(
+      publishDraft({ ...state, draftVersion: 3 }, schema, { validate: async () => [issue] })
+    ).resolves.toEqual({
       success: false,
       error: { type: "validation_failed", issues: [issue] }
     });
-    expect(publishDraft({ ...state, draftVersion: 3 }, schema, { validate: () => false })).toEqual({
+    await expect(publishDraft({ ...state, draftVersion: 3 }, schema, { validate: () => false })).resolves.toEqual({
       success: false,
       error: { type: "validation_failed", issues: [] }
+    });
+  });
+
+  it("creates a self-contained publish transition plan", async () => {
+    const draftRecord: FormVersionRecord = {
+      formId: "analytics",
+      version: 3,
+      status: "draft",
+      schema,
+      revision: 2,
+      createdFromVersion: 2,
+      createdAt: "2026-08-23T00:00:00.000Z",
+      metadata: { author: "ARGS" }
+    };
+    const planned = await createPublishTransitionPlan({ ...state, draftVersion: 3 }, draftRecord, {
+      expectedRevision: 7,
+      publishedAt: "2026-08-24T09:00:00.000Z"
+    });
+    expect(planned).toEqual({
+      success: true,
+      value: {
+        nextState: { formId: "analytics", publishedVersion: 3, nextVersion: 3, revision: 8 },
+        plan: {
+          formId: "analytics",
+          expectedRevision: 7,
+          nextRevision: 8,
+          draftToDeleteVersion: 3,
+          publishedRecordToSave: {
+            ...draftRecord,
+            status: "published",
+            revision: 3,
+            publishedAt: "2026-08-24T09:00:00.000Z"
+          },
+          archivedRecordsToSave: [],
+          timestamp: "2026-08-24T09:00:00.000Z"
+        }
+      }
     });
   });
 
@@ -273,6 +335,31 @@ describe("streaming CSV export", () => {
       ]
     });
     expect(chunks.map((chunk) => new TextDecoder().decode(chunk)).join("")).toBe("context\r\n1:3:analytics");
+  });
+
+  it("awaits asynchronous custom columns without changing row or column order", async () => {
+    async function* responses() {
+      yield submission("1", { comment: "first" });
+      yield submission("2", { comment: "second" });
+    }
+    const chunks: string[] = [];
+    for await (const chunk of exportResponsesToCsvStream(schema, responses(), {
+      withBom: false,
+      includeDefaultColumns: false,
+      columns: [
+        {
+          header: "slow",
+          getValue: async ({ submission: current }) => {
+            await Promise.resolve();
+            return `slow-${current.responseId}`;
+          }
+        },
+        { header: "fast", getValue: ({ submission: current }) => `fast-${current.responseId}` }
+      ]
+    })) {
+      chunks.push(chunk);
+    }
+    expect(chunks.join("")).toBe("slow,fast\r\nslow-1,fast-1\r\nslow-2,fast-2");
   });
 
   it("honors Node writable backpressure and ends the destination", async () => {

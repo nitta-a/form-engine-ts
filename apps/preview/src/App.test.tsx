@@ -73,7 +73,9 @@ describe("preview application", () => {
     await user.click(screen.getByRole("button", { name: "Clone published version to draft" }));
     expect(screen.getByText("Draft v2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Publish draft" }));
-    expect(screen.getByText("Published v2; archived v1")).toBeInTheDocument();
+    expect(await screen.findByText("Published v2; archived v1")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Run concurrent CAS simulation" }));
+    expect(await screen.findByText("CAS: 1 success / 1 revision_conflict")).toBeInTheDocument();
   });
 
   it("demonstrates Visual Builder defaults and manual translation metadata", async () => {
@@ -167,7 +169,7 @@ describe("preview application", () => {
       render(<App />);
       await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
       await user.click(screen.getByRole("button", { name: "Download CSV" }));
-      expect(capturedBlob).toBeDefined();
+      await waitFor(() => expect(capturedBlob).toBeDefined());
       expect(capturedBlob?.type).toBe("text/csv;charset=utf-8;");
       const bytes = await new Promise<Uint8Array>((resolve, reject) => {
         const reader = new FileReader();
@@ -176,6 +178,7 @@ describe("preview application", () => {
         reader.readAsArrayBuffer(capturedBlob as Blob);
       });
       expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+      expect(new TextDecoder().decode(bytes)).toContain("asyncReview");
     } finally {
       Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
       Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
@@ -210,7 +213,7 @@ describe("preview application", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText(/"release": "v2.5.1"/)).toBeInTheDocument();
+    expect(screen.getByText(/"release": "v2.6.0"/)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByLabelText("LocalStorage"));
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());

@@ -25,6 +25,7 @@
       "@form-engine-ts/storage-postgres": ["./packages/storage-postgres/src/index.ts"],
       "@form-engine-ts/storage-sqlite": ["./packages/storage-sqlite/src/index.ts"],
       "@form-engine-ts/translator-azure": ["./packages/translator-azure/src/index.ts"],
+      "@form-engine-ts/translator-cache": ["./packages/translator-cache/src/index.ts"],
       "@form-engine-ts/translator-deepl": ["./packages/translator-deepl/src/index.ts"],
       "@form-engine-ts/translator-google": ["./packages/translator-google/src/index.ts"],
       "@form-engine-ts/translator-mock": ["./packages/translator-mock/src/index.ts"],

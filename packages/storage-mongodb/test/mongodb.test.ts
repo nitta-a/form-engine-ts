@@ -1,4 +1,4 @@
-import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
+import type { FormSchema, FormSubmission, FormVersionRecord, VersionTransitionPlan } from "@form-engine-ts/core";
 import type { Db } from "mongodb";
 import { createMongoDbStorage } from "../src";
 
@@ -45,11 +45,19 @@ function createDbStub() {
         const existing = [...documents.values()].find((document) => matches(document, filter));
         const changes = (update.$set ?? {}) as Record<string, unknown>;
         if (existing !== undefined) {
-          documents.set(existing._id, clone({ ...existing, ...changes }));
+          const next = clone({ ...existing, ...changes });
+          for (const key of Object.keys((update.$unset ?? {}) as Record<string, unknown>)) delete next[key];
+          documents.set(existing._id, next);
+          return { matchedCount: 1, upsertedCount: 0 };
         } else if (options.upsert) {
           const next = clone({ ...filter, ...changes }) as TestDocument;
+          if (documents.has(next._id)) {
+            throw Object.assign(new Error(`E11000 duplicate key: ${next._id}`), { code: 11000 });
+          }
           documents.set(next._id, next);
+          return { matchedCount: 0, upsertedCount: 1 };
         }
+        return { matchedCount: 0, upsertedCount: 0 };
       },
       async findOne(filter: Record<string, unknown>) {
         const found = [...documents.values()].find((document) => matches(document, filter));
@@ -204,6 +212,39 @@ describe("createMongoDbStorage", () => {
       { key: { formId: 1, submittedAt: 1, _id: 1 }, name: "form_responses_form_submitted_at_id" },
       { key: { "submission.locale": 1 }, name: "form_responses_locale" }
     ]);
+    expect(indexes.get("form_versions")).toEqual([
+      { key: { formId: 1, version: 1 }, name: "form_versions_form_version", unique: true },
+      { key: { formId: 1, status: 1 }, name: "form_versions_form_status" }
+    ]);
+  });
+
+  it("allows only one concurrent version transition for the same expected revision", async () => {
+    const { db, collections } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    const record: FormVersionRecord = {
+      formId: "form",
+      version: 2,
+      status: "published",
+      schema: schema("form", 2),
+      revision: 2,
+      createdFromVersion: 1,
+      createdAt: "2026-08-24T00:00:00.000Z",
+      publishedAt: "2026-08-24T01:00:00.000Z"
+    };
+    const plan: VersionTransitionPlan = {
+      formId: "form",
+      expectedRevision: 0,
+      nextRevision: 1,
+      draftToDeleteVersion: 2,
+      publishedRecordToSave: record,
+      archivedRecordsToSave: [],
+      timestamp: "2026-08-24T01:00:00.000Z"
+    };
+    const results = await Promise.all([adapter.commitVersionTransition(plan), adapter.commitVersionTransition(plan)]);
+    expect(results).toContainEqual({ success: true });
+    expect(results).toContainEqual({ success: false, error: "revision_conflict" });
+    expect(collections.get("form_version_states")?.get("form")?.revision).toBe(1);
+    expect(collections.get("form_versions")?.get("version:form:2")?.record).toEqual(record);
   });
 
   it("pages deterministically across equal timestamps and filters locale", async () => {

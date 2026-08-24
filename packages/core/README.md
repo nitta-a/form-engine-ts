@@ -76,17 +76,19 @@ Results are ordered by `submittedAt`, then submission ID. Both boundaries are in
 
 ## Versioning, incremental analytics, and paged storage
 
-`cloneVersionToDraft`, `publishDraft`, and `deleteDraft` implement revision-checked version transitions as pure functions.
+`cloneVersionToDraft`, asynchronous `publishDraft`, and `deleteDraft` implement revision-checked version transitions as
+pure functions.
 Clone/delete operations accept `expectedRevision`; cloning rejects non-published sources, publish validation failures are
-returned as typed `validation_failed` issues, and successful publishing reports every archived record. Storage adapters
-that can commit the resulting changes atomically implement `VersionedFormStorageAdapter` and `VersionTransitionPlan`.
+returned as typed `validation_failed` issues, and successful publishing archives only a supplied actual published record,
+preserving its schema and metadata. `createPublishTransitionPlan` returns complete records plus expected/next revisions for
+storage adapters implementing `VersionedFormStorageAdapter` to commit atomically.
 `createResponseAccumulator` incrementally counts choices, answered/unanswered values, and numeric summaries without retaining
 free-text bodies. In lenient mode, mismatched responses are skipped and exposed by `addMany()` and `getReport()` instead of
 being included silently. Independent accumulators for the same schema can be merged, and `finalize()` matches
 `aggregateResponses`.
 
 `exportResponsesToCsvStream` accepts an `AsyncIterable`, emits the BOM/header and one chunk per response, and supports
-custom `CsvColumnDef` columns. Custom getters receive the submission, form version, and schema. Use
+custom `CsvColumnDef` columns. Custom getters may be asynchronous and receive the submission, form version, and schema. Use
 `pipeResponsesToCsvStream` to write to a Web `WritableStream` or Node-compatible writable while honoring backpressure.
 Formula-injection neutralization applies to both default and custom columns.
 

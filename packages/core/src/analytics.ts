@@ -476,7 +476,9 @@ export interface CsvExportOptions {
 
 export interface CsvColumnDef {
   readonly header: string;
-  readonly getValue: (context: CsvColumnContext) => string | number | boolean | null | undefined;
+  readonly getValue: (
+    context: CsvColumnContext
+  ) => string | number | boolean | null | undefined | Promise<string | number | boolean | null | undefined>;
 }
 
 export interface CsvColumnContext extends FormResponse {
@@ -547,7 +549,7 @@ export async function* exportResponsesToCsvStream(
       formVersion: response.formVersion ?? schema.version,
       schema
     };
-    const customCells = customColumns.map((column) => column.getValue(context));
+    const customCells = await Promise.all(customColumns.map((column) => column.getValue(context)));
     yield `\r\n${[...defaultCells, ...customCells].map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",")}`;
   }
 }

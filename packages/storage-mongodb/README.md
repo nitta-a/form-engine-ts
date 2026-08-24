@@ -30,3 +30,8 @@ The caller owns the MongoDB connection lifecycle. Collection names can be custom
 `listSubmissionPage(formId, { version, pageSize, cursor, since, until, locale })` performs bounded reads using the
 compound `submittedAt`/response-ID cursor. Run `createIndexes()` after upgrading to create the matching compound index.
 `metadataFilters` and custom `filter` predicates are applied before page sizing.
+
+Version records are stored in `form_versions`, with unique `(formId, version)` and `(formId, status)` indexes. Transition
+state lives in `form_version_states`. `commitVersionTransition(plan)` compares `expectedRevision` atomically and returns
+`revision_conflict` to losing concurrent publishers; on a real MongoDB client, the state and record changes are committed
+in one transaction.

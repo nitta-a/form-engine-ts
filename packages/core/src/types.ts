@@ -1,4 +1,4 @@
-import type { FormVersionState } from "./versioning";
+import type { FormVersionRecord } from "./versioning";
 
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
 
@@ -226,11 +226,14 @@ export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
 }
 
 export interface VersionTransitionPlan {
-  readonly state: FormVersionState;
+  readonly formId: string;
   readonly expectedRevision: number;
-  readonly draftToPublish?: FormSchema;
-  readonly versionsToArchive: readonly number[];
-  readonly versionsToDelete: readonly number[];
+  readonly nextRevision: number;
+  readonly draftToCreate?: FormVersionRecord;
+  readonly draftToDeleteVersion?: number;
+  readonly publishedRecordToSave?: FormVersionRecord;
+  readonly archivedRecordsToSave?: readonly FormVersionRecord[];
+  readonly timestamp: string;
 }
 
 export interface VersionedFormStorageAdapter extends FormStorageAdapter {
