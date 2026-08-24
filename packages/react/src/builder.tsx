@@ -3,16 +3,17 @@ import {
   type ConditionOperator,
   type ConditionValue,
   type DisplayCondition,
-  type FieldOption,
   type FieldType,
   type FormField,
+  type FormPolicy,
   type FormSchema,
+  type PopulateTranslationOptions,
   populateSchemaTranslations,
-  sanitizeSchema,
-  type TranslationAdapter
+  type TranslationAdapter,
+  type TranslationReport
 } from "@form-engine-ts/core";
 import { useState } from "react";
-import { type BuilderPolicy, useFormBuilder } from "./hooks/useFormBuilder";
+import { type BuilderFactories, useFormBuilder } from "./hooks/useFormBuilder";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",
@@ -34,6 +35,7 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.questionTitle": "質問文 / Question Title",
   "builder.questionTitlePlaceholder": "Example: Tell us what we could improve",
   "builder.newQuestionTitle": "New question",
+  "builder.completionMessage": "Completion message",
   "builder.type": "Type",
   "builder.required": "Required",
   "builder.minimum": "Minimum",
@@ -95,39 +97,6 @@ function operatorKey(operator: ConditionOperator): string {
   return `builder.operator.${operator}`;
 }
 
-function createUniqueId(prefix: "q" | "opt" | "page", existingIds: ReadonlySet<string>): string {
-  let id: string;
-  do {
-    id = `${prefix}_${globalThis.crypto.randomUUID().slice(0, 8)}`;
-  } while (existingIds.has(id));
-  return id;
-}
-
-function baseField(field: FormField, type: FieldType) {
-  return {
-    id: field.id,
-    type,
-    title: field.title,
-    ...(field.description === undefined ? {} : { description: field.description }),
-    ...(field.translationKey === undefined ? {} : { translationKey: field.translationKey }),
-    required: field.required,
-    ...(field.displayCondition === undefined ? {} : { displayCondition: field.displayCondition })
-  };
-}
-
-function normalizeField(field: FormField, type: FieldType, newOptionLabel: string): FormField {
-  const base = baseField(field, type);
-  if (type === "text" || type === "textarea") return { ...base, type };
-  if (type === "number") return { ...base, type };
-  if (type === "rating") return { ...base, type, min: 1, max: 5 };
-  if (type === "checkbox") return { ...base, type };
-  const options: readonly FieldOption[] =
-    "options" in field && field.options.length > 0
-      ? field.options
-      : [{ id: createUniqueId("opt", new Set()), label: newOptionLabel }];
-  return { ...base, type, options };
-}
-
 function defaultConditionValue(field: FormField): ConditionValue {
   if (field.type === "checkbox") return true;
   if (field.type === "number" || field.type === "rating") return field.min ?? 1;
@@ -141,34 +110,6 @@ function conditionOperators(field: FormField): readonly ConditionOperator[] {
     return ["equals", "not_equals", "contains", "not_empty"];
   }
   return ["equals", "not_equals", "not_empty"];
-}
-
-function withoutDisplayCondition(field: FormField): FormField {
-  const { displayCondition: _displayCondition, ...rest } = field;
-  return rest as FormField;
-}
-
-function sanitizeBuilderSchema(schema: FormSchema): FormSchema {
-  const sanitized = sanitizeSchema(schema);
-  const indexById = new Map(sanitized.fields.map((field, index) => [field.id, index]));
-  const fields = sanitized.fields.map((field, index) => {
-    const sourceId = field.displayCondition?.questionId;
-    if (sourceId === undefined) return field;
-    const sourceIndex = indexById.get(sourceId);
-    return sourceIndex !== undefined && sourceIndex < index ? field : withoutDisplayCondition(field);
-  });
-  return {
-    ...sanitized,
-    fields,
-    ...(sanitized.pages === undefined
-      ? {}
-      : {
-          pages: sanitized.pages.map((page) => ({
-            ...page,
-            questionIds: fields.filter((field) => page.questionIds.includes(field.id)).map((field) => field.id)
-          }))
-        })
-  };
 }
 
 function conditionWithValue(questionId: string, operator: ConditionOperator, value: ConditionValue): DisplayCondition {
@@ -233,8 +174,11 @@ export interface FormBuilderProps {
   readonly locale?: string;
   readonly translator?: TranslationAdapter;
   readonly translationAdapter?: AsyncTranslationAdapter;
-  readonly policy?: BuilderPolicy;
+  readonly translationOptions?: PopulateTranslationOptions;
+  readonly onTranslationReport?: (report: TranslationReport) => void;
+  readonly policy?: FormPolicy;
   readonly idFactory?: (kind: "field" | "option" | "page", existingIds: ReadonlySet<string>) => string;
+  readonly factories?: BuilderFactories;
 }
 
 export function FormBuilder({
@@ -243,14 +187,18 @@ export function FormBuilder({
   locale = "en",
   translator,
   translationAdapter,
+  translationOptions,
+  onTranslationReport,
   policy,
-  idFactory
+  idFactory,
+  factories
 }: FormBuilderProps) {
   const headless = useFormBuilder({
     schema,
     onChange,
     ...(policy === undefined ? {} : { policy }),
-    ...(idFactory === undefined ? {} : { idFactory })
+    ...(idFactory === undefined ? {} : { idFactory }),
+    ...(factories === undefined ? {} : { factories })
   });
   const [newPageQuestionId, setNewPageQuestionId] = useState("");
   const [newLocale, setNewLocale] = useState("");
@@ -261,54 +209,21 @@ export function FormBuilder({
     const translated = translator?.translate(key, locale, params);
     return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
   };
-  const emitSchema = (candidate: FormSchema) => onChange(sanitizeBuilderSchema(candidate));
-
   const updateField = headless.updateField;
-
-  const changeType = (fieldId: string, type: FieldType) => {
-    emitSchema({
-      ...schema,
-      fields: schema.fields.map((field) => {
-        if (field.id === fieldId) {
-          return normalizeField(field, type, translate("builder.newOptionLabel", { index: 1 }));
-        }
-        if (field.displayCondition?.questionId === fieldId) {
-          const { displayCondition: _condition, ...withoutCondition } = field;
-          return withoutCondition as FormField;
-        }
-        return field;
-      })
-    });
-  };
+  const changeType = headless.changeFieldType;
 
   const removeField = headless.removeField;
 
   const moveField = (index: number, offset: -1 | 1) => {
     const target = index + offset;
-    if (target < 0 || target >= schema.fields.length) return;
-    const fields = [...schema.fields];
-    const current = fields[index];
-    const other = fields[target];
-    if (current === undefined || other === undefined) return;
-    fields[index] = other;
-    fields[target] = current;
-    emitSchema({ ...schema, fields });
+    const field = schema.fields[index];
+    if (field !== undefined) headless.moveField(field.id, target);
   };
 
   const addField = () => headless.addField("text");
 
   const enablePages = () => {
-    if (schema.pages !== undefined) return;
-    emitSchema({
-      ...schema,
-      pages: [
-        {
-          id: createUniqueId("page", new Set()),
-          title: translate("builder.newPage"),
-          questionIds: schema.fields.map((field) => field.id)
-        }
-      ]
-    });
+    if (schema.pages === undefined) headless.addPage();
   };
 
   const pageForField = (fieldId: string) => schema.pages?.find((page) => page.questionIds.includes(fieldId));
@@ -322,90 +237,36 @@ export function FormBuilder({
     }
     const questionId = movablePageQuestions.includes(newPageQuestionId) ? newPageQuestionId : movablePageQuestions[0];
     if (questionId === undefined) return;
-    const pageId = createUniqueId("page", new Set(schema.pages.map((page) => page.id)));
-    emitSchema({
-      ...schema,
-      pages: [
-        ...schema.pages.map((page) => ({
-          ...page,
-          questionIds: page.questionIds.filter((id) => id !== questionId)
-        })),
-        { id: pageId, title: translate("builder.newPage"), questionIds: [questionId] }
-      ]
-    });
+    headless.addPage(questionId);
     setNewPageQuestionId("");
   };
 
   const removePage = (pageIndex: number) => {
-    if (schema.pages === undefined) return;
-    const removed = schema.pages[pageIndex];
-    if (removed === undefined) return;
-    if (schema.pages.length === 1) {
-      const { pages: _pages, ...singlePage } = schema;
-      emitSchema(singlePage);
-      return;
-    }
-    const targetIndex = pageIndex === 0 ? 1 : pageIndex - 1;
-    emitSchema({
-      ...schema,
-      pages: schema.pages
-        .map((page, index) =>
-          index === targetIndex ? { ...page, questionIds: [...page.questionIds, ...removed.questionIds] } : page
-        )
-        .filter((_page, index) => index !== pageIndex)
-    });
+    const page = schema.pages?.[pageIndex];
+    if (page !== undefined) headless.removePage(page.id);
   };
 
   const movePage = (pageIndex: number, offset: -1 | 1) => {
-    if (schema.pages === undefined) return;
     const target = pageIndex + offset;
-    if (target < 0 || target >= schema.pages.length) return;
-    const pages = [...schema.pages];
-    const current = pages[pageIndex];
-    const other = pages[target];
-    if (current === undefined || other === undefined) return;
-    pages[pageIndex] = other;
-    pages[target] = current;
-    emitSchema({ ...schema, pages });
+    const page = schema.pages?.[pageIndex];
+    if (page !== undefined) headless.movePage(page.id, target);
   };
 
   const updatePage = (
     pageId: string,
     update: (page: NonNullable<FormSchema["pages"]>[number]) => NonNullable<FormSchema["pages"]>[number]
   ) => {
-    if (schema.pages === undefined) return;
-    emitSchema({ ...schema, pages: schema.pages.map((page) => (page.id === pageId ? update(page) : page)) });
+    headless.updatePage(pageId, update);
   };
 
   const assignFieldToPage = (fieldId: string, pageId: string) => {
-    if (schema.pages === undefined) return;
-    emitSchema({
-      ...schema,
-      pages: schema.pages
-        .map((page) => ({
-          ...page,
-          questionIds:
-            page.id === pageId
-              ? schema.fields
-                  .filter((field) => page.questionIds.includes(field.id) || field.id === fieldId)
-                  .map((field) => field.id)
-              : page.questionIds.filter((id) => id !== fieldId)
-        }))
-        .filter((page) => page.questionIds.length > 0)
-    });
+    headless.assignFieldToPage(fieldId, pageId);
   };
 
   const addLocale = () => {
     const normalized = newLocale.trim();
     if (normalized.length === 0) return;
-    const supportedLocales = [
-      ...new Set([
-        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-        ...(schema.supportedLocales ?? []),
-        normalized
-      ])
-    ];
-    emitSchema({ ...schema, supportedLocales });
+    headless.addLocale(normalized);
     setEditingLocale(normalized);
     setNewLocale("");
   };
@@ -415,10 +276,14 @@ export function FormBuilder({
     setIsTranslating(true);
     setTranslationError(null);
     try {
-      const populated = await populateSchemaTranslations(schema, [editingLocale], translationAdapter, {
-        overwrite: "all"
-      });
+      const populated = await populateSchemaTranslations(
+        schema,
+        [editingLocale],
+        translationAdapter,
+        translationOptions ?? { overwrite: "all" }
+      );
       onChange(populated.schema);
+      onTranslationReport?.(populated.report);
     } catch (cause) {
       setTranslationError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -426,27 +291,9 @@ export function FormBuilder({
     }
   };
 
-  const updateFormTranslation = (key: "title" | "description", value: string) => {
+  const updateFormTranslation = (key: "title" | "description" | "completionMessage", value: string) => {
     if (editingLocale.length === 0) return;
-    const current = schema.translations?.[editingLocale];
-    const next =
-      key === "title"
-        ? value.length === 0
-          ? { description: current?.description }
-          : { ...current, title: value }
-        : value.length === 0
-          ? { title: current?.title }
-          : { ...current, description: value };
-    emitSchema({
-      ...schema,
-      translations: {
-        ...schema.translations,
-        [editingLocale]: {
-          ...(next.title === undefined ? {} : { title: next.title }),
-          ...(next.description === undefined ? {} : { description: next.description })
-        }
-      }
-    });
+    headless.setLocaleTranslation(editingLocale, { kind: "form" }, key, value);
   };
 
   return (
@@ -525,42 +372,28 @@ export function FormBuilder({
                           {translate("builder.pageTitle")}
                           <input
                             value={page.translations?.[editingLocale]?.title ?? ""}
-                            onChange={(event) => {
-                              const value = event.currentTarget.value;
-                              updatePage(page.id, (current) => ({
-                                ...current,
-                                translations: {
-                                  ...current.translations,
-                                  [editingLocale]: {
-                                    ...(value.length === 0 ? {} : { title: value }),
-                                    ...(current.translations?.[editingLocale]?.description === undefined
-                                      ? {}
-                                      : { description: current.translations[editingLocale]?.description })
-                                  }
-                                }
-                              }));
-                            }}
+                            onChange={(event) =>
+                              headless.setLocaleTranslation(
+                                editingLocale,
+                                { kind: "page", id: page.id },
+                                "title",
+                                event.currentTarget.value
+                              )
+                            }
                           />
                         </label>
                         <label>
                           {translate("builder.pageDescription")}
                           <input
                             value={page.translations?.[editingLocale]?.description ?? ""}
-                            onChange={(event) => {
-                              const value = event.currentTarget.value;
-                              updatePage(page.id, (current) => ({
-                                ...current,
-                                translations: {
-                                  ...current.translations,
-                                  [editingLocale]: {
-                                    ...(current.translations?.[editingLocale]?.title === undefined
-                                      ? {}
-                                      : { title: current.translations[editingLocale]?.title }),
-                                    ...(value.length === 0 ? {} : { description: value })
-                                  }
-                                }
-                              }));
-                            }}
+                            onChange={(event) =>
+                              headless.setLocaleTranslation(
+                                editingLocale,
+                                { kind: "page", id: page.id },
+                                "description",
+                                event.currentTarget.value
+                              )
+                            }
                           />
                         </label>
                       </div>
@@ -658,23 +491,21 @@ export function FormBuilder({
 
       <section className="form-engine-builder__localization" aria-labelledby="builder-localization-heading">
         <h2 id="builder-localization-heading">{translate("builder.localization")}</h2>
+        <label>
+          {translate("builder.completionMessage")}
+          <input
+            value={schema.completionMessage ?? ""}
+            onChange={(event) =>
+              headless.setSourceText({ kind: "form" }, "completionMessage", event.currentTarget.value)
+            }
+          />
+        </label>
         <div className="form-engine-builder__grid">
           <label>
             {translate("builder.defaultLocale")}
             <input
               value={schema.defaultLocale ?? ""}
-              onChange={(event) => {
-                const value = event.currentTarget.value.trim();
-                emitSchema(
-                  value.length === 0
-                    ? schema
-                    : {
-                        ...schema,
-                        defaultLocale: value,
-                        supportedLocales: [...new Set([value, ...(schema.supportedLocales ?? [])])]
-                      }
-                );
-              }}
+              onChange={(event) => headless.setDefaultLocale(event.currentTarget.value)}
             />
           </label>
           <label>
@@ -721,6 +552,13 @@ export function FormBuilder({
               <input
                 value={schema.translations?.[editingLocale]?.description ?? ""}
                 onChange={(event) => updateFormTranslation("description", event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              {translate("builder.completionMessage")}
+              <input
+                value={schema.translations?.[editingLocale]?.completionMessage ?? ""}
+                onChange={(event) => updateFormTranslation("completionMessage", event.currentTarget.value)}
               />
             </label>
           </div>
@@ -827,42 +665,28 @@ export function FormBuilder({
                       {translate("builder.questionTitle")}
                       <input
                         value={field.translations?.[editingLocale]?.title ?? ""}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          updateField(field.id, (current) => ({
-                            ...current,
-                            translations: {
-                              ...current.translations,
-                              [editingLocale]: {
-                                ...(value.length === 0 ? {} : { title: value }),
-                                ...(current.translations?.[editingLocale]?.description === undefined
-                                  ? {}
-                                  : { description: current.translations[editingLocale]?.description })
-                              }
-                            }
-                          }));
-                        }}
+                        onChange={(event) =>
+                          headless.setLocaleTranslation(
+                            editingLocale,
+                            { kind: "field", id: field.id },
+                            "title",
+                            event.currentTarget.value
+                          )
+                        }
                       />
                     </label>
                     <label>
                       {translate("builder.pageDescription")}
                       <input
                         value={field.translations?.[editingLocale]?.description ?? ""}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          updateField(field.id, (current) => ({
-                            ...current,
-                            translations: {
-                              ...current.translations,
-                              [editingLocale]: {
-                                ...(current.translations?.[editingLocale]?.title === undefined
-                                  ? {}
-                                  : { title: current.translations[editingLocale]?.title }),
-                                ...(value.length === 0 ? {} : { description: value })
-                              }
-                            }
-                          }));
-                        }}
+                        onChange={(event) =>
+                          headless.setLocaleTranslation(
+                            editingLocale,
+                            { kind: "field", id: field.id },
+                            "description",
+                            event.currentTarget.value
+                          )
+                        }
                       />
                     </label>
                   </div>
@@ -872,28 +696,14 @@ export function FormBuilder({
                           {translate("builder.optionLabel", { index: optionIndex + 1 })} ({editingLocale})
                           <input
                             value={option.translations?.[editingLocale] ?? ""}
-                            onChange={(event) => {
-                              const value = event.currentTarget.value;
-                              updateField(field.id, (current) => {
-                                if (!("options" in current)) return current;
-                                return {
-                                  ...current,
-                                  options: current.options.map((candidate) =>
-                                    candidate.id === option.id
-                                      ? {
-                                          ...candidate,
-                                          translations: Object.fromEntries([
-                                            ...Object.entries(candidate.translations ?? {}).filter(
-                                              ([localeKey]) => localeKey !== editingLocale
-                                            ),
-                                            ...(value.length === 0 ? [] : [[editingLocale, value] as const])
-                                          ])
-                                        }
-                                      : candidate
-                                  )
-                                };
-                              });
-                            }}
+                            onChange={(event) =>
+                              headless.setLocaleTranslation(
+                                editingLocale,
+                                { kind: "option", id: option.id },
+                                "label",
+                                event.currentTarget.value
+                              )
+                            }
                           />
                         </label>
                       ))
@@ -948,17 +758,12 @@ export function FormBuilder({
                         value={option.label}
                         placeholder={translate("builder.optionLabelPlaceholder")}
                         onChange={(event) =>
-                          updateField(field.id, (current) => {
-                            if (!("options" in current)) return current;
-                            const label = event.currentTarget.value;
-                            if (label.trim().length === 0) return current;
-                            return {
-                              ...current,
-                              options: current.options.map((item, itemIndex) =>
-                                itemIndex === optionIndex ? { ...item, label } : item
-                              )
-                            };
-                          })
+                          event.currentTarget.value.trim().length === 0
+                            ? undefined
+                            : headless.updateOption(field.id, option.id, (item) => ({
+                                ...item,
+                                label: event.currentTarget.value
+                              }))
                         }
                       />
                       <button
@@ -989,17 +794,16 @@ export function FormBuilder({
                     value={condition?.questionId ?? ""}
                     onChange={(event) => {
                       const selected = schema.fields.find((item) => item.id === event.currentTarget.value);
-                      updateField(field.id, (current) => {
-                        if (selected === undefined) {
-                          const { displayCondition: _condition, ...withoutCondition } = current;
-                          return withoutCondition as FormField;
-                        }
-                        const operator = conditionOperators(selected)[0] ?? "not_empty";
-                        return {
-                          ...current,
-                          displayCondition: conditionWithValue(selected.id, operator, defaultConditionValue(selected))
-                        };
-                      });
+                      headless.setDisplayCondition(
+                        field.id,
+                        selected === undefined
+                          ? undefined
+                          : conditionWithValue(
+                              selected.id,
+                              conditionOperators(selected)[0] ?? "not_empty",
+                              defaultConditionValue(selected)
+                            )
+                      );
                     }}
                   >
                     <option value="">{translate("builder.alwaysVisible")}</option>
@@ -1017,10 +821,10 @@ export function FormBuilder({
                       value={condition.operator}
                       onChange={(event) => {
                         const operator = event.currentTarget.value as ConditionOperator;
-                        updateField(field.id, (current) => ({
-                          ...current,
-                          displayCondition: conditionWithValue(source.id, operator, defaultConditionValue(source))
-                        }));
+                        headless.setDisplayCondition(
+                          field.id,
+                          conditionWithValue(source.id, operator, defaultConditionValue(source))
+                        );
                       }}
                     >
                       {conditionOperators(source).map((operator) => (
@@ -1032,7 +836,7 @@ export function FormBuilder({
                     <ConditionValueEditor
                       source={source}
                       condition={condition}
-                      onChange={(next) => updateField(field.id, (current) => ({ ...current, displayCondition: next }))}
+                      onChange={(next) => headless.setDisplayCondition(field.id, next)}
                       translate={translate}
                     />
                   </>

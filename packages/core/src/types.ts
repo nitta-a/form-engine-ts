@@ -1,5 +1,14 @@
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
 
+export interface FormPolicy {
+  readonly allowedFieldTypes?: readonly FieldType[];
+  readonly maxFields?: number;
+  readonly maxOptionsPerField?: number;
+  readonly requiredLocales?: readonly string[];
+  readonly maxTextLength?: number;
+  readonly maxSchemaBytes?: number;
+}
+
 export type ConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
 export type ConditionValue = string | number | boolean;
 

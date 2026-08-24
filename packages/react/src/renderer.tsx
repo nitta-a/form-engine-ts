@@ -472,8 +472,20 @@ function ContextFormRenderer({
           {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
         </header>
       )}
-      {activePage?.title === undefined ? null : <h2 className="fe-page-title">{activePage.title}</h2>}
-      {activePage?.description === undefined ? null : <p className="fe-page-description">{activePage.description}</p>}
+      {activePage === undefined
+        ? null
+        : (slots.renderPageHeader?.({
+            page: activePage,
+            pageIndex: activeVisibleIndex,
+            totalPages: visiblePageIndexes.length
+          }) ?? (
+            <div className="fe-page-header">
+              {activePage.title === undefined ? null : <h2 className="fe-page-title">{activePage.title}</h2>}
+              {activePage.description === undefined ? null : (
+                <p className="fe-page-description">{activePage.description}</p>
+              )}
+            </div>
+          ))}
       <div className="fe-fields">
         {form.schema.fields
           .filter((field) => form.visibility[field.id] === true && (fieldIds === undefined || fieldIds.has(field.id)))
@@ -573,9 +585,10 @@ function ContextFormRenderer({
               </div>
             ))
           : null}
-        {form.submitStatus === "error" && form.submitError !== null && errorMessageKey !== undefined ? (
-          <div role="alert">{form.translate(errorMessageKey)}</div>
-        ) : null}
+        {form.submitStatus === "error" && form.submitError !== null
+          ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??
+            (errorMessageKey === undefined ? null : <div role="alert">{form.translate(errorMessageKey)}</div>))
+          : null}
       </div>
     </form>
   );

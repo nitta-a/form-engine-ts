@@ -38,11 +38,20 @@ Forms, pages, fields, options, and submissions accept JSON-only `metadata` and p
 `translationMetadata`. These extension values survive sanitization, localization, submission creation, and storage
 round-trips. `completionMessage` is localized with the rest of the form text.
 
+`transformFieldType` changes a question's type without discarding source text, translations, conditions, or extension
+metadata. `validateFormSchema(schema, { policy })` applies the framework-independent `FormPolicy`, including field,
+option, text, serialized-byte, allowed-type, and required-locale constraints. Required locales cover every source text
+that exists on the form, its fields, options, and pages.
+
+Translation callbacks receive `nodeMetadata` and `existingTranslationMetadata` separately. The deprecated `metadata`
+slot property remains an alias for `nodeMetadata` during migration.
+
 `calculateCrossTabulation` builds a two-question frequency matrix from submissions. `dispatchWebhook` posts typed
 `response.submitted` or `schema.updated` events with timeout handling, custom headers, and optional HMAC-SHA256 signing.
 
 CSV export neutralizes string cells whose first non-whitespace character is `=`, `+`, `-`, or `@`. This is enabled by
 default; trusted callers can pass `{ neutralizeFormulas: false }`. RFC 4180 quoting and the UTF-8 BOM remain unchanged.
+The columns are exactly `submissionId`, `submittedAt`, `locale`, followed by one column per field in schema order.
 
 Storage adapters share inclusive ISO 8601 submission-range filtering:
 

@@ -150,6 +150,29 @@ textarea {
   color: #3156d3;
   font-weight: 700;
 }
+
+.headless-builder-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.headless-builder-demo output {
+  margin-right: auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.preview-slot-page-header,
+.preview-slot-submit-error {
+  border: 1px dashed var(--accent);
+  border-radius: 0.75rem;
+  padding: 0.8rem;
+}
 .renderer-demo-controls label {
   align-items: center;
   display: flex;

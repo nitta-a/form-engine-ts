@@ -16,6 +16,9 @@ export interface TranslationSlot {
   readonly locale: string;
   readonly sourceText: string;
   readonly existingText?: string;
+  readonly nodeMetadata?: Readonly<Record<string, JsonValue>>;
+  readonly existingTranslationMetadata?: Readonly<Record<string, JsonValue>>;
+  /** @deprecated Use nodeMetadata instead. */
   readonly metadata?: Readonly<Record<string, JsonValue>>;
 }
 
@@ -76,7 +79,8 @@ function createSlot(
   locale: string,
   sourceText: string,
   existingText: string | undefined,
-  metadata: Readonly<Record<string, JsonValue>> | undefined
+  nodeMetadata: Readonly<Record<string, JsonValue>> | undefined,
+  existingTranslationMetadata: Readonly<Record<string, JsonValue>> | undefined
 ): TranslationSlot {
   return {
     kind,
@@ -85,7 +89,8 @@ function createSlot(
     locale,
     sourceText,
     ...(existingText === undefined ? {} : { existingText }),
-    ...(metadata === undefined ? {} : { metadata })
+    ...(nodeMetadata === undefined ? {} : { nodeMetadata, metadata: nodeMetadata }),
+    ...(existingTranslationMetadata === undefined ? {} : { existingTranslationMetadata })
   };
 }
 
@@ -99,7 +104,8 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
       locale,
       sourceText,
       schema.translations?.[locale]?.[property],
-      schema.metadata
+      schema.metadata,
+      schema.translationMetadata?.[locale]?.[property]
     );
     descriptors.push({
       slot,
@@ -125,7 +131,8 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
         locale,
         sourceText,
         field.translations?.[locale]?.[property],
-        field.metadata
+        field.metadata,
+        field.translationMetadata?.[locale]?.[property]
       );
       descriptors.push({
         slot,
@@ -159,7 +166,8 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
           locale,
           option.label,
           option.translations?.[locale],
-          option.metadata
+          option.metadata,
+          option.translationMetadata?.[locale]?.label
         );
         descriptors.push({
           slot,
@@ -199,7 +207,8 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
         locale,
         sourceText,
         page.translations?.[locale]?.[property],
-        page.metadata
+        page.metadata,
+        page.translationMetadata?.[locale]?.[property]
       );
       descriptors.push({
         slot,

@@ -56,13 +56,19 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security and v2 extensibility
+### v1.1.1 security, v2 extensibility, and v2.1 authoring APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
 schema node and submission, localized `completionMessage`, translation overwrite policies and reports, the policy-aware
 `useFormBuilder` headless API, cancellable `beforeSubmit`, and replaceable renderer UI slots. All storage adapters preserve
 extension metadata. `@form-engine-ts/zod` now uses Zod 4 as a peer dependency.
+
+v2.1 moves `FormPolicy` and policy-aware `validateFormSchema` into Core so server and React validation return the same
+issues. `transformFieldType` protects authoring translations and extension data during type changes. The headless builder
+now owns all field/option/page/text/condition mutations, supports factory injection and typed ID failures, and the visual
+builder exposes completion-message editing plus translation options/reports. Translation slots separate node metadata
+from existing per-locale metadata, while Renderer adds page-header and submit-error slots.
 
 ### Define and render a form
 
@@ -297,7 +303,7 @@ Zod failures use the field ID as their path and expose the Core validation code,
 - Rating fields default to integer values from 1 through 5 and share numeric analytics.
 - Select, radio, multi-select, and checkbox fields expose counts and percentages.
 - `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
-- `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF, metadata columns, schema-order field columns, and JSON-encoded arrays.
+- `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF and the columns are exactly `submissionId`, `submittedAt`, `locale`, then the schema-order field columns; arrays are JSON-encoded.
 - `escapeCsvCell` neutralizes formula-like strings by default and quotes commas, double quotes, CR, and LF while doubling embedded quotes.
 
 ### SSR and MVP boundaries
@@ -362,13 +368,18 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応とv2拡張
+### v1.1.1セキュリティ対応、v2拡張、v2.1編集API
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
 `metadata`/`translationMetadata`、多言語`completionMessage`、翻訳上書きポリシーとレポート、ポリシー対応の
 Headless `useFormBuilder`、キャンセル可能な`beforeSubmit`、完全置換可能なRenderer UI Slotを追加しました。
 全ストレージアダプターが拡張metadataを保持し、`@form-engine-ts/zod`はZod 4をpeer dependencyとして利用します。
+
+v2.1では`FormPolicy`とポリシー対応`validateFormSchema`をCoreへ移し、サーバーとReactで同一issueを返します。
+`transformFieldType`は形式変更時の原文・翻訳・拡張データを保全します。Headless Builderへfield/option/page/文言/条件の
+全更新を集約し、factory注入と型付きID失敗を追加しました。Visual Builderは完了メッセージと翻訳設定・レポートを公開し、
+翻訳slotはnode metadataと既存言語別metadataを分離します。Rendererにはpage headerとsubmit error slotを追加しました。
 
 ### フォームの定義とレンダリング
 
@@ -575,7 +586,7 @@ Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補�
 - numberフィールドでは回答済み・未回答の件数に加え、最小値、最大値、平均値を公開します。
 - ratingは既定で1～5の整数を扱い、numberと同じ数値集計を行います。
 - select、radio、multi-select、checkboxフィールドでは件数とパーセンテージを公開します。
-- `exportResponsesToCsv`はデフォルトで数式形式の文字列を無害化し、UTF-8 BOM付きのRFC 4180 CSVを返します。BOMを省く場合は`{ withBom: false }`、無害化を無効にする場合は`{ neutralizeFormulas: false }`を渡します。
+- `exportResponsesToCsv`はデフォルトで数式形式の文字列を無害化し、UTF-8 BOM付きのRFC 4180 CSVを返します。列は正確に`submissionId`、`submittedAt`、`locale`、続いてスキーマ順の設問列です。BOMを省く場合は`{ withBom: false }`、無害化を無効にする場合は`{ neutralizeFormulas: false }`を渡します。
 - `escapeCsvCell`も同じ数式対策とRFC 4180の引用・内部引用符二重化を行う公開純粋関数です。
 
 ### SSRとMVPの範囲

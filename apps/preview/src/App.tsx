@@ -7,15 +7,17 @@ import {
   exportResponsesToCsv,
   type FormAnalytics,
   type FormEvent,
+  type FormPolicy,
   type FormSchema,
   type FormStorageAdapter,
   type FormSubmission,
   type FormValues,
   populateSchemaTranslations,
   type QuestionAggregate,
-  type SelectField
+  type SelectField,
+  validateFormSchema
 } from "@form-engine-ts/core";
-import { FormBuilder, FormProvider, FormRenderer, type FormRendererSlots } from "@form-engine-ts/react";
+import { FormBuilder, FormProvider, FormRenderer, type FormRendererSlots, useFormBuilder } from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
@@ -26,6 +28,51 @@ type TabId = "builder" | "respondent" | "analytics";
 type StorageKind = "memory" | "local";
 
 const tabs: readonly TabId[] = ["builder", "respondent", "analytics"];
+const previewPolicy: FormPolicy = {
+  maxFields: 20,
+  maxOptionsPerField: 10,
+  maxTextLength: 500,
+  requiredLocales: ["ja", "en"]
+};
+
+function HeadlessBuilderDemo({
+  schema,
+  onChange
+}: {
+  readonly schema: FormSchema;
+  readonly onChange: (schema: FormSchema) => void;
+}) {
+  const builder = useFormBuilder({
+    schema,
+    onChange,
+    policy: previewPolicy,
+    factories: {
+      createField: (type, id) =>
+        type === "text"
+          ? { id, type, title: "Headless-created question", required: false }
+          : { id, type: "text", title: "Headless-created question", required: false }
+    }
+  });
+  const coreValidation = validateFormSchema(schema, { policy: previewPolicy });
+  const coreIssueCount = coreValidation.valid ? 0 : coreValidation.issues.length;
+  return (
+    <fieldset className="headless-builder-demo">
+      <legend>v2.1 Headless Builder &amp; Core Policy</legend>
+      <output data-testid="policy-parity">
+        Core {coreIssueCount} / React {builder.validationIssues.length}
+      </output>
+      <button type="button" onClick={() => builder.addField("text")}>
+        Add via headless factory
+      </button>
+      <button
+        type="button"
+        onClick={() => builder.setSourceText({ kind: "form" }, "completionMessage", "Updated via headless action")}
+      >
+        Set completion via headless action
+      </button>
+    </fieldset>
+  );
+}
 
 function formatNumber(value: number | null): string {
   return value === null ? "—" : Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -488,6 +535,15 @@ export default function App() {
             {description === undefined ? null : <p>{description}</p>}
           </header>
         ),
+        renderPageHeader: ({ page, pageIndex, totalPages }) => (
+          <header className="preview-slot-page-header" data-testid="preview-slot-page-header">
+            <span>
+              PAGE SLOT {pageIndex + 1}/{totalPages}
+            </span>
+            {page.title === undefined ? null : <h2>{page.title}</h2>}
+            {page.description === undefined ? null : <p>{page.description}</p>}
+          </header>
+        ),
         renderNavigation: ({ currentPage, totalPages, canPrev, canNext, onPrev, onNext }) => (
           <nav className="preview-slot-navigation" aria-label="Custom step navigation">
             <span>
@@ -514,6 +570,16 @@ export default function App() {
         renderCompletion: ({ message }) => (
           <div className="preview-slot-completion" role="status">
             {message}
+          </div>
+        ),
+        renderSubmitError: ({ error, onRetry }) => (
+          <div className="preview-slot-submit-error" role="alert">
+            <span>{error.message}</span>
+            {onRetry === undefined ? null : (
+              <button type="button" onClick={onRetry}>
+                Retry
+              </button>
+            )}
           </div>
         )
       }
@@ -601,13 +667,23 @@ export default function App() {
                 </button>
                 {translationReport === null ? null : <output>{translationReport}</output>}
               </fieldset>
+              <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
               <FormBuilder
                 schema={schema}
                 locale={locale}
                 translator={mockTranslator}
                 translationAdapter={mockAsyncTranslator}
                 onChange={changeSchema}
-                policy={{ maxFields: 20, maxOptionsPerField: 10, maxTextLength: 500, requiredLocales: ["ja", "en"] }}
+                policy={previewPolicy}
+                translationOptions={{
+                  overwrite: translationOverwrite,
+                  createMetadata: (slot) => ({ source: "visual-builder", property: slot.property })
+                }}
+                onTranslationReport={(report) =>
+                  setTranslationReport(
+                    `${report.updatedSlots.length} updated / ${report.skippedSlots.length} skipped (${translationOverwrite})`
+                  )
+                }
               />
             </section>
             <section className="workspace-card json-card">

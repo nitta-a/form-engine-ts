@@ -34,6 +34,7 @@ describe("preview application", () => {
     expect(screen.getByRole("button", { name: "質問を追加" })).toBeInTheDocument();
     expect(screen.getAllByLabelText("種類")).not.toHaveLength(0);
     expect(screen.getAllByText("必須")).not.toHaveLength(0);
+    expect(screen.getByLabelText("完了メッセージ")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add question" })).not.toBeInTheDocument();
   });
 
@@ -49,6 +50,20 @@ describe("preview application", () => {
       )
     );
     await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent('"translationMetadata"'));
+  });
+
+  it("demonstrates headless factory actions with Core and React policy parity", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const parity = screen.getByTestId("policy-parity");
+    const match = parity.textContent?.match(/Core (\d+) \/ React (\d+)/);
+    expect(match?.[1]).toBe(match?.[2]);
+    await user.click(screen.getByRole("button", { name: "Add via headless factory" }));
+    expect(await screen.findByRole("group", { name: "Headless-created question" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Set completion via headless action" }));
+    await waitFor(() =>
+      expect(document.querySelector(".json-card code")).toHaveTextContent("Updated via headless action")
+    );
   });
 
   it("switches locale and completes submission-to-analytics flow", async () => {

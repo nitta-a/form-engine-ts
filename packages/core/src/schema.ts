@@ -3,10 +3,15 @@ import type {
   DisplayCondition,
   FieldOption,
   FormField,
+  FormPolicy,
   FormSchema,
   SchemaIssue,
   SchemaValidationResult
 } from "./types";
+
+export interface ValidateFormSchemaOptions {
+  readonly policy?: FormPolicy;
+}
 
 const FIELD_TYPES = new Set(["text", "textarea", "number", "rating", "select", "multi-select", "checkbox", "radio"]);
 const CONDITION_OPERATORS = new Set(["equals", "not_equals", "contains", "not_empty"]);
@@ -294,7 +299,164 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
   return true;
 }
 
-export function validateFormSchema(input: unknown): SchemaValidationResult {
+interface TextEntry {
+  readonly path: string;
+  readonly value: string;
+}
+
+function collectSchemaText(schema: FormSchema): readonly TextEntry[] {
+  const entries: TextEntry[] = [{ path: "title", value: schema.title }];
+  if (schema.description !== undefined) entries.push({ path: "description", value: schema.description });
+  if (schema.completionMessage !== undefined)
+    entries.push({ path: "completionMessage", value: schema.completionMessage });
+  for (const [locale, translation] of Object.entries(schema.translations ?? {})) {
+    for (const property of ["title", "description", "completionMessage"] as const) {
+      const value = translation[property];
+      if (value !== undefined) entries.push({ path: `translations.${locale}.${property}`, value });
+    }
+  }
+  schema.fields.forEach((field, fieldIndex) => {
+    entries.push({ path: `fields[${fieldIndex}].title`, value: field.title });
+    if (field.description !== undefined)
+      entries.push({ path: `fields[${fieldIndex}].description`, value: field.description });
+    for (const [locale, translation] of Object.entries(field.translations ?? {})) {
+      for (const property of ["title", "description"] as const) {
+        const value = translation[property];
+        if (value !== undefined)
+          entries.push({ path: `fields[${fieldIndex}].translations.${locale}.${property}`, value });
+      }
+    }
+    if (!("options" in field)) return;
+    field.options.forEach((option, optionIndex) => {
+      entries.push({ path: `fields[${fieldIndex}].options[${optionIndex}].label`, value: option.label });
+      for (const [locale, value] of Object.entries(option.translations ?? {})) {
+        entries.push({ path: `fields[${fieldIndex}].options[${optionIndex}].translations.${locale}`, value });
+      }
+    });
+  });
+  schema.pages?.forEach((page, pageIndex) => {
+    if (page.title !== undefined) entries.push({ path: `pages[${pageIndex}].title`, value: page.title });
+    if (page.description !== undefined)
+      entries.push({ path: `pages[${pageIndex}].description`, value: page.description });
+    for (const [locale, translation] of Object.entries(page.translations ?? {})) {
+      for (const property of ["title", "description"] as const) {
+        const value = translation[property];
+        if (value !== undefined)
+          entries.push({ path: `pages[${pageIndex}].translations.${locale}.${property}`, value });
+      }
+    }
+  });
+  return entries;
+}
+
+function addRequiredTranslationIssues(schema: FormSchema, locale: string, issues: SchemaIssue[]): void {
+  if (!(schema.supportedLocales ?? []).includes(locale)) {
+    issue(issues, "supportedLocales", "required_locale_missing", `Required locale ${locale} is missing.`);
+  }
+  if (locale === schema.defaultLocale) return;
+  const required: Array<{ readonly path: string; readonly value: string | undefined }> = [
+    { path: `translations.${locale}.title`, value: schema.translations?.[locale]?.title }
+  ];
+  if (schema.description !== undefined)
+    required.push({ path: `translations.${locale}.description`, value: schema.translations?.[locale]?.description });
+  if (schema.completionMessage !== undefined) {
+    required.push({
+      path: `translations.${locale}.completionMessage`,
+      value: schema.translations?.[locale]?.completionMessage
+    });
+  }
+  schema.fields.forEach((field, fieldIndex) => {
+    required.push({
+      path: `fields[${fieldIndex}].translations.${locale}.title`,
+      value: field.translations?.[locale]?.title
+    });
+    if (field.description !== undefined) {
+      required.push({
+        path: `fields[${fieldIndex}].translations.${locale}.description`,
+        value: field.translations?.[locale]?.description
+      });
+    }
+    if (!("options" in field)) return;
+    field.options.forEach((option, optionIndex) => {
+      required.push({
+        path: `fields[${fieldIndex}].options[${optionIndex}].translations.${locale}`,
+        value: option.translations?.[locale]
+      });
+    });
+  });
+  schema.pages?.forEach((page, pageIndex) => {
+    if (page.title !== undefined) {
+      required.push({
+        path: `pages[${pageIndex}].translations.${locale}.title`,
+        value: page.translations?.[locale]?.title
+      });
+    }
+    if (page.description !== undefined) {
+      required.push({
+        path: `pages[${pageIndex}].translations.${locale}.description`,
+        value: page.translations?.[locale]?.description
+      });
+    }
+  });
+  for (const translation of required) {
+    if (translation.value === undefined || translation.value.trim().length === 0) {
+      issue(
+        issues,
+        translation.path,
+        "required_translation_missing",
+        `A translation for required locale ${locale} is missing.`
+      );
+    }
+  }
+}
+
+function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIssue[]): void {
+  if (policy.maxFields !== undefined && schema.fields.length > policy.maxFields) {
+    issue(issues, "fields", "max_fields_exceeded", `At most ${policy.maxFields} fields are allowed.`);
+  }
+  schema.fields.forEach((field, fieldIndex) => {
+    if (policy.allowedFieldTypes !== undefined && !policy.allowedFieldTypes.includes(field.type)) {
+      issue(issues, `fields[${fieldIndex}].type`, "disallowed_field_type", `Field type ${field.type} is not allowed.`);
+    }
+    if (
+      policy.maxOptionsPerField !== undefined &&
+      "options" in field &&
+      field.options.length > policy.maxOptionsPerField
+    ) {
+      issue(
+        issues,
+        `fields[${fieldIndex}].options`,
+        "max_options_exceeded",
+        `At most ${policy.maxOptionsPerField} options are allowed.`
+      );
+    }
+  });
+  if (policy.maxTextLength !== undefined) {
+    for (const entry of collectSchemaText(schema)) {
+      if (entry.value.length > policy.maxTextLength) {
+        issue(
+          issues,
+          entry.path,
+          "max_text_length_exceeded",
+          `Text must be at most ${policy.maxTextLength} characters.`
+        );
+      }
+    }
+  }
+  for (const locale of policy.requiredLocales ?? []) addRequiredTranslationIssues(schema, locale, issues);
+  if (policy.maxSchemaBytes !== undefined) {
+    try {
+      const byteLength = new TextEncoder().encode(JSON.stringify(schema)).byteLength;
+      if (byteLength > policy.maxSchemaBytes) {
+        issue(issues, "$", "max_schema_bytes_exceeded", `Schema must be at most ${policy.maxSchemaBytes} bytes.`);
+      }
+    } catch {
+      // Structural validation reports non-serializable schema values separately.
+    }
+  }
+}
+
+export function validateFormSchema(input: unknown, options: ValidateFormSchemaOptions = {}): SchemaValidationResult {
   const issues: SchemaIssue[] = [];
   if (!isRecord(input)) {
     return { valid: false, issues: [{ path: "$", code: "invalid_schema", message: "Expected a schema object." }] };
@@ -448,6 +610,15 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
           }
         });
       }
+    }
+  }
+  if (Array.isArray(input.fields)) {
+    const policyIssues: SchemaIssue[] = [];
+    try {
+      validatePolicy(input as unknown as FormSchema, options.policy ?? {}, policyIssues);
+      issues.push(...policyIssues);
+    } catch {
+      // Unsafe shapes are already described by structural issues above.
     }
   }
   return issues.length === 0
