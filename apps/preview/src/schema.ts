@@ -5,10 +5,16 @@ export const customerFeedbackSchema = {
   version: 1,
   title: "サービスの満足度",
   description: "ご利用いただいたサービスについてお聞かせください。",
+  completionMessage: "ご回答ありがとうございました。",
   defaultLocale: "ja",
   supportedLocales: ["ja", "en"],
+  metadata: { owner: "ARGS", release: "v2.0.0" },
   translations: {
-    en: { title: "Service satisfaction", description: "Tell us about the service you used." }
+    en: {
+      title: "Service satisfaction",
+      description: "Tell us about the service you used.",
+      completionMessage: "Thank you for your response."
+    }
   },
   submitLabelKey: "form.submit",
   fields: [
@@ -20,6 +26,7 @@ export const customerFeedbackSchema = {
       translationKey: "field.name.label",
       placeholderKey: "field.name.placeholder",
       required: true,
+      metadata: { externalId: "args-customer-name" },
       translations: { en: { title: "Your name", description: "Enter at least two characters." } },
       minLength: 2,
       maxLength: 80
@@ -68,7 +75,12 @@ export const customerFeedbackSchema = {
       required: true,
       translations: { en: { title: "Team", description: "Choose the team you worked with." } },
       options: [
-        { id: "opt_a1b2c3d4", label: "製品", translations: { en: "Product" } },
+        {
+          id: "opt_a1b2c3d4",
+          label: "製品",
+          translations: { en: "Product" },
+          metadata: { analyticsCode: "product" }
+        },
         { id: "opt_b2c3d4e5", label: "サポート", translations: { en: "Support" } },
         { id: "opt_c3d4e5f6", label: "営業", translations: { en: "Sales" } }
       ]
@@ -136,6 +148,7 @@ export const customerFeedbackSchema = {
       title: "基本情報",
       description: "回答者とご利用内容について教えてください。",
       translations: { en: { title: "Basic information", description: "Tell us about yourself and your visit." } },
+      metadata: { section: "identity" },
       questionIds: ["q_a1b2c3d4", "q_b2c3d4e5", "q_d4e5f6a7"]
     },
     {

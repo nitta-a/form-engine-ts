@@ -3,6 +3,17 @@ export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "
 export type ConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
 export type ConditionValue = string | number | boolean;
 
+export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+
+/** Arbitrary, JSON-serializable data preserved by every form-engine operation. */
+export interface ExtensibleNode {
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
+  /** Locale -> translated property -> metadata created for that translation. */
+  readonly translationMetadata?: Readonly<
+    Record<string, Readonly<Record<string, Readonly<Record<string, JsonValue>>>>>
+  >;
+}
+
 export interface DisplayCondition {
   readonly questionId: string;
   readonly operator: ConditionOperator;
@@ -12,6 +23,7 @@ export interface DisplayCondition {
 export interface LocalizedText {
   readonly title?: string;
   readonly description?: string;
+  readonly completionMessage?: string;
 }
 
 export type SchemaTranslations = Readonly<Record<string, LocalizedText>>;
@@ -30,13 +42,13 @@ export type ValidationCode =
   | "max_selections"
   | "unknown_field";
 
-export interface FieldOption {
+export interface FieldOption extends ExtensibleNode {
   readonly id: string;
   readonly label: string;
   readonly translations?: Readonly<Record<string, string>>;
 }
 
-export interface BaseField {
+export interface BaseField extends ExtensibleNode {
   readonly id: string;
   readonly type: FieldType;
   readonly title: string;
@@ -88,7 +100,7 @@ export interface CheckboxField extends BaseField {
 
 export type FormField = TextField | NumberField | RatingField | SelectField | MultiSelectField | CheckboxField;
 
-export interface FormPage {
+export interface FormPage extends ExtensibleNode {
   readonly id: string;
   readonly title?: string;
   readonly description?: string;
@@ -97,11 +109,12 @@ export interface FormPage {
   readonly translations?: SchemaTranslations;
 }
 
-export interface FormSchema {
+export interface FormSchema extends ExtensibleNode {
   readonly id: string;
   readonly version: number;
   readonly title: string;
   readonly description?: string;
+  readonly completionMessage?: string;
   readonly submitLabelKey?: string;
   readonly defaultLocale?: string;
   readonly supportedLocales?: readonly string[];
@@ -130,11 +143,13 @@ export interface ValidationIssue {
   readonly params: Readonly<Record<string, string | number>>;
 }
 
+export type ValidationError = ValidationIssue;
+
 export type AnswerValidationResult =
   | { readonly valid: true; readonly issues: readonly [] }
   | { readonly valid: false; readonly issues: readonly ValidationIssue[] };
 
-export interface FormSubmission {
+export interface FormSubmission extends ExtensibleNode {
   readonly id: string;
   readonly formId: string;
   readonly formVersion: number;
@@ -229,7 +244,13 @@ export interface FormAnalytics {
 export type Question = FormField;
 export type QuestionType = FieldType;
 export type ChoiceOption = FieldOption;
-export type FormResponse = FormSubmission;
+export interface FormResponse extends ExtensibleNode {
+  readonly responseId: string;
+  readonly formId: string;
+  readonly sourceLocale?: string;
+  readonly answers: Readonly<Record<string, unknown>>;
+  readonly submittedAt: string;
+}
 
 export interface CrossTabulationResult {
   readonly rowQuestionId: string;

@@ -1,11 +1,11 @@
 # @form-engine-ts/zod
 
-Generates a Zod 3 answer validator from a form-engine-ts `FormSchema` while preserving Core-compatible validation issues.
+Generates a Zod 4 answer validator from a form-engine-ts `FormSchema` while preserving Core-compatible validation issues.
 
 ## Install
 
 ```bash
-pnpm add @form-engine-ts/core @form-engine-ts/zod zod@^3
+pnpm add @form-engine-ts/core @form-engine-ts/zod zod@^4
 ```
 
 ## Quick start
@@ -29,3 +29,6 @@ Generate a validator for one wizard page while preserving passthrough values fro
 ```ts
 const firstPageResult = createZodFormSchema(schema, { pageIndex: 0 }).safeParse(values);
 ```
+
+Zod is a `^4.0.0` peer dependency. Schema metadata is checked by Core before validator creation, and parsed answer
+objects retain passthrough values. Required, choice, visibility, and page-scoped issue codes match Core validation.

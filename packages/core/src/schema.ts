@@ -23,6 +23,54 @@ function issue(issues: SchemaIssue[], path: string, code: string, message: strin
   issues.push({ path, code, message });
 }
 
+function validateJsonValue(value: unknown, path: string, issues: SchemaIssue[], ancestors = new Set<object>()): void {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) issue(issues, path, "invalid_metadata", "Metadata numbers must be finite.");
+    return;
+  }
+  if (typeof value !== "object") {
+    issue(issues, path, "invalid_metadata", "Expected JSON-serializable metadata.");
+    return;
+  }
+  if (ancestors.has(value)) {
+    issue(issues, path, "invalid_metadata", "Metadata must not contain cycles.");
+    return;
+  }
+  const nextAncestors = new Set(ancestors).add(value);
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      validateJsonValue(item, `${path}[${index}]`, issues, nextAncestors);
+    });
+    return;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    issue(issues, path, "invalid_metadata", "Metadata objects must be plain JSON objects.");
+    return;
+  }
+  for (const [key, item] of Object.entries(value)) {
+    validateJsonValue(item, `${path}.${key}`, issues, nextAncestors);
+  }
+}
+
+function validateExtensibleNode(value: Record<string, unknown>, path: string, issues: SchemaIssue[]): void {
+  for (const property of ["metadata", "translationMetadata"] as const) {
+    const candidate = value[property];
+    if (candidate === undefined) continue;
+    if (!isRecord(candidate)) {
+      issue(
+        issues,
+        path.length === 0 ? property : `${path}.${property}`,
+        "invalid_metadata",
+        "Expected a metadata object."
+      );
+      continue;
+    }
+    validateJsonValue(candidate, path.length === 0 ? property : `${path}.${property}`, issues);
+  }
+}
+
 function validateLocalizedTextMap(value: unknown, path: string, issues: SchemaIssue[]): void {
   if (!isRecord(value)) {
     issue(issues, path, "invalid_translations", "Expected a locale-to-translation object.");
@@ -33,7 +81,7 @@ function validateLocalizedTextMap(value: unknown, path: string, issues: SchemaIs
       issue(issues, `${path}.${locale}`, "invalid_translation", "Expected a translation object.");
       continue;
     }
-    for (const key of ["title", "description"] as const) {
+    for (const key of ["title", "description", "completionMessage"] as const) {
       if (translation[key] !== undefined && !isNonEmptyString(translation[key])) {
         issue(issues, `${path}.${locale}.${key}`, "invalid_translation", "Expected non-empty translated text.");
       }
@@ -97,6 +145,7 @@ function validateOptions(value: unknown, path: string, issues: SchemaIssue[]): v
       return;
     }
     rejectLegacyProperties(option, optionPath, ["value", "labelKey"], issues);
+    validateExtensibleNode(option, optionPath, issues);
     if (!isNonEmptyString(option.id)) {
       issue(issues, `${optionPath}.id`, "invalid_option_id", "Expected a non-empty option ID.");
     } else if (seen.has(option.id)) {
@@ -144,6 +193,7 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
     return false;
   }
   rejectLegacyProperties(value, path, ["titleKey", "labelKey", "helpTextKey", "descriptionKey"], issues);
+  validateExtensibleNode(value, path, issues);
   if (!isNonEmptyString(value.id)) issue(issues, `${path}.id`, "invalid_id", "Expected a non-empty ID.");
   if (!isNonEmptyString(value.title)) {
     issue(issues, `${path}.title`, "invalid_title", "Expected a non-empty question title.");
@@ -250,6 +300,7 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
     return { valid: false, issues: [{ path: "$", code: "invalid_schema", message: "Expected a schema object." }] };
   }
   rejectLegacyProperties(input, "", ["titleKey", "descriptionKey"], issues);
+  validateExtensibleNode(input, "", issues);
   if (!isNonEmptyString(input.id)) issue(issues, "id", "invalid_id", "Expected a non-empty ID.");
   if (!Number.isInteger(input.version) || (input.version as number) < 1) {
     issue(issues, "version", "invalid_version", "Expected a positive integer version.");
@@ -257,13 +308,13 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
   if (!isNonEmptyString(input.title)) {
     issue(issues, "title", "invalid_title", "Expected a non-empty form title.");
   }
-  for (const key of ["description", "submitLabelKey"] as const) {
+  for (const key of ["description", "completionMessage", "submitLabelKey"] as const) {
     if (input[key] !== undefined && !isNonEmptyString(input[key])) {
       issue(
         issues,
         key,
-        key === "description" ? "invalid_description" : "invalid_translation_key",
-        key === "description" ? "Expected a non-empty form description." : "Expected a translation key."
+        key === "submitLabelKey" ? "invalid_translation_key" : "invalid_description",
+        key === "submitLabelKey" ? "Expected a translation key." : "Expected non-empty form text."
       );
     }
   }
@@ -335,6 +386,7 @@ export function validateFormSchema(input: unknown): SchemaValidationResult {
             issue(issues, pagePath, "invalid_page", "Expected a page object.");
             return;
           }
+          validateExtensibleNode(page, pagePath, issues);
           if (!isNonEmptyString(page.id)) {
             issue(issues, `${pagePath}.id`, "invalid_page_id", "Expected a non-empty page ID.");
           } else if (pageIds.has(page.id)) {

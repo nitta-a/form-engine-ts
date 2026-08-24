@@ -6,11 +6,22 @@ const schema: FormSchema = {
   id: "form",
   version: 2,
   title: "title",
-  fields: [{ id: "answer", type: "text", title: "answer", required: false }]
+  metadata: { owner: "ARGS" },
+  translationMetadata: { ja: { title: { provider: "machine" } } },
+  fields: [{ id: "answer", type: "text", title: "answer", required: false, metadata: { source: "api" } }]
 };
 
 function submission(id = "response", submittedAt = "2025-01-02T00:00:00.000Z"): FormSubmission {
-  return { id, formId: "form", formVersion: 2, locale: "en", submittedAt, values: { answer: "yes" } };
+  return {
+    id,
+    formId: "form",
+    formVersion: 2,
+    locale: "en",
+    submittedAt,
+    values: { answer: "yes" },
+    metadata: { channel: "ARGS" },
+    translationMetadata: { ja: { title: { provider: "human" } } }
+  };
 }
 
 function clientWithRows(...rows: readonly unknown[][]) {

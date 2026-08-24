@@ -5,7 +5,9 @@ const schema: FormSchema = {
   id: "form",
   version: 2,
   title: "title",
-  fields: [{ id: "answer", type: "text", title: "answer", required: false }]
+  metadata: { owner: "ARGS" },
+  translationMetadata: { ja: { title: { provider: "machine" } } },
+  fields: [{ id: "answer", type: "text", title: "answer", required: false, metadata: { source: "api" } }]
 };
 
 const submission: FormSubmission = {
@@ -14,7 +16,9 @@ const submission: FormSubmission = {
   formVersion: 2,
   locale: "en",
   submittedAt: "2025-01-02T00:00:00.000Z",
-  values: { answer: "yes" }
+  values: { answer: "yes" },
+  metadata: { channel: "ARGS" },
+  translationMetadata: { ja: { title: { provider: "human" } } }
 };
 
 function scripted(

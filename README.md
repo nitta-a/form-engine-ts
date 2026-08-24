@@ -20,7 +20,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Translator adapter | `@form-engine-ts/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
 | Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
-| Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 3 answer-validator generation with Core-compatible issues |
+| Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
 | Demo app | `@form-engine-ts/preview` | Private Vite sandbox for building, responding, switching storage, analytics, and CSV export |
 
 The library packages build as public dual ESM/CommonJS packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
@@ -55,6 +55,14 @@ schema, populated in batches through `populateSchemaTranslations`, and applied s
 The builder exposes page membership and locale override controls. Core also provides `calculateCrossTabulation` for
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
+
+### v1.1.1 security and v2 extensibility
+
+CSV export neutralizes formula-like string cells after leading whitespace by default; pass
+`{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
+schema node and submission, localized `completionMessage`, translation overwrite policies and reports, the policy-aware
+`useFormBuilder` headless API, cancellable `beforeSubmit`, and replaceable renderer UI slots. All storage adapters preserve
+extension metadata. `@form-engine-ts/zod` now uses Zod 4 as a peer dependency.
 
 ### Define and render a form
 
@@ -271,7 +279,7 @@ const sqliteStorage = createSqliteStorage({ db: sqliteExecutor });
 const d1Storage = createD1Storage({ db: env.DB });
 ```
 
-Generate a Zod 3 validator without duplicating the Core validation rules:
+Generate a Zod 4 validator without duplicating the Core validation rules:
 
 ```ts
 const answerSchema = createZodFormSchema(schema);
@@ -290,7 +298,7 @@ Zod failures use the field ID as their path and expose the Core validation code,
 - Select, radio, multi-select, and checkbox fields expose counts and percentages.
 - `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
 - `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF, metadata columns, schema-order field columns, and JSON-encoded arrays.
-- `escapeCsvCell` is exported for custom CSV producers and quotes commas, double quotes, CR, and LF while doubling embedded quotes.
+- `escapeCsvCell` neutralizes formula-like strings by default and quotes commas, double quotes, CR, and LF while doubling embedded quotes.
 
 ### SSR and MVP boundaries
 
@@ -318,7 +326,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Translator Adapter | `@form-engine-ts/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
-| Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 3検証器への変換 |
+| Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
 | デモアプリ | `@form-engine-ts/preview` | Builder・回答・集計/CSVの3タブを備えた非公開Viteサンドボックス |
 
 ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESM/CommonJS両対応パッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
@@ -353,6 +361,14 @@ pnpm test
 `resolveLocalizedSchema`でAPI通信なしに同期解決します。Builderはページ所属と各言語の手動訳文を編集できます。
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
+
+### v1.1.1セキュリティ対応とv2拡張
+
+CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
+`{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
+`metadata`/`translationMetadata`、多言語`completionMessage`、翻訳上書きポリシーとレポート、ポリシー対応の
+Headless `useFormBuilder`、キャンセル可能な`beforeSubmit`、完全置換可能なRenderer UI Slotを追加しました。
+全ストレージアダプターが拡張metadataを保持し、`@form-engine-ts/zod`はZod 4をpeer dependencyとして利用します。
 
 ### フォームの定義とレンダリング
 
@@ -542,7 +558,7 @@ const sqliteStorage = createSqliteStorage({ db: sqliteExecutor });
 const d1Storage = createD1Storage({ db: env.DB });
 ```
 
-Coreの検証規則を重複実装せず、Zod 3の回答検証器を生成できます。
+Coreの検証規則を重複実装せず、Zod 4の回答検証器を生成できます。
 
 ```ts
 const answerSchema = createZodFormSchema(schema);
@@ -559,8 +575,8 @@ Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補�
 - numberフィールドでは回答済み・未回答の件数に加え、最小値、最大値、平均値を公開します。
 - ratingは既定で1～5の整数を扱い、numberと同じ数値集計を行います。
 - select、radio、multi-select、checkboxフィールドでは件数とパーセンテージを公開します。
-- `exportResponsesToCsv`はデフォルトでUTF-8 BOM付きのRFC 4180 CSVを返します。BOMを省く場合は`{ withBom: false }`を渡します。改行はCRLFで、配列値はJSON文字列として出力します。
-- `escapeCsvCell`はカンマ、引用符、CR、LFを含むセルを引用し、内部引用符を二重化する公開純粋関数です。
+- `exportResponsesToCsv`はデフォルトで数式形式の文字列を無害化し、UTF-8 BOM付きのRFC 4180 CSVを返します。BOMを省く場合は`{ withBom: false }`、無害化を無効にする場合は`{ neutralizeFormulas: false }`を渡します。
+- `escapeCsvCell`も同じ数式対策とRFC 4180の引用・内部引用符二重化を行う公開純粋関数です。
 
 ### SSRとMVPの範囲
 

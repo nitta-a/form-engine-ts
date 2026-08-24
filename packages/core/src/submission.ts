@@ -1,9 +1,9 @@
 import { assertValidFormSchema } from "./schema";
-import type { FormSchema, FormSubmission, FormValues } from "./types";
+import type { ExtensibleNode, FormSchema, FormSubmission, FormValues } from "./types";
 import { validateAnswers } from "./validation";
 import { selectVisibleAnswers } from "./visibility";
 
-export interface CreateSubmissionOptions {
+export interface CreateSubmissionOptions extends ExtensibleNode {
   readonly id: string;
   readonly locale: string;
   readonly submittedAt: string;
@@ -39,6 +39,10 @@ export function createSubmission(
     formVersion: schema.version,
     locale: options.locale,
     values: Object.freeze(cloneValues(visibleValues)),
-    submittedAt: options.submittedAt
+    submittedAt: options.submittedAt,
+    ...(options.metadata === undefined ? {} : { metadata: Object.freeze({ ...options.metadata }) }),
+    ...(options.translationMetadata === undefined
+      ? {}
+      : { translationMetadata: Object.freeze({ ...options.translationMetadata }) })
   });
 }

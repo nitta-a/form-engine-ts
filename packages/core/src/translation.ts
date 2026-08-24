@@ -1,81 +1,186 @@
 import { assertValidFormSchema } from "./schema";
-import type { AsyncTranslationAdapter, FormField, FormPage, FormSchema, SchemaTranslations } from "./types";
+import type {
+  AsyncTranslationAdapter,
+  ExtensibleNode,
+  FormField,
+  FormPage,
+  FormSchema,
+  JsonValue,
+  SchemaTranslations
+} from "./types";
 
-interface TextSlot {
-  readonly text: string;
-  readonly apply: (schema: FormSchema, translated: string, locale: string) => FormSchema;
+export interface TranslationSlot {
+  readonly kind: "form" | "page" | "field" | "option";
+  readonly nodeId: string;
+  readonly property: "title" | "description" | "label" | "completionMessage";
+  readonly locale: string;
+  readonly sourceText: string;
+  readonly existingText?: string;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
 }
+
+export interface PopulateTranslationOptions {
+  readonly overwrite?: "missing-only" | "all";
+  readonly shouldOverwrite?: (slot: TranslationSlot) => boolean;
+  readonly createMetadata?: (slot: TranslationSlot, translatedText: string) => Readonly<Record<string, JsonValue>>;
+}
+
+export interface TranslationReport {
+  readonly updatedSlots: readonly TranslationSlot[];
+  readonly skippedSlots: readonly TranslationSlot[];
+}
+
+interface SlotDescriptor {
+  readonly slot: TranslationSlot;
+  readonly apply: (
+    schema: FormSchema,
+    translatedText: string,
+    metadata: Readonly<Record<string, JsonValue>> | undefined
+  ) => FormSchema;
+}
+
+type LocalizedProperty = "title" | "description" | "completionMessage";
 
 function mergeLocalizedText(
   translations: SchemaTranslations | undefined,
   locale: string,
-  key: "title" | "description",
+  property: LocalizedProperty,
   value: string
 ): SchemaTranslations {
-  return { ...translations, [locale]: { ...translations?.[locale], [key]: value } };
+  return { ...translations, [locale]: { ...translations?.[locale], [property]: value } };
 }
 
-function translationSlots(schema: FormSchema): readonly TextSlot[] {
-  const slots: TextSlot[] = [
-    {
-      text: schema.title,
-      apply: (current, value, locale) => ({
-        ...current,
-        translations: mergeLocalizedText(current.translations, locale, "title", value)
-      })
+function withTranslationMetadata<T extends ExtensibleNode>(
+  node: T,
+  locale: string,
+  property: TranslationSlot["property"],
+  metadata: Readonly<Record<string, JsonValue>> | undefined
+): T {
+  if (metadata === undefined) return node;
+  return {
+    ...node,
+    translationMetadata: {
+      ...node.translationMetadata,
+      [locale]: {
+        ...node.translationMetadata?.[locale],
+        [property]: metadata
+      }
     }
-  ];
-  if (schema.description !== undefined) {
-    slots.push({
-      text: schema.description,
-      apply: (current, value, locale) => ({
-        ...current,
-        translations: mergeLocalizedText(current.translations, locale, "description", value)
-      })
-    });
-  }
-  schema.fields.forEach((field, fieldIndex) => {
-    slots.push({
-      text: field.title,
-      apply: (current, value, locale) => ({
-        ...current,
-        fields: current.fields.map((item, index) =>
-          index === fieldIndex
-            ? ({ ...item, translations: mergeLocalizedText(item.translations, locale, "title", value) } as FormField)
-            : item
+  };
+}
+
+function createSlot(
+  kind: TranslationSlot["kind"],
+  nodeId: string,
+  property: TranslationSlot["property"],
+  locale: string,
+  sourceText: string,
+  existingText: string | undefined,
+  metadata: Readonly<Record<string, JsonValue>> | undefined
+): TranslationSlot {
+  return {
+    kind,
+    nodeId,
+    property,
+    locale,
+    sourceText,
+    ...(existingText === undefined ? {} : { existingText }),
+    ...(metadata === undefined ? {} : { metadata })
+  };
+}
+
+function translationSlots(schema: FormSchema, locale: string): readonly SlotDescriptor[] {
+  const descriptors: SlotDescriptor[] = [];
+  const addFormSlot = (property: LocalizedProperty, sourceText: string) => {
+    const slot = createSlot(
+      "form",
+      schema.id,
+      property,
+      locale,
+      sourceText,
+      schema.translations?.[locale]?.[property],
+      schema.metadata
+    );
+    descriptors.push({
+      slot,
+      apply: (current, value, metadata) =>
+        withTranslationMetadata(
+          { ...current, translations: mergeLocalizedText(current.translations, locale, property, value) },
+          locale,
+          property,
+          metadata
         )
-      })
     });
-    if (field.description !== undefined) {
-      slots.push({
-        text: field.description,
-        apply: (current, value, locale) => ({
+  };
+  addFormSlot("title", schema.title);
+  if (schema.description !== undefined) addFormSlot("description", schema.description);
+  if (schema.completionMessage !== undefined) addFormSlot("completionMessage", schema.completionMessage);
+
+  schema.fields.forEach((field, fieldIndex) => {
+    const addFieldSlot = (property: "title" | "description", sourceText: string) => {
+      const slot = createSlot(
+        "field",
+        field.id,
+        property,
+        locale,
+        sourceText,
+        field.translations?.[locale]?.[property],
+        field.metadata
+      );
+      descriptors.push({
+        slot,
+        apply: (current, value, metadata) => ({
           ...current,
-          fields: current.fields.map((item, index) =>
+          fields: current.fields.map((candidate, index) =>
             index === fieldIndex
-              ? ({
-                  ...item,
-                  translations: mergeLocalizedText(item.translations, locale, "description", value)
-                } as FormField)
-              : item
+              ? withTranslationMetadata(
+                  {
+                    ...candidate,
+                    translations: mergeLocalizedText(candidate.translations, locale, property, value)
+                  } as FormField,
+                  locale,
+                  property,
+                  metadata
+                )
+              : candidate
           )
         })
       });
-    }
+    };
+    addFieldSlot("title", field.title);
+    if (field.description !== undefined) addFieldSlot("description", field.description);
+
     if ("options" in field) {
       field.options.forEach((option, optionIndex) => {
-        slots.push({
-          text: option.label,
-          apply: (current, value, locale) => ({
+        const slot = createSlot(
+          "option",
+          option.id,
+          "label",
+          locale,
+          option.label,
+          option.translations?.[locale],
+          option.metadata
+        );
+        descriptors.push({
+          slot,
+          apply: (current, value, metadata) => ({
             ...current,
-            fields: current.fields.map((item, index) => {
-              if (index !== fieldIndex || !("options" in item)) return item;
+            fields: current.fields.map((candidate, candidateIndex) => {
+              if (candidateIndex !== fieldIndex || !("options" in candidate)) return candidate;
               return {
-                ...item,
-                options: item.options.map((candidate, candidateIndex) =>
-                  candidateIndex === optionIndex
-                    ? { ...candidate, translations: { ...candidate.translations, [locale]: value } }
-                    : candidate
+                ...candidate,
+                options: candidate.options.map((candidateOption, candidateOptionIndex) =>
+                  candidateOptionIndex === optionIndex
+                    ? withTranslationMetadata(
+                        {
+                          ...candidateOption,
+                          translations: { ...candidateOption.translations, [locale]: value }
+                        },
+                        locale,
+                        "label",
+                        metadata
+                      )
+                    : candidateOption
                 )
               } as FormField;
             })
@@ -84,54 +189,59 @@ function translationSlots(schema: FormSchema): readonly TextSlot[] {
       });
     }
   });
+
   schema.pages?.forEach((page, pageIndex) => {
-    if (page.title !== undefined) {
-      slots.push({
-        text: page.title,
-        apply: (current, value, locale) => ({
+    const addPageSlot = (property: "title" | "description", sourceText: string) => {
+      const slot = createSlot(
+        "page",
+        page.id,
+        property,
+        locale,
+        sourceText,
+        page.translations?.[locale]?.[property],
+        page.metadata
+      );
+      descriptors.push({
+        slot,
+        apply: (current, value, metadata) => ({
           ...current,
           ...(current.pages === undefined
             ? {}
             : {
-                pages: current.pages.map((item, index) =>
+                pages: current.pages.map((candidate, index) =>
                   index === pageIndex
-                    ? { ...item, translations: mergeLocalizedText(item.translations, locale, "title", value) }
-                    : item
+                    ? withTranslationMetadata(
+                        {
+                          ...candidate,
+                          translations: mergeLocalizedText(candidate.translations, locale, property, value)
+                        },
+                        locale,
+                        property,
+                        metadata
+                      )
+                    : candidate
                 )
               })
         })
       });
-    }
-    if (page.description !== undefined) {
-      slots.push({
-        text: page.description,
-        apply: (current, value, locale) => ({
-          ...current,
-          ...(current.pages === undefined
-            ? {}
-            : {
-                pages: current.pages.map((item, index) =>
-                  index === pageIndex
-                    ? { ...item, translations: mergeLocalizedText(item.translations, locale, "description", value) }
-                    : item
-                )
-              })
-        })
-      });
-    }
+    };
+    if (page.title !== undefined) addPageSlot("title", page.title);
+    if (page.description !== undefined) addPageSlot("description", page.description);
   });
-  return slots;
+  return descriptors;
 }
 
 export function resolveLocalizedSchema(schema: FormSchema, targetLocale: string): FormSchema {
   if (targetLocale.length === 0 || targetLocale === schema.defaultLocale) return schema;
   const formTranslation = schema.translations?.[targetLocale];
+  const completionMessage = formTranslation?.completionMessage ?? schema.completionMessage;
   return {
     ...schema,
     title: formTranslation?.title ?? schema.title,
     ...((formTranslation?.description ?? schema.description) === undefined
       ? {}
       : { description: formTranslation?.description ?? schema.description }),
+    ...(completionMessage === undefined ? {} : { completionMessage }),
     fields: schema.fields.map((field): FormField => {
       const translation = field.translations?.[targetLocale];
       const localized = {
@@ -170,27 +280,43 @@ export function resolveLocalizedSchema(schema: FormSchema, targetLocale: string)
 export async function populateSchemaTranslations(
   schema: FormSchema,
   targetLocales: readonly string[],
-  adapter: AsyncTranslationAdapter
-): Promise<FormSchema> {
+  adapter: AsyncTranslationAdapter,
+  options: PopulateTranslationOptions = {}
+): Promise<{ readonly schema: FormSchema; readonly report: TranslationReport }> {
   assertValidFormSchema(schema);
-  const slots = translationSlots(schema);
   const locales = [...new Set(targetLocales.filter((locale) => locale.length > 0 && locale !== schema.defaultLocale))];
-  let result: FormSchema = schema;
+  const updatedSlots: TranslationSlot[] = [];
+  const skippedSlots: TranslationSlot[] = [];
+  let result = schema;
+
   for (const locale of locales) {
+    const descriptors = translationSlots(schema, locale);
+    const selected: SlotDescriptor[] = [];
+    for (const descriptor of descriptors) {
+      const shouldTranslate =
+        options.shouldOverwrite?.(descriptor.slot) ??
+        (options.overwrite === "all" || descriptor.slot.existingText === undefined);
+      if (shouldTranslate) selected.push(descriptor);
+      else skippedSlots.push(descriptor.slot);
+    }
+    if (selected.length === 0) continue;
     const translated = await adapter.translateBatch(
-      slots.map((slot) => slot.text),
+      selected.map((descriptor) => descriptor.slot.sourceText),
       locale,
       schema.defaultLocale
     );
-    if (translated.length !== slots.length) {
-      throw new Error(`Translation adapter returned ${translated.length} texts for ${slots.length} inputs.`);
+    if (translated.length !== selected.length) {
+      throw new Error(`Translation adapter returned ${translated.length} texts for ${selected.length} inputs.`);
     }
-    translated.forEach((value, index) => {
-      const slot = slots[index];
-      if (slot === undefined) throw new Error("Translation adapter returned an unexpected result.");
-      result = slot.apply(result, value, locale);
+    selected.forEach((descriptor, index) => {
+      const translatedText = translated[index];
+      if (translatedText === undefined) throw new Error("Translation adapter returned an unexpected result.");
+      const metadata = options.createMetadata?.(descriptor.slot, translatedText);
+      result = descriptor.apply(result, translatedText, metadata);
+      updatedSlots.push(descriptor.slot);
     });
   }
+
   const supportedLocales = [
     ...new Set([
       ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
@@ -198,9 +324,9 @@ export async function populateSchemaTranslations(
       ...locales
     ])
   ];
-  result = supportedLocales.length === 0 ? result : { ...result, supportedLocales };
+  if (supportedLocales.length > 0) result = { ...result, supportedLocales };
   assertValidFormSchema(result);
-  return result;
+  return { schema: result, report: { updatedSlots, skippedSlots } };
 }
 
 export async function resolveFormTranslation(
@@ -212,7 +338,8 @@ export async function resolveFormTranslation(
   const populated = await populateSchemaTranslations(
     sourceLocale === undefined ? schema : { ...schema, defaultLocale: sourceLocale },
     [targetLocale],
-    adapter
+    adapter,
+    { overwrite: "all" }
   );
-  return resolveLocalizedSchema(populated, targetLocale);
+  return resolveLocalizedSchema(populated.schema, targetLocale);
 }

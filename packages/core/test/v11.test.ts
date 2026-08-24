@@ -67,7 +67,7 @@ describe("static schema localization", () => {
         texts.map((text) => `${locale}:${text}`)
       )
     };
-    const populated = await populateSchemaTranslations(pagedSchema, ["ja", "ja"], adapter);
+    const { schema: populated } = await populateSchemaTranslations(pagedSchema, ["ja", "ja"], adapter);
     expect(adapter.translateBatch).toHaveBeenCalledTimes(1);
     expect(populated.translations?.ja?.title).toBe("ja:Survey");
     expect(populated.fields[0]?.translations?.ja?.title).toBe("ja:Kind");

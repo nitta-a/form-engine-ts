@@ -9,12 +9,23 @@ function cloneValues(values: FormValues): FormValues {
   return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, cloneValue(value)]));
 }
 
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function cloneSubmission(submission: FormSubmission): FormSubmission {
-  return { ...submission, values: cloneValues(submission.values) };
+  return {
+    ...submission,
+    values: cloneValues(submission.values),
+    ...(submission.metadata === undefined ? {} : { metadata: cloneJson(submission.metadata) }),
+    ...(submission.translationMetadata === undefined
+      ? {}
+      : { translationMetadata: cloneJson(submission.translationMetadata) })
+  };
 }
 
 function cloneSchema(schema: FormSchema): FormSchema {
-  return JSON.parse(JSON.stringify(schema)) as FormSchema;
+  return cloneJson(schema);
 }
 
 function schemaKey(formId: string, formVersion: number): string {

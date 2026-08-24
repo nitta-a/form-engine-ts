@@ -1,12 +1,26 @@
 import {
   type FieldType,
   type FormField,
+  type FormSchema,
   type FormValue,
+  type FormValues,
+  type TranslationAdapter,
   type ValidationIssue,
   validateAnswers
 } from "@form-engine-ts/core";
-import { type ComponentType, type FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useForm } from "./context";
+import {
+  type ComponentType,
+  type FormEvent,
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState
+} from "react";
+import { FormProvider, useForm } from "./context";
+import type { BeforeSubmit, FormRendererSlots, SubmitResult } from "./types";
 
 export interface FieldComponentProps {
   readonly field: FormField;
@@ -231,13 +245,27 @@ function DefaultField(props: FieldComponentProps) {
   );
 }
 
-export interface FormRendererProps {
+export interface FormRendererPresentationProps {
   readonly components?: FieldComponents;
   readonly className?: string;
   readonly successMessageKey?: string;
   readonly errorMessageKey?: string;
   readonly autoSaveKey?: string;
+  readonly beforeSubmit?: BeforeSubmit;
+  readonly onDraftSave?: (draft: FormValues) => void;
+  readonly slots?: FormRendererSlots;
 }
+
+export interface StandaloneFormRendererProps extends FormRendererPresentationProps {
+  readonly schema: FormSchema;
+  readonly locale?: string;
+  readonly translator?: TranslationAdapter;
+  readonly initialValues?: FormValues;
+  readonly resetOnSuccess?: boolean;
+  readonly onSubmit: (answers: FormValues) => Promise<void> | void;
+}
+
+export type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
 
 interface StoredDraft {
   readonly formId: string;
@@ -287,13 +315,16 @@ function parseDraft(serialized: string): StoredDraft | null {
   }
 }
 
-export function FormRenderer({
+function ContextFormRenderer({
   components = {},
   className = "",
   successMessageKey,
   errorMessageKey,
-  autoSaveKey
-}: FormRendererProps) {
+  autoSaveKey,
+  beforeSubmit,
+  onDraftSave,
+  slots = {}
+}: FormRendererPresentationProps) {
   const form = useForm();
   const prefix = useId().replace(/:/g, "");
   const formRef = useRef<HTMLFormElement>(null);
@@ -345,9 +376,10 @@ export function FormRenderer({
   }, [autoSaveKey, form.restoreValues, form.schema.id, form.schema.version]);
 
   useEffect(() => {
-    if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
     if (form.submitStatus === "success") return;
     const timeout = globalThis.setTimeout(() => {
+      onDraftSave?.(form.values);
+      if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
       const draft: StoredDraft = {
         formId: form.schema.id,
         formVersion: form.schema.version,
@@ -357,7 +389,7 @@ export function FormRenderer({
       globalThis.localStorage.setItem(autoSaveKey, JSON.stringify(draft));
     }, 500);
     return () => globalThis.clearTimeout(timeout);
-  }, [autoSaveKey, form.schema.id, form.schema.version, form.submitStatus, form.values]);
+  }, [autoSaveKey, form.schema.id, form.schema.version, form.submitStatus, form.values, onDraftSave]);
 
   const focusFirstIssue = (fieldId: string | undefined) => {
     if (fieldId !== undefined) setFocusFieldId(fieldId);
@@ -373,68 +405,104 @@ export function FormRenderer({
     if (nextPageIndex !== undefined) setCurrentPageIndex(nextPageIndex);
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitValues = async (): Promise<SubmitResult> => {
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
-    const valid = await form.submit();
-    if (!valid) {
+    const result = await form.submit(beforeSubmit);
+    if (result.status === "invalid") {
       const invalidPageIndex = pages?.findIndex((page) =>
         firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
       );
       if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
       focusFirstIssue(firstInvalidFieldId);
-      return;
+      return result;
     }
+    if (result.status !== "success") return result;
     if (autoSaveKey !== undefined && typeof globalThis.localStorage !== "undefined") {
       globalThis.localStorage.removeItem(autoSaveKey);
       setDraftRestored(false);
     }
     setCurrentPageIndex(visiblePageIndexes[0] ?? 0);
+    return result;
   };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void submitValues();
+  };
+
+  const validationIssues = Object.values(form.errors).filter((issue): issue is ValidationIssue => issue !== undefined);
+  const canPrev = pages !== undefined && activeVisibleIndex > 0;
+  const canNext = pages !== undefined && activeVisibleIndex < visiblePageIndexes.length - 1;
+  const renderSubmitButton = () =>
+    slots.renderSubmitButton?.({ isSubmitting: form.isSubmitting, onSubmit: () => void submitValues() }) ?? (
+      <button className="fe-submit" type="submit" disabled={form.isSubmitting}>
+        {form.translate(form.schema.submitLabelKey ?? "form.submit")}
+      </button>
+    );
 
   return (
     <form ref={formRef} className={`fe-form ${className}`.trim()} noValidate onSubmit={handleSubmit}>
-      <header className="fe-header">
-        <h1>{form.schema.title}</h1>
-        {form.schema.description === undefined ? null : <p>{form.schema.description}</p>}
-        {pages === undefined ? null : (
-          <div className="fe-progress">
-            <div
-              className="form-progress-bar"
-              role="progressbar"
-              aria-valuemin={1}
-              aria-valuemax={visiblePageIndexes.length}
-              aria-valuenow={activeVisibleIndex + 1}
-            >
+      {slots.renderHeader?.({
+        title: form.schema.title,
+        ...(form.schema.description === undefined ? {} : { description: form.schema.description })
+      }) ?? (
+        <header className="fe-header">
+          <h1>{form.schema.title}</h1>
+          {form.schema.description === undefined ? null : <p>{form.schema.description}</p>}
+          {pages === undefined ? null : (
+            <div className="fe-progress">
               <div
-                className="form-progress-fill"
-                style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
-              />
+                className="form-progress-bar"
+                role="progressbar"
+                aria-valuemin={1}
+                aria-valuemax={visiblePageIndexes.length}
+                aria-valuenow={activeVisibleIndex + 1}
+              >
+                <div
+                  className="form-progress-fill"
+                  style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
+                />
+              </div>
+              <span>
+                {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
+              </span>
             </div>
-            <span>
-              {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
-            </span>
-          </div>
-        )}
-        {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
-      </header>
+          )}
+          {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
+        </header>
+      )}
       {activePage?.title === undefined ? null : <h2 className="fe-page-title">{activePage.title}</h2>}
       {activePage?.description === undefined ? null : <p className="fe-page-description">{activePage.description}</p>}
       <div className="fe-fields">
         {form.schema.fields
           .filter((field) => form.visibility[field.id] === true && (fieldIds === undefined || fieldIds.has(field.id)))
           .map((field) => {
+            const error = form.errors[field.id];
             const props: FieldComponentProps = {
               field,
               value: form.values[field.id],
-              error: form.errors[field.id],
+              error,
               setValue: (value) => form.setValue(field.id, value),
               translate: form.translate,
               inputId: `${prefix}-${field.id}`,
               errorId: `${prefix}-${field.id}-error`,
               helpId: `${prefix}-${field.id}-help`
             };
+            if (slots.renderField !== undefined) {
+              return (
+                <Fragment key={field.id}>
+                  {slots.renderField({
+                    question: field,
+                    value: form.values[field.id],
+                    onChange: (value) => {
+                      if (isFormValue(value)) form.setValue(field.id, value);
+                    },
+                    ...(error === undefined ? {} : { error })
+                  })}
+                </Fragment>
+              );
+            }
             const Component = components[field.type];
             return Component === undefined ? (
               <DefaultField key={field.id} {...props} />
@@ -443,40 +511,114 @@ export function FormRenderer({
             );
           })}
       </div>
+      {validationIssues.length === 0
+        ? null
+        : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
+            <div className="fe-validation-summary" role="alert">
+              {validationIssues.length} validation error{validationIssues.length === 1 ? "" : "s"}.
+            </div>
+          ))}
       {pages === undefined ? (
-        <button className="fe-submit" type="submit" disabled={form.isSubmitting}>
-          {form.translate(form.schema.submitLabelKey ?? "form.submit")}
-        </button>
+        <>
+          {slots.renderNavigation?.({
+            currentPage: 0,
+            totalPages: 1,
+            canPrev: false,
+            canNext: false,
+            onPrev: () => undefined,
+            onNext: () => undefined
+          })}
+          {renderSubmitButton()}
+        </>
       ) : (
         <div className="form-step-navigation">
-          {activeVisibleIndex > 0 ? (
-            <button
-              className="btn-prev"
-              type="button"
-              onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
-            >
-              {form.translate("form.back")}
-            </button>
-          ) : null}
-          {activeVisibleIndex < visiblePageIndexes.length - 1 ? (
-            <button className="btn-next" type="button" onClick={handleNext}>
-              {form.translate("form.next")}
-            </button>
-          ) : (
-            <button className="fe-submit" type="submit" disabled={form.isSubmitting}>
-              {form.translate(form.schema.submitLabelKey ?? "form.submit")}
-            </button>
+          {slots.renderNavigation?.({
+            currentPage: activeVisibleIndex,
+            totalPages: visiblePageIndexes.length,
+            canPrev,
+            canNext,
+            onPrev: () => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0),
+            onNext: handleNext
+          }) ?? (
+            <>
+              {canPrev ? (
+                <button
+                  className="btn-prev"
+                  type="button"
+                  onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
+                >
+                  {form.translate("form.back")}
+                </button>
+              ) : null}
+              {canNext ? (
+                <button className="btn-next" type="button" onClick={handleNext}>
+                  {form.translate("form.next")}
+                </button>
+              ) : null}
+            </>
           )}
+          {canNext ? null : renderSubmitButton()}
         </div>
       )}
       <div className="fe-status" aria-live="polite">
-        {form.submitStatus === "success" && successMessageKey !== undefined ? (
-          <div role="status">{form.translate(successMessageKey)}</div>
-        ) : null}
+        {form.submitStatus === "success"
+          ? (slots.renderCompletion?.({
+              message:
+                form.schema.completionMessage ??
+                (successMessageKey === undefined ? "Submitted." : form.translate(successMessageKey))
+            }) ?? (
+              <div role="status">
+                {form.schema.completionMessage ??
+                  (successMessageKey === undefined ? "Submitted." : form.translate(successMessageKey))}
+              </div>
+            ))
+          : null}
         {form.submitStatus === "error" && form.submitError !== null && errorMessageKey !== undefined ? (
           <div role="alert">{form.translate(errorMessageKey)}</div>
         ) : null}
       </div>
     </form>
+  );
+}
+
+const RENDERER_MESSAGES: Readonly<Record<string, string>> = {
+  "form.submit": "Submit",
+  "form.back": "Back",
+  "form.next": "Next",
+  "form.step": "Step {{current}} / {{total}}",
+  "form.draftRestored": "Draft restored",
+  "validation.required": "This field is required."
+};
+
+const defaultRendererTranslator: TranslationAdapter = {
+  translate(key, _locale, params = {}) {
+    return (RENDERER_MESSAGES[key] ?? key).replace(/\{\{(\w+)\}\}/g, (token, name: string) =>
+      Object.hasOwn(params, name) ? String(params[name]) : token
+    );
+  }
+};
+
+export function FormRenderer(props: FormRendererProps) {
+  if (!("schema" in props)) return <ContextFormRenderer {...props} />;
+  const {
+    schema,
+    locale = schema.defaultLocale ?? "en",
+    translator = defaultRendererTranslator,
+    initialValues,
+    resetOnSuccess,
+    onSubmit,
+    ...rendererProps
+  } = props;
+  return (
+    <FormProvider
+      schema={schema}
+      locale={locale}
+      translator={translator}
+      onSubmit={onSubmit}
+      {...(initialValues === undefined ? {} : { initialValues })}
+      {...(resetOnSuccess === undefined ? {} : { resetOnSuccess })}
+    >
+      <ContextFormRenderer {...rendererProps} />
+    </FormProvider>
   );
 }

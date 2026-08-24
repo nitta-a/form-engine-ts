@@ -11,10 +11,11 @@ import {
   type FormStorageAdapter,
   type FormSubmission,
   type FormValues,
+  populateSchemaTranslations,
   type QuestionAggregate,
   type SelectField
 } from "@form-engine-ts/core";
-import { FormBuilder, FormProvider, FormRenderer } from "@form-engine-ts/react";
+import { FormBuilder, FormProvider, FormRenderer, type FormRendererSlots } from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
@@ -382,6 +383,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("builder");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
+  const [useCustomSlots, setUseCustomSlots] = useState(false);
+  const [cancelNextSubmit, setCancelNextSubmit] = useState(false);
+  const [lifecycleStatus, setLifecycleStatus] = useState<string | null>(null);
+  const [translationOverwrite, setTranslationOverwrite] = useState<"missing-only" | "all">("missing-only");
+  const [translationReport, setTranslationReport] = useState<string | null>(null);
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [resetStatus, setResetStatus] = useState<{
     readonly kind: "success" | "error";
     readonly message: string;
@@ -406,7 +413,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void loadWorkspace(storage);
+    setWorkspaceReady(false);
+    void loadWorkspace(storage).finally(() => setWorkspaceReady(true));
   }, [loadWorkspace, storage]);
 
   const changeSchema = (nextSchema: FormSchema) => {
@@ -422,7 +430,8 @@ export default function App() {
     const submission = createSubmission(schema, values, {
       id: globalThis.crypto.randomUUID(),
       locale,
-      submittedAt: new Date().toISOString()
+      submittedAt: new Date().toISOString(),
+      metadata: { source: "preview", storage: storageKind }
     });
     await storage.saveSubmission(submission);
     setSubmissions(await storage.listSubmissions(schema.id, schema.version));
@@ -468,6 +477,61 @@ export default function App() {
     if (next === undefined) return;
     setActiveTab(next);
     document.getElementById(`tab-${next}`)?.focus();
+  };
+
+  const rendererSlots: FormRendererSlots | undefined = useCustomSlots
+    ? {
+        renderHeader: ({ title, description }) => (
+          <header className="preview-slot-header" data-testid="preview-slot-header">
+            <span>UI SLOT</span>
+            <h1>{title}</h1>
+            {description === undefined ? null : <p>{description}</p>}
+          </header>
+        ),
+        renderNavigation: ({ currentPage, totalPages, canPrev, canNext, onPrev, onNext }) => (
+          <nav className="preview-slot-navigation" aria-label="Custom step navigation">
+            <span>
+              {currentPage + 1} / {totalPages}
+            </span>
+            <button type="button" disabled={!canPrev} onClick={onPrev}>
+              {t("form.back")}
+            </button>
+            <button type="button" disabled={!canNext} onClick={onNext}>
+              {t("form.next")}
+            </button>
+          </nav>
+        ),
+        renderSubmitButton: ({ isSubmitting, onSubmit }) => (
+          <button className="preview-slot-submit" type="button" disabled={isSubmitting} onClick={onSubmit}>
+            SLOT · {t("form.submit")}
+          </button>
+        ),
+        renderValidationSummary: ({ issues }) => (
+          <aside className="preview-slot-summary" role="alert">
+            {issues.length} validation issue(s)
+          </aside>
+        ),
+        renderCompletion: ({ message }) => (
+          <div className="preview-slot-completion" role="status">
+            {message}
+          </div>
+        )
+      }
+    : undefined;
+
+  const runTranslationPolicyDemo = async () => {
+    const targetLocale =
+      locale === schema.defaultLocale
+        ? (schema.supportedLocales?.find((candidate) => candidate !== schema.defaultLocale) ?? "en")
+        : locale;
+    const result = await populateSchemaTranslations(schema, [targetLocale], mockAsyncTranslator, {
+      overwrite: translationOverwrite,
+      createMetadata: (slot) => ({ source: "preview-mock", property: slot.property })
+    });
+    changeSchema(result.schema);
+    setTranslationReport(
+      `${result.report.updatedSlots.length} updated / ${result.report.skippedSlots.length} skipped (${translationOverwrite})`
+    );
   };
 
   return (
@@ -520,12 +584,30 @@ export default function App() {
         <div id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden={activeTab !== "builder"}>
           <div className="builder-grid">
             <section className="workspace-card">
+              <fieldset className="translation-policy-demo">
+                <legend>v2 Translation overwrite policy</legend>
+                <label>
+                  Overwrite
+                  <select
+                    value={translationOverwrite}
+                    onChange={(event) => setTranslationOverwrite(event.currentTarget.value as "missing-only" | "all")}
+                  >
+                    <option value="missing-only">missing-only</option>
+                    <option value="all">all</option>
+                  </select>
+                </label>
+                <button type="button" disabled={!workspaceReady} onClick={() => void runTranslationPolicyDemo()}>
+                  Run translation policy
+                </button>
+                {translationReport === null ? null : <output>{translationReport}</output>}
+              </fieldset>
               <FormBuilder
                 schema={schema}
                 locale={locale}
                 translator={mockTranslator}
                 translationAdapter={mockAsyncTranslator}
                 onChange={changeSchema}
+                policy={{ maxFields: 20, maxOptionsPerField: 10, maxTextLength: 500, requiredLocales: ["ja", "en"] }}
               />
             </section>
             <section className="workspace-card json-card">
@@ -544,11 +626,38 @@ export default function App() {
               disabled={isClearing || storage.clearResponses === undefined}
               onReset={resetResponses}
             />
+            <fieldset className="renderer-demo-controls">
+              <legend>v2 Renderer lifecycle &amp; slots</legend>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={useCustomSlots}
+                  onChange={(event) => setUseCustomSlots(event.currentTarget.checked)}
+                />
+                Use custom UI slots
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={cancelNextSubmit}
+                  onChange={(event) => setCancelNextSubmit(event.currentTarget.checked)}
+                />
+                Cancel next submission in beforeSubmit
+              </label>
+            </fieldset>
+            {lifecycleStatus === null ? null : <p className="lifecycle-status">{lifecycleStatus}</p>}
             <FormProvider schema={schema} locale={locale} translator={mockTranslator} onSubmit={submit} resetOnSuccess>
               <FormRenderer
                 successMessageKey="preview.success"
                 errorMessageKey="preview.error"
                 autoSaveKey={`form-engine-preview-draft:${schema.id}:${schema.version}`}
+                beforeSubmit={() => {
+                  if (!cancelNextSubmit) return "continue";
+                  setCancelNextSubmit(false);
+                  setLifecycleStatus("Submission cancelled; values and draft were preserved.");
+                  return "cancel";
+                }}
+                {...(rendererSlots === undefined ? {} : { slots: rendererSlots })}
               />
             </FormProvider>
           </section>

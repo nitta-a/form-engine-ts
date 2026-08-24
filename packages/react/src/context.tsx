@@ -15,6 +15,7 @@ import {
   validatePageAnswers
 } from "@form-engine-ts/core";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { BeforeSubmit, SubmitResult } from "./types";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -33,7 +34,7 @@ export interface FormContextValue {
   readonly restoreValues: (values: FormValues) => void;
   readonly validatePage: (pageIndex: number) => AnswerValidationResult;
   readonly reset: () => void;
-  readonly submit: () => Promise<boolean>;
+  readonly submit: (beforeSubmit?: BeforeSubmit) => Promise<SubmitResult>;
   readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }
 
@@ -135,30 +136,39 @@ export function FormProvider({
     setSubmitError(null);
   }, [initialValues]);
 
-  const submit = useCallback(async (): Promise<boolean> => {
-    const validation = validateAnswers(validSchema, values);
-    if (!validation.valid) {
-      setErrors(issuesByField(validation.issues));
+  const submit = useCallback(
+    async (beforeSubmit?: BeforeSubmit): Promise<SubmitResult> => {
+      const validation = validateAnswers(validSchema, values);
+      if (!validation.valid) {
+        setErrors(issuesByField(validation.issues));
+        setValidationPageIndex(null);
+        setSubmitStatus("error");
+        setSubmitError(null);
+        return { status: "invalid", issues: validation.issues };
+      }
+      setErrors({});
       setValidationPageIndex(null);
-      setSubmitStatus("error");
       setSubmitError(null);
-      return false;
-    }
-    setErrors({});
-    setValidationPageIndex(null);
-    setSubmitStatus("submitting");
-    setSubmitError(null);
-    try {
-      await onSubmit(selectVisibleAnswers(validSchema, values));
-      if (resetOnSuccess) setValues({ ...initialValues });
-      setSubmitStatus("success");
-      return true;
-    } catch (cause) {
-      setSubmitError(cause instanceof Error ? cause : new Error(String(cause)));
-      setSubmitStatus("error");
-      return false;
-    }
-  }, [initialValues, onSubmit, resetOnSuccess, validSchema, values]);
+      const visibleValues = selectVisibleAnswers(validSchema, values);
+      try {
+        if (beforeSubmit !== undefined && (await beforeSubmit(visibleValues)) === "cancel") {
+          setSubmitStatus("idle");
+          return { status: "cancelled" };
+        }
+        setSubmitStatus("submitting");
+        await onSubmit(visibleValues);
+        if (resetOnSuccess) setValues({ ...initialValues });
+        setSubmitStatus("success");
+        return { status: "success" };
+      } catch (cause) {
+        const error = cause instanceof Error ? cause : new Error(String(cause));
+        setSubmitError(error);
+        setSubmitStatus("error");
+        return { status: "error", error };
+      }
+    },
+    [initialValues, onSubmit, resetOnSuccess, validSchema, values]
+  );
 
   const translate = useCallback(
     (key: string, params?: Readonly<Record<string, string | number>>) => translator.translate(key, locale, params),

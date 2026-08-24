@@ -1,8 +1,8 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
-async function submitCompleteResponse(user: ReturnType<typeof userEvent.setup>) {
+async function submitCompleteResponse(user: ReturnType<typeof userEvent.setup>, expectSuccess = true) {
   const respondent = within(screen.getByRole("tabpanel"));
   await user.type(respondent.getByLabelText(/^Your name/), "Ada");
   await user.type(respondent.getByLabelText(/^Reference code/), "ABC123");
@@ -15,7 +15,8 @@ async function submitCompleteResponse(user: ReturnType<typeof userEvent.setup>) 
   await user.click(respondent.getByRole("button", { name: "Next" }));
   await user.click(respondent.getByLabelText(/I agree that this response/));
   await user.click(respondent.getByRole("button", { name: "Send response" }));
-  await waitFor(() => expect(respondent.getByRole("status")).toHaveTextContent("Response saved"));
+  if (expectSuccess)
+    await waitFor(() => expect(respondent.getByRole("status")).toHaveTextContent(/Response saved|Thank you/));
 }
 
 describe("preview application", () => {
@@ -34,6 +35,20 @@ describe("preview application", () => {
     expect(screen.getAllByLabelText("種類")).not.toHaveLength(0);
     expect(screen.getAllByText("必須")).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Add question" })).not.toBeInTheDocument();
+  });
+
+  it("runs the translation overwrite policy and displays its report", async () => {
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("Overwrite"), { target: { value: "all" } });
+    const runTranslation = screen.getByRole("button", { name: "Run translation policy" });
+    await waitFor(() => expect(runTranslation).toBeEnabled());
+    fireEvent.click(runTranslation);
+    await waitFor(() =>
+      expect(document.querySelector(".translation-policy-demo output")).toHaveTextContent(
+        /updated \/ 0 skipped \(all\)/
+      )
+    );
+    await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent('"translationMetadata"'));
   });
 
   it("switches locale and completes submission-to-analytics flow", async () => {
@@ -114,6 +129,35 @@ describe("preview application", () => {
     expect(screen.getByLabelText("Column question")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Send simulated event" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("simulated webhook was accepted"));
+  });
+
+  it("demonstrates custom UI slots and cancellation without losing entered values", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
+    await user.click(screen.getByLabelText("Use custom UI slots"));
+    expect(screen.getByTestId("preview-slot-header")).toHaveTextContent("UI SLOT");
+    expect(screen.getByRole("navigation", { name: "Custom step navigation" })).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Use custom UI slots"));
+    await user.click(screen.getByLabelText("Cancel next submission in beforeSubmit"));
+    await submitCompleteResponse(user, false);
+    await waitFor(() => expect(screen.getByText(/Submission cancelled/)).toBeInTheDocument());
+    expect(screen.getByLabelText(/I agree that this response/)).toBeChecked();
+  });
+
+  it("round-trips schema and response metadata through LocalStorage", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.getByText(/"release": "v2.0.0"/)).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
+    await user.click(screen.getByLabelText("LocalStorage"));
+    await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
+    await submitCompleteResponse(user);
+    const stored = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key): key is string => key !== null)
+      .map((key) => localStorage.getItem(key) ?? "");
+    expect(stored.some((value) => value.includes('"owner":"ARGS"'))).toBe(true);
+    expect(stored.some((value) => value.includes('"source":"preview"'))).toBe(true);
   });
 
   it("clears LocalStorage responses from the respondent tab", async () => {

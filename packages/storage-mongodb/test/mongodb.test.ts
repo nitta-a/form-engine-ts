@@ -105,7 +105,9 @@ function schema(id = "form", version = 1, title = "title"): FormSchema {
     id,
     version,
     title,
-    fields: [{ id: "answer", type: "text", title: "answer", required: false }]
+    metadata: { owner: "ARGS" },
+    translationMetadata: { ja: { title: { provider: "machine" } } },
+    fields: [{ id: "answer", type: "text", title: "answer", required: false, metadata: { source: "api" } }]
   };
 }
 
@@ -116,7 +118,9 @@ function submission(id: string, formId = "form", version = 1, submittedAt = "202
     formVersion: version,
     locale: "en",
     submittedAt,
-    values: { answer: "yes" }
+    values: { answer: "yes" },
+    metadata: { channel: "ARGS" },
+    translationMetadata: { ja: { title: { provider: "human" } } }
   };
 }
 

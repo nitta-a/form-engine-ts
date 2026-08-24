@@ -12,6 +12,7 @@ import {
   type TranslationAdapter
 } from "@form-engine-ts/core";
 import { useState } from "react";
+import { type BuilderPolicy, useFormBuilder } from "./hooks/useFormBuilder";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",
@@ -232,9 +233,25 @@ export interface FormBuilderProps {
   readonly locale?: string;
   readonly translator?: TranslationAdapter;
   readonly translationAdapter?: AsyncTranslationAdapter;
+  readonly policy?: BuilderPolicy;
+  readonly idFactory?: (kind: "field" | "option" | "page", existingIds: ReadonlySet<string>) => string;
 }
 
-export function FormBuilder({ schema, onChange, locale = "en", translator, translationAdapter }: FormBuilderProps) {
+export function FormBuilder({
+  schema,
+  onChange,
+  locale = "en",
+  translator,
+  translationAdapter,
+  policy,
+  idFactory
+}: FormBuilderProps) {
+  const headless = useFormBuilder({
+    schema,
+    onChange,
+    ...(policy === undefined ? {} : { policy }),
+    ...(idFactory === undefined ? {} : { idFactory })
+  });
   const [newPageQuestionId, setNewPageQuestionId] = useState("");
   const [newLocale, setNewLocale] = useState("");
   const [editingLocale, setEditingLocale] = useState("");
@@ -246,9 +263,7 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
   };
   const emitSchema = (candidate: FormSchema) => onChange(sanitizeBuilderSchema(candidate));
 
-  const updateField = (fieldId: string, update: (field: FormField) => FormField) => {
-    emitSchema({ ...schema, fields: schema.fields.map((field) => (field.id === fieldId ? update(field) : field)) });
-  };
+  const updateField = headless.updateField;
 
   const changeType = (fieldId: string, type: FieldType) => {
     emitSchema({
@@ -266,10 +281,7 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
     });
   };
 
-  const removeField = (fieldId: string) => {
-    if (schema.fields.length === 1) return;
-    emitSchema({ ...schema, fields: schema.fields.filter((field) => field.id !== fieldId) });
-  };
+  const removeField = headless.removeField;
 
   const moveField = (index: number, offset: -1 | 1) => {
     const target = index + offset;
@@ -283,23 +295,7 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
     emitSchema({ ...schema, fields });
   };
 
-  const addField = () => {
-    const id = createUniqueId("q", new Set(schema.fields.map((field) => field.id)));
-    const nextSchema: FormSchema = {
-      ...schema,
-      fields: [...schema.fields, { id, type: "text", title: translate("builder.newQuestionTitle"), required: false }]
-    };
-    emitSchema(
-      schema.pages === undefined
-        ? nextSchema
-        : {
-            ...nextSchema,
-            pages: schema.pages.map((page, index) =>
-              index === (schema.pages?.length ?? 0) - 1 ? { ...page, questionIds: [...page.questionIds, id] } : page
-            )
-          }
-    );
-  };
+  const addField = () => headless.addField("text");
 
   const enablePages = () => {
     if (schema.pages !== undefined) return;
@@ -419,7 +415,10 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
     setIsTranslating(true);
     setTranslationError(null);
     try {
-      onChange(await populateSchemaTranslations(schema, [editingLocale], translationAdapter));
+      const populated = await populateSchemaTranslations(schema, [editingLocale], translationAdapter, {
+        overwrite: "all"
+      });
+      onChange(populated.schema);
     } catch (cause) {
       setTranslationError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -783,7 +782,9 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
                     value={field.type}
                     onChange={(event) => changeType(field.id, event.currentTarget.value as FieldType)}
                   >
-                    {FIELD_TYPES.map((type) => (
+                    {FIELD_TYPES.filter(
+                      (type) => policy?.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
+                    ).map((type) => (
                       <option key={type} value={type}>
                         {translate(fieldTypeKey(type))}
                       </option>
@@ -963,16 +964,7 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
                       <button
                         type="button"
                         disabled={field.options.length === 1}
-                        onClick={() =>
-                          updateField(field.id, (current) =>
-                            "options" in current
-                              ? {
-                                  ...current,
-                                  options: current.options.filter((_item, itemIndex) => itemIndex !== optionIndex)
-                                }
-                              : current
-                          )
-                        }
+                        onClick={() => headless.removeOption(field.id, option.id)}
                       >
                         {translate("builder.remove")}
                       </button>
@@ -980,25 +972,10 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
                   ))}
                   <button
                     type="button"
-                    onClick={() =>
-                      updateField(field.id, (current) =>
-                        "options" in current
-                          ? (() => {
-                              const id = createUniqueId("opt", new Set(current.options.map((option) => option.id)));
-                              return {
-                                ...current,
-                                options: [
-                                  ...current.options,
-                                  {
-                                    id,
-                                    label: translate("builder.newOptionLabel", { index: current.options.length + 1 })
-                                  }
-                                ]
-                              };
-                            })()
-                          : current
-                      )
+                    disabled={
+                      policy?.maxOptionsPerField !== undefined && field.options.length >= policy.maxOptionsPerField
                     }
+                    onClick={() => headless.addOption(field.id)}
                   >
                     {translate("builder.addOption")}
                   </button>
@@ -1065,7 +1042,12 @@ export function FormBuilder({ schema, onChange, locale = "en", translator, trans
           );
         })}
       </div>
-      <button className="form-engine-builder__add" type="button" onClick={addField}>
+      <button
+        className="form-engine-builder__add"
+        type="button"
+        disabled={policy?.maxFields !== undefined && schema.fields.length >= policy.maxFields}
+        onClick={addField}
+      >
         {translate("builder.addQuestion")}
       </button>
     </section>

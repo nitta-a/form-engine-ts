@@ -1,5 +1,5 @@
-import type { FormSchema, FormValues } from "@form-engine-ts/core";
-import type { SafeParseReturnType, ZodIssue } from "zod";
+import { type FormSchema, type FormValues, validateAnswers, validatePageAnswers } from "@form-engine-ts/core";
+import type { ZodIssue, ZodSafeParseResult } from "zod";
 import { createZodFormSchema } from "../src";
 
 const schema = {
@@ -58,11 +58,11 @@ const validValues: FormValues = {
   checkbox: true
 };
 
-function issues(result: SafeParseReturnType<Record<string, unknown>, Record<string, unknown>>): ZodIssue[] {
+function issues(result: ZodSafeParseResult<Record<string, unknown>>): ZodIssue[] {
   return result.success ? [] : result.error.issues;
 }
 
-function hasCoreIssue(result: SafeParseReturnType<Record<string, unknown>, Record<string, unknown>>, code: string) {
+function hasCoreIssue(result: ZodSafeParseResult<Record<string, unknown>>, code: string) {
   return issues(result).some(
     (issue) => issue.code === "custom" && issue.params?.formEngineCode === code && issue.path.length > 0
   );
@@ -172,5 +172,67 @@ describe("createZodFormSchema", () => {
       success: true,
       data: { external: true }
     });
+  });
+
+  it("matches Core issue codes for required, choices, and page-scoped validation", () => {
+    const issueCodes = (result: ZodSafeParseResult<Record<string, unknown>>) =>
+      issues(result)
+        .map((issue) => (issue.code === "custom" ? String(issue.params?.formEngineCode) : issue.code))
+        .sort();
+    const coreCodes = (result: ReturnType<typeof validateAnswers>) => result.issues.map((issue) => issue.code).sort();
+    for (const values of [
+      { ...validValues, text: "" },
+      { ...validValues, select: "missing" },
+      { ...validValues, multi: ["x"] }
+    ]) {
+      expect(issueCodes(createZodFormSchema(schema).safeParse(values))).toEqual(
+        coreCodes(validateAnswers(schema, values))
+      );
+    }
+
+    const paged: FormSchema = {
+      id: "aligned-pages",
+      version: 2,
+      title: "Pages",
+      fields: [
+        { id: "first", type: "text", title: "First", required: true },
+        {
+          id: "second",
+          type: "select",
+          title: "Second",
+          required: true,
+          options: [{ id: "ok", label: "OK" }]
+        }
+      ],
+      pages: [
+        { id: "one", questionIds: ["first"] },
+        { id: "two", questionIds: ["second"] }
+      ]
+    };
+    const values = { second: "missing" };
+    expect(issueCodes(createZodFormSchema(paged, { pageIndex: 0 }).safeParse(values))).toEqual(
+      coreCodes(validatePageAnswers(paged, 0, values))
+    );
+    expect(issueCodes(createZodFormSchema(paged, { pageIndex: 1 }).safeParse(values))).toEqual(
+      coreCodes(validatePageAnswers(paged, 1, values))
+    );
+  });
+
+  it("accepts valid schema metadata and rejects non-JSON metadata before building", () => {
+    expect(() => createZodFormSchema({ ...schema, metadata: { owner: "ARGS", revision: 2 } })).not.toThrow();
+    expect(() => createZodFormSchema({ ...schema, metadata: { invalid: Number.NaN } })).toThrow(TypeError);
+  });
+
+  it("validates and passes through extensible response metadata", () => {
+    const candidate = {
+      ...validValues,
+      metadata: { source: "ARGS", nested: [true, 2, null] },
+      translationMetadata: { ja: { provider: "human" } }
+    };
+    expect(createZodFormSchema(schema).safeParse(candidate)).toEqual({ success: true, data: candidate });
+    expect(createZodFormSchema(schema).safeParse({ ...validValues, metadata: { invalid: Number.NaN } }).success).toBe(
+      false
+    );
+    expect(createZodFormSchema(schema).safeParse({ ...validValues, metadata: new Date() }).success).toBe(false);
   });
 });

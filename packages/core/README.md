@@ -30,10 +30,19 @@ Add `pages` to partition every field into an accessible wizard and use `validate
 for step-scoped validation. Schemas without `pages` remain single-page forms.
 
 Store authoring-time translations on forms, fields, options, and pages. `resolveLocalizedSchema` applies them synchronously,
-while `populateSchemaTranslations` fills them through an injected `AsyncTranslationAdapter`.
+while `populateSchemaTranslations` fills them through an injected `AsyncTranslationAdapter`. Population defaults to
+`overwrite: "missing-only"`, accepts per-slot `shouldOverwrite` and `createMetadata` callbacks, and returns
+`{ schema, report }` with updated and skipped translation slots.
+
+Forms, pages, fields, options, and submissions accept JSON-only `metadata` and per-locale/property
+`translationMetadata`. These extension values survive sanitization, localization, submission creation, and storage
+round-trips. `completionMessage` is localized with the rest of the form text.
 
 `calculateCrossTabulation` builds a two-question frequency matrix from submissions. `dispatchWebhook` posts typed
 `response.submitted` or `schema.updated` events with timeout handling, custom headers, and optional HMAC-SHA256 signing.
+
+CSV export neutralizes string cells whose first non-whitespace character is `=`, `+`, `-`, or `@`. This is enabled by
+default; trusted callers can pass `{ neutralizeFormulas: false }`. RFC 4180 quoting and the UTF-8 BOM remain unchanged.
 
 Storage adapters share inclusive ISO 8601 submission-range filtering:
 

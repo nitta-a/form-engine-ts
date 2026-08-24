@@ -18,7 +18,9 @@ const schema: FormSchema = {
   id: "form",
   version: 1,
   title: "title",
-  fields: [{ id: "answer", type: "text", title: "answer", required: false }]
+  metadata: { owner: "ARGS" },
+  translationMetadata: { ja: { title: { provider: "machine" } } },
+  fields: [{ id: "answer", type: "text", title: "answer", required: false, metadata: { source: "api" } }]
 };
 
 function submission(
@@ -33,6 +35,8 @@ function submission(
     formVersion: version,
     locale: "en",
     values: { answer: "yes" },
+    metadata: { channel: "ARGS" },
+    translationMetadata: { ja: { title: { provider: "human" } } },
     submittedAt
   };
 }

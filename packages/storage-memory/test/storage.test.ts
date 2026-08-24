@@ -8,6 +8,8 @@ function submission(id: string, version = 1, formId = "form", submittedAt?: stri
     formVersion: version,
     locale: "en",
     values: { choices: ["a"] },
+    metadata: { channel: "ARGS", nested: { retained: true } },
+    translationMetadata: { ja: { title: { provider: "human" } } },
     submittedAt: submittedAt ?? `2025-01-0${version}T00:00:00.000Z`
   };
 }
@@ -67,7 +69,9 @@ describe("createMemoryStorageAdapter", () => {
       id: "form",
       version: 1,
       title: "title",
-      fields: [{ id: "answer", type: "text", title: "answer", required: false }]
+      metadata: { owner: "ARGS" },
+      translationMetadata: { ja: { title: { provider: "machine" } } },
+      fields: [{ id: "answer", type: "text", title: "answer", required: false, metadata: { source: "api" } }]
     } as const;
     await storage.saveSchema(schema);
     expect(await storage.getSchema("form", 1)).toEqual(schema);

@@ -184,20 +184,28 @@ export function aggregateResponses(schema: FormSchema, submissions: readonly For
   };
 }
 
-export function escapeCsvCell(value: string | number | null | undefined): string {
+export function escapeCsvCell(value: string | number | boolean | null | undefined, neutralizeFormulas = true): string {
   if (value === null || value === undefined) return "";
-  const stringValue = String(value);
+  let stringValue = String(value);
+  if (neutralizeFormulas && typeof value === "string") {
+    const trimmed = stringValue.trimStart();
+    if (trimmed.length > 0 && ["=", "+", "-", "@"].includes(trimmed[0] ?? "")) {
+      stringValue = `'${stringValue}`;
+    }
+  }
   return /[",\r\n]/.test(stringValue) ? `"${stringValue.replaceAll('"', '""')}"` : stringValue;
 }
 
-function serializeValue(value: FormValue): string {
+function serializeValue(value: FormValue): string | number | boolean {
   if (value === undefined) return "";
-  if (Array.isArray(value)) return JSON.stringify(value);
-  return String(value);
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+    ? value
+    : JSON.stringify(value);
 }
 
 export interface CsvExportOptions {
   readonly withBom?: boolean;
+  readonly neutralizeFormulas?: boolean;
 }
 
 export function exportResponsesToCsv(
@@ -223,6 +231,7 @@ export function exportResponsesToCsv(
       ];
     })
   ];
-  const csv = rows.map((row) => row.map((cell) => escapeCsvCell(cell)).join(",")).join("\r\n");
+  const neutralizeFormulas = options.neutralizeFormulas ?? true;
+  const csv = rows.map((row) => row.map((cell) => escapeCsvCell(cell, neutralizeFormulas)).join(",")).join("\r\n");
   return (options.withBom ?? true) ? `\uFEFF${csv}` : csv;
 }

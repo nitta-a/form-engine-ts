@@ -50,3 +50,33 @@ on the next mount:
 `FormProvider` resolves authoring-time translations synchronously whenever `locale` changes. `FormBuilder` includes page
 membership controls and localization editors; pass an `AsyncTranslationAdapter` as `translationAdapter` to enable its
 batch-translation action.
+
+## Headless builder and renderer lifecycle
+
+`useFormBuilder({ schema, onChange, policy, idFactory })` exposes controlled field, option, page, and locale actions.
+`BuilderPolicy` can enforce allowed field types, 20-field/10-option style limits, text length, and required locales.
+Rejected add operations return typed errors without changing the schema. `<FormBuilder>` uses the same hook and accepts
+`policy` and `idFactory` props.
+
+`FormRenderer` can also be used without an explicit provider:
+
+```tsx
+<FormRenderer
+  schema={schema}
+  locale="en"
+  beforeSubmit={async (values) => (await confirmValues(values) ? "continue" : "cancel")}
+  onSubmit={saveValues}
+  onDraftSave={saveDraft}
+  slots={{
+    renderHeader: ({ title }) => <MyHeader>{title}</MyHeader>,
+    renderField: (props) => <MyField {...props} />,
+    renderSubmitButton: ({ isSubmitting, onSubmit }) => (
+      <MyButton disabled={isSubmitting} onClick={onSubmit}>Save</MyButton>
+    )
+  }}
+/>
+```
+
+Validation runs before `beforeSubmit`. A `"cancel"` result does not call `onSubmit` and preserves values and drafts.
+Header, field, navigation, submit, validation-summary, and completion slots can replace the default UI. The localized
+`completionMessage` is displayed after a successful submission.
