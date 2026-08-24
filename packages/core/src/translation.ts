@@ -1,9 +1,11 @@
+import { collectSchemaLocales } from "./policy";
 import { assertValidFormSchema } from "./schema";
 import type {
   AsyncTranslationAdapter,
   ExtensibleNode,
   FormField,
   FormPage,
+  FormPolicy,
   FormSchema,
   JsonValue,
   SchemaTranslations
@@ -26,6 +28,8 @@ export interface PopulateTranslationOptions {
   readonly overwrite?: "missing-only" | "all";
   readonly shouldOverwrite?: (slot: TranslationSlot) => boolean;
   readonly createMetadata?: (slot: TranslationSlot, translatedText: string) => Readonly<Record<string, JsonValue>>;
+  /** Applies locale admission and count limits before the adapter is called. */
+  readonly policy?: Pick<FormPolicy, "allowedLocales" | "maxLocales">;
 }
 
 export interface TranslationReport {
@@ -294,6 +298,18 @@ export async function populateSchemaTranslations(
 ): Promise<{ readonly schema: FormSchema; readonly report: TranslationReport }> {
   assertValidFormSchema(schema);
   const locales = [...new Set(targetLocales.filter((locale) => locale.length > 0 && locale !== schema.defaultLocale))];
+  const allowedLocales = options.policy?.allowedLocales;
+  const collectedLocales = collectSchemaLocales(schema);
+  const disallowedLocale = [...collectedLocales.allUniqueLocales, ...locales].find(
+    (locale) => allowedLocales !== undefined && !allowedLocales.includes(locale)
+  );
+  if (disallowedLocale !== undefined) {
+    throw new RangeError(`Translation locale ${disallowedLocale} is not allowed by the form policy.`);
+  }
+  const projectedLocales = new Set([...collectedLocales.allUniqueLocales, ...locales]);
+  if (options.policy?.maxLocales !== undefined && projectedLocales.size > options.policy.maxLocales) {
+    throw new RangeError(`At most ${options.policy.maxLocales} locales are allowed by the form policy.`);
+  }
   const updatedSlots: TranslationSlot[] = [];
   const skippedSlots: TranslationSlot[] = [];
   let result = schema;

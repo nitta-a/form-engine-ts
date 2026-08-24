@@ -173,6 +173,29 @@ textarea {
   color: var(--ink-muted);
 }
 
+.preview-mui-button,
+.preview-ai-translation {
+  border: 1px solid #6750a4;
+  border-radius: 999px;
+  background: #6750a4;
+  color: #fff;
+  font: inherit;
+  padding: 0.5rem 0.9rem;
+}
+
+.preview-mui-button:disabled,
+.preview-ai-translation:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.preview-mui-input {
+  border: 1px solid #79747e;
+  border-radius: 0.35rem;
+  font: inherit;
+  padding: 0.55rem 0.7rem;
+}
+
 .preview-slot-page-header,
 .preview-slot-submit-error {
   border: 1px dashed var(--accent);

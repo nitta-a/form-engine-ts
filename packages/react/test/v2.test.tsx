@@ -153,6 +153,7 @@ describe("useFormBuilder", () => {
       version: 1,
       title: "Headless",
       defaultLocale: "en",
+      supportedLocales: ["en", "ja"],
       fields: [
         {
           id: "seed",

@@ -79,6 +79,11 @@ now constrain schema validation and the headless/visual locale actions; allowed 
 unregistered-locale selector. Page updates and locale mutations use the same typed `onActionError` pipeline as every
 other visual action.
 
+The Visual Builder also exposes orthogonal `components` and `slots` extension layers for design-system integration.
+Primitive controls can be adapted to MUI/Tailwind components while domain surfaces—including only the automatic
+translation actions—can be replaced independently. Core locale collection now scans translation and translation-metadata
+keys on every schema node, closing unregistered, disallowed, and maximum-locale policy gaps.
+
 ### Define and render a form
 
 ```bash
@@ -396,6 +401,10 @@ v2.1.1パッチではVisual Builderに`defaultFieldType`、型付き`onActionErr
 v2.2ではVisual Builderに`readOnly`と表示領域別の`features`制御を追加しました。`FormPolicy.allowedLocales`と
 `maxLocales`はスキーマ検証およびHeadless/Visual Builderの言語操作に適用され、許可ロケールは未登録候補から選択できます。
 ページ更新と言語操作も他のVisual actionと同じ型付き`onActionError`パイプラインを通ります。
+
+Visual Builderはデザインシステム統合向けに、直交する`components`と`slots`の拡張層も公開します。MUI/Tailwind等へ
+プリミティブ部品を差し替えつつ、自動翻訳actionだけを含むdomain領域を独立して置換できます。Coreのロケール収集は
+全スキーマノードの翻訳・翻訳metadataキーを走査し、未登録・非許可・上限超過の抜け道を防ぎます。
 
 ### フォームの定義とレンダリング
 

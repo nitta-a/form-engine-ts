@@ -1,6 +1,7 @@
 export * from "./analytics";
 export * from "./events";
 export * from "./field";
+export * from "./policy";
 export * from "./sanitization";
 export * from "./schema";
 export * from "./submission";

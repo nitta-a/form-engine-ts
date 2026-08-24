@@ -1,6 +1,13 @@
 import type { FormSchema } from "@form-engine-ts/core";
 import { fireEvent, render, renderHook, screen, within } from "@testing-library/react";
-import { FormBuilder, useFormBuilder } from "../src";
+import { useState } from "react";
+import {
+  type BuilderButtonProps,
+  type BuilderTextInputProps,
+  type BuilderTranslationActionsSlotProps,
+  FormBuilder,
+  useFormBuilder
+} from "../src";
 
 const schema: FormSchema = {
   id: "builder-v22",
@@ -42,6 +49,10 @@ describe("useFormBuilder v2.2", () => {
       success: false,
       error: { type: "disallowed_locale", locale: "zh" }
     });
+    expect(allowed.result.current.setLocaleTranslation("zh", { kind: "form" }, "title", "表单")).toEqual({
+      success: false,
+      error: { type: "disallowed_locale", locale: "zh" }
+    });
 
     const limited = renderHook(() => useFormBuilder({ schema, onChange: vi.fn(), policy: { maxLocales: 1 } }));
     expect(limited.result.current.addLocale("ja")).toEqual({
@@ -49,6 +60,10 @@ describe("useFormBuilder v2.2", () => {
       error: { type: "max_locales_exceeded", max: 1 }
     });
     expect(limited.result.current.setDefaultLocale("ja")).toEqual({
+      success: false,
+      error: { type: "max_locales_exceeded", max: 1 }
+    });
+    expect(limited.result.current.setLocaleTranslation("ja", { kind: "form" }, "title", "フォーム")).toEqual({
       success: false,
       error: { type: "max_locales_exceeded", max: 1 }
     });
@@ -160,5 +175,92 @@ describe("FormBuilder v2.2", () => {
         .getAllByRole("option")
         .map((option) => option.textContent)
     ).toEqual(["—"]);
+  });
+
+  it("renders injected button and text-input primitives and propagates changes and disabled state", () => {
+    function CustomButton({ children, onClick, disabled, "aria-label": ariaLabel }: BuilderButtonProps) {
+      return (
+        <button type="button" data-design-system="button" disabled={disabled} aria-label={ariaLabel} onClick={onClick}>
+          {children}
+        </button>
+      );
+    }
+    function CustomTextInput({ value, onChange, disabled, id, "aria-label": ariaLabel }: BuilderTextInputProps) {
+      return (
+        <input
+          id={id}
+          data-design-system="text-input"
+          disabled={disabled}
+          aria-label={ariaLabel}
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+      );
+    }
+    function Harness({ readOnly = false }: { readonly readOnly?: boolean }) {
+      const [current, setCurrent] = useState(schema);
+      return (
+        <>
+          <FormBuilder
+            schema={current}
+            onChange={setCurrent}
+            readOnly={readOnly}
+            components={{ Button: CustomButton, TextInput: CustomTextInput }}
+            idFactory={(kind) => `custom-${kind}`}
+          />
+          <output data-testid="custom-schema">{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+
+    const view = render(<Harness />);
+    expect(screen.getByRole("button", { name: "Add question" })).toHaveAttribute("data-design-system", "button");
+    expect(screen.getAllByRole("textbox").every((input) => input.dataset.designSystem === "text-input")).toBe(true);
+    fireEvent.change(screen.getAllByLabelText("Page title")[0] as HTMLElement, { target: { value: "Updated" } });
+    expect(screen.getByTestId("custom-schema")).toHaveTextContent('"title":"Updated"');
+    fireEvent.click(screen.getByRole("button", { name: "Add question" }));
+    expect(screen.getByTestId("custom-schema")).toHaveTextContent('"id":"custom-field"');
+    view.unmount();
+
+    render(<Harness readOnly />);
+    expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
+    expect(screen.getAllByRole("textbox").every((input) => input.matches(":disabled"))).toBe(true);
+  });
+
+  it("fully replaces translation actions and exposes policy-aware builder actions", () => {
+    function CustomActions({ actions }: BuilderTranslationActionsSlotProps) {
+      return (
+        <button type="button" onClick={() => actions.addLocale("ja")}>
+          Run ARGS AI translation
+        </button>
+      );
+    }
+    function Harness() {
+      const [current, setCurrent] = useState<FormSchema>({ ...schema, supportedLocales: ["en"] });
+      return (
+        <>
+          <FormBuilder
+            schema={current}
+            onChange={setCurrent}
+            slots={{ translationActions: CustomActions }}
+            policy={{ allowedLocales: ["en", "ja"] }}
+          />
+          <output data-testid="slot-schema">{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+
+    render(<Harness />);
+    expect(screen.queryByRole("button", { name: "Translate all text" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Run ARGS AI translation" }));
+    expect(screen.getByTestId("slot-schema")).toHaveTextContent('"supportedLocales":["en","ja"]');
+  });
+
+  it("keeps the default DOM unchanged when component and slot overrides are omitted or empty", () => {
+    const baseline = render(<FormBuilder schema={schema} onChange={vi.fn()} />);
+    const baselineHtml = baseline.container.innerHTML;
+    baseline.unmount();
+    const explicitDefaults = render(<FormBuilder schema={schema} onChange={vi.fn()} components={{}} slots={{}} />);
+    expect(explicitDefaults.container.innerHTML).toBe(baselineHtml);
   });
 });

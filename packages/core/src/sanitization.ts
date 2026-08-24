@@ -1,4 +1,4 @@
-import type { FormField, FormPage, FormSchema } from "./types";
+import type { ExtensibleNode, FieldOption, FormField, FormPage, FormSchema } from "./types";
 
 export type SchemaStructureIssueType =
   | "dangling_condition_reference"
@@ -12,6 +12,54 @@ export interface SchemaStructureIssue {
   readonly questionId: string;
   readonly choiceId?: string;
   readonly message: string;
+}
+
+function registeredEntries<T>(
+  value: Readonly<Record<string, T>> | undefined,
+  registeredLocales: ReadonlySet<string>
+): Readonly<Record<string, T>> | undefined {
+  if (value === undefined) return undefined;
+  const entries = Object.entries(value).filter(([locale]) => registeredLocales.has(locale));
+  return entries.length === 0 ? undefined : Object.fromEntries(entries);
+}
+
+function sanitizeNodeLocales<T extends ExtensibleNode>(node: T, registeredLocales: ReadonlySet<string>): T {
+  const { translationMetadata: _translationMetadata, ...base } = node;
+  const translationMetadata = registeredEntries(node.translationMetadata, registeredLocales);
+  return {
+    ...base,
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
+  } as T;
+}
+
+function sanitizeOptionLocales(option: FieldOption, registeredLocales: ReadonlySet<string>): FieldOption {
+  const { translations: _translations, ...base } = sanitizeNodeLocales(option, registeredLocales);
+  const translations = registeredEntries(option.translations, registeredLocales);
+  return { ...base, ...(translations === undefined ? {} : { translations }) };
+}
+
+function sanitizeFieldLocales(field: FormField, registeredLocales: ReadonlySet<string>): FormField {
+  const localizedNode = sanitizeNodeLocales(field, registeredLocales);
+  const { translations: _translations, ...base } = localizedNode;
+  const translations = registeredEntries(field.translations, registeredLocales);
+  const localized = {
+    ...base,
+    ...(translations === undefined ? {} : { translations })
+  };
+  if (!("options" in localizedNode)) return localized;
+  const { translations: _choiceTranslations, ...choiceBase } = localizedNode;
+  return {
+    ...choiceBase,
+    ...(translations === undefined ? {} : { translations }),
+    options: localizedNode.options.map((option) => sanitizeOptionLocales(option, registeredLocales))
+  };
+}
+
+function sanitizePageLocales(page: FormPage, registeredLocales: ReadonlySet<string>): FormPage {
+  const localizedNode = sanitizeNodeLocales(page, registeredLocales);
+  const { translations: _translations, ...base } = localizedNode;
+  const translations = registeredEntries(page.translations, registeredLocales);
+  return { ...base, ...(translations === undefined ? {} : { translations }) };
 }
 
 function cyclicQuestionIds(fields: readonly FormField[]): ReadonlySet<string> {
@@ -106,8 +154,13 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
 
 export function sanitizeSchema(schema: FormSchema): FormSchema {
   const existingQuestionIds = new Set(schema.fields.map((field) => field.id));
+  const registeredLocales = new Set([
+    ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+    ...(schema.supportedLocales ?? [])
+  ]);
   const cyclic = cyclicQuestionIds(schema.fields);
-  const sanitizedFields = schema.fields.map((field) => {
+  const sanitizedFields = schema.fields.map((sourceField) => {
+    const field = sanitizeFieldLocales(sourceField, registeredLocales);
     const sourceId = field.displayCondition?.questionId;
     if (
       sourceId === undefined ||
@@ -118,17 +171,21 @@ export function sanitizeSchema(schema: FormSchema): FormSchema {
     const { displayCondition: _displayCondition, ...sanitized } = field;
     return sanitized as FormField;
   });
+  const localizedSchema = sanitizeNodeLocales(schema, registeredLocales);
+  const { translations: _translations, ...schemaWithoutLocaleContent } = localizedSchema;
+  const translations = registeredEntries(schema.translations, registeredLocales);
   const base: FormSchema = {
-    ...schema,
+    ...schemaWithoutLocaleContent,
+    ...(translations === undefined ? {} : { translations }),
     fields: sanitizedFields
   };
   if (schema.pages === undefined) return base;
 
   const assigned = new Set<string>();
   const pages: FormPage[] = schema.pages
-    .map((page) => ({
-      ...page,
-      questionIds: page.questionIds.filter((id) => {
+    .map((sourcePage) => ({
+      ...sanitizePageLocales(sourcePage, registeredLocales),
+      questionIds: sourcePage.questionIds.filter((id) => {
         if (!existingQuestionIds.has(id) || assigned.has(id)) return false;
         assigned.add(id);
         return true;

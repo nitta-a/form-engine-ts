@@ -1,5 +1,6 @@
 import {
   type ChoiceOption,
+  collectSchemaLocales,
   type DisplayCondition,
   type FormField,
   type FormPage,
@@ -647,6 +648,17 @@ export function useFormBuilder({
       const normalized = locale.trim();
       if (normalized.length === 0)
         return { success: false, error: { type: "invalid_operation", message: "Locale must not be empty." } };
+      if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(normalized)) {
+        return { success: false, error: { type: "disallowed_locale", locale: normalized } };
+      }
+      const allUniqueLocales = collectSchemaLocales(schema).allUniqueLocales;
+      if (
+        !allUniqueLocales.has(normalized) &&
+        policy?.maxLocales !== undefined &&
+        allUniqueLocales.size >= policy.maxLocales
+      ) {
+        return { success: false, error: { type: "max_locales_exceeded", max: policy.maxLocales } };
+      }
       const error = textPolicyError(text);
       if (error !== undefined) return error;
       const supportedLocales = [...new Set([...(schema.supportedLocales ?? []), normalized])];
@@ -723,7 +735,7 @@ export function useFormBuilder({
       onChange({ ...schema, supportedLocales, fields, ...(pages === undefined ? {} : { pages }) });
       return { success: true };
     },
-    [onChange, schema, textPolicyError]
+    [onChange, policy?.allowedLocales, policy?.maxLocales, schema, textPolicyError]
   );
 
   const addLocale = useCallback(
@@ -734,12 +746,14 @@ export function useFormBuilder({
       if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(normalized)) {
         return { success: false, error: { type: "disallowed_locale", locale: normalized } };
       }
-      const registeredLocales = new Set([
-        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-        ...(schema.supportedLocales ?? [])
-      ]);
-      if (registeredLocales.has(normalized)) return { success: true };
-      if (policy?.maxLocales !== undefined && registeredLocales.size >= policy.maxLocales) {
+      const allUniqueLocales = collectSchemaLocales(schema).allUniqueLocales;
+      if ((schema.supportedLocales ?? []).includes(normalized) || schema.defaultLocale === normalized)
+        return { success: true };
+      if (
+        policy?.maxLocales !== undefined &&
+        !allUniqueLocales.has(normalized) &&
+        allUniqueLocales.size >= policy.maxLocales
+      ) {
         return { success: false, error: { type: "max_locales_exceeded", max: policy.maxLocales } };
       }
       onChange({
@@ -765,14 +779,11 @@ export function useFormBuilder({
       if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(normalized)) {
         return { success: false, error: { type: "disallowed_locale", locale: normalized } };
       }
-      const registeredLocales = new Set([
-        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-        ...(schema.supportedLocales ?? [])
-      ]);
+      const allUniqueLocales = collectSchemaLocales(schema).allUniqueLocales;
       if (
-        !registeredLocales.has(normalized) &&
+        !allUniqueLocales.has(normalized) &&
         policy?.maxLocales !== undefined &&
-        registeredLocales.size >= policy.maxLocales
+        allUniqueLocales.size >= policy.maxLocales
       ) {
         return { success: false, error: { type: "max_locales_exceeded", max: policy.maxLocales } };
       }

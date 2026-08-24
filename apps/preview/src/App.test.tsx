@@ -93,6 +93,16 @@ describe("preview application", () => {
     expect(screen.queryAllByLabelText("Display condition")).toHaveLength(0);
   });
 
+  it("demonstrates injected Builder primitives and the ARGS translation action slot", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByLabelText("Use custom Builder UI"));
+    expect(screen.getByRole("button", { name: "Add question" })).toHaveClass("preview-mui-button");
+    expect(screen.getAllByLabelText("Page title")[0]).toHaveClass("preview-mui-input");
+    expect(screen.queryByRole("button", { name: "Translate all text" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Run ARGS AI translation" })).toBeInTheDocument();
+  });
+
   it("switches locale and completes submission-to-analytics flow", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -190,7 +200,7 @@ describe("preview application", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText(/"release": "v2.2.0"/)).toBeInTheDocument();
+    expect(screen.getByText(/"release": "v2.3.0"/)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByLabelText("LocalStorage"));
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());

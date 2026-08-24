@@ -44,6 +44,12 @@ option, text, serialized-byte, allowed-type, and locale constraints. `allowedLoc
 locales, `maxLocales` limits their unique total, and contradictory required/allowed locale policies are reported.
 Required locales cover every source text that exists on the form, its fields, options, and pages.
 
+`collectSchemaLocales(schema)` scans registrations plus every form/page/field/option `translations` and
+`translationMetadata` key. Validation reports unregistered translation locales and applies `allowedLocales` and
+`maxLocales` to the complete collected set. `sanitizeSchema` purges unregistered locale content. Pass
+`{ policy: { allowedLocales, maxLocales } }` to `populateSchemaTranslations` to reject inadmissible targets before the
+translation adapter runs.
+
 Translation callbacks receive `nodeMetadata` and `existingTranslationMetadata` separately. The deprecated `metadata`
 slot property remains an alias for `nodeMetadata` during migration.
 

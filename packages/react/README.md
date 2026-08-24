@@ -72,6 +72,21 @@ controls `pages`, `localization`, and `conditions` authoring surfaces; each defa
 set, locale addition becomes a selector containing only unregistered allowed locales, and the action is disabled at
 `maxLocales`.
 
+Visual Builder has two independent design-system extension layers. `components` replaces normalized primitives such as
+`Button`, `TextInput`, `TextArea`, `Select`, `Checkbox`, `Section`, and `Fieldset`. `slots` replaces complete authoring
+surfaces: `toolbar`, `fieldEditor`, `optionEditor`, `pages`, `localization`, or `translationActions`. Slot props expose
+policy-aware `actions`; a custom `translationActions` slot can therefore call an application-specific AI mutation while
+the standard manual localization editors remain unchanged.
+
+```tsx
+<FormBuilder
+  schema={schema}
+  onChange={setSchema}
+  components={{ Button: MuiButtonAdapter, TextInput: MuiTextFieldAdapter }}
+  slots={{ translationActions: ArgsAiTranslationActions }}
+/>
+```
+
 `FormRenderer` can also be used without an explicit provider:
 
 ```tsx

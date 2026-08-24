@@ -105,6 +105,8 @@ function schema(id = "form", version = 1, title = "title"): FormSchema {
     id,
     version,
     title,
+    defaultLocale: "en",
+    supportedLocales: ["en", "ja"],
     metadata: { owner: "ARGS" },
     translationMetadata: { ja: { title: { provider: "machine" } } },
     fields: [{ id: "answer", type: "text", title: "answer", required: false, metadata: { source: "api" } }]

@@ -234,6 +234,7 @@ describe("React form engine", () => {
       version: 1,
       title: "English title",
       defaultLocale: "en",
+      supportedLocales: ["en", "ja"],
       translations: { ja: { title: "日本語タイトル" } },
       fields: [
         {

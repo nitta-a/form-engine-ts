@@ -1,5 +1,166 @@
-import type { FormField, FormPage, JsonValue, ValidationError } from "@form-engine-ts/core";
-import type { ReactNode } from "react";
+import type {
+  FieldOption,
+  FormField,
+  FormPage,
+  FormPolicy,
+  FormSchema,
+  JsonValue,
+  ValidationError
+} from "@form-engine-ts/core";
+import type { ComponentType, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { FormBuilderResult } from "./hooks/useFormBuilder";
+
+export interface ComponentBaseProps {
+  readonly id?: string;
+  readonly className?: string;
+  readonly disabled?: boolean;
+  readonly readOnly?: boolean;
+  readonly "aria-label"?: string;
+}
+
+export interface BuilderButtonProps extends ComponentBaseProps {
+  readonly onClick?: () => void;
+  readonly variant?: "primary" | "secondary" | "danger";
+  readonly children: ReactNode;
+  readonly title?: string;
+  readonly action?: string;
+  readonly targetId?: string;
+}
+
+export interface BuilderIconButtonProps extends ComponentBaseProps {
+  readonly onClick?: () => void;
+  readonly icon: string;
+  readonly title: string;
+}
+
+export interface BuilderTextInputProps extends ComponentBaseProps {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly placeholder?: string;
+  readonly maxLength?: number;
+  readonly inputMode?: "text" | "numeric";
+  readonly type?: "text" | "number";
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+}
+
+export interface BuilderTextAreaProps extends ComponentBaseProps {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly rows?: number;
+  readonly placeholder?: string;
+  readonly maxLength?: number;
+}
+
+export interface BuilderSelectOption {
+  readonly label: string;
+  readonly value: string;
+  readonly disabled?: boolean;
+}
+
+export interface BuilderSelectProps extends ComponentBaseProps {
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly options: readonly BuilderSelectOption[];
+}
+
+export interface BuilderCheckboxProps extends ComponentBaseProps {
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+  readonly label: string;
+}
+
+export interface BuilderSectionProps {
+  readonly id?: string;
+  readonly className?: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly headingId?: string;
+  readonly "aria-label"?: string;
+  readonly onClickCapture?: (event: ReactMouseEvent<HTMLElement>) => void;
+  readonly children: ReactNode;
+}
+
+export interface BuilderFieldsetProps {
+  readonly className?: string;
+  readonly legend?: string;
+  readonly disabled?: boolean;
+  readonly children: ReactNode;
+}
+
+export interface FormBuilderComponents {
+  readonly Button?: ComponentType<BuilderButtonProps>;
+  readonly IconButton?: ComponentType<BuilderIconButtonProps>;
+  readonly TextInput?: ComponentType<BuilderTextInputProps>;
+  readonly TextArea?: ComponentType<BuilderTextAreaProps>;
+  readonly Select?: ComponentType<BuilderSelectProps>;
+  readonly Checkbox?: ComponentType<BuilderCheckboxProps>;
+  readonly Section?: ComponentType<BuilderSectionProps>;
+  readonly Fieldset?: ComponentType<BuilderFieldsetProps>;
+  readonly ErrorMessage?: ComponentType<{ readonly message: string }>;
+}
+
+export type FormBuilderActions = Omit<FormBuilderResult, "schema" | "validationIssues">;
+
+interface BuilderSlotBaseProps {
+  readonly schema: FormSchema;
+  readonly readOnly: boolean;
+  readonly actions: FormBuilderActions;
+  readonly components: Required<FormBuilderComponents>;
+}
+
+export interface BuilderToolbarSlotProps extends BuilderSlotBaseProps {
+  readonly kind: "page" | "field" | "option";
+  readonly targetId: string;
+  readonly index: number;
+  readonly total: number;
+  readonly title: string;
+  readonly onMoveUp: () => void;
+  readonly onMoveDown: () => void;
+  readonly onRemove: () => void;
+}
+
+export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
+  readonly field: FormField;
+  readonly index: number;
+  readonly currentLocale: string;
+  readonly policy?: FormPolicy;
+}
+
+export interface BuilderOptionEditorSlotProps extends BuilderSlotBaseProps {
+  readonly field: FormField & { readonly options: readonly FieldOption[] };
+  readonly option: FieldOption;
+  readonly index: number;
+  readonly currentLocale: string;
+}
+
+export interface BuilderPagesSlotProps extends BuilderSlotBaseProps {
+  readonly currentLocale: string;
+}
+
+export interface BuilderLocalizationSlotProps extends BuilderSlotBaseProps {
+  readonly currentLocale: string;
+  readonly onCurrentLocaleChange: (locale: string) => void;
+  readonly onAutoTranslate: () => void;
+  readonly isTranslating: boolean;
+  readonly translationError?: string;
+}
+
+export interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps {
+  readonly currentLocale: string;
+  readonly onAutoTranslate: () => void;
+  readonly isTranslating: boolean;
+}
+
+export interface FormBuilderSlots {
+  readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;
+  readonly fieldEditor?: ComponentType<BuilderFieldEditorSlotProps>;
+  readonly optionEditor?: ComponentType<BuilderOptionEditorSlotProps>;
+  readonly pages?: ComponentType<BuilderPagesSlotProps>;
+  readonly localization?: ComponentType<BuilderLocalizationSlotProps>;
+  readonly translationActions?: ComponentType<BuilderTranslationActionsSlotProps>;
+}
 
 export interface BuilderActionContext {
   readonly action:

@@ -1,3 +1,4 @@
+import { collectSchemaLocales } from "./policy";
 import { validateSchemaStructure } from "./sanitization";
 import type {
   DisplayCondition,
@@ -443,31 +444,38 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
       }
     }
   }
-  const registeredLocales = [
-    ...new Set([
-      ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-      ...(schema.supportedLocales ?? [])
-    ])
-  ];
-  if (policy.allowedLocales !== undefined) {
-    if (schema.defaultLocale !== undefined && !policy.allowedLocales.includes(schema.defaultLocale)) {
+  const collectedLocales = collectSchemaLocales(schema);
+  const registeredLocales = new Set([
+    ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+    ...(schema.supportedLocales ?? [])
+  ]);
+  for (const locale of collectedLocales.translationLocales) {
+    if (registeredLocales.has(locale)) continue;
+    for (const path of collectedLocales.translationLocalePaths.get(locale) ?? []) {
       issue(
         issues,
-        "defaultLocale",
-        "disallowed_locale",
-        `Locale ${schema.defaultLocale} is not allowed by the form policy.`
+        path,
+        "unregistered_translation_locale",
+        `Translation locale ${locale} is not registered by defaultLocale or supportedLocales.`
       );
     }
+  }
+  if (policy.allowedLocales !== undefined) {
+    const pathsByLocale = new Map<string, string[]>();
+    if (schema.defaultLocale !== undefined) pathsByLocale.set(schema.defaultLocale, ["defaultLocale"]);
     schema.supportedLocales?.forEach((locale, index) => {
-      if (!policy.allowedLocales?.includes(locale)) {
-        issue(
-          issues,
-          `supportedLocales[${index}]`,
-          "disallowed_locale",
-          `Locale ${locale} is not allowed by the form policy.`
-        );
-      }
+      pathsByLocale.set(locale, [...(pathsByLocale.get(locale) ?? []), `supportedLocales[${index}]`]);
     });
+    for (const [locale, paths] of collectedLocales.translationLocalePaths) {
+      pathsByLocale.set(locale, [...(pathsByLocale.get(locale) ?? []), ...paths]);
+    }
+    for (const [locale, paths] of pathsByLocale) {
+      if (!policy.allowedLocales.includes(locale)) {
+        for (const path of paths) {
+          issue(issues, path, "disallowed_locale", `Locale ${locale} is not allowed by the form policy.`);
+        }
+      }
+    }
     for (const locale of policy.requiredLocales ?? []) {
       if (!policy.allowedLocales.includes(locale)) {
         issue(
@@ -479,7 +487,7 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
       }
     }
   }
-  if (policy.maxLocales !== undefined && registeredLocales.length > policy.maxLocales) {
+  if (policy.maxLocales !== undefined && collectedLocales.allUniqueLocales.size > policy.maxLocales) {
     issue(issues, "supportedLocales", "max_locales_exceeded", `At most ${policy.maxLocales} locales are allowed.`);
   }
   for (const locale of policy.requiredLocales ?? []) addRequiredTranslationIssues(schema, locale, issues);

@@ -17,7 +17,17 @@ import {
   type SelectField,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { FormBuilder, FormProvider, FormRenderer, type FormRendererSlots, useFormBuilder } from "@form-engine-ts/react";
+import {
+  type BuilderButtonProps,
+  type BuilderTextInputProps,
+  type BuilderTranslationActionsSlotProps,
+  FormBuilder,
+  type FormBuilderComponents,
+  FormProvider,
+  FormRenderer,
+  type FormRendererSlots,
+  useFormBuilder
+} from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
@@ -36,6 +46,85 @@ const previewPolicy: FormPolicy = {
   allowedLocales: ["ja", "en"],
   maxLocales: 2
 };
+
+function PreviewMuiButton({
+  children,
+  onClick,
+  disabled,
+  className = "",
+  variant = "secondary",
+  "aria-label": ariaLabel,
+  action,
+  targetId
+}: BuilderButtonProps) {
+  return (
+    <button
+      className={`preview-mui-button preview-mui-button--${variant} ${className}`.trim()}
+      type="button"
+      disabled={disabled}
+      aria-label={ariaLabel}
+      data-builder-action={action}
+      data-target-id={targetId}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PreviewMuiTextInput({
+  id,
+  value,
+  onChange,
+  disabled,
+  readOnly,
+  placeholder,
+  maxLength,
+  type,
+  min,
+  max,
+  step,
+  inputMode,
+  className = "",
+  "aria-label": ariaLabel
+}: BuilderTextInputProps) {
+  return (
+    <input
+      id={id}
+      className={`preview-mui-input ${className}`.trim()}
+      value={value}
+      disabled={disabled}
+      readOnly={readOnly}
+      placeholder={placeholder}
+      maxLength={maxLength}
+      type={type}
+      min={min}
+      max={max}
+      step={step}
+      inputMode={inputMode}
+      aria-label={ariaLabel}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    />
+  );
+}
+
+const previewBuilderComponents: FormBuilderComponents = {
+  Button: PreviewMuiButton,
+  TextInput: PreviewMuiTextInput
+};
+
+function PreviewAiTranslationActions({ currentLocale, readOnly, onAutoTranslate }: BuilderTranslationActionsSlotProps) {
+  return (
+    <button
+      className="preview-ai-translation"
+      type="button"
+      disabled={readOnly || currentLocale.length === 0}
+      onClick={onAutoTranslate}
+    >
+      Run ARGS AI translation
+    </button>
+  );
+}
 
 function HeadlessBuilderDemo({
   schema,
@@ -442,6 +531,7 @@ export default function App() {
   const [pagesEnabled, setPagesEnabled] = useState(true);
   const [localizationEnabled, setLocalizationEnabled] = useState(true);
   const [conditionsEnabled, setConditionsEnabled] = useState(true);
+  const [useCustomBuilderUi, setUseCustomBuilderUi] = useState(false);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [resetStatus, setResetStatus] = useState<{
     readonly kind: "success" | "error";
@@ -709,6 +799,14 @@ export default function App() {
                   />
                   Conditions feature
                 </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={useCustomBuilderUi}
+                    onChange={(event) => setUseCustomBuilderUi(event.currentTarget.checked)}
+                  />
+                  Use custom Builder UI
+                </label>
               </fieldset>
               {builderActionStatus === null ? null : (
                 <p className="builder-action-status" role="status">
@@ -729,6 +827,12 @@ export default function App() {
                   localization: localizationEnabled,
                   conditions: conditionsEnabled
                 }}
+                {...(useCustomBuilderUi
+                  ? {
+                      components: previewBuilderComponents,
+                      slots: { translationActions: PreviewAiTranslationActions }
+                    }
+                  : {})}
                 translationOptions={{
                   overwrite: translationOverwrite,
                   createMetadata: (slot) => ({ source: "visual-builder", property: slot.property })
