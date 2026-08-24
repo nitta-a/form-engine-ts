@@ -56,7 +56,7 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security, v2 extensibility, and v2.1 authoring APIs
+### v1.1.1 security, v2 extensibility, and v2.2 authoring APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
@@ -73,6 +73,11 @@ from existing per-locale metadata, while Renderer adds page-header and submit-er
 The v2.1.1 patch adds Visual Builder `defaultFieldType`, typed `onActionError` notifications, and manual-translation
 metadata creation. Its automatic translation default is now consistently `missing-only`, and field creation is disabled
 when policy permits no type or the field limit is reached.
+
+v2.2 adds `readOnly` and per-surface `features` controls to Visual Builder. `FormPolicy.allowedLocales` and `maxLocales`
+now constrain schema validation and the headless/visual locale actions; allowed locale additions are presented as an
+unregistered-locale selector. Page updates and locale mutations use the same typed `onActionError` pipeline as every
+other visual action.
 
 ### Define and render a form
 
@@ -372,7 +377,7 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応、v2拡張、v2.1編集API
+### v1.1.1セキュリティ対応、v2拡張、v2.2編集API
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
@@ -387,6 +392,10 @@ v2.1では`FormPolicy`とポリシー対応`validateFormSchema`をCoreへ移し�
 
 v2.1.1パッチではVisual Builderに`defaultFieldType`、型付き`onActionError`通知、手動翻訳metadata生成を追加しました。
 自動翻訳の既定値を`missing-only`へ統一し、ポリシー上追加可能な型がない場合や設問上限到達時は追加を無効化します。
+
+v2.2ではVisual Builderに`readOnly`と表示領域別の`features`制御を追加しました。`FormPolicy.allowedLocales`と
+`maxLocales`はスキーマ検証およびHeadless/Visual Builderの言語操作に適用され、許可ロケールは未登録候補から選択できます。
+ページ更新と言語操作も他のVisual actionと同じ型付き`onActionError`パイプラインを通ります。
 
 ### フォームの定義とレンダリング
 

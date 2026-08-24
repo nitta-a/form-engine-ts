@@ -55,7 +55,7 @@ batch-translation action.
 
 `useFormBuilder({ schema, onChange, policy, idFactory, factories })` exposes controlled field, option, page, condition,
 source-text, and localized-text actions. Core's `FormPolicy` enforces allowed field types, field/option limits, text and
-schema-byte limits, and required locales identically in browser and server code. Every mutation returns a typed
+schema-byte limits, and required/allowed/maximum locale constraints identically in browser and server code. Every mutation returns a typed
 `BuilderActionResult`; invalid, empty, or duplicate generated IDs leave the schema unchanged. `BuilderFactories` injects
 initial field, option, and page shapes. `<FormBuilder>` delegates its UI mutations to this hook and accepts the same
 options. Its completion-message editors cover both source and locale text. `translationOptions` and
@@ -66,6 +66,11 @@ Visual-builder field creation uses `defaultFieldType` when it is allowed, otherw
 `onActionError` receives typed failures from visual headless actions, and `createManualTranslationMetadata` can attach
 per-locale/property metadata to manual edits. Automatic translation defaults to `overwrite: "missing-only"`; explicitly
 pass `{ overwrite: "all" }` to replace existing translations.
+
+Pass `readOnly` to keep the complete builder visible while disabling every mutation. The `features` prop independently
+controls `pages`, `localization`, and `conditions` authoring surfaces; each defaults to `true`. When `allowedLocales` is
+set, locale addition becomes a selector containing only unregistered allowed locales, and the action is disabled at
+`maxLocales`.
 
 `FormRenderer` can also be used without an explicit provider:
 

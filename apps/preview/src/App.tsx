@@ -32,7 +32,9 @@ const previewPolicy: FormPolicy = {
   maxFields: 20,
   maxOptionsPerField: 10,
   maxTextLength: 500,
-  requiredLocales: ["ja", "en"]
+  requiredLocales: ["ja", "en"],
+  allowedLocales: ["ja", "en"],
+  maxLocales: 2
 };
 
 function HeadlessBuilderDemo({
@@ -57,7 +59,7 @@ function HeadlessBuilderDemo({
   const coreIssueCount = coreValidation.valid ? 0 : coreValidation.issues.length;
   return (
     <fieldset className="headless-builder-demo">
-      <legend>v2.1 Headless Builder &amp; Core Policy</legend>
+      <legend>v2.2 Headless Builder &amp; Core Policy</legend>
       <output data-testid="policy-parity">
         Core {coreIssueCount} / React {builder.validationIssues.length}
       </output>
@@ -436,6 +438,10 @@ export default function App() {
   const [translationOverwrite, setTranslationOverwrite] = useState<"missing-only" | "all">("missing-only");
   const [translationReport, setTranslationReport] = useState<string | null>(null);
   const [builderActionStatus, setBuilderActionStatus] = useState<string | null>(null);
+  const [builderReadOnly, setBuilderReadOnly] = useState(false);
+  const [pagesEnabled, setPagesEnabled] = useState(true);
+  const [localizationEnabled, setLocalizationEnabled] = useState(true);
+  const [conditionsEnabled, setConditionsEnabled] = useState(true);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [resetStatus, setResetStatus] = useState<{
     readonly kind: "success" | "error";
@@ -669,6 +675,41 @@ export default function App() {
                 {translationReport === null ? null : <output>{translationReport}</output>}
               </fieldset>
               <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
+              <fieldset className="renderer-demo-controls">
+                <legend>v2.2 Builder capabilities</legend>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={builderReadOnly}
+                    onChange={(event) => setBuilderReadOnly(event.currentTarget.checked)}
+                  />
+                  Read-only builder
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={pagesEnabled}
+                    onChange={(event) => setPagesEnabled(event.currentTarget.checked)}
+                  />
+                  Pages feature
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={localizationEnabled}
+                    onChange={(event) => setLocalizationEnabled(event.currentTarget.checked)}
+                  />
+                  Localization feature
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={conditionsEnabled}
+                    onChange={(event) => setConditionsEnabled(event.currentTarget.checked)}
+                  />
+                  Conditions feature
+                </label>
+              </fieldset>
               {builderActionStatus === null ? null : (
                 <p className="builder-action-status" role="status">
                   {builderActionStatus}
@@ -682,6 +723,12 @@ export default function App() {
                 onChange={changeSchema}
                 policy={previewPolicy}
                 defaultFieldType="textarea"
+                readOnly={builderReadOnly}
+                features={{
+                  pages: pagesEnabled,
+                  localization: localizationEnabled,
+                  conditions: conditionsEnabled
+                }}
                 translationOptions={{
                   overwrite: translationOverwrite,
                   createMetadata: (slot) => ({ source: "visual-builder", property: slot.property })

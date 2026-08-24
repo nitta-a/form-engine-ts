@@ -443,6 +443,45 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
       }
     }
   }
+  const registeredLocales = [
+    ...new Set([
+      ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+      ...(schema.supportedLocales ?? [])
+    ])
+  ];
+  if (policy.allowedLocales !== undefined) {
+    if (schema.defaultLocale !== undefined && !policy.allowedLocales.includes(schema.defaultLocale)) {
+      issue(
+        issues,
+        "defaultLocale",
+        "disallowed_locale",
+        `Locale ${schema.defaultLocale} is not allowed by the form policy.`
+      );
+    }
+    schema.supportedLocales?.forEach((locale, index) => {
+      if (!policy.allowedLocales?.includes(locale)) {
+        issue(
+          issues,
+          `supportedLocales[${index}]`,
+          "disallowed_locale",
+          `Locale ${locale} is not allowed by the form policy.`
+        );
+      }
+    });
+    for (const locale of policy.requiredLocales ?? []) {
+      if (!policy.allowedLocales.includes(locale)) {
+        issue(
+          issues,
+          "policy.requiredLocales",
+          "required_locale_not_allowed",
+          `Required locale ${locale} is not included in allowedLocales.`
+        );
+      }
+    }
+  }
+  if (policy.maxLocales !== undefined && registeredLocales.length > policy.maxLocales) {
+    issue(issues, "supportedLocales", "max_locales_exceeded", `At most ${policy.maxLocales} locales are allowed.`);
+  }
   for (const locale of policy.requiredLocales ?? []) addRequiredTranslationIssues(schema, locale, issues);
   if (policy.maxSchemaBytes !== undefined) {
     try {

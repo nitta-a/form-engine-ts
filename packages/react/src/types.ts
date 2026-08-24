@@ -15,7 +15,10 @@ export interface BuilderActionContext {
     | "addPage"
     | "removePage"
     | "movePage"
+    | "updatePage"
     | "assignFieldToPage"
+    | "addLocale"
+    | "setDefaultLocale"
     | "setDisplayCondition"
     | "setSourceText"
     | "setLocaleTranslation";

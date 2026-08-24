@@ -80,6 +80,19 @@ describe("preview application", () => {
     await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent("preview-manual"));
   });
 
+  it("demonstrates read-only and feature-scoped builder modes", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByLabelText("Read-only builder"));
+    expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
+    await user.click(screen.getByLabelText("Pages feature"));
+    await user.click(screen.getByLabelText("Localization feature"));
+    await user.click(screen.getByLabelText("Conditions feature"));
+    expect(screen.queryByRole("heading", { name: "Page manager" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Localization" })).not.toBeInTheDocument();
+    expect(screen.queryAllByLabelText("Display condition")).toHaveLength(0);
+  });
+
   it("switches locale and completes submission-to-analytics flow", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -177,7 +190,7 @@ describe("preview application", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText(/"release": "v2.1.1"/)).toBeInTheDocument();
+    expect(screen.getByText(/"release": "v2.2.0"/)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByLabelText("LocalStorage"));
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());

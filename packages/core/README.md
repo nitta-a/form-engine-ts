@@ -40,8 +40,9 @@ round-trips. `completionMessage` is localized with the rest of the form text.
 
 `transformFieldType` changes a question's type without discarding source text, translations, conditions, or extension
 metadata. `validateFormSchema(schema, { policy })` applies the framework-independent `FormPolicy`, including field,
-option, text, serialized-byte, allowed-type, and required-locale constraints. Required locales cover every source text
-that exists on the form, its fields, options, and pages.
+option, text, serialized-byte, allowed-type, and locale constraints. `allowedLocales` constrains the default and supported
+locales, `maxLocales` limits their unique total, and contradictory required/allowed locale policies are reported.
+Required locales cover every source text that exists on the form, its fields, options, and pages.
 
 Translation callbacks receive `nodeMetadata` and `existingTranslationMetadata` separately. The deprecated `metadata`
 slot property remains an alias for `nodeMetadata` during migration.

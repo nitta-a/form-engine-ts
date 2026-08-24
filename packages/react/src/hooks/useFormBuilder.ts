@@ -42,6 +42,8 @@ export type BuilderActionError =
   | { readonly type: "max_options_exceeded"; readonly max: number }
   | { readonly type: "max_text_length_exceeded"; readonly max: number }
   | { readonly type: "disallowed_field_type"; readonly fieldType: QuestionType }
+  | { readonly type: "disallowed_locale"; readonly locale: string }
+  | { readonly type: "max_locales_exceeded"; readonly max: number }
   | { readonly type: "node_not_found"; readonly kind: BuilderTextTarget["kind"]; readonly id: string }
   | { readonly type: "invalid_operation"; readonly message: string };
 
@@ -240,10 +242,16 @@ export function useFormBuilder({
       if (pages === undefined) return { success: false, error: { type: "node_not_found", kind: "page", id: pageId } };
       const updated = updater(page);
       if (updated.id !== pageId) return { success: false, error: { type: "invalid_id", kind: "page", id: updated.id } };
+      for (const text of [updated.title, updated.description]) {
+        if (text !== undefined) {
+          const error = textPolicyError(text);
+          if (error !== undefined) return error;
+        }
+      }
       onChange({ ...schema, pages: pages.map((candidate) => (candidate.id === pageId ? updated : candidate)) });
       return { success: true };
     },
-    [onChange, schema]
+    [onChange, schema, textPolicyError]
   );
 
   const addField = useCallback(
@@ -723,6 +731,17 @@ export function useFormBuilder({
       const normalized = locale.trim();
       if (normalized.length === 0)
         return { success: false, error: { type: "invalid_operation", message: "Locale must not be empty." } };
+      if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(normalized)) {
+        return { success: false, error: { type: "disallowed_locale", locale: normalized } };
+      }
+      const registeredLocales = new Set([
+        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+        ...(schema.supportedLocales ?? [])
+      ]);
+      if (registeredLocales.has(normalized)) return { success: true };
+      if (policy?.maxLocales !== undefined && registeredLocales.size >= policy.maxLocales) {
+        return { success: false, error: { type: "max_locales_exceeded", max: policy.maxLocales } };
+      }
       onChange({
         ...schema,
         supportedLocales: [
@@ -735,7 +754,7 @@ export function useFormBuilder({
       });
       return { success: true };
     },
-    [onChange, schema]
+    [onChange, policy?.allowedLocales, policy?.maxLocales, schema]
   );
 
   const setDefaultLocale = useCallback(
@@ -743,6 +762,20 @@ export function useFormBuilder({
       const normalized = locale.trim();
       if (normalized.length === 0)
         return { success: false, error: { type: "invalid_operation", message: "Locale must not be empty." } };
+      if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(normalized)) {
+        return { success: false, error: { type: "disallowed_locale", locale: normalized } };
+      }
+      const registeredLocales = new Set([
+        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+        ...(schema.supportedLocales ?? [])
+      ]);
+      if (
+        !registeredLocales.has(normalized) &&
+        policy?.maxLocales !== undefined &&
+        registeredLocales.size >= policy.maxLocales
+      ) {
+        return { success: false, error: { type: "max_locales_exceeded", max: policy.maxLocales } };
+      }
       onChange({
         ...schema,
         defaultLocale: normalized,
@@ -750,7 +783,7 @@ export function useFormBuilder({
       });
       return { success: true };
     },
-    [onChange, schema]
+    [onChange, policy?.allowedLocales, policy?.maxLocales, schema]
   );
 
   const validationIssues = useMemo(() => {

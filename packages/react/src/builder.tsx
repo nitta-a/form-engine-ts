@@ -189,6 +189,12 @@ export function resolveInitialFieldType(
   return null;
 }
 
+export interface FormBuilderFeatures {
+  readonly pages?: boolean;
+  readonly localization?: boolean;
+  readonly conditions?: boolean;
+}
+
 export interface FormBuilderProps {
   readonly schema: FormSchema;
   readonly onChange: (newSchema: FormSchema) => void;
@@ -206,6 +212,8 @@ export interface FormBuilderProps {
   readonly createManualTranslationMetadata?: (
     context: ManualTranslationContext
   ) => Readonly<Record<string, JsonValue>> | undefined;
+  readonly readOnly?: boolean;
+  readonly features?: FormBuilderFeatures;
 }
 
 export function FormBuilder({
@@ -222,7 +230,9 @@ export function FormBuilder({
   className = "",
   defaultFieldType,
   onActionError,
-  createManualTranslationMetadata
+  createManualTranslationMetadata,
+  readOnly = false,
+  features
 }: FormBuilderProps) {
   const headless = useFormBuilder({
     schema,
@@ -240,24 +250,29 @@ export function FormBuilder({
     const translated = translator?.translate(key, locale, params);
     return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
   };
-  const executeAction = (result: BuilderActionResult, context: BuilderActionContext): BuilderActionResult => {
+  const pagesEnabled = features?.pages ?? true;
+  const localizationEnabled = features?.localization ?? true;
+  const conditionsEnabled = features?.conditions ?? true;
+  const executeAction = (run: () => BuilderActionResult, context: BuilderActionContext): BuilderActionResult => {
+    if (readOnly) return { success: true };
+    const result = run();
     if (!result.success) onActionError?.(result.error, context);
     return result;
   };
   const updateField = (fieldId: string, updater: (field: FormField) => FormField, params?: Record<string, unknown>) =>
-    executeAction(headless.updateField(fieldId, updater), {
+    executeAction(() => headless.updateField(fieldId, updater), {
       action: "updateField",
       targetId: fieldId,
       ...(params === undefined ? {} : { params })
     });
   const changeType = (fieldId: string, type: FieldType) =>
-    executeAction(headless.changeFieldType(fieldId, type), {
+    executeAction(() => headless.changeFieldType(fieldId, type), {
       action: "changeFieldType",
       targetId: fieldId,
       params: { type }
     });
   const removeField = (fieldId: string) =>
-    executeAction(headless.removeField(fieldId), { action: "removeField", targetId: fieldId });
+    executeAction(() => headless.removeField(fieldId), { action: "removeField", targetId: fieldId });
   const initialFieldType = resolveInitialFieldType(defaultFieldType, policy?.allowedFieldTypes);
   const maxFieldsReached = policy?.maxFields !== undefined && schema.fields.length >= policy.maxFields;
 
@@ -265,7 +280,7 @@ export function FormBuilder({
     const target = index + offset;
     const field = schema.fields[index];
     if (field !== undefined) {
-      executeAction(headless.moveField(field.id, target), {
+      executeAction(() => headless.moveField(field.id, target), {
         action: "moveField",
         targetId: field.id,
         params: { targetIndex: target }
@@ -275,11 +290,11 @@ export function FormBuilder({
 
   const addField = () => {
     if (initialFieldType === null) return;
-    executeAction(headless.addField(initialFieldType), { action: "addField" });
+    executeAction(() => headless.addField(initialFieldType), { action: "addField" });
   };
 
   const enablePages = () => {
-    if (schema.pages === undefined) executeAction(headless.addPage(), { action: "addPage" });
+    if (schema.pages === undefined) executeAction(() => headless.addPage(), { action: "addPage" });
   };
 
   const pageForField = (fieldId: string) => schema.pages?.find((page) => page.questionIds.includes(fieldId));
@@ -293,7 +308,7 @@ export function FormBuilder({
     }
     const questionId = movablePageQuestions.includes(newPageQuestionId) ? newPageQuestionId : movablePageQuestions[0];
     if (questionId === undefined) return;
-    executeAction(headless.addPage(questionId), {
+    executeAction(() => headless.addPage(questionId), {
       action: "addPage",
       targetId: questionId,
       params: { questionId }
@@ -303,14 +318,15 @@ export function FormBuilder({
 
   const removePage = (pageIndex: number) => {
     const page = schema.pages?.[pageIndex];
-    if (page !== undefined) executeAction(headless.removePage(page.id), { action: "removePage", targetId: page.id });
+    if (page !== undefined)
+      executeAction(() => headless.removePage(page.id), { action: "removePage", targetId: page.id });
   };
 
   const movePage = (pageIndex: number, offset: -1 | 1) => {
     const target = pageIndex + offset;
     const page = schema.pages?.[pageIndex];
     if (page !== undefined) {
-      executeAction(headless.movePage(page.id, target), {
+      executeAction(() => headless.movePage(page.id, target), {
         action: "movePage",
         targetId: page.id,
         params: { targetIndex: target }
@@ -322,11 +338,14 @@ export function FormBuilder({
     pageId: string,
     update: (page: NonNullable<FormSchema["pages"]>[number]) => NonNullable<FormSchema["pages"]>[number]
   ) => {
-    headless.updatePage(pageId, update);
+    executeAction(() => headless.updatePage(pageId, update), {
+      action: "updatePage",
+      targetId: pageId
+    });
   };
 
   const assignFieldToPage = (fieldId: string, pageId: string) => {
-    executeAction(headless.assignFieldToPage(fieldId, pageId), {
+    executeAction(() => headless.assignFieldToPage(fieldId, pageId), {
       action: "assignFieldToPage",
       targetId: fieldId,
       params: { pageId }
@@ -334,15 +353,26 @@ export function FormBuilder({
   };
 
   const addLocale = () => {
+    if (readOnly) return;
     const normalized = newLocale.trim();
     if (normalized.length === 0) return;
-    headless.addLocale(normalized);
+    const result = executeAction(() => headless.addLocale(normalized), {
+      action: "addLocale",
+      params: { locale: normalized }
+    });
+    if (!result.success) return;
     setEditingLocale(normalized);
     setNewLocale("");
   };
 
+  const setDefaultLocale = (locale: string) =>
+    executeAction(() => headless.setDefaultLocale(locale), {
+      action: "setDefaultLocale",
+      params: { locale }
+    });
+
   const translateAll = async () => {
-    if (translationAdapter === undefined || editingLocale.length === 0) return;
+    if (readOnly || translationAdapter === undefined || editingLocale.length === 0) return;
     setIsTranslating(true);
     setTranslationError(null);
     try {
@@ -360,17 +390,19 @@ export function FormBuilder({
   };
 
   const updateManualTranslation = (context: ManualTranslationContext) => {
+    if (readOnly) return;
     const metadata = createManualTranslationMetadata?.(context);
     const target =
       context.kind === "form" ? ({ kind: "form" } as const) : ({ kind: context.kind, id: context.nodeId } as const);
     executeAction(
-      headless.setLocaleTranslation(
-        context.locale,
-        target,
-        context.property,
-        context.translatedText,
-        metadata === undefined ? undefined : { metadata }
-      ),
+      () =>
+        headless.setLocaleTranslation(
+          context.locale,
+          target,
+          context.property,
+          context.translatedText,
+          metadata === undefined ? undefined : { metadata }
+        ),
       {
         action: "setLocaleTranslation",
         targetId: context.nodeId,
@@ -395,46 +427,56 @@ export function FormBuilder({
   };
 
   const setSourceText = (target: BuilderTextTarget, property: string, text: string) =>
-    executeAction(headless.setSourceText(target, property, text), {
+    executeAction(() => headless.setSourceText(target, property, text), {
       action: "setSourceText",
       ...(target.id === undefined ? {} : { targetId: target.id }),
       params: { kind: target.kind, property }
     });
   const updateOption = (fieldId: string, optionId: string, label: string) =>
-    executeAction(
-      headless.updateOption(fieldId, optionId, (option) => ({ ...option, label })),
-      { action: "updateOption", targetId: optionId, params: { fieldId } }
-    );
+    executeAction(() => headless.updateOption(fieldId, optionId, (option) => ({ ...option, label })), {
+      action: "updateOption",
+      targetId: optionId,
+      params: { fieldId }
+    });
   const addOption = (fieldId: string) =>
-    executeAction(headless.addOption(fieldId), { action: "addOption", targetId: fieldId });
+    executeAction(() => headless.addOption(fieldId), { action: "addOption", targetId: fieldId });
   const removeOption = (fieldId: string, optionId: string) =>
-    executeAction(headless.removeOption(fieldId, optionId), {
+    executeAction(() => headless.removeOption(fieldId, optionId), {
       action: "removeOption",
       targetId: optionId,
       params: { fieldId }
     });
   const moveOption = (fieldId: string, optionId: string, targetIndex: number) =>
-    executeAction(headless.moveOption(fieldId, optionId, targetIndex), {
+    executeAction(() => headless.moveOption(fieldId, optionId, targetIndex), {
       action: "moveOption",
       targetId: optionId,
       params: { fieldId, targetIndex }
     });
   const setDisplayCondition = (fieldId: string, condition?: DisplayCondition) =>
-    executeAction(headless.setDisplayCondition(fieldId, condition), {
+    executeAction(() => headless.setDisplayCondition(fieldId, condition), {
       action: "setDisplayCondition",
       targetId: fieldId,
       ...(condition === undefined ? {} : { params: { condition } })
     });
+  const registeredLocales = new Set([
+    ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+    ...(schema.supportedLocales ?? [])
+  ]);
+  const availableAllowedLocales = policy?.allowedLocales?.filter((candidate) => !registeredLocales.has(candidate));
+  const localeLimitReached = policy?.maxLocales !== undefined && registeredLocales.size >= policy.maxLocales;
 
   return (
     <section
       className={`form-engine-builder ${className}`.trim()}
       aria-label={translate("builder.formBuilder")}
       onClickCapture={(event) => {
+        if (readOnly) return;
         if (!(event.target instanceof HTMLElement)) return;
         const actionTarget = event.target.closest<HTMLElement>("[data-builder-action]");
         if (actionTarget?.dataset.builderAction === "addField" && maxFieldsReached && initialFieldType !== null)
           addField();
+        if (actionTarget?.dataset.builderAction === "addLocale" && localeLimitReached && newLocale.trim().length > 0)
+          addLocale();
         if (actionTarget?.dataset.builderAction !== "addOption") return;
         const fieldId = actionTarget.dataset.targetId;
         const field = schema.fields.find((candidate) => candidate.id === fieldId);
@@ -449,163 +491,621 @@ export function FormBuilder({
         }
       }}
     >
-      <section className="form-engine-builder__pages" aria-labelledby="builder-pages-heading">
-        <h2 id="builder-pages-heading">{translate("builder.pages")}</h2>
-        {schema.pages === undefined ? (
-          <button type="button" onClick={enablePages}>
-            {translate("builder.enablePages")}
-          </button>
-        ) : (
-          <>
-            {schema.pages.map((page, pageIndex) => {
-              const priorQuestionIds = new Set(schema.pages?.slice(0, pageIndex).flatMap((item) => item.questionIds));
-              const availableSources = schema.fields.filter((field) => priorQuestionIds.has(field.id));
-              const source = schema.fields.find((field) => field.id === page.displayCondition?.questionId);
-              return (
-                <fieldset className="form-engine-builder__page" key={page.id}>
-                  <legend>{page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}</legend>
-                  <div className="form-engine-builder__toolbar">
-                    <button
-                      type="button"
-                      disabled={pageIndex === 0}
-                      aria-label={translate("builder.moveUp", { title: page.title ?? page.id })}
-                      onClick={() => movePage(pageIndex, -1)}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pageIndex === (schema.pages?.length ?? 0) - 1}
-                      aria-label={translate("builder.moveDown", { title: page.title ?? page.id })}
-                      onClick={() => movePage(pageIndex, 1)}
-                    >
-                      ↓
-                    </button>
-                    <button type="button" onClick={() => removePage(pageIndex)}>
-                      {translate("builder.deleteAction")}
-                    </button>
-                  </div>
-                  <div className="form-engine-builder__grid">
-                    <label>
-                      {translate("builder.pageTitle")}
-                      <input
-                        value={page.title ?? ""}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          updatePage(page.id, (current) => {
-                            if (value.length > 0) return { ...current, title: value };
-                            const { title: _title, ...withoutTitle } = current;
-                            return withoutTitle;
-                          });
-                        }}
-                      />
-                    </label>
-                    <label>
-                      {translate("builder.pageDescription")}
-                      <input
-                        value={page.description ?? ""}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          updatePage(page.id, (current) => {
-                            if (value.length > 0) return { ...current, description: value };
-                            const { description: _description, ...withoutDescription } = current;
-                            return withoutDescription;
-                          });
-                        }}
-                      />
-                    </label>
-                  </div>
-                  {editingLocale.length === 0 ? null : (
-                    <div className="form-engine-builder__translation-editor">
-                      <strong>{editingLocale}</strong>
+      <fieldset className="form-engine-builder__controls" disabled={readOnly}>
+        {pagesEnabled ? (
+          <section className="form-engine-builder__pages" aria-labelledby="builder-pages-heading">
+            <h2 id="builder-pages-heading">{translate("builder.pages")}</h2>
+            {schema.pages === undefined ? (
+              <button type="button" onClick={enablePages}>
+                {translate("builder.enablePages")}
+              </button>
+            ) : (
+              <>
+                {schema.pages.map((page, pageIndex) => {
+                  const priorQuestionIds = new Set(
+                    schema.pages?.slice(0, pageIndex).flatMap((item) => item.questionIds)
+                  );
+                  const availableSources = schema.fields.filter((field) => priorQuestionIds.has(field.id));
+                  const source = schema.fields.find((field) => field.id === page.displayCondition?.questionId);
+                  return (
+                    <fieldset className="form-engine-builder__page" key={page.id}>
+                      <legend>{page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}</legend>
+                      <div className="form-engine-builder__toolbar">
+                        <button
+                          type="button"
+                          disabled={pageIndex === 0}
+                          aria-label={translate("builder.moveUp", { title: page.title ?? page.id })}
+                          onClick={() => movePage(pageIndex, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pageIndex === (schema.pages?.length ?? 0) - 1}
+                          aria-label={translate("builder.moveDown", { title: page.title ?? page.id })}
+                          onClick={() => movePage(pageIndex, 1)}
+                        >
+                          ↓
+                        </button>
+                        <button type="button" onClick={() => removePage(pageIndex)}>
+                          {translate("builder.deleteAction")}
+                        </button>
+                      </div>
                       <div className="form-engine-builder__grid">
                         <label>
                           {translate("builder.pageTitle")}
                           <input
-                            value={page.translations?.[editingLocale]?.title ?? ""}
-                            onChange={(event) =>
-                              updateManualTranslation({
-                                locale: editingLocale,
-                                kind: "page",
-                                nodeId: page.id,
-                                property: "title",
-                                sourceText: page.title ?? "",
-                                translatedText: event.currentTarget.value,
-                                ...(page.translationMetadata?.[editingLocale]?.title === undefined
-                                  ? {}
-                                  : {
-                                      existingTranslationMetadata: page.translationMetadata[editingLocale]?.title
-                                    })
-                              })
-                            }
+                            value={page.title ?? ""}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              updatePage(page.id, (current) => {
+                                if (value.length > 0) return { ...current, title: value };
+                                const { title: _title, ...withoutTitle } = current;
+                                return withoutTitle;
+                              });
+                            }}
                           />
                         </label>
                         <label>
                           {translate("builder.pageDescription")}
                           <input
-                            value={page.translations?.[editingLocale]?.description ?? ""}
-                            onChange={(event) =>
-                              updateManualTranslation({
-                                locale: editingLocale,
-                                kind: "page",
-                                nodeId: page.id,
-                                property: "description",
-                                sourceText: page.description ?? "",
-                                translatedText: event.currentTarget.value,
-                                ...(page.translationMetadata?.[editingLocale]?.description === undefined
-                                  ? {}
-                                  : {
-                                      existingTranslationMetadata: page.translationMetadata[editingLocale]?.description
-                                    })
-                              })
-                            }
+                            value={page.description ?? ""}
+                            onChange={(event) => {
+                              const value = event.currentTarget.value;
+                              updatePage(page.id, (current) => {
+                                if (value.length > 0) return { ...current, description: value };
+                                const { description: _description, ...withoutDescription } = current;
+                                return withoutDescription;
+                              });
+                            }}
                           />
                         </label>
                       </div>
+                      {!localizationEnabled || editingLocale.length === 0 ? null : (
+                        <div className="form-engine-builder__translation-editor">
+                          <strong>{editingLocale}</strong>
+                          <div className="form-engine-builder__grid">
+                            <label>
+                              {translate("builder.pageTitle")}
+                              <input
+                                value={page.translations?.[editingLocale]?.title ?? ""}
+                                onChange={(event) =>
+                                  updateManualTranslation({
+                                    locale: editingLocale,
+                                    kind: "page",
+                                    nodeId: page.id,
+                                    property: "title",
+                                    sourceText: page.title ?? "",
+                                    translatedText: event.currentTarget.value,
+                                    ...(page.translationMetadata?.[editingLocale]?.title === undefined
+                                      ? {}
+                                      : {
+                                          existingTranslationMetadata: page.translationMetadata[editingLocale]?.title
+                                        })
+                                  })
+                                }
+                              />
+                            </label>
+                            <label>
+                              {translate("builder.pageDescription")}
+                              <input
+                                value={page.translations?.[editingLocale]?.description ?? ""}
+                                onChange={(event) =>
+                                  updateManualTranslation({
+                                    locale: editingLocale,
+                                    kind: "page",
+                                    nodeId: page.id,
+                                    property: "description",
+                                    sourceText: page.description ?? "",
+                                    translatedText: event.currentTarget.value,
+                                    ...(page.translationMetadata?.[editingLocale]?.description === undefined
+                                      ? {}
+                                      : {
+                                          existingTranslationMetadata:
+                                            page.translationMetadata[editingLocale]?.description
+                                        })
+                                  })
+                                }
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                      {conditionsEnabled ? (
+                        <div className="form-engine-builder__condition">
+                          <label>
+                            {translate("builder.pageCondition")}
+                            <select
+                              value={page.displayCondition?.questionId ?? ""}
+                              onChange={(event) => {
+                                const selected = schema.fields.find((field) => field.id === event.currentTarget.value);
+                                updatePage(page.id, (current) => {
+                                  if (selected === undefined) {
+                                    const { displayCondition: _condition, ...withoutCondition } = current;
+                                    return withoutCondition;
+                                  }
+                                  return {
+                                    ...current,
+                                    displayCondition: conditionWithValue(
+                                      selected.id,
+                                      conditionOperators(selected)[0] ?? "not_empty",
+                                      defaultConditionValue(selected)
+                                    )
+                                  };
+                                });
+                              }}
+                            >
+                              <option value="">{translate("builder.alwaysVisible")}</option>
+                              {availableSources.map((field) => (
+                                <option value={field.id} key={field.id}>
+                                  {field.title}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {page.displayCondition !== undefined && source !== undefined ? (
+                            <>
+                              <select
+                                aria-label={translate("builder.conditionOperator")}
+                                value={page.displayCondition.operator}
+                                onChange={(event) => {
+                                  const operator = event.currentTarget.value as ConditionOperator;
+                                  updatePage(page.id, (current) => ({
+                                    ...current,
+                                    displayCondition: conditionWithValue(
+                                      source.id,
+                                      operator,
+                                      defaultConditionValue(source)
+                                    )
+                                  }));
+                                }}
+                              >
+                                {conditionOperators(source).map((operator) => (
+                                  <option key={operator} value={operator}>
+                                    {translate(operatorKey(operator))}
+                                  </option>
+                                ))}
+                              </select>
+                              <ConditionValueEditor
+                                source={source}
+                                condition={page.displayCondition}
+                                onChange={(condition) =>
+                                  updatePage(page.id, (current) => ({ ...current, displayCondition: condition }))
+                                }
+                                translate={translate}
+                              />
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </fieldset>
+                  );
+                })}
+                <div className="form-engine-builder__page-add">
+                  <label>
+                    {translate("builder.pageQuestion")}
+                    <select
+                      value={newPageQuestionId}
+                      disabled={movablePageQuestions.length === 0}
+                      onChange={(event) => setNewPageQuestionId(event.currentTarget.value)}
+                    >
+                      <option value="">—</option>
+                      {schema.fields
+                        .filter((field) => movablePageQuestions.includes(field.id))
+                        .map((field) => (
+                          <option key={field.id} value={field.id}>
+                            {field.title}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button type="button" disabled={movablePageQuestions.length === 0} onClick={addPage}>
+                    {translate("builder.addPage")}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        ) : null}
+
+        {localizationEnabled ? (
+          <section className="form-engine-builder__localization" aria-labelledby="builder-localization-heading">
+            <h2 id="builder-localization-heading">{translate("builder.localization")}</h2>
+            <label>
+              {translate("builder.completionMessage")}
+              <input
+                value={schema.completionMessage ?? ""}
+                onChange={(event) => setSourceText({ kind: "form" }, "completionMessage", event.currentTarget.value)}
+              />
+            </label>
+            <div className="form-engine-builder__grid">
+              <label>
+                {translate("builder.defaultLocale")}
+                <input
+                  value={schema.defaultLocale ?? ""}
+                  onChange={(event) => setDefaultLocale(event.currentTarget.value)}
+                />
+              </label>
+              <label htmlFor="builder-new-locale">
+                {translate("builder.addLocale")}
+                {availableAllowedLocales === undefined ? (
+                  <input
+                    id="builder-new-locale"
+                    value={newLocale}
+                    onChange={(event) => setNewLocale(event.currentTarget.value)}
+                  />
+                ) : (
+                  <select
+                    id="builder-new-locale"
+                    value={newLocale}
+                    onChange={(event) => setNewLocale(event.currentTarget.value)}
+                  >
+                    <option value="">—</option>
+                    {availableAllowedLocales.map((candidate) => (
+                      <option key={candidate} value={candidate}>
+                        {candidate}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+              <button
+                type="button"
+                data-builder-action="addLocale"
+                disabled={newLocale.trim().length === 0 || localeLimitReached}
+                onClick={addLocale}
+              >
+                {translate("builder.addLocale")}
+              </button>
+              <label>
+                {translate("builder.editLocale")}
+                <select value={editingLocale} onChange={(event) => setEditingLocale(event.currentTarget.value)}>
+                  <option value="">—</option>
+                  {(schema.supportedLocales ?? [])
+                    .filter((item) => item !== schema.defaultLocale)
+                    .map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={translationAdapter === undefined || editingLocale.length === 0 || isTranslating}
+                onClick={() => void translateAll()}
+              >
+                {translate("builder.autoTranslate")}
+              </button>
+            </div>
+            {translationAdapter === undefined ? <p>{translate("builder.translationUnavailable")}</p> : null}
+            {translationError === null ? null : <p className="form-engine-builder__error">{translationError}</p>}
+            {editingLocale.length === 0 ? null : (
+              <div className="form-engine-builder__grid">
+                <label>
+                  {translate("builder.questionTitle")}
+                  <input
+                    value={schema.translations?.[editingLocale]?.title ?? ""}
+                    onChange={(event) => updateFormTranslation("title", event.currentTarget.value)}
+                  />
+                </label>
+                <label>
+                  {translate("builder.pageDescription")}
+                  <input
+                    value={schema.translations?.[editingLocale]?.description ?? ""}
+                    onChange={(event) => updateFormTranslation("description", event.currentTarget.value)}
+                  />
+                </label>
+                <label>
+                  {translate("builder.completionMessage")}
+                  <input
+                    value={schema.translations?.[editingLocale]?.completionMessage ?? ""}
+                    onChange={(event) => updateFormTranslation("completionMessage", event.currentTarget.value)}
+                  />
+                </label>
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        <div className="form-engine-builder__list">
+          {schema.fields.map((field, index) => {
+            const condition = field.displayCondition;
+            const source =
+              condition === undefined ? undefined : schema.fields.find((item) => item.id === condition.questionId);
+            const availableSources = schema.fields.slice(0, index);
+            return (
+              <fieldset className="form-engine-builder__question" key={field.id}>
+                <legend>{field.title}</legend>
+                <div className="form-engine-builder__toolbar">
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => moveField(index, -1)}
+                    aria-label={translate("builder.moveUp", { title: field.title })}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === schema.fields.length - 1}
+                    onClick={() => moveField(index, 1)}
+                    aria-label={translate("builder.moveDown", { title: field.title })}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    disabled={schema.fields.length === 1}
+                    onClick={() => removeField(field.id)}
+                    aria-label={translate("builder.delete", { title: field.title })}
+                  >
+                    {translate("builder.deleteAction")}
+                  </button>
+                </div>
+                <div className="form-engine-builder__grid">
+                  <label>
+                    {translate("builder.questionTitle")}
+                    <input
+                      value={field.title}
+                      placeholder={translate("builder.questionTitlePlaceholder")}
+                      onChange={(event) =>
+                        updateField(field.id, (current) => ({
+                          ...current,
+                          title:
+                            event.currentTarget.value.trim().length === 0 ? current.title : event.currentTarget.value
+                        }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    {translate("builder.type")}
+                    <select
+                      value={field.type}
+                      onChange={(event) => changeType(field.id, event.currentTarget.value as FieldType)}
+                    >
+                      {FIELD_TYPES.filter(
+                        (type) => policy?.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
+                      ).map((type) => (
+                        <option key={type} value={type}>
+                          {translate(fieldTypeKey(type))}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="form-engine-builder__check">
+                    <input
+                      type="checkbox"
+                      checked={field.required === true}
+                      onChange={(event) =>
+                        updateField(field.id, (current) => ({ ...current, required: event.currentTarget.checked }))
+                      }
+                    />
+                    {translate("builder.required")}
+                  </label>
+                </div>
+
+                {!pagesEnabled || schema.pages === undefined ? null : (
+                  <label>
+                    {translate("builder.questionPage")}
+                    <select
+                      value={pageForField(field.id)?.id ?? ""}
+                      onChange={(event) => assignFieldToPage(field.id, event.currentTarget.value)}
+                    >
+                      {schema.pages.map((page, pageIndex) => (
+                        <option key={page.id} value={page.id}>
+                          {page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                {!localizationEnabled || editingLocale.length === 0 ? null : (
+                  <div className="form-engine-builder__translation-editor">
+                    <strong>{editingLocale}</strong>
+                    <div className="form-engine-builder__grid">
+                      <label>
+                        {translate("builder.questionTitle")}
+                        <input
+                          value={field.translations?.[editingLocale]?.title ?? ""}
+                          onChange={(event) =>
+                            updateManualTranslation({
+                              locale: editingLocale,
+                              kind: "field",
+                              nodeId: field.id,
+                              property: "title",
+                              sourceText: field.title,
+                              translatedText: event.currentTarget.value,
+                              ...(field.translationMetadata?.[editingLocale]?.title === undefined
+                                ? {}
+                                : {
+                                    existingTranslationMetadata: field.translationMetadata[editingLocale]?.title
+                                  })
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        {translate("builder.pageDescription")}
+                        <input
+                          value={field.translations?.[editingLocale]?.description ?? ""}
+                          onChange={(event) =>
+                            updateManualTranslation({
+                              locale: editingLocale,
+                              kind: "field",
+                              nodeId: field.id,
+                              property: "description",
+                              sourceText: field.description ?? "",
+                              translatedText: event.currentTarget.value,
+                              ...(field.translationMetadata?.[editingLocale]?.description === undefined
+                                ? {}
+                                : {
+                                    existingTranslationMetadata: field.translationMetadata[editingLocale]?.description
+                                  })
+                            })
+                          }
+                        />
+                      </label>
                     </div>
-                  )}
+                    {"options" in field
+                      ? field.options.map((option, optionIndex) => (
+                          <label key={option.id}>
+                            {translate("builder.optionLabel", { index: optionIndex + 1 })} ({editingLocale})
+                            <input
+                              value={option.translations?.[editingLocale] ?? ""}
+                              onChange={(event) =>
+                                updateManualTranslation({
+                                  locale: editingLocale,
+                                  kind: "option",
+                                  nodeId: option.id,
+                                  property: "label",
+                                  sourceText: option.label,
+                                  translatedText: event.currentTarget.value,
+                                  ...(option.translationMetadata?.[editingLocale]?.label === undefined
+                                    ? {}
+                                    : {
+                                        existingTranslationMetadata: option.translationMetadata[editingLocale]?.label
+                                      })
+                                })
+                              }
+                            />
+                          </label>
+                        ))
+                      : null}
+                  </div>
+                )}
+
+                {field.type === "rating" ? (
+                  <div className="form-engine-builder__grid">
+                    <label>
+                      {translate("builder.minimum")}
+                      <input
+                        type="number"
+                        value={field.min ?? 1}
+                        onChange={(event) => {
+                          const min = event.currentTarget.valueAsNumber;
+                          if (!Number.isInteger(min)) return;
+                          updateField(field.id, (current) =>
+                            current.type === "rating"
+                              ? { ...current, min, max: Math.max(min, current.max ?? 5) }
+                              : current
+                          );
+                        }}
+                      />
+                    </label>
+                    <label>
+                      {translate("builder.maximum")}
+                      <input
+                        type="number"
+                        value={field.max ?? 5}
+                        onChange={(event) => {
+                          const max = event.currentTarget.valueAsNumber;
+                          if (!Number.isInteger(max)) return;
+                          updateField(field.id, (current) =>
+                            current.type === "rating"
+                              ? { ...current, min: Math.min(current.min ?? 1, max), max }
+                              : current
+                          );
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : null}
+
+                {"options" in field ? (
+                  <div className="form-engine-builder__options">
+                    <strong>{translate("builder.options")}</strong>
+                    {field.options.map((option, optionIndex) => (
+                      <div className="form-engine-builder__option" key={option.id}>
+                        <input
+                          aria-label={translate("builder.optionLabel", { index: optionIndex + 1 })}
+                          value={option.label}
+                          placeholder={translate("builder.optionLabelPlaceholder")}
+                          onChange={(event) =>
+                            event.currentTarget.value.trim().length === 0
+                              ? undefined
+                              : updateOption(field.id, option.id, event.currentTarget.value)
+                          }
+                        />
+                        <button
+                          type="button"
+                          disabled={optionIndex === 0}
+                          aria-label={translate("builder.moveUp", { title: option.label })}
+                          onClick={() => moveOption(field.id, option.id, optionIndex - 1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          disabled={optionIndex === field.options.length - 1}
+                          aria-label={translate("builder.moveDown", { title: option.label })}
+                          onClick={() => moveOption(field.id, option.id, optionIndex + 1)}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          disabled={field.options.length === 1}
+                          onClick={() => removeOption(field.id, option.id)}
+                        >
+                          {translate("builder.remove")}
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      data-builder-action="addOption"
+                      data-target-id={field.id}
+                      disabled={
+                        policy?.maxOptionsPerField !== undefined && field.options.length >= policy.maxOptionsPerField
+                      }
+                      onClick={() => addOption(field.id)}
+                    >
+                      {translate("builder.addOption")}
+                    </button>
+                  </div>
+                ) : null}
+
+                {conditionsEnabled ? (
                   <div className="form-engine-builder__condition">
                     <label>
-                      {translate("builder.pageCondition")}
+                      {translate("builder.displayCondition")}
                       <select
-                        value={page.displayCondition?.questionId ?? ""}
+                        value={condition?.questionId ?? ""}
                         onChange={(event) => {
-                          const selected = schema.fields.find((field) => field.id === event.currentTarget.value);
-                          updatePage(page.id, (current) => {
-                            if (selected === undefined) {
-                              const { displayCondition: _condition, ...withoutCondition } = current;
-                              return withoutCondition;
-                            }
-                            return {
-                              ...current,
-                              displayCondition: conditionWithValue(
-                                selected.id,
-                                conditionOperators(selected)[0] ?? "not_empty",
-                                defaultConditionValue(selected)
-                              )
-                            };
-                          });
+                          const selected = schema.fields.find((item) => item.id === event.currentTarget.value);
+                          setDisplayCondition(
+                            field.id,
+                            selected === undefined
+                              ? undefined
+                              : conditionWithValue(
+                                  selected.id,
+                                  conditionOperators(selected)[0] ?? "not_empty",
+                                  defaultConditionValue(selected)
+                                )
+                          );
                         }}
                       >
                         <option value="">{translate("builder.alwaysVisible")}</option>
-                        {availableSources.map((field) => (
-                          <option value={field.id} key={field.id}>
-                            {field.title}
+                        {availableSources.map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.title}
                           </option>
                         ))}
                       </select>
                     </label>
-                    {page.displayCondition !== undefined && source !== undefined ? (
+                    {condition !== undefined && source !== undefined ? (
                       <>
                         <select
                           aria-label={translate("builder.conditionOperator")}
-                          value={page.displayCondition.operator}
+                          value={condition.operator}
                           onChange={(event) => {
                             const operator = event.currentTarget.value as ConditionOperator;
-                            updatePage(page.id, (current) => ({
-                              ...current,
-                              displayCondition: conditionWithValue(source.id, operator, defaultConditionValue(source))
-                            }));
+                            setDisplayCondition(
+                              field.id,
+                              conditionWithValue(source.id, operator, defaultConditionValue(source))
+                            );
                           }}
                         >
                           {conditionOperators(source).map((operator) => (
@@ -616,444 +1116,28 @@ export function FormBuilder({
                         </select>
                         <ConditionValueEditor
                           source={source}
-                          condition={page.displayCondition}
-                          onChange={(condition) =>
-                            updatePage(page.id, (current) => ({ ...current, displayCondition: condition }))
-                          }
+                          condition={condition}
+                          onChange={(next) => setDisplayCondition(field.id, next)}
                           translate={translate}
                         />
                       </>
                     ) : null}
                   </div>
-                </fieldset>
-              );
-            })}
-            <div className="form-engine-builder__page-add">
-              <label>
-                {translate("builder.pageQuestion")}
-                <select
-                  value={newPageQuestionId}
-                  disabled={movablePageQuestions.length === 0}
-                  onChange={(event) => setNewPageQuestionId(event.currentTarget.value)}
-                >
-                  <option value="">—</option>
-                  {schema.fields
-                    .filter((field) => movablePageQuestions.includes(field.id))
-                    .map((field) => (
-                      <option key={field.id} value={field.id}>
-                        {field.title}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <button type="button" disabled={movablePageQuestions.length === 0} onClick={addPage}>
-                {translate("builder.addPage")}
-              </button>
-            </div>
-          </>
-        )}
-      </section>
-
-      <section className="form-engine-builder__localization" aria-labelledby="builder-localization-heading">
-        <h2 id="builder-localization-heading">{translate("builder.localization")}</h2>
-        <label>
-          {translate("builder.completionMessage")}
-          <input
-            value={schema.completionMessage ?? ""}
-            onChange={(event) => setSourceText({ kind: "form" }, "completionMessage", event.currentTarget.value)}
-          />
-        </label>
-        <div className="form-engine-builder__grid">
-          <label>
-            {translate("builder.defaultLocale")}
-            <input
-              value={schema.defaultLocale ?? ""}
-              onChange={(event) => headless.setDefaultLocale(event.currentTarget.value)}
-            />
-          </label>
-          <label>
-            {translate("builder.addLocale")}
-            <input value={newLocale} onChange={(event) => setNewLocale(event.currentTarget.value)} />
-          </label>
-          <button type="button" onClick={addLocale}>
-            {translate("builder.addLocale")}
-          </button>
-          <label>
-            {translate("builder.editLocale")}
-            <select value={editingLocale} onChange={(event) => setEditingLocale(event.currentTarget.value)}>
-              <option value="">—</option>
-              {(schema.supportedLocales ?? [])
-                .filter((item) => item !== schema.defaultLocale)
-                .map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={translationAdapter === undefined || editingLocale.length === 0 || isTranslating}
-            onClick={() => void translateAll()}
-          >
-            {translate("builder.autoTranslate")}
-          </button>
-        </div>
-        {translationAdapter === undefined ? <p>{translate("builder.translationUnavailable")}</p> : null}
-        {translationError === null ? null : <p className="form-engine-builder__error">{translationError}</p>}
-        {editingLocale.length === 0 ? null : (
-          <div className="form-engine-builder__grid">
-            <label>
-              {translate("builder.questionTitle")}
-              <input
-                value={schema.translations?.[editingLocale]?.title ?? ""}
-                onChange={(event) => updateFormTranslation("title", event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              {translate("builder.pageDescription")}
-              <input
-                value={schema.translations?.[editingLocale]?.description ?? ""}
-                onChange={(event) => updateFormTranslation("description", event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              {translate("builder.completionMessage")}
-              <input
-                value={schema.translations?.[editingLocale]?.completionMessage ?? ""}
-                onChange={(event) => updateFormTranslation("completionMessage", event.currentTarget.value)}
-              />
-            </label>
-          </div>
-        )}
-      </section>
-
-      <div className="form-engine-builder__list">
-        {schema.fields.map((field, index) => {
-          const condition = field.displayCondition;
-          const source =
-            condition === undefined ? undefined : schema.fields.find((item) => item.id === condition.questionId);
-          const availableSources = schema.fields.slice(0, index);
-          return (
-            <fieldset className="form-engine-builder__question" key={field.id}>
-              <legend>{field.title}</legend>
-              <div className="form-engine-builder__toolbar">
-                <button
-                  type="button"
-                  disabled={index === 0}
-                  onClick={() => moveField(index, -1)}
-                  aria-label={translate("builder.moveUp", { title: field.title })}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  disabled={index === schema.fields.length - 1}
-                  onClick={() => moveField(index, 1)}
-                  aria-label={translate("builder.moveDown", { title: field.title })}
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  disabled={schema.fields.length === 1}
-                  onClick={() => removeField(field.id)}
-                  aria-label={translate("builder.delete", { title: field.title })}
-                >
-                  {translate("builder.deleteAction")}
-                </button>
-              </div>
-              <div className="form-engine-builder__grid">
-                <label>
-                  {translate("builder.questionTitle")}
-                  <input
-                    value={field.title}
-                    placeholder={translate("builder.questionTitlePlaceholder")}
-                    onChange={(event) =>
-                      updateField(field.id, (current) => ({
-                        ...current,
-                        title: event.currentTarget.value.trim().length === 0 ? current.title : event.currentTarget.value
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  {translate("builder.type")}
-                  <select
-                    value={field.type}
-                    onChange={(event) => changeType(field.id, event.currentTarget.value as FieldType)}
-                  >
-                    {FIELD_TYPES.filter(
-                      (type) => policy?.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
-                    ).map((type) => (
-                      <option key={type} value={type}>
-                        {translate(fieldTypeKey(type))}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="form-engine-builder__check">
-                  <input
-                    type="checkbox"
-                    checked={field.required === true}
-                    onChange={(event) =>
-                      updateField(field.id, (current) => ({ ...current, required: event.currentTarget.checked }))
-                    }
-                  />
-                  {translate("builder.required")}
-                </label>
-              </div>
-
-              {schema.pages === undefined ? null : (
-                <label>
-                  {translate("builder.questionPage")}
-                  <select
-                    value={pageForField(field.id)?.id ?? ""}
-                    onChange={(event) => assignFieldToPage(field.id, event.currentTarget.value)}
-                  >
-                    {schema.pages.map((page, pageIndex) => (
-                      <option key={page.id} value={page.id}>
-                        {page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-
-              {editingLocale.length === 0 ? null : (
-                <div className="form-engine-builder__translation-editor">
-                  <strong>{editingLocale}</strong>
-                  <div className="form-engine-builder__grid">
-                    <label>
-                      {translate("builder.questionTitle")}
-                      <input
-                        value={field.translations?.[editingLocale]?.title ?? ""}
-                        onChange={(event) =>
-                          updateManualTranslation({
-                            locale: editingLocale,
-                            kind: "field",
-                            nodeId: field.id,
-                            property: "title",
-                            sourceText: field.title,
-                            translatedText: event.currentTarget.value,
-                            ...(field.translationMetadata?.[editingLocale]?.title === undefined
-                              ? {}
-                              : {
-                                  existingTranslationMetadata: field.translationMetadata[editingLocale]?.title
-                                })
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      {translate("builder.pageDescription")}
-                      <input
-                        value={field.translations?.[editingLocale]?.description ?? ""}
-                        onChange={(event) =>
-                          updateManualTranslation({
-                            locale: editingLocale,
-                            kind: "field",
-                            nodeId: field.id,
-                            property: "description",
-                            sourceText: field.description ?? "",
-                            translatedText: event.currentTarget.value,
-                            ...(field.translationMetadata?.[editingLocale]?.description === undefined
-                              ? {}
-                              : {
-                                  existingTranslationMetadata: field.translationMetadata[editingLocale]?.description
-                                })
-                          })
-                        }
-                      />
-                    </label>
-                  </div>
-                  {"options" in field
-                    ? field.options.map((option, optionIndex) => (
-                        <label key={option.id}>
-                          {translate("builder.optionLabel", { index: optionIndex + 1 })} ({editingLocale})
-                          <input
-                            value={option.translations?.[editingLocale] ?? ""}
-                            onChange={(event) =>
-                              updateManualTranslation({
-                                locale: editingLocale,
-                                kind: "option",
-                                nodeId: option.id,
-                                property: "label",
-                                sourceText: option.label,
-                                translatedText: event.currentTarget.value,
-                                ...(option.translationMetadata?.[editingLocale]?.label === undefined
-                                  ? {}
-                                  : {
-                                      existingTranslationMetadata: option.translationMetadata[editingLocale]?.label
-                                    })
-                              })
-                            }
-                          />
-                        </label>
-                      ))
-                    : null}
-                </div>
-              )}
-
-              {field.type === "rating" ? (
-                <div className="form-engine-builder__grid">
-                  <label>
-                    {translate("builder.minimum")}
-                    <input
-                      type="number"
-                      value={field.min ?? 1}
-                      onChange={(event) => {
-                        const min = event.currentTarget.valueAsNumber;
-                        if (!Number.isInteger(min)) return;
-                        updateField(field.id, (current) =>
-                          current.type === "rating"
-                            ? { ...current, min, max: Math.max(min, current.max ?? 5) }
-                            : current
-                        );
-                      }}
-                    />
-                  </label>
-                  <label>
-                    {translate("builder.maximum")}
-                    <input
-                      type="number"
-                      value={field.max ?? 5}
-                      onChange={(event) => {
-                        const max = event.currentTarget.valueAsNumber;
-                        if (!Number.isInteger(max)) return;
-                        updateField(field.id, (current) =>
-                          current.type === "rating"
-                            ? { ...current, min: Math.min(current.min ?? 1, max), max }
-                            : current
-                        );
-                      }}
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              {"options" in field ? (
-                <div className="form-engine-builder__options">
-                  <strong>{translate("builder.options")}</strong>
-                  {field.options.map((option, optionIndex) => (
-                    <div className="form-engine-builder__option" key={option.id}>
-                      <input
-                        aria-label={translate("builder.optionLabel", { index: optionIndex + 1 })}
-                        value={option.label}
-                        placeholder={translate("builder.optionLabelPlaceholder")}
-                        onChange={(event) =>
-                          event.currentTarget.value.trim().length === 0
-                            ? undefined
-                            : updateOption(field.id, option.id, event.currentTarget.value)
-                        }
-                      />
-                      <button
-                        type="button"
-                        disabled={optionIndex === 0}
-                        aria-label={translate("builder.moveUp", { title: option.label })}
-                        onClick={() => moveOption(field.id, option.id, optionIndex - 1)}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        disabled={optionIndex === field.options.length - 1}
-                        aria-label={translate("builder.moveDown", { title: option.label })}
-                        onClick={() => moveOption(field.id, option.id, optionIndex + 1)}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        disabled={field.options.length === 1}
-                        onClick={() => removeOption(field.id, option.id)}
-                      >
-                        {translate("builder.remove")}
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    data-builder-action="addOption"
-                    data-target-id={field.id}
-                    disabled={
-                      policy?.maxOptionsPerField !== undefined && field.options.length >= policy.maxOptionsPerField
-                    }
-                    onClick={() => addOption(field.id)}
-                  >
-                    {translate("builder.addOption")}
-                  </button>
-                </div>
-              ) : null}
-
-              <div className="form-engine-builder__condition">
-                <label>
-                  {translate("builder.displayCondition")}
-                  <select
-                    value={condition?.questionId ?? ""}
-                    onChange={(event) => {
-                      const selected = schema.fields.find((item) => item.id === event.currentTarget.value);
-                      setDisplayCondition(
-                        field.id,
-                        selected === undefined
-                          ? undefined
-                          : conditionWithValue(
-                              selected.id,
-                              conditionOperators(selected)[0] ?? "not_empty",
-                              defaultConditionValue(selected)
-                            )
-                      );
-                    }}
-                  >
-                    <option value="">{translate("builder.alwaysVisible")}</option>
-                    {availableSources.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {condition !== undefined && source !== undefined ? (
-                  <>
-                    <select
-                      aria-label={translate("builder.conditionOperator")}
-                      value={condition.operator}
-                      onChange={(event) => {
-                        const operator = event.currentTarget.value as ConditionOperator;
-                        setDisplayCondition(
-                          field.id,
-                          conditionWithValue(source.id, operator, defaultConditionValue(source))
-                        );
-                      }}
-                    >
-                      {conditionOperators(source).map((operator) => (
-                        <option key={operator} value={operator}>
-                          {translate(operatorKey(operator))}
-                        </option>
-                      ))}
-                    </select>
-                    <ConditionValueEditor
-                      source={source}
-                      condition={condition}
-                      onChange={(next) => setDisplayCondition(field.id, next)}
-                      translate={translate}
-                    />
-                  </>
                 ) : null}
-              </div>
-            </fieldset>
-          );
-        })}
-      </div>
-      <button
-        className="form-engine-builder__add"
-        type="button"
-        data-builder-action="addField"
-        disabled={initialFieldType === null || maxFieldsReached}
-        onClick={addField}
-      >
-        {translate("builder.addQuestion")}
-      </button>
+              </fieldset>
+            );
+          })}
+        </div>
+        <button
+          className="form-engine-builder__add"
+          type="button"
+          data-builder-action="addField"
+          disabled={initialFieldType === null || maxFieldsReached}
+          onClick={addField}
+        >
+          {translate("builder.addQuestion")}
+        </button>
+      </fieldset>
     </section>
   );
 }

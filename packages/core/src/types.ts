@@ -5,6 +5,8 @@ export interface FormPolicy {
   readonly maxFields?: number;
   readonly maxOptionsPerField?: number;
   readonly requiredLocales?: readonly string[];
+  readonly allowedLocales?: readonly string[];
+  readonly maxLocales?: number;
   readonly maxTextLength?: number;
   readonly maxSchemaBytes?: number;
 }
