@@ -359,7 +359,7 @@ describe("React form engine", () => {
     expect(screen.getByTestId("page-builder-schema")).toHaveTextContent("翻訳タイトル");
     await user.click(screen.getByRole("button", { name: "Translate all text" }));
     await waitFor(() => expect(translationAdapter.translateBatch).toHaveBeenCalled());
-    expect(screen.getByTestId("page-builder-schema")).toHaveTextContent("ja:title");
+    expect(screen.getByTestId("page-builder-schema")).toHaveTextContent("翻訳タイトル");
   });
 
   it("hides generated IDs and keeps them stable while natural-language labels change", () => {

@@ -7,13 +7,22 @@ import {
   type FormField,
   type FormPolicy,
   type FormSchema,
+  type JsonValue,
   type PopulateTranslationOptions,
   populateSchemaTranslations,
+  type QuestionType,
   type TranslationAdapter,
   type TranslationReport
 } from "@form-engine-ts/core";
 import { useState } from "react";
-import { type BuilderFactories, useFormBuilder } from "./hooks/useFormBuilder";
+import {
+  type BuilderActionError,
+  type BuilderActionResult,
+  type BuilderFactories,
+  type BuilderTextTarget,
+  useFormBuilder
+} from "./hooks/useFormBuilder";
+import type { BuilderActionContext, ManualTranslationContext } from "./types";
 
 const FIELD_TYPES: readonly FieldType[] = [
   "text",
@@ -168,6 +177,18 @@ function ConditionValueEditor({
   );
 }
 
+export function resolveInitialFieldType(
+  defaultType?: QuestionType,
+  allowedTypes?: readonly QuestionType[]
+): QuestionType | null {
+  if (defaultType !== undefined && (allowedTypes === undefined || allowedTypes.includes(defaultType))) {
+    return defaultType;
+  }
+  if (allowedTypes !== undefined && allowedTypes.length > 0) return allowedTypes[0] ?? null;
+  if (allowedTypes === undefined || allowedTypes.includes("text")) return "text";
+  return null;
+}
+
 export interface FormBuilderProps {
   readonly schema: FormSchema;
   readonly onChange: (newSchema: FormSchema) => void;
@@ -179,6 +200,12 @@ export interface FormBuilderProps {
   readonly policy?: FormPolicy;
   readonly idFactory?: (kind: "field" | "option" | "page", existingIds: ReadonlySet<string>) => string;
   readonly factories?: BuilderFactories;
+  readonly className?: string;
+  readonly defaultFieldType?: QuestionType;
+  readonly onActionError?: (error: BuilderActionError, context: BuilderActionContext) => void;
+  readonly createManualTranslationMetadata?: (
+    context: ManualTranslationContext
+  ) => Readonly<Record<string, JsonValue>> | undefined;
 }
 
 export function FormBuilder({
@@ -191,7 +218,11 @@ export function FormBuilder({
   onTranslationReport,
   policy,
   idFactory,
-  factories
+  factories,
+  className = "",
+  defaultFieldType,
+  onActionError,
+  createManualTranslationMetadata
 }: FormBuilderProps) {
   const headless = useFormBuilder({
     schema,
@@ -209,21 +240,46 @@ export function FormBuilder({
     const translated = translator?.translate(key, locale, params);
     return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
   };
-  const updateField = headless.updateField;
-  const changeType = headless.changeFieldType;
-
-  const removeField = headless.removeField;
+  const executeAction = (result: BuilderActionResult, context: BuilderActionContext): BuilderActionResult => {
+    if (!result.success) onActionError?.(result.error, context);
+    return result;
+  };
+  const updateField = (fieldId: string, updater: (field: FormField) => FormField, params?: Record<string, unknown>) =>
+    executeAction(headless.updateField(fieldId, updater), {
+      action: "updateField",
+      targetId: fieldId,
+      ...(params === undefined ? {} : { params })
+    });
+  const changeType = (fieldId: string, type: FieldType) =>
+    executeAction(headless.changeFieldType(fieldId, type), {
+      action: "changeFieldType",
+      targetId: fieldId,
+      params: { type }
+    });
+  const removeField = (fieldId: string) =>
+    executeAction(headless.removeField(fieldId), { action: "removeField", targetId: fieldId });
+  const initialFieldType = resolveInitialFieldType(defaultFieldType, policy?.allowedFieldTypes);
+  const maxFieldsReached = policy?.maxFields !== undefined && schema.fields.length >= policy.maxFields;
 
   const moveField = (index: number, offset: -1 | 1) => {
     const target = index + offset;
     const field = schema.fields[index];
-    if (field !== undefined) headless.moveField(field.id, target);
+    if (field !== undefined) {
+      executeAction(headless.moveField(field.id, target), {
+        action: "moveField",
+        targetId: field.id,
+        params: { targetIndex: target }
+      });
+    }
   };
 
-  const addField = () => headless.addField("text");
+  const addField = () => {
+    if (initialFieldType === null) return;
+    executeAction(headless.addField(initialFieldType), { action: "addField" });
+  };
 
   const enablePages = () => {
-    if (schema.pages === undefined) headless.addPage();
+    if (schema.pages === undefined) executeAction(headless.addPage(), { action: "addPage" });
   };
 
   const pageForField = (fieldId: string) => schema.pages?.find((page) => page.questionIds.includes(fieldId));
@@ -237,19 +293,29 @@ export function FormBuilder({
     }
     const questionId = movablePageQuestions.includes(newPageQuestionId) ? newPageQuestionId : movablePageQuestions[0];
     if (questionId === undefined) return;
-    headless.addPage(questionId);
+    executeAction(headless.addPage(questionId), {
+      action: "addPage",
+      targetId: questionId,
+      params: { questionId }
+    });
     setNewPageQuestionId("");
   };
 
   const removePage = (pageIndex: number) => {
     const page = schema.pages?.[pageIndex];
-    if (page !== undefined) headless.removePage(page.id);
+    if (page !== undefined) executeAction(headless.removePage(page.id), { action: "removePage", targetId: page.id });
   };
 
   const movePage = (pageIndex: number, offset: -1 | 1) => {
     const target = pageIndex + offset;
     const page = schema.pages?.[pageIndex];
-    if (page !== undefined) headless.movePage(page.id, target);
+    if (page !== undefined) {
+      executeAction(headless.movePage(page.id, target), {
+        action: "movePage",
+        targetId: page.id,
+        params: { targetIndex: target }
+      });
+    }
   };
 
   const updatePage = (
@@ -260,7 +326,11 @@ export function FormBuilder({
   };
 
   const assignFieldToPage = (fieldId: string, pageId: string) => {
-    headless.assignFieldToPage(fieldId, pageId);
+    executeAction(headless.assignFieldToPage(fieldId, pageId), {
+      action: "assignFieldToPage",
+      targetId: fieldId,
+      params: { pageId }
+    });
   };
 
   const addLocale = () => {
@@ -276,12 +346,10 @@ export function FormBuilder({
     setIsTranslating(true);
     setTranslationError(null);
     try {
-      const populated = await populateSchemaTranslations(
-        schema,
-        [editingLocale],
-        translationAdapter,
-        translationOptions ?? { overwrite: "all" }
-      );
+      const populated = await populateSchemaTranslations(schema, [editingLocale], translationAdapter, {
+        overwrite: "missing-only",
+        ...translationOptions
+      });
       onChange(populated.schema);
       onTranslationReport?.(populated.report);
     } catch (cause) {
@@ -291,13 +359,96 @@ export function FormBuilder({
     }
   };
 
-  const updateFormTranslation = (key: "title" | "description" | "completionMessage", value: string) => {
-    if (editingLocale.length === 0) return;
-    headless.setLocaleTranslation(editingLocale, { kind: "form" }, key, value);
+  const updateManualTranslation = (context: ManualTranslationContext) => {
+    const metadata = createManualTranslationMetadata?.(context);
+    const target =
+      context.kind === "form" ? ({ kind: "form" } as const) : ({ kind: context.kind, id: context.nodeId } as const);
+    executeAction(
+      headless.setLocaleTranslation(
+        context.locale,
+        target,
+        context.property,
+        context.translatedText,
+        metadata === undefined ? undefined : { metadata }
+      ),
+      {
+        action: "setLocaleTranslation",
+        targetId: context.nodeId,
+        params: { locale: context.locale, kind: context.kind, property: context.property }
+      }
+    );
   };
 
+  const updateFormTranslation = (property: "title" | "description" | "completionMessage", translatedText: string) => {
+    if (editingLocale.length === 0) return;
+    updateManualTranslation({
+      locale: editingLocale,
+      kind: "form",
+      nodeId: schema.id,
+      property,
+      sourceText: schema[property] ?? "",
+      translatedText,
+      ...(schema.translationMetadata?.[editingLocale]?.[property] === undefined
+        ? {}
+        : { existingTranslationMetadata: schema.translationMetadata[editingLocale]?.[property] })
+    });
+  };
+
+  const setSourceText = (target: BuilderTextTarget, property: string, text: string) =>
+    executeAction(headless.setSourceText(target, property, text), {
+      action: "setSourceText",
+      ...(target.id === undefined ? {} : { targetId: target.id }),
+      params: { kind: target.kind, property }
+    });
+  const updateOption = (fieldId: string, optionId: string, label: string) =>
+    executeAction(
+      headless.updateOption(fieldId, optionId, (option) => ({ ...option, label })),
+      { action: "updateOption", targetId: optionId, params: { fieldId } }
+    );
+  const addOption = (fieldId: string) =>
+    executeAction(headless.addOption(fieldId), { action: "addOption", targetId: fieldId });
+  const removeOption = (fieldId: string, optionId: string) =>
+    executeAction(headless.removeOption(fieldId, optionId), {
+      action: "removeOption",
+      targetId: optionId,
+      params: { fieldId }
+    });
+  const moveOption = (fieldId: string, optionId: string, targetIndex: number) =>
+    executeAction(headless.moveOption(fieldId, optionId, targetIndex), {
+      action: "moveOption",
+      targetId: optionId,
+      params: { fieldId, targetIndex }
+    });
+  const setDisplayCondition = (fieldId: string, condition?: DisplayCondition) =>
+    executeAction(headless.setDisplayCondition(fieldId, condition), {
+      action: "setDisplayCondition",
+      targetId: fieldId,
+      ...(condition === undefined ? {} : { params: { condition } })
+    });
+
   return (
-    <section className="form-engine-builder" aria-label={translate("builder.formBuilder")}>
+    <section
+      className={`form-engine-builder ${className}`.trim()}
+      aria-label={translate("builder.formBuilder")}
+      onClickCapture={(event) => {
+        if (!(event.target instanceof HTMLElement)) return;
+        const actionTarget = event.target.closest<HTMLElement>("[data-builder-action]");
+        if (actionTarget?.dataset.builderAction === "addField" && maxFieldsReached && initialFieldType !== null)
+          addField();
+        if (actionTarget?.dataset.builderAction !== "addOption") return;
+        const fieldId = actionTarget.dataset.targetId;
+        const field = schema.fields.find((candidate) => candidate.id === fieldId);
+        if (
+          fieldId !== undefined &&
+          field !== undefined &&
+          "options" in field &&
+          policy?.maxOptionsPerField !== undefined &&
+          field.options.length >= policy.maxOptionsPerField
+        ) {
+          addOption(fieldId);
+        }
+      }}
+    >
       <section className="form-engine-builder__pages" aria-labelledby="builder-pages-heading">
         <h2 id="builder-pages-heading">{translate("builder.pages")}</h2>
         {schema.pages === undefined ? (
@@ -373,12 +524,19 @@ export function FormBuilder({
                           <input
                             value={page.translations?.[editingLocale]?.title ?? ""}
                             onChange={(event) =>
-                              headless.setLocaleTranslation(
-                                editingLocale,
-                                { kind: "page", id: page.id },
-                                "title",
-                                event.currentTarget.value
-                              )
+                              updateManualTranslation({
+                                locale: editingLocale,
+                                kind: "page",
+                                nodeId: page.id,
+                                property: "title",
+                                sourceText: page.title ?? "",
+                                translatedText: event.currentTarget.value,
+                                ...(page.translationMetadata?.[editingLocale]?.title === undefined
+                                  ? {}
+                                  : {
+                                      existingTranslationMetadata: page.translationMetadata[editingLocale]?.title
+                                    })
+                              })
                             }
                           />
                         </label>
@@ -387,12 +545,19 @@ export function FormBuilder({
                           <input
                             value={page.translations?.[editingLocale]?.description ?? ""}
                             onChange={(event) =>
-                              headless.setLocaleTranslation(
-                                editingLocale,
-                                { kind: "page", id: page.id },
-                                "description",
-                                event.currentTarget.value
-                              )
+                              updateManualTranslation({
+                                locale: editingLocale,
+                                kind: "page",
+                                nodeId: page.id,
+                                property: "description",
+                                sourceText: page.description ?? "",
+                                translatedText: event.currentTarget.value,
+                                ...(page.translationMetadata?.[editingLocale]?.description === undefined
+                                  ? {}
+                                  : {
+                                      existingTranslationMetadata: page.translationMetadata[editingLocale]?.description
+                                    })
+                              })
                             }
                           />
                         </label>
@@ -495,9 +660,7 @@ export function FormBuilder({
           {translate("builder.completionMessage")}
           <input
             value={schema.completionMessage ?? ""}
-            onChange={(event) =>
-              headless.setSourceText({ kind: "form" }, "completionMessage", event.currentTarget.value)
-            }
+            onChange={(event) => setSourceText({ kind: "form" }, "completionMessage", event.currentTarget.value)}
           />
         </label>
         <div className="form-engine-builder__grid">
@@ -666,12 +829,19 @@ export function FormBuilder({
                       <input
                         value={field.translations?.[editingLocale]?.title ?? ""}
                         onChange={(event) =>
-                          headless.setLocaleTranslation(
-                            editingLocale,
-                            { kind: "field", id: field.id },
-                            "title",
-                            event.currentTarget.value
-                          )
+                          updateManualTranslation({
+                            locale: editingLocale,
+                            kind: "field",
+                            nodeId: field.id,
+                            property: "title",
+                            sourceText: field.title,
+                            translatedText: event.currentTarget.value,
+                            ...(field.translationMetadata?.[editingLocale]?.title === undefined
+                              ? {}
+                              : {
+                                  existingTranslationMetadata: field.translationMetadata[editingLocale]?.title
+                                })
+                          })
                         }
                       />
                     </label>
@@ -680,12 +850,19 @@ export function FormBuilder({
                       <input
                         value={field.translations?.[editingLocale]?.description ?? ""}
                         onChange={(event) =>
-                          headless.setLocaleTranslation(
-                            editingLocale,
-                            { kind: "field", id: field.id },
-                            "description",
-                            event.currentTarget.value
-                          )
+                          updateManualTranslation({
+                            locale: editingLocale,
+                            kind: "field",
+                            nodeId: field.id,
+                            property: "description",
+                            sourceText: field.description ?? "",
+                            translatedText: event.currentTarget.value,
+                            ...(field.translationMetadata?.[editingLocale]?.description === undefined
+                              ? {}
+                              : {
+                                  existingTranslationMetadata: field.translationMetadata[editingLocale]?.description
+                                })
+                          })
                         }
                       />
                     </label>
@@ -697,12 +874,19 @@ export function FormBuilder({
                           <input
                             value={option.translations?.[editingLocale] ?? ""}
                             onChange={(event) =>
-                              headless.setLocaleTranslation(
-                                editingLocale,
-                                { kind: "option", id: option.id },
-                                "label",
-                                event.currentTarget.value
-                              )
+                              updateManualTranslation({
+                                locale: editingLocale,
+                                kind: "option",
+                                nodeId: option.id,
+                                property: "label",
+                                sourceText: option.label,
+                                translatedText: event.currentTarget.value,
+                                ...(option.translationMetadata?.[editingLocale]?.label === undefined
+                                  ? {}
+                                  : {
+                                      existingTranslationMetadata: option.translationMetadata[editingLocale]?.label
+                                    })
+                              })
                             }
                           />
                         </label>
@@ -760,16 +944,29 @@ export function FormBuilder({
                         onChange={(event) =>
                           event.currentTarget.value.trim().length === 0
                             ? undefined
-                            : headless.updateOption(field.id, option.id, (item) => ({
-                                ...item,
-                                label: event.currentTarget.value
-                              }))
+                            : updateOption(field.id, option.id, event.currentTarget.value)
                         }
                       />
                       <button
                         type="button"
+                        disabled={optionIndex === 0}
+                        aria-label={translate("builder.moveUp", { title: option.label })}
+                        onClick={() => moveOption(field.id, option.id, optionIndex - 1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        disabled={optionIndex === field.options.length - 1}
+                        aria-label={translate("builder.moveDown", { title: option.label })}
+                        onClick={() => moveOption(field.id, option.id, optionIndex + 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
                         disabled={field.options.length === 1}
-                        onClick={() => headless.removeOption(field.id, option.id)}
+                        onClick={() => removeOption(field.id, option.id)}
                       >
                         {translate("builder.remove")}
                       </button>
@@ -777,10 +974,12 @@ export function FormBuilder({
                   ))}
                   <button
                     type="button"
+                    data-builder-action="addOption"
+                    data-target-id={field.id}
                     disabled={
                       policy?.maxOptionsPerField !== undefined && field.options.length >= policy.maxOptionsPerField
                     }
-                    onClick={() => headless.addOption(field.id)}
+                    onClick={() => addOption(field.id)}
                   >
                     {translate("builder.addOption")}
                   </button>
@@ -794,7 +993,7 @@ export function FormBuilder({
                     value={condition?.questionId ?? ""}
                     onChange={(event) => {
                       const selected = schema.fields.find((item) => item.id === event.currentTarget.value);
-                      headless.setDisplayCondition(
+                      setDisplayCondition(
                         field.id,
                         selected === undefined
                           ? undefined
@@ -821,7 +1020,7 @@ export function FormBuilder({
                       value={condition.operator}
                       onChange={(event) => {
                         const operator = event.currentTarget.value as ConditionOperator;
-                        headless.setDisplayCondition(
+                        setDisplayCondition(
                           field.id,
                           conditionWithValue(source.id, operator, defaultConditionValue(source))
                         );
@@ -836,7 +1035,7 @@ export function FormBuilder({
                     <ConditionValueEditor
                       source={source}
                       condition={condition}
-                      onChange={(next) => headless.setDisplayCondition(field.id, next)}
+                      onChange={(next) => setDisplayCondition(field.id, next)}
                       translate={translate}
                     />
                   </>
@@ -849,7 +1048,8 @@ export function FormBuilder({
       <button
         className="form-engine-builder__add"
         type="button"
-        disabled={policy?.maxFields !== undefined && schema.fields.length >= policy.maxFields}
+        data-builder-action="addField"
+        disabled={initialFieldType === null || maxFieldsReached}
         onClick={addField}
       >
         {translate("builder.addQuestion")}

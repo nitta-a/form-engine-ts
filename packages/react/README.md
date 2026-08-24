@@ -61,6 +61,12 @@ initial field, option, and page shapes. `<FormBuilder>` delegates its UI mutatio
 options. Its completion-message editors cover both source and locale text. `translationOptions` and
 `onTranslationReport` expose automatic-translation policy and reporting.
 
+Visual-builder field creation uses `defaultFieldType` when it is allowed, otherwise the first allowed policy type, then
+`text` when unrestricted. The add button is disabled when no type is allowed or `maxFields` is reached.
+`onActionError` receives typed failures from visual headless actions, and `createManualTranslationMetadata` can attach
+per-locale/property metadata to manual edits. Automatic translation defaults to `overwrite: "missing-only"`; explicitly
+pass `{ overwrite: "all" }` to replace existing translations.
+
 `FormRenderer` can also be used without an explicit provider:
 
 ```tsx

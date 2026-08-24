@@ -76,7 +76,7 @@ export interface FormBuilderResult {
     target: BuilderTextTarget,
     property: string,
     text: string,
-    options?: { readonly metadata?: Record<string, JsonValue> }
+    options?: { readonly metadata?: Readonly<Record<string, JsonValue>> }
   ) => BuilderActionResult;
   readonly addLocale: (locale: string) => BuilderActionResult;
   readonly setDefaultLocale: (locale: string) => BuilderActionResult;
@@ -634,7 +634,7 @@ export function useFormBuilder({
       target: BuilderTextTarget,
       property: string,
       text: string,
-      options: { readonly metadata?: Record<string, JsonValue> } = {}
+      options: { readonly metadata?: Readonly<Record<string, JsonValue>> } = {}
     ): BuilderActionResult => {
       const normalized = locale.trim();
       if (normalized.length === 0)

@@ -435,6 +435,7 @@ export default function App() {
   const [lifecycleStatus, setLifecycleStatus] = useState<string | null>(null);
   const [translationOverwrite, setTranslationOverwrite] = useState<"missing-only" | "all">("missing-only");
   const [translationReport, setTranslationReport] = useState<string | null>(null);
+  const [builderActionStatus, setBuilderActionStatus] = useState<string | null>(null);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [resetStatus, setResetStatus] = useState<{
     readonly kind: "success" | "error";
@@ -668,6 +669,11 @@ export default function App() {
                 {translationReport === null ? null : <output>{translationReport}</output>}
               </fieldset>
               <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
+              {builderActionStatus === null ? null : (
+                <p className="builder-action-status" role="status">
+                  {builderActionStatus}
+                </p>
+              )}
               <FormBuilder
                 schema={schema}
                 locale={locale}
@@ -675,6 +681,7 @@ export default function App() {
                 translationAdapter={mockAsyncTranslator}
                 onChange={changeSchema}
                 policy={previewPolicy}
+                defaultFieldType="textarea"
                 translationOptions={{
                   overwrite: translationOverwrite,
                   createMetadata: (slot) => ({ source: "visual-builder", property: slot.property })
@@ -684,6 +691,12 @@ export default function App() {
                     `${report.updatedSlots.length} updated / ${report.skippedSlots.length} skipped (${translationOverwrite})`
                   )
                 }
+                onActionError={(error, context) => setBuilderActionStatus(`${context.action}: ${error.type}`)}
+                createManualTranslationMetadata={(context) => ({
+                  source: "preview-manual",
+                  isManual: true,
+                  property: context.property
+                })}
               />
             </section>
             <section className="workspace-card json-card">

@@ -167,6 +167,12 @@ textarea {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.builder-action-status {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.75rem;
+  color: var(--ink-muted);
+}
+
 .preview-slot-page-header,
 .preview-slot-submit-error {
   border: 1px dashed var(--accent);

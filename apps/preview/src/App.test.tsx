@@ -66,6 +66,20 @@ describe("preview application", () => {
     );
   });
 
+  it("demonstrates Visual Builder defaults and manual translation metadata", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Add question" }));
+    const added = screen.getByRole("group", { name: "New question" });
+    expect(within(added).getByLabelText("Type")).toHaveValue("textarea");
+
+    await user.selectOptions(screen.getByLabelText("Edit locale"), "en");
+    const localizedCompletion = screen.getAllByLabelText("Completion message")[1];
+    if (localizedCompletion === undefined) throw new Error("Expected localized completion editor");
+    await user.type(localizedCompletion, "!");
+    await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent("preview-manual"));
+  });
+
   it("switches locale and completes submission-to-analytics flow", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -163,7 +177,7 @@ describe("preview application", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText(/"release": "v2.0.0"/)).toBeInTheDocument();
+    expect(screen.getByText(/"release": "v2.1.1"/)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByLabelText("LocalStorage"));
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());

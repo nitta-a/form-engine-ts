@@ -1,5 +1,37 @@
-import type { FormField, FormPage, ValidationError } from "@form-engine-ts/core";
+import type { FormField, FormPage, JsonValue, ValidationError } from "@form-engine-ts/core";
 import type { ReactNode } from "react";
+
+export interface BuilderActionContext {
+  readonly action:
+    | "addField"
+    | "removeField"
+    | "moveField"
+    | "changeFieldType"
+    | "updateField"
+    | "addOption"
+    | "removeOption"
+    | "moveOption"
+    | "updateOption"
+    | "addPage"
+    | "removePage"
+    | "movePage"
+    | "assignFieldToPage"
+    | "setDisplayCondition"
+    | "setSourceText"
+    | "setLocaleTranslation";
+  readonly targetId?: string;
+  readonly params?: Record<string, unknown>;
+}
+
+export interface ManualTranslationContext {
+  readonly locale: string;
+  readonly kind: "form" | "page" | "field" | "option";
+  readonly nodeId: string;
+  readonly property: "title" | "description" | "label" | "completionMessage";
+  readonly sourceText: string;
+  readonly translatedText: string;
+  readonly existingTranslationMetadata?: Readonly<Record<string, JsonValue>>;
+}
 
 export type SubmitResult =
   | { readonly status: "invalid"; readonly issues: readonly ValidationError[] }

@@ -70,6 +70,10 @@ now owns all field/option/page/text/condition mutations, supports factory inject
 builder exposes completion-message editing plus translation options/reports. Translation slots separate node metadata
 from existing per-locale metadata, while Renderer adds page-header and submit-error slots.
 
+The v2.1.1 patch adds Visual Builder `defaultFieldType`, typed `onActionError` notifications, and manual-translation
+metadata creation. Its automatic translation default is now consistently `missing-only`, and field creation is disabled
+when policy permits no type or the field limit is reached.
+
 ### Define and render a form
 
 ```bash
@@ -380,6 +384,9 @@ v2.1では`FormPolicy`とポリシー対応`validateFormSchema`をCoreへ移し�
 `transformFieldType`は形式変更時の原文・翻訳・拡張データを保全します。Headless Builderへfield/option/page/文言/条件の
 全更新を集約し、factory注入と型付きID失敗を追加しました。Visual Builderは完了メッセージと翻訳設定・レポートを公開し、
 翻訳slotはnode metadataと既存言語別metadataを分離します。Rendererにはpage headerとsubmit error slotを追加しました。
+
+v2.1.1パッチではVisual Builderに`defaultFieldType`、型付き`onActionError`通知、手動翻訳metadata生成を追加しました。
+自動翻訳の既定値を`missing-only`へ統一し、ポリシー上追加可能な型がない場合や設問上限到達時は追加を無効化します。
 
 ### フォームの定義とレンダリング
 
