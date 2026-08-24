@@ -28,6 +28,8 @@ export interface TranslationCacheOptions {
   readonly variant?: string;
   readonly buildKey?: (context: TranslationCacheKeyContext) => string;
   readonly onStatsReport?: (stats: TranslationCacheStats) => void;
+  readonly cacheErrorPolicy?: "bypass" | "throw";
+  readonly onCacheError?: (error: Error, operation: "get" | "set") => void;
 }
 
 export interface MemoryTranslationCacheOptions {
@@ -146,9 +148,46 @@ export function withTranslationCache(
   if (options.buildKey !== undefined && typeof options.buildKey !== "function") {
     throw new TypeError("buildKey must be a function.");
   }
+  if (
+    options.cacheErrorPolicy !== undefined &&
+    options.cacheErrorPolicy !== "bypass" &&
+    options.cacheErrorPolicy !== "throw"
+  ) {
+    throw new TypeError('cacheErrorPolicy must be "bypass" or "throw".');
+  }
+  const cacheErrorPolicy = options.cacheErrorPolicy ?? "bypass";
   const initialEvictionCount = cache.evictionCount ?? 0;
   let hits = 0;
   let misses = 0;
+
+  const handleCacheError = (cause: unknown, operation: "get" | "set"): Error => {
+    const error = cause instanceof Error ? cause : new Error(String(cause));
+    try {
+      options.onCacheError?.(error, operation);
+    } catch {
+      // Cache error observers cannot override the configured cache policy.
+    }
+    return error;
+  };
+
+  const getCached = async (key: string): Promise<string | undefined> => {
+    try {
+      return await cache.get(key);
+    } catch (cause) {
+      const error = handleCacheError(cause, "get");
+      if (cacheErrorPolicy === "throw") throw error;
+      return undefined;
+    }
+  };
+
+  const setCached = async (key: string, value: string): Promise<void> => {
+    try {
+      await cache.set(key, value, options.ttlMs);
+    } catch (cause) {
+      const error = handleCacheError(cause, "set");
+      if (cacheErrorPolicy === "throw") throw error;
+    }
+  };
 
   const reportStats = () => {
     const size = cache.size ?? 0;
@@ -183,7 +222,7 @@ export function withTranslationCache(
       if (typeof key !== "string" || key.length === 0) throw new TypeError("Translation cache key must not be empty.");
       return key;
     });
-    const cached = await Promise.all(keys.map((key) => cache.get(key)));
+    const cached = await Promise.all(keys.map(getCached));
     hits += cached.filter((value) => value !== undefined).length;
     misses += cached.filter((value) => value === undefined).length;
     const missingByKey = new Map<string, { readonly text: string; readonly indices: number[] }>();
@@ -210,7 +249,7 @@ export function withTranslationCache(
         missing.map(async ([key, value], translatedIndex) => {
           const translation = translated[translatedIndex];
           if (translation === undefined) throw new Error("Translation adapter result is unavailable.");
-          await cache.set(key, translation, options.ttlMs);
+          await setCached(key, translation);
           for (const index of value.indices) cached[index] = translation;
         })
       );

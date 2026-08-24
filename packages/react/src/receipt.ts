@@ -14,7 +14,7 @@ export interface SubmissionReceiptQuery {
 
 export interface SubmissionReceiptStore {
   get(formId: string, formVersion: number): Promise<SubmissionReceipt | null>;
-  getBatch(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
+  getBatch?(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
   save(receipt: SubmissionReceipt): Promise<void>;
   remove(formId: string, formVersion: number): Promise<void>;
 }
@@ -144,8 +144,19 @@ export function useSubmissionReceipts(
       };
     }
     setState((current) => ({ ...current, isLoading: true, error: null }));
-    void store
-      .getBatch(stableQueries)
+    const load =
+      store.getBatch?.(stableQueries) ??
+      Promise.all(stableQueries.map((query) => store.get(query.formId, query.formVersion))).then(
+        (receipts) =>
+          new Map(
+            receipts.flatMap((receipt) =>
+              receipt === null
+                ? []
+                : [[submissionReceiptQueryKey(receipt.formId, receipt.formVersion), receipt] as const]
+            )
+          )
+      );
+    void load
       .then((receipts) => {
         if (active) setState({ receipts, isLoading: false, error: null });
       })

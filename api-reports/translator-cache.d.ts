@@ -25,6 +25,8 @@ interface TranslationCacheOptions {
     readonly variant?: string;
     readonly buildKey?: (context: TranslationCacheKeyContext) => string;
     readonly onStatsReport?: (stats: TranslationCacheStats) => void;
+    readonly cacheErrorPolicy?: "bypass" | "throw";
+    readonly onCacheError?: (error: Error, operation: "get" | "set") => void;
 }
 interface MemoryTranslationCacheOptions {
     readonly maxEntries?: number;

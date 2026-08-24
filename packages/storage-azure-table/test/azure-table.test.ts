@@ -320,6 +320,28 @@ describe("createAzureTableStorage", () => {
     expect(pageRequests).toHaveLength(3);
   });
 
+  it("rejects a text-answer cursor when its filter fingerprint changes", async () => {
+    const { client } = createClientStub();
+    const storage = createAzureTableStorage({ client, maxScanPages: 1 });
+    for (const id of ["one", "two", "three"]) await storage.saveSubmission(submission(id));
+    if (storage.listTextAnswerPage === undefined) throw new Error("Expected text answer paging");
+    const first = await storage.listTextAnswerPage("form", {
+      pageSize: 1,
+      fieldIds: ["answer"],
+      filter: { op: "eq", path: "deckId", value: "A" }
+    });
+    expect(first).toMatchObject({ items: [], hasMore: true });
+    if (first.nextCursor === undefined) throw new Error("Expected a fingerprinted cursor");
+    await expect(
+      storage.listTextAnswerPage("form", {
+        pageSize: 1,
+        fieldIds: ["answer"],
+        filter: { op: "eq", path: "deckId", value: "B" },
+        cursor: first.nextCursor
+      })
+    ).rejects.toThrow("invalid_cursor_context");
+  });
+
   it("deletes individual responses, form responses, schemas, and all configured entities", async () => {
     const { client } = createClientStub();
     const storage = createAzureTableStorage({ client });

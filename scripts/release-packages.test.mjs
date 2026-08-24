@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   discoverReleasePackages,
   formatReleaseNotes,
+  generateApiMigrationNotes,
   publishUnpublishedPackages,
   validateReleasePackages,
   waitForPublishedPackages
@@ -73,10 +74,30 @@ test("skips published versions and publishes only missing packages", async () =>
     skipped: ["@form-engine-ts/core@2.7.0"]
   });
   assert.equal(calls.filter(([command]) => command === "pnpm").length, 1);
+  assert.equal(calls.find(([command]) => command === "pnpm")?.includes("--provenance"), true);
   assert.equal(
     calls.filter(([command]) => command === "npm").every((call) => call.includes("--prefer-online")),
     true
   );
+});
+
+test("generates migration notes from public declaration changes", async () => {
+  const notes = await generateApiMigrationNotes("v2.8.0", {
+    runCommand: async () => ({
+      code: 0,
+      stdout: [
+        "diff --git a/api-reports/core.d.ts b/api-reports/core.d.ts",
+        "--- a/api-reports/core.d.ts",
+        "+++ b/api-reports/core.d.ts",
+        "-declare function oldApi(value: string): void;",
+        "+declare function newApi(value: string): void;"
+      ].join("\n"),
+      stderr: ""
+    })
+  });
+  assert.match(notes, /Compared with `v2\.8\.0`/);
+  assert.match(notes, /core.*Removed\/changed.*oldApi/);
+  assert.match(notes, /core.*Added\/changed.*newApi/);
 });
 
 test("does not publish when npm availability cannot be determined", async () => {

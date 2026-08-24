@@ -3,6 +3,21 @@ import { ReactNode, ComponentType, MouseEvent } from 'react';
 import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, FieldOption, TranslationReport, ValidationError, FormValues, TranslationAdapter, AsyncTranslationAdapter, PopulateTranslationOptions, FormValue, ValidationIssue, AnswerValidationResult, FieldType } from '@form-engine-ts/core';
 import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 
+interface SubmissionAttempt {
+    readonly attemptId: string;
+    readonly formId: string;
+    readonly formVersion: number;
+    readonly createdAt: string;
+}
+interface SubmissionAttemptStore {
+    getOrCreate(formId: string, formVersion: number, idFactory?: () => string): Promise<SubmissionAttempt>;
+    get(formId: string, formVersion: number): Promise<SubmissionAttempt | null>;
+    clear(formId: string, formVersion: number): Promise<void>;
+}
+declare function createLocalStorageSubmissionAttemptStore(options?: {
+    readonly namespace?: string;
+}): SubmissionAttemptStore;
+
 /** @deprecated Import FormPolicy from @form-engine-ts/core instead. */
 type BuilderPolicy = FormPolicy;
 type BuilderIdKind = "field" | "option" | "page";
@@ -97,7 +112,7 @@ interface SubmissionReceiptQuery {
 }
 interface SubmissionReceiptStore {
     get(formId: string, formVersion: number): Promise<SubmissionReceipt | null>;
-    getBatch(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
+    getBatch?(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
     save(receipt: SubmissionReceipt): Promise<void>;
     remove(formId: string, formVersion: number): Promise<void>;
 }
@@ -356,6 +371,8 @@ interface FormRendererSlots {
 interface SubmissionProtectionProps {
     readonly submissionGuards?: readonly SubmissionGuard[];
     readonly receiptStore?: SubmissionReceiptStore;
+    readonly attemptStore?: SubmissionAttemptStore;
+    readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
 }
 type BeforeSubmit = (values: Readonly<Record<string, unknown>>) => "continue" | "cancel" | Promise<"continue" | "cancel">;
 
@@ -403,7 +420,7 @@ interface FormContextValue {
     readonly restoreValues: (values: FormValues) => void;
     readonly validatePage: (pageIndex: number) => AnswerValidationResult;
     readonly reset: () => void;
-    readonly submit: (beforeSubmit?: BeforeSubmit) => Promise<SubmitResult>;
+    readonly submit: (beforeSubmit?: BeforeSubmit, prepareSubmission?: (values: FormValues) => FormValues | Promise<FormValues>) => Promise<SubmitResult>;
     readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }
 interface FormProviderProps {
@@ -458,4 +475,4 @@ interface StandaloneFormRendererProps extends FormRendererPresentationProps {
 type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
 declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
 
-export { type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldState, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSlots, type FormContextValue, FormProvider, type FormProviderProps, FormRenderer, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlots, type FormSubmitHandler, type FormSubmitState, type InputComponentProps, type ManualTranslationContext, type StandaloneFormRendererProps, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionReceiptStore, resolveInitialFieldType, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };
+export { type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldState, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSlots, type FormContextValue, FormProvider, type FormProviderProps, FormRenderer, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlots, type FormSubmitHandler, type FormSubmitState, type InputComponentProps, type ManualTranslationContext, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, resolveInitialFieldType, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };

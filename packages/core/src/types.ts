@@ -277,6 +277,7 @@ export interface VersionTransitionPlan {
 export type StorageCommitError =
   | { readonly type: "revision_conflict"; readonly expectedRevision: number; readonly actualRevision?: number }
   | { readonly type: "draft_already_exists"; readonly currentDraftVersion: number }
+  | { readonly type: "transaction_unsupported" }
   | { readonly type: "invalid_transition"; readonly message: string }
   | { readonly type: "storage_error"; readonly cause: unknown };
 

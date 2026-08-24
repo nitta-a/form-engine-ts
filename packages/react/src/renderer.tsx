@@ -21,6 +21,7 @@ import {
   useRef,
   useState
 } from "react";
+import type { SubmissionAttempt } from "./attempt";
 import { FormProvider, useForm } from "./context";
 import type { SubmissionReceipt } from "./receipt";
 import type {
@@ -354,6 +355,8 @@ function ContextFormRenderer({
   onDraftSave,
   submissionGuards = [],
   receiptStore,
+  attemptStore,
+  onReceiptError,
   slots = {}
 }: FormRendererPresentationProps) {
   const form = useForm();
@@ -539,7 +542,20 @@ function ContextFormRenderer({
     setGuardMessage(null);
     rendererSubmissionInFlight.current = true;
     try {
-      const result = await form.submit(beforeSubmit);
+      let submissionAttempt: SubmissionAttempt | undefined;
+      const result = await form.submit(
+        beforeSubmit,
+        attemptStore === undefined
+          ? undefined
+          : async (values) => {
+              submissionAttempt = await attemptStore.getOrCreate(form.schema.id, form.schema.version);
+              return {
+                ...values,
+                attemptId: submissionAttempt.attemptId,
+                submissionId: submissionAttempt.attemptId
+              };
+            }
+      );
       if (result.status === "invalid") {
         const invalidPageIndex = pages?.findIndex((page) =>
           firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
@@ -551,14 +567,31 @@ function ContextFormRenderer({
       if (result.status !== "success") return result;
       if (receiptStore !== undefined) {
         const response = result.response;
+        const submissionId = response?.submissionId ?? submissionAttempt?.attemptId;
         const storedReceipt: SubmissionReceipt = {
           formId: form.schema.id,
           formVersion: form.schema.version,
           submittedAt: response?.submittedAt ?? new Date().toISOString(),
-          ...(response?.submissionId === undefined ? {} : { submissionId: response.submissionId })
+          ...(submissionId === undefined ? {} : { submissionId })
         };
-        await receiptStore.save(storedReceipt);
-        setReceipt(storedReceipt);
+        try {
+          await receiptStore.save(storedReceipt);
+          setReceipt(storedReceipt);
+        } catch (cause) {
+          const error = cause instanceof Error ? cause : new Error(String(cause));
+          try {
+            onReceiptError?.(error, storedReceipt);
+          } catch {
+            // Receipt notifications must not change a successful submission result.
+          }
+        }
+      }
+      if (attemptStore !== undefined && submissionAttempt !== undefined) {
+        try {
+          await attemptStore.clear(form.schema.id, form.schema.version);
+        } catch {
+          // Attempt cleanup must not change a successful server submission result.
+        }
       }
       if (autoSaveKey !== undefined && typeof globalThis.localStorage !== "undefined") {
         globalThis.localStorage.removeItem(autoSaveKey);

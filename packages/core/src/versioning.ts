@@ -39,6 +39,9 @@ export type VersionTransitionError =
   | { readonly type: "draft_already_exists"; readonly currentDraftVersion: number }
   | { readonly type: "draft_not_found" }
   | { readonly type: "missing_published_record"; readonly expectedVersion: number }
+  | { readonly type: "form_id_mismatch" }
+  | { readonly type: "invalid_published_status" }
+  | { readonly type: "unexpected_published_record" }
   | { readonly type: "revision_conflict"; readonly expectedRevision: number; readonly actualRevision: number }
   | { readonly type: "invalid_source_version"; readonly requestedVersion: number; readonly publishedVersion?: number }
   | { readonly type: "version_immutable"; readonly status: FormVersionStatus }
@@ -225,19 +228,23 @@ function validatePublishedRecord(
   state: FormVersionState,
   record: FormVersionRecord | undefined
 ): { readonly success: false; readonly error: VersionTransitionError } | undefined {
-  if (state.publishedVersion !== undefined && record?.version !== state.publishedVersion) {
+  if (state.publishedVersion === undefined) {
+    return record === undefined ? undefined : { success: false, error: { type: "unexpected_published_record" } };
+  }
+  if (record !== undefined && record.formId !== state.formId) {
+    return { success: false, error: { type: "form_id_mismatch" } };
+  }
+  if (record !== undefined && record.status !== "published") {
+    return { success: false, error: { type: "invalid_published_status" } };
+  }
+  if (record?.version !== state.publishedVersion) {
     return {
       success: false,
       error: { type: "missing_published_record", expectedVersion: state.publishedVersion }
     };
   }
   if (record === undefined) return undefined;
-  if (
-    record.formId !== state.formId ||
-    record.status !== "published" ||
-    record.schema.id !== record.formId ||
-    record.schema.version !== record.version
-  ) {
+  if (record.schema.id !== record.formId || record.schema.version !== record.version) {
     throw new TypeError("currentPublishedRecord must match the state's published version.");
   }
   return undefined;

@@ -39,4 +39,6 @@ owns table creation, credentials, retries, and client lifecycle.
 `listTextAnswerPage` accepts either the legacy single field ID or `TextAnswerPageQueryOptions.fieldIds`. Page size counts
 emitted text items rather than entities. Its opaque Base64 JSON cursor retains the Azure continuation token plus entity
 and field indexes, so a page can resume inside a multi-answer entity without gaps or duplicates. Empty answers do not
-consume the item limit, and scanning remains bounded by `maxScanPages`.
+consume the item limit, and scanning remains bounded by `maxScanPages`. Cursor format version 1 also records the form,
+version, sorted fields, and a SHA-256 filter fingerprint. Reusing a cursor with different query context throws
+`invalid_cursor_context`.

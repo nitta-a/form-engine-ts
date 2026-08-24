@@ -55,9 +55,19 @@ interface AzureTableStorageOptions<T = FormSubmission> {
     readonly toODataFilter?: (options: SubmissionPageQueryOptions) => string;
     readonly maxScanPages?: number;
 }
+interface AzureTextAnswerCursorPayload {
+    readonly formatVersion: 1;
+    readonly formId: string;
+    readonly formVersion?: number;
+    readonly fieldIdsSorted: readonly string[];
+    readonly filterFingerprint: string;
+    readonly tableContinuationToken?: string;
+    readonly entityIndex: number;
+    readonly fieldIndex: number;
+}
 declare const defaultAzureTableSubmissionCodec: AzureTableSubmissionCodec<FormSubmission>;
 declare function metadataFiltersToOData(options: SubmissionPageQueryOptions): string;
 declare function submissionFilterToOData(filter: SubmissionFilter): string | undefined;
 declare function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
 
-export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, createAzureTableStorage, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };
+export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTextAnswerCursorPayload, createAzureTableStorage, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };

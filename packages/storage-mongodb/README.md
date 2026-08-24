@@ -39,3 +39,6 @@ lives in `form_version_states`. `commitVersionTransition(plan)` compares `expect
 `revision_conflict` to losing concurrent publishers; on a real MongoDB client, the state and record changes are committed
 in one transaction. Clone, publish, and draft-delete plans persist complete version state, affected records, and audit
 events. State/record/list reads and typed commit errors are exposed through the full `VersionedFormStorageAdapter` API.
+Version commits require transaction support and return `transaction_unsupported` before any write when it is unavailable.
+MongoDB duplicate-key failures are mapped to `draft_already_exists` or `revision_conflict` rather than a generic storage
+error.

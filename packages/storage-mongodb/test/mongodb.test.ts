@@ -56,7 +56,7 @@ function matches(document: TestDocument, filter: Record<string, unknown>): boole
   });
 }
 
-function createDbStub() {
+function createDbStub(options: { readonly transactionSupported?: boolean } = {}) {
   const collections = new Map<string, Map<string, TestDocument>>();
   const indexes = new Map<
     string,
@@ -174,7 +174,22 @@ function createDbStub() {
       }
     };
   };
-  return { db: { collection } as unknown as Db, collections, indexes };
+  const client = {
+    startSession() {
+      return {
+        async withTransaction(callback: () => Promise<unknown>) {
+          if (options.transactionSupported === false) {
+            throw Object.assign(new Error("Transaction numbers are only allowed on a replica set member or mongos"), {
+              code: 20
+            });
+          }
+          await callback();
+        },
+        async endSession() {}
+      };
+    }
+  };
+  return { db: { collection, client } as unknown as Db, collections, indexes };
 }
 
 function schema(id = "form", version = 1, title = "title"): FormSchema {
@@ -311,9 +326,7 @@ describe("createMongoDbStorage", () => {
       value: { success: true }
     });
     const duplicate = await adapter.commitVersionTransition(plan(1, versionRecord(2, "published")));
-    expect(duplicate).toMatchObject({ success: false, error: { type: "storage_error" } });
-    if (duplicate.success) throw new Error("Expected unique index rejection");
-    expect(String(duplicate.error.type === "storage_error" ? duplicate.error.cause : "")).toContain("E11000");
+    expect(duplicate).toMatchObject({ success: false, error: { type: "revision_conflict" } });
 
     const archivedPlan: VersionTransitionPlan = {
       formId: "archive-form",
@@ -330,6 +343,37 @@ describe("createMongoDbStorage", () => {
     };
     expect(await adapter.commitVersionTransition(archivedPlan)).toEqual({ success: true, value: { success: true } });
     expect(await adapter.listVersionRecords("archive-form")).toHaveLength(2);
+  });
+
+  it("maps the draft partial-index violation to draft_already_exists", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.createIndexes();
+    const draftRecord = (version: number): FormVersionRecord => ({
+      formId: "draft-form",
+      version,
+      status: "draft",
+      schema: schema("draft-form", version),
+      revision: 1,
+      createdAt: "2026-08-25T00:00:00.000Z"
+    });
+    const plan = (expectedRevision: number, version: number): VersionTransitionPlan => ({
+      formId: "draft-form",
+      expectedRevision,
+      nextRevision: expectedRevision + 1,
+      draftToCreate: draftRecord(version),
+      events: [],
+      nextVersion: version + 1,
+      timestamp: "2026-08-25T00:00:00.000Z"
+    });
+    expect(await adapter.commitVersionTransition(plan(0, 1))).toEqual({
+      success: true,
+      value: { success: true }
+    });
+    expect(await adapter.commitVersionTransition(plan(1, 2))).toEqual({
+      success: false,
+      error: { type: "draft_already_exists", currentDraftVersion: 1 }
+    });
   });
 
   it("archives the old published record before saving its replacement", async () => {
@@ -382,6 +426,31 @@ describe("createMongoDbStorage", () => {
       })
     ).toEqual({ success: true, value: { success: true } });
     expect(await adapter.listVersionRecords("replace-form")).toEqual([archived, replacement]);
+  });
+
+  it("fails before writes when transactions are unsupported", async () => {
+    const { db, collections } = createDbStub({ transactionSupported: false });
+    const adapter = createMongoDbStorage({ db });
+    const record: FormVersionRecord = {
+      formId: "standalone",
+      version: 1,
+      status: "draft",
+      schema: schema("standalone", 1),
+      revision: 1,
+      createdAt: "2026-08-25T00:00:00.000Z"
+    };
+    const result = await adapter.commitVersionTransition({
+      formId: "standalone",
+      expectedRevision: 0,
+      nextRevision: 1,
+      draftToCreate: record,
+      events: [],
+      nextVersion: 2,
+      timestamp: "2026-08-25T00:00:00.000Z"
+    });
+    expect(result).toEqual({ success: false, error: { type: "transaction_unsupported" } });
+    expect(collections.get("form_version_states")?.size).toBe(0);
+    expect(collections.get("form_versions")?.size).toBe(0);
   });
 
   it("allows only one concurrent version transition for the same expected revision", async () => {

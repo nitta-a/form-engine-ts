@@ -104,4 +104,9 @@ may push supported nodes to their native query language while preserving identic
 implement `listTextAnswerPage` expose stable cursor pagination over individual text answers.
 `TextAnswerPageQueryOptions.fieldIds` can select multiple free-text fields for item-level paging.
 
+`iterateSubmissionPages(adapter, formId, query, options)` safely traverses every page as an async generator. It supports
+`pageSize`, `maxItems`, and `AbortSignal`, continues through empty pages with a next cursor, and rejects missing or cyclic
+cursors instead of looping indefinitely. Publish transition validation also rejects mismatched form IDs, non-Published
+records, and an unexpected current record with typed errors.
+
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.

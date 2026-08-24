@@ -34,7 +34,10 @@ export interface FormContextValue {
   readonly restoreValues: (values: FormValues) => void;
   readonly validatePage: (pageIndex: number) => AnswerValidationResult;
   readonly reset: () => void;
-  readonly submit: (beforeSubmit?: BeforeSubmit) => Promise<SubmitResult>;
+  readonly submit: (
+    beforeSubmit?: BeforeSubmit,
+    prepareSubmission?: (values: FormValues) => FormValues | Promise<FormValues>
+  ) => Promise<SubmitResult>;
   readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }
 
@@ -138,7 +141,10 @@ export function FormProvider({
   }, [initialValues]);
 
   const submit = useCallback(
-    async (beforeSubmit?: BeforeSubmit): Promise<SubmitResult> => {
+    async (
+      beforeSubmit?: BeforeSubmit,
+      prepareSubmission?: (values: FormValues) => FormValues | Promise<FormValues>
+    ): Promise<SubmitResult> => {
       if (submissionInFlight.current) return { status: "cancelled" };
       const validation = validateAnswers(validSchema, values);
       if (!validation.valid) {
@@ -159,7 +165,9 @@ export function FormProvider({
           setSubmitStatus("idle");
           return { status: "cancelled" };
         }
-        const response = await onSubmit(visibleValues);
+        const submissionValues =
+          prepareSubmission === undefined ? visibleValues : await prepareSubmission(visibleValues);
+        const response = await onSubmit(submissionValues);
         if (resetOnSuccess) setValues({ ...initialValues });
         setSubmitStatus("success");
         return response === undefined ? { status: "success" } : { status: "success", response };

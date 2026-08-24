@@ -8,7 +8,7 @@ export const customerFeedbackSchema = {
   completionMessage: "ご回答ありがとうございました。",
   defaultLocale: "ja",
   supportedLocales: ["ja", "en"],
-  metadata: { owner: "ARGS", release: "v2.8.0" },
+  metadata: { owner: "ARGS", release: "v2.9.0" },
   translations: {
     en: {
       title: "Service satisfaction",

@@ -27,3 +27,5 @@ are deduplicated, translated once in source order, cached, and restored to their
 cache applies both TTL expiration and bounded LRU eviction and exposes `size`, `evictionCount`, and `clear()` diagnostics.
 Use `variant` to isolate glossary/model/configuration revisions, or `buildKey` for complete key control.
 `onStatsReport` receives cumulative real cache hits, misses, evictions, and current size after successful translations.
+Cache backend failures default to `cacheErrorPolicy: "bypass"`: `onCacheError` is notified and translation continues
+through the wrapped adapter. Use `cacheErrorPolicy: "throw"` when cache availability is mandatory.

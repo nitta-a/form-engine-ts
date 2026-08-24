@@ -18,7 +18,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "test": "turbo run test",
-    "test:release": "node --test scripts/release-packages.test.mjs",
+    "test:release": "node --test scripts/check-public-api.test.mjs scripts/release-packages.test.mjs",
     "turbo": "turbo",
     "typecheck": "turbo run typecheck"
   },

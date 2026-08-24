@@ -117,4 +117,44 @@ describe("withTranslationCache", () => {
     });
     expect(set).toHaveBeenCalledWith("model-2:hello", "hello", undefined);
   });
+
+  it("bypasses cache get and set failures while reporting them", async () => {
+    const getError = new Error("cache get unavailable");
+    const setError = new Error("cache set unavailable");
+    const onCacheError = vi.fn();
+    const translateBatch = vi.fn(async (texts: readonly string[]) => texts.map((text) => text.toUpperCase()));
+    const translator = withTranslationCache(
+      { translateText: async (text) => text.toUpperCase(), translateBatch },
+      {
+        get() {
+          throw getError;
+        },
+        async set() {
+          throw setError;
+        }
+      },
+      { onCacheError }
+    );
+    await expect(translator.translateBatch(["hello"], "ja", "en")).resolves.toEqual(["HELLO"]);
+    expect(translateBatch).toHaveBeenCalledWith(["hello"], "ja", "en");
+    expect(onCacheError).toHaveBeenNthCalledWith(1, getError, "get");
+    expect(onCacheError).toHaveBeenNthCalledWith(2, setError, "set");
+  });
+
+  it("propagates cache errors when cacheErrorPolicy is throw", async () => {
+    const error = new Error("strict cache failure");
+    const translateBatch = vi.fn(async (texts: readonly string[]) => texts);
+    const translator = withTranslationCache(
+      { translateText: async (text) => text, translateBatch },
+      {
+        async get() {
+          throw error;
+        },
+        async set() {}
+      },
+      { cacheErrorPolicy: "throw" }
+    );
+    await expect(translator.translateText("hello", "ja", "en")).rejects.toBe(error);
+    expect(translateBatch).not.toHaveBeenCalled();
+  });
 });

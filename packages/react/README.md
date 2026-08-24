@@ -128,3 +128,9 @@ The Builder basic-settings section edits source `title` and `description` throug
 Submission confirmation slots receive the effective message, localized schema, and visible answers. An `onSubmit` result
 may provide `submissionId` and `submittedAt`, which Renderer copies into its receipt. Receipt stores support `getBatch`,
 and `useSubmissionReceipts` loads multiple form/version receipts for list and dashboard surfaces.
+
+Receipt persistence is best-effort: `onReceiptError` observes storage failures while the successful completion screen is
+preserved. Pass an SSR-safe `createLocalStorageSubmissionAttemptStore()` as `attemptStore` to reserve an ID immediately
+before submission. Renderer injects it as `attemptId` and `submissionId`, retains it after a failed request, promotes it
+to the receipt after success, and then clears the attempt. Custom receipt stores may omit `getBatch`; the hook falls back
+to concurrent `get` calls.

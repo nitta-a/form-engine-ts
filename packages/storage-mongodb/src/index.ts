@@ -205,14 +205,32 @@ function parseVersionRecordDocument(document: StoredVersionDocument): FormVersio
   return cloneJson(document.record);
 }
 
-function isCasConflict(error: unknown): boolean {
+function mongoErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : isRecord(error) ? String(error.message ?? "") : "";
+}
+
+function isDuplicateKeyError(error: unknown): boolean {
+  return isRecord(error) && error.code === 11000;
+}
+
+function duplicateIndexName(error: unknown): string | undefined {
+  if (!isDuplicateKeyError(error)) return undefined;
+  return /unique_(?:draft|published|version)_per_form/u.exec(mongoErrorMessage(error))?.[0];
+}
+
+function isRevisionConflict(error: unknown): boolean {
   if (!isRecord(error)) return false;
-  if (error.code === 11000) {
-    const message = error instanceof Error ? error.message : String(error.message ?? "");
-    return !/unique_(?:draft|published|version)_per_form/u.test(message);
-  }
+  if (error.code === 11000) return duplicateIndexName(error) !== "unique_draft_per_form";
   if (error.code === 112 || error.code === 251) return true;
   return typeof error.hasErrorLabel === "function" && error.hasErrorLabel("TransientTransactionError") === true;
+}
+
+function isTransactionUnsupported(error: unknown): boolean {
+  if (!isRecord(error)) return false;
+  if (error.code === 20 || error.code === 263 || error.code === 303) return true;
+  return /transaction numbers are only allowed|transactions? (?:are|is) not supported|replica set member|mongos/iu.test(
+    mongoErrorMessage(error)
+  );
 }
 
 function parseSchemaDocument(document: StoredSchemaDocument): FormSchema {
@@ -287,6 +305,27 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         ...(actual === null ? {} : { actualRevision: actual.revision })
       }
     };
+  };
+
+  const storageDraftAlreadyExists = async (
+    plan: VersionTransitionPlan
+  ): Promise<{ readonly success: false; readonly error: StorageCommitError }> => {
+    const state = await versionStates.findOne({ _id: plan.formId });
+    const record = await versions.findOne({ formId: plan.formId, status: "draft" });
+    const currentDraftVersion = record?.version ?? state?.draftVersion ?? plan.draftToCreate?.version;
+    return currentDraftVersion === undefined
+      ? storageRevisionConflict(plan)
+      : { success: false, error: { type: "draft_already_exists", currentDraftVersion } };
+  };
+
+  const mapCommitError = async (
+    error: unknown,
+    plan: VersionTransitionPlan
+  ): Promise<{ readonly success: false; readonly error: StorageCommitError }> => {
+    if (isTransactionUnsupported(error)) return { success: false, error: { type: "transaction_unsupported" } };
+    if (duplicateIndexName(error) === "unique_draft_per_form") return storageDraftAlreadyExists(plan);
+    if (isRevisionConflict(error)) return storageRevisionConflict(plan);
+    return { success: false, error: { type: "storage_error", cause: error } };
   };
 
   const upsertVersionRecord = async (record: FormVersionRecord, session?: ClientSession): Promise<void> => {
@@ -596,16 +635,20 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
       }
       const client = options.db.client;
       if (client === undefined || typeof client.startSession !== "function") {
-        try {
-          return await applyVersionTransition(plan);
-        } catch (error) {
-          if (isCasConflict(error)) {
-            return storageRevisionConflict(plan);
-          }
-          return { success: false, error: { type: "storage_error", cause: error } };
-        }
+        return { success: false, error: { type: "transaction_unsupported" } };
       }
-      const session = client.startSession();
+      let session: ClientSession;
+      try {
+        session = client.startSession();
+      } catch (error) {
+        return isTransactionUnsupported(error)
+          ? { success: false, error: { type: "transaction_unsupported" } }
+          : { success: false, error: { type: "storage_error", cause: error } };
+      }
+      if (typeof session.withTransaction !== "function") {
+        await session.endSession();
+        return { success: false, error: { type: "transaction_unsupported" } };
+      }
       try {
         let result:
           | { readonly success: true; readonly value: { readonly success: true } }
@@ -618,10 +661,7 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         });
         return result;
       } catch (error) {
-        if (isCasConflict(error)) {
-          return storageRevisionConflict(plan);
-        }
-        return { success: false, error: { type: "storage_error", cause: error } };
+        return mapCommitError(error, plan);
       } finally {
         await session.endSession();
       }

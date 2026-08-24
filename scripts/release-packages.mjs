@@ -86,9 +86,11 @@ export async function publishUnpublishedPackages(packages, options = {}) {
       throw new Error(`Unable to determine npm publication state for ${identifier}: ${lookup.stderr || lookup.stdout}`);
     }
     options.onStatus?.(`publish ${identifier}`);
-    const result = await execute("pnpm", ["--dir", pkg.directory, "publish", "--access", "public", "--no-git-checks"], {
-      env: options.env
-    });
+    const result = await execute(
+      "pnpm",
+      ["--dir", pkg.directory, "publish", "--access", "public", "--provenance", "--no-git-checks"],
+      { env: options.env }
+    );
     if (result.code !== 0) throw new Error(`Publishing ${identifier} failed with exit code ${result.code}.`);
     published.push(identifier);
   }
@@ -146,6 +148,54 @@ export function formatReleaseNotes(version, result) {
   ].join("\n");
 }
 
+export async function resolvePreviousReleaseTag(expectedVersion, options = {}) {
+  const execute = options.runCommand ?? runCommand;
+  const current = await execute("git", ["describe", "--tags", "--abbrev=0"], { capture: true });
+  if (current.code !== 0) return undefined;
+  const currentTag = current.stdout.trim();
+  if (currentTag.replace(/^v/, "") !== expectedVersion) return currentTag;
+  const previous = await execute("git", ["describe", "--tags", "--abbrev=0", "HEAD^"], { capture: true });
+  return previous.code === 0 ? previous.stdout.trim() : undefined;
+}
+
+export async function generateApiMigrationNotes(previousTag, options = {}) {
+  if (previousTag === undefined) return "## API migration notes\n\n- No previous release tag was found.";
+  const execute = options.runCommand ?? runCommand;
+  const result = await execute("git", ["diff", "--unified=0", previousTag, "--", "api-reports"], { capture: true });
+  if (result.code !== 0)
+    throw new Error(`Unable to generate API migration notes from ${previousTag}: ${result.stderr}`);
+  const changes = [];
+  let report = "unknown";
+  for (const line of result.stdout.split(/\r?\n/u)) {
+    const match = /^\+\+\+ b\/api-reports\/(.+)\.d\.ts$/u.exec(line);
+    if (match?.[1] !== undefined) {
+      report = match[1];
+      continue;
+    }
+    if ((!line.startsWith("+") && !line.startsWith("-")) || line.startsWith("+++") || line.startsWith("---")) {
+      continue;
+    }
+    const declaration = line.slice(1).trim();
+    if (declaration.length === 0 || declaration.startsWith("export {")) continue;
+    changes.push({ report, kind: line[0] === "+" ? "Added/changed" : "Removed/changed", declaration });
+  }
+  if (changes.length === 0)
+    return `## API migration notes\n\nCompared with \`${previousTag}\`.\n\n- No public declaration changes.`;
+  return [
+    "## API migration notes",
+    "",
+    `Compared with \`${previousTag}\`. Review changed signatures when upgrading:`,
+    "",
+    ...changes
+      .slice(0, 100)
+      .map(
+        ({ report: packageReport, kind, declaration }) =>
+          `- **${packageReport}** ${kind}: \`${declaration.slice(0, 240).replaceAll("`", "\\`")}\``
+      ),
+    ...(changes.length <= 100 ? [] : [`- ${changes.length - 100} additional declaration changes omitted.`])
+  ].join("\n");
+}
+
 async function writeGitHubOutputs(version, result) {
   const outputPath = process.env.GITHUB_OUTPUT;
   if (outputPath === undefined) return;
@@ -176,7 +226,12 @@ async function main() {
     console.log(`Published ${result.published.length}; skipped ${result.skipped.length}.`);
     return;
   }
-  throw new Error("Usage: node scripts/release-packages.mjs <validate|publish>");
+  if (command === "migration-notes") {
+    const previousTag = await resolvePreviousReleaseTag(expectedVersion);
+    console.log(await generateApiMigrationNotes(previousTag));
+    return;
+  }
+  throw new Error("Usage: node scripts/release-packages.mjs <validate|publish|migration-notes>");
 }
 
 if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {

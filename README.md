@@ -60,7 +60,7 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security, v2 extensibility, and v2.8 domain/infrastructure APIs
+### v1.1.1 security, v2 extensibility, and v2.9 resilience APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
@@ -120,6 +120,12 @@ item-level text-answer paging with cursors that resume inside an entity. React B
 Renderer confirmation slots receive schema and visible answers, `onSubmit` response IDs flow into receipts, and batch
 receipt hooks support dashboard views. Privacy detection recognizes `www.` URLs and merges overlapping findings. The
 translation cache adds variant/custom keys and cumulative hit, miss, eviction, and size reporting.
+
+v2.9 makes receipt persistence best-effort and adds SSR-safe submission attempts so network retries reuse a reserved ID.
+Core provides abortable, cycle-safe page iteration and stricter Published-record guards. Azure text-answer cursors are
+bound to their exact query by a SHA-256 fingerprint; MongoDB version commits fail fast when transactions are unavailable;
+translation caches can bypass backend failures or propagate them by policy. Release CI now blocks incompatible public API
+changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ### Define and render a form
 
@@ -425,7 +431,7 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応、v2拡張、v2.8ドメイン／インフラAPI
+### v1.1.1セキュリティ対応、v2拡張、v2.9耐障害性API
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
@@ -480,6 +486,12 @@ v2.8では既存フォームの公開時に完全な現Published recordを必須
 item単位のbounded自由記述pagingに対応しました。React Builderはフォーム原文を直接編集でき、Rendererの確認slotへ
 schemaと表示中回答を渡し、`onSubmit`の回答IDをreceiptへ保存し、batch receipt hookで一覧取得できます。Privacyは
 `www.` URLと重複finding集約に対応し、翻訳cacheはvariant/custom keyおよびhit/miss/eviction/size統計を公開します。
+
+v2.9ではreceipt保存をbest-effort化し、SSR-safeなsubmission attemptにより通信失敗後も予約済みIDで再送できます。
+Coreはabort・cursor循環・空page・件数上限に対応するpage iteratorとPublished recordの厳密検証を追加しました。
+Azureの自由記述cursorはSHA-256検索指紋でqueryへ固定され、MongoDBのversion commitはtransaction非対応時に部分更新せず
+fail-fastします。翻訳cacheはbackend障害をbypassまたはthrowするpolicyを選択できます。Release CIはmajor releaseを
+伴わない破壊的public API変更を拒否し、npm provenanceとAPI migration noteを生成します。
 
 ### フォームの定義とレンダリング
 

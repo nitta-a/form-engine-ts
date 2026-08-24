@@ -11,6 +11,7 @@ import type {
 } from "@form-engine-ts/core";
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import type { ComponentType, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { SubmissionAttemptStore } from "./attempt";
 import type { FormBuilderResult } from "./hooks/useFormBuilder";
 import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
 
@@ -282,6 +283,8 @@ export interface FormRendererSlots {
 export interface SubmissionProtectionProps {
   readonly submissionGuards?: readonly SubmissionGuard[];
   readonly receiptStore?: SubmissionReceiptStore;
+  readonly attemptStore?: SubmissionAttemptStore;
+  readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
 }
 
 export type BeforeSubmit = (

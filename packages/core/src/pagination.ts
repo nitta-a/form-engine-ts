@@ -1,4 +1,73 @@
-import type { FormSubmission, JsonValue, SubmissionFilter, SubmissionPageQueryOptions } from "./types";
+import type {
+  FormResponse,
+  FormSubmission,
+  JsonValue,
+  PagedSubmissionStorageAdapter,
+  SubmissionFilter,
+  SubmissionPageQueryOptions
+} from "./types";
+
+export interface PaginationIteratorOptions {
+  readonly pageSize?: number;
+  readonly maxItems?: number;
+  readonly signal?: AbortSignal;
+}
+
+function asFormResponse(submission: FormSubmission): FormResponse {
+  return {
+    responseId: submission.id,
+    formId: submission.formId,
+    formVersion: submission.formVersion,
+    sourceLocale: submission.locale,
+    answers: submission.values,
+    submittedAt: submission.submittedAt,
+    ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+  };
+}
+
+export async function* iterateSubmissionPages(
+  adapter: PagedSubmissionStorageAdapter,
+  formId: string,
+  queryOptions: SubmissionPageQueryOptions = {},
+  options: PaginationIteratorOptions = {}
+): AsyncIterable<readonly FormResponse[]> {
+  const pageSize = normalizeSubmissionPageSize(options.pageSize ?? queryOptions.pageSize);
+  const maxItems = options.maxItems ?? Number.POSITIVE_INFINITY;
+  if (maxItems !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(maxItems) || maxItems < 0)) {
+    throw new TypeError("maxItems must be a non-negative safe integer.");
+  }
+  if (maxItems === 0) return;
+  const seenCursors = new Set<string>();
+  let cursor = queryOptions.cursor;
+  const { cursor: _initialCursor, pageSize: _initialPageSize, ...baseQueryOptions } = queryOptions;
+  if (cursor !== undefined) seenCursors.add(cursor);
+  let emitted = 0;
+
+  while (emitted < maxItems) {
+    options.signal?.throwIfAborted();
+    const remaining = maxItems - emitted;
+    const requestedPageSize = Number.isFinite(remaining) ? Math.min(pageSize, remaining) : pageSize;
+    const page = await adapter.listSubmissionPage(formId, {
+      ...baseQueryOptions,
+      pageSize: requestedPageSize,
+      ...(cursor === undefined ? {} : { cursor })
+    });
+    options.signal?.throwIfAborted();
+    const available = Number.isFinite(remaining) ? page.items.slice(0, remaining) : page.items;
+    if (available.length > 0) {
+      emitted += available.length;
+      yield available.map(asFormResponse);
+    }
+    if (!page.hasMore || emitted >= maxItems) return;
+    const nextCursor = page.nextCursor;
+    if (nextCursor === undefined || nextCursor.length === 0) {
+      throw new Error("Submission pagination returned hasMore without a next cursor.");
+    }
+    if (seenCursors.has(nextCursor)) throw new Error(`Submission pagination cursor cycle detected: ${nextCursor}`);
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+}
 
 export interface SubmissionCursorValue {
   readonly submittedAt: string;
