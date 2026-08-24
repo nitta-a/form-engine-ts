@@ -1,4 +1,4 @@
-import type { ExtensibleNode, FormSchema, SchemaIssue, VersionTransitionPlan } from "./types";
+import type { ExtensibleNode, FormSchema, JsonValue, SchemaIssue, VersionTransitionPlan } from "./types";
 
 export type Result<T, E> =
   | { readonly success: true; readonly value: T }
@@ -26,6 +26,15 @@ export interface FormVersionState {
   readonly revision: number;
 }
 
+export interface VersionTransitionEvent {
+  readonly type: "draft.created" | "draft.deleted" | "version.published" | "version.archived";
+  readonly formId: string;
+  readonly fromRevision: number;
+  readonly toRevision: number;
+  readonly affectedVersions: readonly number[];
+  readonly occurredAt: string;
+}
+
 export type VersionTransitionError =
   | { readonly type: "draft_already_exists"; readonly currentDraftVersion: number }
   | { readonly type: "draft_not_found" }
@@ -38,6 +47,8 @@ export type VersionTransitionError =
 export interface CloneVersionOptions {
   readonly maxVersions?: number;
   readonly expectedRevision?: number;
+  readonly clonedAt?: string;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
   /** Additional known published versions that may be used as a clone source. */
   readonly allowedSourceVersions?: readonly number[];
 }
@@ -55,6 +66,7 @@ export interface PublishDraftOptions {
 
 export interface DeleteDraftOptions {
   readonly expectedRevision?: number;
+  readonly deletedAt?: string;
 }
 
 export interface PublishDraftResult {
@@ -85,6 +97,29 @@ function validateState(state: FormVersionState): void {
   if (!Number.isSafeInteger(state.revision) || state.revision < 0) {
     throw new TypeError("revision must be a non-negative safe integer.");
   }
+}
+
+function requireTimestamp(value: string | undefined, name: string): string {
+  const timestamp = value ?? "1970-01-01T00:00:00.000Z";
+  if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError(`${name} must be a valid date string.`);
+  return timestamp;
+}
+
+function transitionEvent(
+  type: VersionTransitionEvent["type"],
+  state: FormVersionState,
+  nextState: FormVersionState,
+  affectedVersions: readonly number[],
+  occurredAt: string
+): VersionTransitionEvent {
+  return {
+    type,
+    formId: state.formId,
+    fromRevision: state.revision,
+    toRevision: nextState.revision,
+    affectedVersions,
+    occurredAt
+  };
 }
 
 export function cloneVersionToDraft(
@@ -135,6 +170,56 @@ export function cloneVersionToDraft(
   };
 }
 
+export function createCloneTransitionPlan(
+  state: FormVersionState,
+  sourceRecord: FormVersionRecord,
+  options: CloneVersionOptions = {}
+): Result<{ readonly nextState: FormVersionState; readonly plan: VersionTransitionPlan }, VersionTransitionError> {
+  if (
+    sourceRecord.formId !== state.formId ||
+    sourceRecord.schema.id !== sourceRecord.formId ||
+    sourceRecord.schema.version !== sourceRecord.version ||
+    (sourceRecord.status !== "published" && !options.allowedSourceVersions?.includes(sourceRecord.version))
+  ) {
+    return {
+      success: false,
+      error: {
+        type: "invalid_source_version",
+        requestedVersion: sourceRecord.version,
+        ...(state.publishedVersion === undefined ? {} : { publishedVersion: state.publishedVersion })
+      }
+    };
+  }
+  const result = cloneVersionToDraft(state, sourceRecord.schema, options);
+  if (!result.success) return result;
+  const timestamp = requireTimestamp(options.clonedAt, "clonedAt");
+  const draftRecord: FormVersionRecord = {
+    formId: state.formId,
+    version: result.value.draftSchema.version,
+    status: "draft",
+    schema: result.value.draftSchema,
+    revision: 1,
+    createdFromVersion: sourceRecord.version,
+    createdAt: timestamp,
+    ...(options.metadata === undefined ? {} : { metadata: options.metadata })
+  };
+  return {
+    success: true,
+    value: {
+      nextState: result.value.nextState,
+      plan: {
+        formId: state.formId,
+        expectedRevision: options.expectedRevision ?? state.revision,
+        nextRevision: result.value.nextState.revision,
+        draftToCreate: draftRecord,
+        events: [transitionEvent("draft.created", state, result.value.nextState, [draftRecord.version], timestamp)],
+        nextVersion: result.value.nextState.nextVersion,
+        timestamp
+      }
+    }
+  };
+}
+
 function validatePublishedRecord(state: FormVersionState, record: FormVersionRecord | undefined): void {
   if (record === undefined) return;
   if (
@@ -149,9 +234,7 @@ function validatePublishedRecord(state: FormVersionState, record: FormVersionRec
 }
 
 function transitionTimestamp(options: PublishDraftOptions): string {
-  const timestamp = options.publishedAt ?? options.timestamp ?? "1970-01-01T00:00:00.000Z";
-  if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("publishedAt must be a valid date string.");
-  return timestamp;
+  return requireTimestamp(options.publishedAt ?? options.timestamp, "publishedAt");
 }
 
 export async function publishDraft(
@@ -258,6 +341,21 @@ export async function createPublishTransitionPlan(
         draftToDeleteVersion: draftRecord.version,
         publishedRecordToSave,
         archivedRecordsToSave: result.value.archivedRecords,
+        events: [
+          ...(result.value.archivedRecords.length === 0
+            ? []
+            : [
+                transitionEvent(
+                  "version.archived",
+                  state,
+                  result.value.nextState,
+                  result.value.archivedRecords.map((record) => record.version),
+                  timestamp
+                )
+              ]),
+          transitionEvent("version.published", state, result.value.nextState, [draftRecord.version], timestamp)
+        ],
+        nextVersion: result.value.nextState.nextVersion,
         timestamp
       }
     }
@@ -276,6 +374,40 @@ export function deleteDraft(
   return {
     success: true,
     value: { nextState: { ...stateWithoutDraft, revision: state.revision + 1 } }
+  };
+}
+
+export function createDeleteDraftTransitionPlan(
+  state: FormVersionState,
+  draftRecord: FormVersionRecord,
+  options: DeleteDraftOptions = {}
+): Result<{ readonly nextState: FormVersionState; readonly plan: VersionTransitionPlan }, VersionTransitionError> {
+  if (
+    draftRecord.formId !== state.formId ||
+    draftRecord.version !== state.draftVersion ||
+    draftRecord.status !== "draft" ||
+    draftRecord.schema.id !== state.formId ||
+    draftRecord.schema.version !== draftRecord.version
+  ) {
+    return { success: false, error: { type: "draft_not_found" } };
+  }
+  const result = deleteDraft(state, options);
+  if (!result.success) return result;
+  const timestamp = requireTimestamp(options.deletedAt, "deletedAt");
+  return {
+    success: true,
+    value: {
+      nextState: result.value.nextState,
+      plan: {
+        formId: state.formId,
+        expectedRevision: options.expectedRevision ?? state.revision,
+        nextRevision: result.value.nextState.revision,
+        draftToDeleteVersion: draftRecord.version,
+        events: [transitionEvent("draft.deleted", state, result.value.nextState, [draftRecord.version], timestamp)],
+        nextVersion: result.value.nextState.nextVersion,
+        timestamp
+      }
+    }
   };
 }
 

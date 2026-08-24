@@ -187,6 +187,17 @@ describe("form version transitions", () => {
             publishedAt: "2026-08-24T09:00:00.000Z"
           },
           archivedRecordsToSave: [],
+          events: [
+            {
+              type: "version.published",
+              formId: "analytics",
+              fromRevision: 7,
+              toRevision: 8,
+              affectedVersions: [3],
+              occurredAt: "2026-08-24T09:00:00.000Z"
+            }
+          ],
+          nextVersion: 3,
           timestamp: "2026-08-24T09:00:00.000Z"
         }
       }

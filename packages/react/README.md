@@ -116,3 +116,10 @@ translation lifecycle.
 Validation runs before `beforeSubmit`. A `"cancel"` result does not call `onSubmit` and preserves values and drafts.
 Header, page-header, field, navigation, submit, validation-summary, completion, and submit-error slots can replace the
 default UI. The localized `completionMessage` is displayed after a successful submission.
+
+Pass ordered `submissionGuards` to allow, block, or require confirmation before `onSubmit`. Confirmation receives all
+guard findings through `renderSubmissionConfirmation`. A `receiptStore` prevents accidental repeat submissions and can
+be created with the SSR-safe `createLocalStorageSubmissionReceiptStore`; `renderAlreadySubmitted` customizes its return
+state. Text controls forward schema `minLength`, `maxLength`, and `pattern` constraints to the DOM, and
+`renderCharacterCount` can replace the default count. Guard evaluation, confirmation, receipt persistence, and provider
+submission share an in-flight lock so rapid clicks cannot submit twice.

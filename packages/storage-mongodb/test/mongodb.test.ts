@@ -1,4 +1,11 @@
-import type { FormSchema, FormSubmission, FormVersionRecord, VersionTransitionPlan } from "@form-engine-ts/core";
+import {
+  createCloneTransitionPlan,
+  createDeleteDraftTransitionPlan,
+  type FormSchema,
+  type FormSubmission,
+  type FormVersionRecord,
+  type VersionTransitionPlan
+} from "@form-engine-ts/core";
 import type { Db } from "mongodb";
 import { createMongoDbStorage } from "../src";
 
@@ -16,6 +23,11 @@ function property(document: TestDocument, path: string): unknown {
 
 function matches(document: TestDocument, filter: Record<string, unknown>): boolean {
   return Object.entries(filter).every(([key, value]) => {
+    if (key === "$and") {
+      return (
+        Array.isArray(value) && value.every((candidate) => matches(document, candidate as Record<string, unknown>))
+      );
+    }
     if (key === "$or") {
       return Array.isArray(value) && value.some((candidate) => matches(document, candidate as Record<string, unknown>));
     }
@@ -25,11 +37,21 @@ function matches(document: TestDocument, filter: Record<string, unknown>): boole
     const minimum = operators.$gte;
     const maximum = operators.$lte;
     const greaterThan = operators.$gt;
+    const included = operators.$in;
+    const exists = operators.$exists;
+    const expectedType = operators.$type;
+    const comparable = (left: unknown, right: unknown, comparison: (result: number) => boolean) => {
+      if (typeof left === "number" && typeof right === "number") return comparison(left - right);
+      if (typeof left === "string" && typeof right === "string") return comparison(left.localeCompare(right));
+      return false;
+    };
     return (
-      (minimum === undefined || (typeof actual === "string" && typeof minimum === "string" && actual >= minimum)) &&
-      (maximum === undefined || (typeof actual === "string" && typeof maximum === "string" && actual <= maximum)) &&
-      (greaterThan === undefined ||
-        (typeof actual === "string" && typeof greaterThan === "string" && actual > greaterThan))
+      (minimum === undefined || comparable(actual, minimum, (result) => result >= 0)) &&
+      (maximum === undefined || comparable(actual, maximum, (result) => result <= 0)) &&
+      (greaterThan === undefined || comparable(actual, greaterThan, (result) => result > 0)) &&
+      (included === undefined || (Array.isArray(included) && included.includes(actual))) &&
+      (exists === undefined || (actual !== undefined) === exists) &&
+      (expectedType === undefined || (expectedType === "string" && typeof actual === "string"))
     );
   });
 }
@@ -238,13 +260,71 @@ describe("createMongoDbStorage", () => {
       draftToDeleteVersion: 2,
       publishedRecordToSave: record,
       archivedRecordsToSave: [],
+      events: [
+        {
+          type: "version.published",
+          formId: "form",
+          fromRevision: 0,
+          toRevision: 1,
+          affectedVersions: [2],
+          occurredAt: "2026-08-24T01:00:00.000Z"
+        }
+      ],
+      nextVersion: 3,
       timestamp: "2026-08-24T01:00:00.000Z"
     };
     const results = await Promise.all([adapter.commitVersionTransition(plan), adapter.commitVersionTransition(plan)]);
-    expect(results).toContainEqual({ success: true });
-    expect(results).toContainEqual({ success: false, error: "revision_conflict" });
+    expect(results).toContainEqual({ success: true, value: { success: true } });
+    expect(results).toContainEqual({
+      success: false,
+      error: { type: "revision_conflict", expectedRevision: 0, actualRevision: 1 }
+    });
     expect(collections.get("form_version_states")?.get("form")?.revision).toBe(1);
     expect(collections.get("form_versions")?.get("version:form:2")?.record).toEqual(record);
+    expect(await adapter.getVersionState("form")).toEqual({
+      formId: "form",
+      revision: 1,
+      nextVersion: 3,
+      publishedVersion: 2
+    });
+    expect(await adapter.getVersionRecord("form", 2)).toEqual(record);
+    expect(await adapter.listVersionRecords("form")).toEqual([record]);
+    expect(collections.get("form_version_events")?.size).toBe(1);
+  });
+
+  it("returns a typed storage conflict for a stale delete plan after cloning", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    const sourceRecord: FormVersionRecord = {
+      formId: "form",
+      version: 1,
+      status: "published",
+      schema: schema("form", 1),
+      revision: 1,
+      createdAt: "2026-08-25T00:00:00.000Z",
+      publishedAt: "2026-08-25T00:00:00.000Z"
+    };
+    const clone = createCloneTransitionPlan(
+      { formId: "form", revision: 0, nextVersion: 2, publishedVersion: 1 },
+      sourceRecord,
+      { expectedRevision: 0, clonedAt: "2026-08-25T01:00:00.000Z" }
+    );
+    if (!clone.success || clone.value.plan.draftToCreate === undefined) throw new Error("Expected a clone plan");
+    expect(await adapter.commitVersionTransition(clone.value.plan)).toEqual({
+      success: true,
+      value: { success: true }
+    });
+
+    const staleDelete = createDeleteDraftTransitionPlan(
+      { ...clone.value.nextState, revision: 0 },
+      clone.value.plan.draftToCreate,
+      { expectedRevision: 0, deletedAt: "2026-08-25T02:00:00.000Z" }
+    );
+    if (!staleDelete.success) throw new Error("Expected a delete plan");
+    expect(await adapter.commitVersionTransition(staleDelete.value.plan)).toEqual({
+      success: false,
+      error: { type: "revision_conflict", expectedRevision: 0, actualRevision: 1 }
+    });
   });
 
   it("pages deterministically across equal timestamps and filters locale", async () => {
@@ -275,6 +355,33 @@ describe("createMongoDbStorage", () => {
       filter: (item) => item.metadata?.channel === "ARGS"
     });
     expect(page).toEqual({ items: [expected], hasMore: false });
+  });
+
+  it("pushes generic filter ASTs into MongoDB and pages free-text answers", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.saveSubmission({ ...submission("a"), values: { answer: "first" }, metadata: { channel: "ARGS" } });
+    await adapter.saveSubmission({ ...submission("b"), values: { answer: "second" }, metadata: { channel: "ARGS" } });
+    await adapter.saveSubmission({ ...submission("c"), values: { answer: "third" }, metadata: { channel: "other" } });
+    const query = {
+      pageSize: 1,
+      filter: {
+        op: "and" as const,
+        filters: [
+          { op: "eq" as const, path: "metadata.channel", value: "ARGS" },
+          { op: "in" as const, path: "values.answer", values: ["first", "second"] }
+        ]
+      }
+    };
+    expect((await adapter.listSubmissionPage("form", query)).items.map((item) => item.id)).toEqual(["a"]);
+    const first = await adapter.listTextAnswerPage?.("form", "answer", query);
+    expect(first?.items).toEqual([
+      expect.objectContaining({ responseId: "a", fieldId: "answer", text: "first", metadata: { channel: "ARGS" } })
+    ]);
+    if (first?.nextCursor === undefined) throw new Error("Expected a text answer cursor.");
+    const second = await adapter.listTextAnswerPage?.("form", "answer", { ...query, cursor: first.nextCursor });
+    expect(second?.items).toEqual([expect.objectContaining({ responseId: "b", text: "second" })]);
+    expect(second?.hasMore).toBe(false);
   });
 
   it("clears one form across versions without deleting schemas or other forms", async () => {

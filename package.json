@@ -8,6 +8,8 @@
     "node": ">=22.22.2"
   },
   "scripts": {
+    "api:check": "pnpm build && node scripts/check-public-api.mjs check",
+    "api:update": "pnpm build && node scripts/check-public-api.mjs update",
     "build": "turbo run build",
     "check": "turbo run check",
     "dev": "turbo run dev --filter=@form-engine-ts/preview",

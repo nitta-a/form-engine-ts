@@ -40,6 +40,9 @@ jobs:
           pnpm build
           pnpm test
 
+      - name: Verify public API reports
+        run: node scripts/check-public-api.mjs check
+
       - name: Check package versions
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -55,6 +58,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      version: ${{ steps.publish.outputs.version }}
+      published_json: ${{ steps.publish.outputs.published_json }}
+      skipped_json: ${{ steps.publish.outputs.skipped_json }}
 
     steps:
       - name: Checkout
@@ -76,10 +83,12 @@ jobs:
       - name: Build packages
         run: pnpm build
 
-      - name: Publish packages
+      - name: Publish packages and poll npm availability
+        id: publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
+          RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/release-packages.mjs publish
 
   github:
@@ -98,4 +107,17 @@ jobs:
       - name: Create release from tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" --verify-tag --generate-notes --title "${{ github.ref_name }}"
+          RELEASE_VERSION: ${{ needs.npm.outputs.version }}
+          PUBLISHED_JSON: ${{ needs.npm.outputs.published_json }}
+          SKIPPED_JSON: ${{ needs.npm.outputs.skipped_json }}
+        run: |
+          {
+            echo "## Package publication (${RELEASE_VERSION})"
+            echo
+            echo "### Published"
+            echo "${PUBLISHED_JSON}" | jq -r 'if length == 0 then "- None" else .[] | "- `\(.)`" end'
+            echo
+            echo "### Already available"
+            echo "${SKIPPED_JSON}" | jq -r 'if length == 0 then "- None" else .[] | "- `\(.)`" end'
+          } > release-notes.md
+          gh release create "${{ github.ref_name }}" --verify-tag --generate-notes --notes-file release-notes.md --title "${{ github.ref_name }}"

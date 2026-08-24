@@ -1,4 +1,4 @@
-import type { FormVersionRecord } from "./versioning";
+import type { FormVersionRecord, FormVersionState, Result, VersionTransitionEvent } from "./versioning";
 
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
 
@@ -211,9 +211,18 @@ export interface SubmissionPageQueryOptions {
   readonly since?: string;
   readonly until?: string;
   readonly locale?: string;
-  readonly filter?: (submission: FormSubmission) => boolean;
+  readonly filter?: SubmissionFilter | ((submission: FormSubmission) => boolean);
+  /** @deprecated Prefer the generic filter AST. */
   readonly metadataFilters?: Readonly<Record<string, JsonValue>>;
 }
+
+export type SubmissionFilter =
+  | { readonly op: "eq"; readonly path: string; readonly value: JsonValue }
+  | { readonly op: "in"; readonly path: string; readonly values: readonly JsonValue[] }
+  | { readonly op: "range"; readonly path: string; readonly from?: JsonValue; readonly to?: JsonValue }
+  | { readonly op: "exists"; readonly path: string; readonly value: boolean }
+  | { readonly op: "and"; readonly filters: readonly SubmissionFilter[] }
+  | { readonly op: "or"; readonly filters: readonly SubmissionFilter[] };
 
 export interface SubmissionPage {
   readonly items: readonly FormSubmission[];
@@ -223,6 +232,24 @@ export interface SubmissionPage {
 
 export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
   listSubmissionPage(formId: string, options?: SubmissionPageQueryOptions): Promise<SubmissionPage>;
+  listTextAnswerPage?(formId: string, fieldId: string, options?: SubmissionPageQueryOptions): Promise<TextAnswerPage>;
+}
+
+export interface TextAnswerItem {
+  readonly responseId: string;
+  readonly formId: string;
+  readonly formVersion: number;
+  readonly fieldId: string;
+  readonly text: string;
+  readonly locale?: string;
+  readonly submittedAt: string;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
+}
+
+export interface TextAnswerPage {
+  readonly items: readonly TextAnswerItem[];
+  readonly nextCursor?: string;
+  readonly hasMore: boolean;
 }
 
 export interface VersionTransitionPlan {
@@ -233,11 +260,23 @@ export interface VersionTransitionPlan {
   readonly draftToDeleteVersion?: number;
   readonly publishedRecordToSave?: FormVersionRecord;
   readonly archivedRecordsToSave?: readonly FormVersionRecord[];
+  readonly events: readonly VersionTransitionEvent[];
+  /** The complete next state value used by persistent adapters. */
+  readonly nextVersion?: number;
   readonly timestamp: string;
 }
 
+export type StorageCommitError =
+  | { readonly type: "revision_conflict"; readonly expectedRevision: number; readonly actualRevision?: number }
+  | { readonly type: "draft_already_exists"; readonly currentDraftVersion: number }
+  | { readonly type: "invalid_transition"; readonly message: string }
+  | { readonly type: "storage_error"; readonly cause: unknown };
+
 export interface VersionedFormStorageAdapter extends FormStorageAdapter {
-  commitVersionTransition(plan: VersionTransitionPlan): Promise<{ readonly success: boolean; readonly error?: string }>;
+  getVersionState(formId: string): Promise<FormVersionState | null>;
+  getVersionRecord(formId: string, version: number): Promise<FormVersionRecord | null>;
+  listVersionRecords(formId: string): Promise<readonly FormVersionRecord[]>;
+  commitVersionTransition(plan: VersionTransitionPlan): Promise<Result<{ readonly success: true }, StorageCommitError>>;
 }
 
 interface BaseQuestionAggregate {

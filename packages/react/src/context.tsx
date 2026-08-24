@@ -14,7 +14,7 @@ import {
   validateAnswers,
   validatePageAnswers
 } from "@form-engine-ts/core";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { BeforeSubmit, SubmitResult } from "./types";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
@@ -76,6 +76,7 @@ export function FormProvider({
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [submitError, setSubmitError] = useState<Error | null>(null);
   const [validationPageIndex, setValidationPageIndex] = useState<number | null>(null);
+  const submissionInFlight = useRef(false);
   const visibility = useMemo(() => calculateFieldVisibility(validSchema, values), [validSchema, values]);
   const pageVisibility = useMemo(() => calculatePageVisibility(validSchema, values), [validSchema, values]);
 
@@ -138,6 +139,7 @@ export function FormProvider({
 
   const submit = useCallback(
     async (beforeSubmit?: BeforeSubmit): Promise<SubmitResult> => {
+      if (submissionInFlight.current) return { status: "cancelled" };
       const validation = validateAnswers(validSchema, values);
       if (!validation.valid) {
         setErrors(issuesByField(validation.issues));
@@ -150,12 +152,13 @@ export function FormProvider({
       setValidationPageIndex(null);
       setSubmitError(null);
       const visibleValues = selectVisibleAnswers(validSchema, values);
+      submissionInFlight.current = true;
       try {
+        setSubmitStatus("submitting");
         if (beforeSubmit !== undefined && (await beforeSubmit(visibleValues)) === "cancel") {
           setSubmitStatus("idle");
           return { status: "cancelled" };
         }
-        setSubmitStatus("submitting");
         await onSubmit(visibleValues);
         if (resetOnSuccess) setValues({ ...initialValues });
         setSubmitStatus("success");
@@ -165,6 +168,8 @@ export function FormProvider({
         setSubmitError(error);
         setSubmitStatus("error");
         return { status: "error", error };
+      } finally {
+        submissionInFlight.current = false;
       }
     },
     [initialValues, onSubmit, resetOnSuccess, validSchema, values]

@@ -3,14 +3,20 @@ import type {
   FormSubmission,
   FormValue,
   FormVersionRecord,
+  FormVersionState,
   PagedSubmissionStorageAdapter,
+  StorageCommitError,
+  SubmissionFilter,
+  TextAnswerPage,
   VersionedFormStorageAdapter,
   VersionTransitionPlan
 } from "@form-engine-ts/core";
 import {
   assertValidFormSchema,
   decodeSubmissionCursor,
+  decodeTextAnswerCursor,
   encodeSubmissionCursor,
+  encodeTextAnswerCursor,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
 } from "@form-engine-ts/core";
@@ -57,6 +63,15 @@ interface StoredVersionStateDocument extends Document {
   readonly updatedAt: string;
   readonly draftVersion?: number;
   readonly publishedVersion?: number;
+  readonly nextVersion?: number;
+}
+
+interface StoredVersionEventDocument extends Document {
+  readonly _id: string;
+  readonly formId: string;
+  readonly fromRevision: number;
+  readonly eventIndex: number;
+  readonly event: VersionTransitionPlan["events"][number];
 }
 
 function cloneJson<T>(value: T): T {
@@ -101,6 +116,38 @@ function versionDocumentId(formId: string, formVersion: number): string {
   return `version:${encodeURIComponent(formId)}:${formVersion}`;
 }
 
+function versionEventDocumentId(formId: string, fromRevision: number, eventIndex: number): string {
+  return `event:${encodeURIComponent(formId)}:${fromRevision}:${eventIndex}`;
+}
+
+function mongoSubmissionPath(path: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(path) || path.split(".").some((part) => part.startsWith("$"))) {
+    throw new TypeError(`Invalid submission filter path: ${path}`);
+  }
+  const [root, ...rest] = path.split(".");
+  const suffix = rest.length === 0 ? "" : `.${rest.join(".")}`;
+  if (root === "id" || root === "responseId") return `_id${suffix}`;
+  if (root === "formId" || root === "formVersion" || root === "submittedAt") return `${root}${suffix}`;
+  if (root === "locale") return `submission.locale${suffix}`;
+  return `submission.${path}`;
+}
+
+export function submissionFilterToMongo(filter: SubmissionFilter): Document {
+  if (filter.op === "and" || filter.op === "or") {
+    return { [filter.op === "and" ? "$and" : "$or"]: filter.filters.map(submissionFilterToMongo) };
+  }
+  const path = mongoSubmissionPath(filter.path);
+  if (filter.op === "eq") return { [path]: filter.value };
+  if (filter.op === "in") return { [path]: { $in: [...filter.values] } };
+  if (filter.op === "exists") return { [path]: { $exists: filter.value } };
+  return {
+    [path]: {
+      ...(filter.from === undefined ? {} : { $gte: filter.from }),
+      ...(filter.to === undefined ? {} : { $lte: filter.to })
+    }
+  };
+}
+
 function assertVersionRecord(
   record: FormVersionRecord,
   formId: string,
@@ -131,6 +178,7 @@ function assertTransitionPlan(plan: VersionTransitionPlan): void {
   ) {
     throw new TypeError("Version transition plan is invalid.");
   }
+  if (!Array.isArray(plan.events)) throw new TypeError("Version transition plan events are required.");
   if (plan.draftToCreate !== undefined) assertVersionRecord(plan.draftToCreate, plan.formId, "draft");
   if (plan.publishedRecordToSave !== undefined) {
     assertVersionRecord(plan.publishedRecordToSave, plan.formId, "published");
@@ -142,6 +190,18 @@ function assertTransitionPlan(plan: VersionTransitionPlan): void {
   ) {
     throw new TypeError("draftToDeleteVersion must be a positive safe integer.");
   }
+}
+
+function parseVersionRecordDocument(document: StoredVersionDocument): FormVersionRecord {
+  assertVersionRecord(document.record, document.formId);
+  if (
+    document._id !== versionDocumentId(document.formId, document.version) ||
+    document.record.version !== document.version ||
+    document.record.status !== document.status
+  ) {
+    throw new Error(`MongoDB version document "${String(document._id)}" has inconsistent metadata.`);
+  }
+  return cloneJson(document.record);
 }
 
 function isCasConflict(error: unknown): boolean {
@@ -203,10 +263,26 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
     "form_version_states",
     "versionStatesCollectionName"
   );
+  const versionEventsCollectionName = "form_version_events";
   const schemas = options.db.collection<StoredSchemaDocument>(schemasCollectionName);
   const submissions = options.db.collection<StoredSubmissionDocument>(responsesCollectionName);
   const versions = options.db.collection<StoredVersionDocument>(versionsCollectionName);
   const versionStates = options.db.collection<StoredVersionStateDocument>(versionStatesCollectionName);
+  const versionEvents = options.db.collection<StoredVersionEventDocument>(versionEventsCollectionName);
+
+  const storageRevisionConflict = async (
+    plan: VersionTransitionPlan
+  ): Promise<{ readonly success: false; readonly error: StorageCommitError }> => {
+    const actual = await versionStates.findOne({ _id: plan.formId });
+    return {
+      success: false,
+      error: {
+        type: "revision_conflict",
+        expectedRevision: plan.expectedRevision,
+        ...(actual === null ? {} : { actualRevision: actual.revision })
+      }
+    };
+  };
 
   const upsertVersionRecord = async (record: FormVersionRecord, session?: ClientSession): Promise<void> => {
     const stored = cloneJson(record);
@@ -220,8 +296,21 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
   const applyVersionTransition = async (
     plan: VersionTransitionPlan,
     session?: ClientSession
-  ): Promise<{ readonly success: boolean; readonly error?: string }> => {
-    const stateSet: Record<string, unknown> = { revision: plan.nextRevision, updatedAt: plan.timestamp };
+  ): Promise<
+    | { readonly success: true; readonly value: { readonly success: true } }
+    | { readonly success: false; readonly error: StorageCommitError }
+  > => {
+    const inferredNextVersion = Math.max(
+      1,
+      (plan.draftToCreate?.version ?? 0) + 1,
+      (plan.draftToDeleteVersion ?? 0) + 1,
+      (plan.publishedRecordToSave?.version ?? 0) + 1
+    );
+    const stateSet: Record<string, unknown> = {
+      revision: plan.nextRevision,
+      nextVersion: plan.nextVersion ?? inferredNextVersion,
+      updatedAt: plan.timestamp
+    };
     if (plan.draftToCreate !== undefined) stateSet.draftVersion = plan.draftToCreate.version;
     if (plan.publishedRecordToSave !== undefined) stateSet.publishedVersion = plan.publishedRecordToSave.version;
     const stateUpdate = {
@@ -237,7 +326,15 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
       }
     );
     if (stateResult.matchedCount === 0 && stateResult.upsertedCount === 0) {
-      return { success: false, error: "revision_conflict" };
+      const actual = await versionStates.findOne({ _id: plan.formId }, session === undefined ? {} : { session });
+      return {
+        success: false,
+        error: {
+          type: "revision_conflict",
+          expectedRevision: plan.expectedRevision,
+          ...(actual === null ? {} : { actualRevision: actual.revision })
+        }
+      };
     }
     if (plan.draftToDeleteVersion !== undefined) {
       await versions.deleteOne(
@@ -248,7 +345,14 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
     if (plan.draftToCreate !== undefined) await upsertVersionRecord(plan.draftToCreate, session);
     if (plan.publishedRecordToSave !== undefined) await upsertVersionRecord(plan.publishedRecordToSave, session);
     for (const record of plan.archivedRecordsToSave ?? []) await upsertVersionRecord(record, session);
-    return { success: true };
+    for (const [eventIndex, event] of plan.events.entries()) {
+      await versionEvents.updateOne(
+        { _id: versionEventDocumentId(plan.formId, plan.expectedRevision, eventIndex) },
+        { $set: { formId: plan.formId, fromRevision: plan.expectedRevision, eventIndex, event: cloneJson(event) } },
+        { upsert: true, ...(session === undefined ? {} : { session }) }
+      );
+    }
+    return { success: true, value: { success: true } };
   };
 
   return {
@@ -312,7 +416,7 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
               ...(options.since === undefined ? {} : { $gte: options.since }),
               ...(options.until === undefined ? {} : { $lte: options.until })
             };
-      const filter: Filter<StoredSubmissionDocument> = {
+      const baseFilter: Filter<StoredSubmissionDocument> = {
         formId,
         ...(options.version === undefined ? {} : { formVersion: options.version }),
         ...(options.locale === undefined ? {} : { "submission.locale": options.locale }),
@@ -326,8 +430,17 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
               ]
             })
       };
+      const serverFilters: Document[] = [baseFilter];
+      if (options.filter !== undefined && typeof options.filter !== "function") {
+        serverFilters.push(submissionFilterToMongo(options.filter));
+      }
+      for (const [key, value] of Object.entries(options.metadataFilters ?? {})) {
+        serverFilters.push({ [`submission.metadata.${key}`]: value });
+      }
+      const filter: Filter<StoredSubmissionDocument> =
+        serverFilters.length === 1 ? baseFilter : { $and: serverFilters };
       const sorted = submissions.find(filter).sort({ submittedAt: 1, _id: 1 });
-      const requiresClientFiltering = options.filter !== undefined || options.metadataFilters !== undefined;
+      const requiresClientFiltering = typeof options.filter === "function";
       const documents = requiresClientFiltering ? await sorted.toArray() : await sorted.limit(pageSize + 1).toArray();
       const candidates = documents
         .map(parseSubmissionDocument)
@@ -343,6 +456,70 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
           : {})
       };
     },
+    async listTextAnswerPage(formId, fieldId, options = {}): Promise<TextAnswerPage> {
+      if (fieldId.trim().length === 0) throw new TypeError("fieldId must not be empty.");
+      const pageSize = normalizeSubmissionPageSize(options.pageSize);
+      const cursor = options.cursor === undefined ? undefined : decodeTextAnswerCursor(options.cursor);
+      if (cursor !== undefined && cursor.fieldId !== fieldId) {
+        throw new TypeError("Text answer cursor fieldId does not match the query.");
+      }
+      const submittedAt =
+        options.since === undefined && options.until === undefined
+          ? undefined
+          : {
+              ...(options.since === undefined ? {} : { $gte: options.since }),
+              ...(options.until === undefined ? {} : { $lte: options.until })
+            };
+      const baseFilter: Filter<StoredSubmissionDocument> = {
+        formId,
+        ...(options.version === undefined ? {} : { formVersion: options.version }),
+        ...(options.locale === undefined ? {} : { "submission.locale": options.locale }),
+        ...(submittedAt === undefined ? {} : { submittedAt }),
+        ...(cursor === undefined ? {} : { _id: { $gt: cursor.responseId } }),
+        [`submission.values.${fieldId}`]: { $type: "string" }
+      };
+      const serverFilters: Document[] = [baseFilter];
+      if (options.filter !== undefined && typeof options.filter !== "function") {
+        serverFilters.push(submissionFilterToMongo(options.filter));
+      }
+      for (const [key, value] of Object.entries(options.metadataFilters ?? {})) {
+        serverFilters.push({ [`submission.metadata.${key}`]: value });
+      }
+      const filter: Filter<StoredSubmissionDocument> =
+        serverFilters.length === 1 ? baseFilter : { $and: serverFilters };
+      const sorted = submissions.find(filter).sort({ _id: 1 });
+      const documents =
+        typeof options.filter === "function" ? await sorted.toArray() : await sorted.limit(pageSize + 1).toArray();
+      const candidates = documents
+        .map(parseSubmissionDocument)
+        .filter((submission) => matchesSubmissionPageFilters(submission, options))
+        .flatMap((submission) => {
+          const text = submission.values[fieldId];
+          if (typeof text !== "string") return [];
+          return [
+            {
+              responseId: submission.id,
+              formId: submission.formId,
+              formVersion: submission.formVersion,
+              fieldId,
+              text,
+              locale: submission.locale,
+              submittedAt: submission.submittedAt,
+              ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+            }
+          ];
+        });
+      const hasMore = candidates.length > pageSize;
+      const items = candidates.slice(0, pageSize);
+      const last = items.at(-1);
+      return {
+        items,
+        hasMore,
+        ...(hasMore && last !== undefined
+          ? { nextCursor: encodeTextAnswerCursor({ responseId: last.responseId, fieldId }) }
+          : {})
+      };
+    },
     async deleteSubmission(submissionId) {
       await submissions.deleteOne({ _id: submissionId });
     },
@@ -354,33 +531,70 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         schemas.deleteMany({}),
         submissions.deleteMany({}),
         versions.deleteMany({}),
-        versionStates.deleteMany({})
+        versionStates.deleteMany({}),
+        versionEvents.deleteMany({})
       ]);
     },
+    async getVersionState(formId): Promise<FormVersionState | null> {
+      const document = await versionStates.findOne({ _id: formId });
+      if (document === null) return null;
+      if (!Number.isSafeInteger(document.revision) || document.revision < 0) {
+        throw new Error(`MongoDB version state "${formId}" is invalid.`);
+      }
+      const nextVersion =
+        document.nextVersion ?? Math.max(1, (document.draftVersion ?? 0) + 1, (document.publishedVersion ?? 0) + 1);
+      return {
+        formId,
+        revision: document.revision,
+        nextVersion,
+        ...(document.draftVersion === undefined ? {} : { draftVersion: document.draftVersion }),
+        ...(document.publishedVersion === undefined ? {} : { publishedVersion: document.publishedVersion })
+      };
+    },
+    async getVersionRecord(formId, version) {
+      const document = await versions.findOne({ _id: versionDocumentId(formId, version) });
+      return document === null ? null : parseVersionRecordDocument(document);
+    },
+    async listVersionRecords(formId) {
+      return (await versions.find({ formId }).sort({ version: 1 }).toArray()).map(parseVersionRecordDocument);
+    },
     async commitVersionTransition(plan) {
-      assertTransitionPlan(plan);
+      try {
+        assertTransitionPlan(plan);
+      } catch (cause) {
+        return {
+          success: false,
+          error: { type: "invalid_transition", message: cause instanceof Error ? cause.message : String(cause) }
+        };
+      }
       const client = options.db.client;
       if (client === undefined || typeof client.startSession !== "function") {
         try {
           return await applyVersionTransition(plan);
         } catch (error) {
-          if (isCasConflict(error)) return { success: false, error: "revision_conflict" };
-          throw error;
+          if (isCasConflict(error)) {
+            return storageRevisionConflict(plan);
+          }
+          return { success: false, error: { type: "storage_error", cause: error } };
         }
       }
       const session = client.startSession();
       try {
-        let result: { readonly success: boolean; readonly error?: string } = {
+        let result:
+          | { readonly success: true; readonly value: { readonly success: true } }
+          | { readonly success: false; readonly error: StorageCommitError } = {
           success: false,
-          error: "revision_conflict"
+          error: { type: "revision_conflict", expectedRevision: plan.expectedRevision }
         };
         await session.withTransaction(async () => {
           result = await applyVersionTransition(plan, session);
         });
         return result;
       } catch (error) {
-        if (isCasConflict(error)) return { success: false, error: "revision_conflict" };
-        throw error;
+        if (isCasConflict(error)) {
+          return storageRevisionConflict(plan);
+        }
+        return { success: false, error: { type: "storage_error", cause: error } };
       } finally {
         await session.endSession();
       }
@@ -394,6 +608,9 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         versions.createIndexes([
           { key: { formId: 1, version: 1 }, name: "form_versions_form_version", unique: true },
           { key: { formId: 1, status: 1 }, name: "form_versions_form_status" }
+        ]),
+        versionEvents.createIndexes([
+          { key: { formId: 1, fromRevision: 1, eventIndex: 1 }, name: "form_version_events_revision" }
         ])
       ]);
     }

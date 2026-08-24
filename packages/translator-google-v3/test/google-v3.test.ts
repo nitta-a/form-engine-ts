@@ -173,8 +173,42 @@ describe("createGoogleV3Translator", () => {
       totalChunks: 2,
       totalCharacters: 4,
       retryAttempts: 1,
-      durationMs: 35
+      durationMs: 35,
+      cacheHitCount: 0,
+      cacheMissCount: 3,
+      evictionCount: 0
     });
+  });
+
+  it("skips blank strings without losing their positions and reports only API-bound misses", async () => {
+    const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { contents: string[] };
+      return response(200, { translations: body.contents.map((text) => ({ translatedText: `ja:${text}` })) });
+    });
+    const onBatchReport = vi.fn();
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      fetchFn,
+      onBatchReport
+    });
+    await expect(translator.translateBatch(["", "hello", "   ", "world"], "ja", "en")).resolves.toEqual([
+      "",
+      "ja:hello",
+      "",
+      "ja:world"
+    ]);
+    expect(fetchFn).toHaveBeenCalledOnce();
+    expect(JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body)).contents).toEqual(["hello", "world"]);
+    expect(onBatchReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        totalChunks: 1,
+        totalCharacters: 10,
+        cacheHitCount: 0,
+        cacheMissCount: 2,
+        evictionCount: 0
+      })
+    );
   });
 
   it("does not retry non-retryable failures and redacts access tokens", async () => {

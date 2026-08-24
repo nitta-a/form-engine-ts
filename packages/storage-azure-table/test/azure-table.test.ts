@@ -4,6 +4,7 @@ import {
   type AzureTableClientLike,
   type AzureTableEntityCodec,
   type AzureTableEntityPage,
+  type AzureTableSubmissionCodec,
   createAzureTableStorage
 } from "../src";
 
@@ -176,6 +177,59 @@ describe("createAzureTableStorage", () => {
     expect(submissions.filters.at(-1)).toContain("PartitionKey eq 'custom:form'");
     expect(submissions.filters.at(-1)).toContain("deckId eq 'xyz' and isPii eq false");
     expect(toODataFilter).toHaveBeenCalledWith({ metadataFilters: { deckId: "xyz", isPii: false } });
+  });
+
+  it("round-trips legacy partition/ULID layouts through a resolver and performs a bounded filtered scan", async () => {
+    const schemas = createClientStub();
+    const responses = createClientStub();
+    const codec: AzureTableSubmissionCodec<FormSubmission> = {
+      createEntity: (item) => ({ entityType: "legacy-response", body: JSON.stringify(item) }),
+      deserialize: (entity) => {
+        if (typeof entity.body !== "string") throw new Error("Missing legacy body");
+        return JSON.parse(entity.body) as FormSubmission;
+      },
+      matchesEntity: (entity) => entity.entityType === "legacy-response",
+      createPartitionKey: (item) => `${item.formId}_v${item.formVersion}`,
+      createPartitionKeyFromQuery: (formId, query) =>
+        query.version === undefined ? undefined : `${formId}_v${query.version}`,
+      createRowKey: (item) => item.id
+    };
+    const clientResolver = vi.fn(async () => responses.client);
+    const buildSubmissionFilter = vi.fn((formId: string) => `SurveyId eq '${formId}'`);
+    const storage = createAzureTableStorage({
+      schemasTableClient: schemas.client,
+      clientResolver,
+      codec,
+      buildSubmissionFilter,
+      maxScanPages: 3
+    });
+    for (const [id, accepted] of [
+      ["01H00000000000000000000001", false],
+      ["01H00000000000000000000002", true],
+      ["01H00000000000000000000003", false],
+      ["01H00000000000000000000004", true]
+    ] as const) {
+      await storage.saveSubmission({ ...submission(id), metadata: { accepted } });
+    }
+    expect([...responses.entities.values()][0]).toEqual(
+      expect.objectContaining({
+        partitionKey: "form_v2",
+        rowKey: "01H00000000000000000000001",
+        entityType: "legacy-response"
+      })
+    );
+    expect([...responses.entities.values()][0]).not.toHaveProperty("kind");
+    const page = await storage.listSubmissionPage("form", {
+      version: 2,
+      pageSize: 2,
+      filter: { op: "eq", path: "metadata.accepted", value: true }
+    });
+    expect(page.items.map((item) => item.id)).toEqual(["01H00000000000000000000002", "01H00000000000000000000004"]);
+    expect(responses.pageRequests).toHaveLength(3);
+    expect(buildSubmissionFilter).toHaveBeenCalledWith("form", expect.objectContaining({ version: 2, pageSize: 2 }));
+    expect(clientResolver).toHaveBeenCalledWith(
+      expect.objectContaining({ formId: "form", query: expect.objectContaining({ version: 2 }) })
+    );
   });
 
   it("deletes individual responses, form responses, schemas, and all configured entities", async () => {

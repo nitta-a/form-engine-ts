@@ -8,6 +8,24 @@ export interface TranslationCacheStorage {
 export interface TranslationCacheOptions {
   readonly ttlMs?: number;
   readonly keyPrefix?: string;
+  readonly adapterName?: string;
+}
+
+export interface MemoryTranslationCacheOptions {
+  readonly maxEntries?: number;
+  readonly ttlMs?: number;
+  readonly now?: () => number;
+}
+
+export interface MemoryTranslationCache extends TranslationCacheStorage {
+  readonly size: number;
+  readonly evictionCount: number;
+  clear(): void;
+}
+
+interface MemoryCacheEntry {
+  readonly value: string;
+  readonly expiresAt: number;
 }
 
 const FNV_OFFSET_BASIS = 14_695_981_039_346_656_037n;
@@ -29,6 +47,64 @@ function requireLocale(value: string, name: string): string {
   return value.trim();
 }
 
+function nonNegativeDuration(value: number | undefined, fallback: number, name: string): number {
+  const resolved = value ?? fallback;
+  if (!Number.isSafeInteger(resolved) || resolved < 0) {
+    throw new TypeError(`${name} must be a non-negative safe integer.`);
+  }
+  return resolved;
+}
+
+export function createMemoryTranslationCache(options: MemoryTranslationCacheOptions = {}): MemoryTranslationCache {
+  const maxEntries = options.maxEntries ?? 500;
+  if (!Number.isSafeInteger(maxEntries) || maxEntries < 1) {
+    throw new TypeError("maxEntries must be a positive safe integer.");
+  }
+  const defaultTtlMs = nonNegativeDuration(options.ttlMs, 5 * 60 * 1000, "ttlMs");
+  const now = options.now ?? Date.now;
+  const entries = new Map<string, MemoryCacheEntry>();
+  let evictionCount = 0;
+
+  const evictExpired = (key: string, entry: MemoryCacheEntry): boolean => {
+    if (entry.expiresAt > now()) return false;
+    entries.delete(key);
+    evictionCount += 1;
+    return true;
+  };
+
+  return {
+    get size() {
+      for (const [key, entry] of entries) evictExpired(key, entry);
+      return entries.size;
+    },
+    get evictionCount() {
+      return evictionCount;
+    },
+    get(key) {
+      const entry = entries.get(key);
+      if (entry === undefined || evictExpired(key, entry)) return undefined;
+      entries.delete(key);
+      entries.set(key, entry);
+      return entry.value;
+    },
+    set(key, value, ttlMs) {
+      const resolvedTtlMs = nonNegativeDuration(ttlMs, defaultTtlMs, "ttlMs");
+      if (!entries.has(key) && entries.size >= maxEntries) {
+        const leastRecentlyUsed = entries.keys().next().value;
+        if (leastRecentlyUsed !== undefined) {
+          entries.delete(leastRecentlyUsed);
+          evictionCount += 1;
+        }
+      }
+      entries.delete(key);
+      entries.set(key, { value, expiresAt: now() + resolvedTtlMs });
+    },
+    clear() {
+      entries.clear();
+    }
+  };
+}
+
 export function withTranslationCache(
   baseAdapter: AsyncTranslationAdapter,
   cache: TranslationCacheStorage,
@@ -43,6 +119,8 @@ export function withTranslationCache(
   }
   const prefix = options.keyPrefix ?? "form-engine-ts";
   if (prefix.trim().length === 0) throw new TypeError("keyPrefix must not be empty.");
+  const adapterName = options.adapterName ?? "anonymous";
+  if (adapterName.trim().length === 0) throw new TypeError("adapterName must not be empty.");
 
   const translateBatch = async (
     texts: readonly string[],
@@ -54,7 +132,7 @@ export function withTranslationCache(
     }
     const target = requireLocale(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? "auto" : requireLocale(sourceLocale, "sourceLocale");
-    const keys = texts.map((text) => `${prefix}:${source}:${target}:${hashTranslationText(text)}`);
+    const keys = texts.map((text) => `${prefix}:${adapterName}:${source}:${target}:${hashTranslationText(text)}`);
     const cached = await Promise.all(keys.map((key) => cache.get(key)));
     const missingByKey = new Map<string, { readonly text: string; readonly indices: number[] }>();
     for (let index = 0; index < texts.length; index += 1) {

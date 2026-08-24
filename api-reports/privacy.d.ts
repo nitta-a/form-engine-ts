@@ -1,0 +1,24 @@
+import { FormSchema } from '@form-engine-ts/core';
+
+interface SensitiveDataFinding {
+    readonly fieldId: string;
+    readonly type: "email" | "phone" | "url" | "postal_code" | string;
+    readonly start?: number;
+    readonly end?: number;
+    readonly matchedText?: string;
+}
+interface SensitiveDataDetectorRule {
+    readonly type: string;
+    readonly pattern: RegExp;
+    readonly enabled?: boolean;
+}
+interface PrivacyDetectorConfig {
+    readonly rules?: readonly SensitiveDataDetectorRule[];
+    readonly customDetectors?: readonly ((fieldId: string, text: string) => readonly SensitiveDataFinding[])[];
+}
+interface SensitiveDataDetector {
+    detect(schema: FormSchema, values: Record<string, unknown>): readonly SensitiveDataFinding[];
+}
+declare function createStandardPrivacyDetector(config?: PrivacyDetectorConfig): SensitiveDataDetector;
+
+export { type PrivacyDetectorConfig, type SensitiveDataDetector, type SensitiveDataDetectorRule, type SensitiveDataFinding, createStandardPrivacyDetector };

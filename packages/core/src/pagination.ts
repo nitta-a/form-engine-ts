@@ -1,8 +1,13 @@
-import type { FormSubmission, JsonValue, SubmissionPageQueryOptions } from "./types";
+import type { FormSubmission, JsonValue, SubmissionFilter, SubmissionPageQueryOptions } from "./types";
 
 export interface SubmissionCursorValue {
   readonly submittedAt: string;
   readonly responseId: string;
+}
+
+export interface TextAnswerCursorValue {
+  readonly responseId: string;
+  readonly fieldId: string;
 }
 
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -68,6 +73,35 @@ export function decodeSubmissionCursor(cursor: string): SubmissionCursorValue {
   }
 }
 
+export function encodeTextAnswerCursor(value: TextAnswerCursorValue): string {
+  if (value.responseId.length === 0 || value.fieldId.length === 0) {
+    throw new TypeError("Text answer cursor values must not be empty.");
+  }
+  return encodeBase64(new TextEncoder().encode(JSON.stringify(value)));
+}
+
+export function decodeTextAnswerCursor(cursor: string): TextAnswerCursorValue {
+  try {
+    const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(decodeBase64(cursor))) as unknown;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("responseId" in parsed) ||
+      typeof parsed.responseId !== "string" ||
+      parsed.responseId.length === 0 ||
+      !("fieldId" in parsed) ||
+      typeof parsed.fieldId !== "string" ||
+      parsed.fieldId.length === 0
+    ) {
+      throw new TypeError("text answer cursor payload is invalid.");
+    }
+    return { responseId: parsed.responseId, fieldId: parsed.fieldId };
+  } catch (cause) {
+    if (cause instanceof TypeError && cause.message === "text answer cursor payload is invalid.") throw cause;
+    throw new TypeError("cursor must be a valid text answer cursor.", { cause });
+  }
+}
+
 export function normalizeSubmissionPageSize(pageSize: number | undefined, fallback = 100): number {
   const value = pageSize ?? fallback;
   if (!Number.isSafeInteger(value) || value < 1) throw new TypeError("pageSize must be a positive safe integer.");
@@ -82,7 +116,7 @@ function isJsonObject(value: JsonValue): value is Readonly<Record<string, JsonVa
   return typeof value === "object" && value !== null && !isJsonArray(value);
 }
 
-function jsonValuesEqual(left: JsonValue | undefined, right: JsonValue | undefined): boolean {
+export function jsonValuesEqual(left: JsonValue | undefined, right: JsonValue | undefined): boolean {
   if (left === right) return true;
   if (left === undefined || left === null || right === undefined || right === null || typeof left !== typeof right) {
     return false;
@@ -104,11 +138,56 @@ function jsonValuesEqual(left: JsonValue | undefined, right: JsonValue | undefin
   );
 }
 
+function readSubmissionPath(submission: FormSubmission, path: string): JsonValue | undefined {
+  if (
+    path.length === 0 ||
+    path.split(".").some((part) => part.length === 0 || part === "__proto__" || part === "constructor")
+  ) {
+    return undefined;
+  }
+  let current: unknown = submission;
+  for (const part of path.split(".")) {
+    if (typeof current !== "object" || current === null || !Object.hasOwn(current, part)) return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current as JsonValue | undefined;
+}
+
+function compareRangeValue(value: JsonValue | undefined, boundary: JsonValue, direction: "from" | "to"): boolean {
+  if (typeof value === "number" && typeof boundary === "number") {
+    return direction === "from" ? value >= boundary : value <= boundary;
+  }
+  if (typeof value === "string" && typeof boundary === "string") {
+    return direction === "from" ? value >= boundary : value <= boundary;
+  }
+  return false;
+}
+
+export function matchesSubmissionFilter(submission: FormSubmission, filter: SubmissionFilter): boolean {
+  if (filter.op === "and") return filter.filters.every((item) => matchesSubmissionFilter(submission, item));
+  if (filter.op === "or") return filter.filters.some((item) => matchesSubmissionFilter(submission, item));
+  const value = readSubmissionPath(submission, filter.path);
+  if (filter.op === "eq") return jsonValuesEqual(value, filter.value);
+  if (filter.op === "in") return filter.values.some((candidate) => jsonValuesEqual(value, candidate));
+  if (filter.op === "exists") return filter.value ? value !== undefined : value === undefined;
+  return (
+    (filter.from === undefined || compareRangeValue(value, filter.from, "from")) &&
+    (filter.to === undefined || compareRangeValue(value, filter.to, "to"))
+  );
+}
+
 export function matchesSubmissionPageFilters(
   submission: FormSubmission,
   options: Pick<SubmissionPageQueryOptions, "filter" | "metadataFilters">
 ): boolean {
-  if (options.filter !== undefined && !options.filter(submission)) return false;
+  if (
+    options.filter !== undefined &&
+    !(typeof options.filter === "function"
+      ? options.filter(submission)
+      : matchesSubmissionFilter(submission, options.filter))
+  ) {
+    return false;
+  }
   if (options.metadataFilters === undefined) return true;
   return Object.entries(options.metadataFilters).every(([key, value]) =>
     jsonValuesEqual(submission.metadata?.[key], value)

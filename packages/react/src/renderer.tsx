@@ -4,10 +4,12 @@ import {
   type FormSchema,
   type FormValue,
   type FormValues,
+  selectVisibleAnswers,
   type TranslationAdapter,
   type ValidationIssue,
   validateAnswers
 } from "@form-engine-ts/core";
+import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import {
   type ComponentType,
   type FormEvent,
@@ -20,7 +22,15 @@ import {
   useState
 } from "react";
 import { FormProvider, useForm } from "./context";
-import type { BeforeSubmit, FormRendererSlots, SubmitResult } from "./types";
+import type { SubmissionReceipt } from "./receipt";
+import type {
+  BeforeSubmit,
+  FormRendererSlots,
+  FormSubmitState,
+  SubmissionGuard,
+  SubmissionProtectionProps,
+  SubmitResult
+} from "./types";
 
 export interface FieldComponentProps {
   readonly field: FormField;
@@ -31,6 +41,7 @@ export interface FieldComponentProps {
   readonly inputId: string;
   readonly errorId: string;
   readonly helpId: string;
+  readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
 }
 
 export type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
@@ -179,10 +190,19 @@ function DefaultField(props: FieldComponentProps) {
     </label>
   );
   let control: ReactNode;
+  const textConstraints =
+    field.type === "text" || field.type === "textarea"
+      ? {
+          minLength: field.minLength,
+          maxLength: field.maxLength,
+          ...(field.pattern === undefined ? {} : { pattern: field.pattern })
+        }
+      : {};
   if (field.type === "textarea") {
     control = (
       <textarea
         {...ariaProps}
+        {...textConstraints}
         id={inputId}
         name={field.id}
         placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
@@ -194,6 +214,7 @@ function DefaultField(props: FieldComponentProps) {
     control = (
       <input
         {...ariaProps}
+        {...textConstraints}
         id={inputId}
         name={field.id}
         type="number"
@@ -240,12 +261,19 @@ function DefaultField(props: FieldComponentProps) {
     <div className={`fe-field fe-field--${field.type}`} data-field-id={field.id}>
       {label}
       {control}
+      {(field.type === "text" || field.type === "textarea") && field.maxLength !== undefined
+        ? props.renderCharacterCount?.({
+            fieldId: field.id,
+            current: typeof value === "string" ? value.length : 0,
+            max: field.maxLength
+          })
+        : null}
       <FieldMessage props={props} />
     </div>
   );
 }
 
-export interface FormRendererPresentationProps {
+export interface FormRendererPresentationProps extends SubmissionProtectionProps {
   readonly components?: FieldComponents;
   readonly className?: string;
   readonly successMessageKey?: string;
@@ -323,6 +351,8 @@ function ContextFormRenderer({
   autoSaveKey,
   beforeSubmit,
   onDraftSave,
+  submissionGuards = [],
+  receiptStore,
   slots = {}
 }: FormRendererPresentationProps) {
   const form = useForm();
@@ -332,6 +362,14 @@ function ContextFormRenderer({
   const [draftRestored, setDraftRestored] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [focusFieldId, setFocusFieldId] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    readonly findings: readonly SensitiveDataFinding[];
+    readonly message?: string;
+  } | null>(null);
+  const [guardMessage, setGuardMessage] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
+  const [receiptLoaded, setReceiptLoaded] = useState(receiptStore === undefined);
+  const rendererSubmissionInFlight = useRef(false);
   const pages = form.schema.pages;
   const visiblePageIndexes = useMemo(
     () =>
@@ -341,6 +379,34 @@ function ContextFormRenderer({
   const activePage = pages?.[currentPageIndex];
   const activeVisibleIndex = visiblePageIndexes.indexOf(currentPageIndex);
   const fieldIds = activePage === undefined ? undefined : new Set(activePage.questionIds);
+  const submitState: FormSubmitState = confirmation === null ? form.submitStatus : "confirming";
+  const interactionLocked = submitState === "confirming" || submitState === "submitting";
+
+  useEffect(() => {
+    let active = true;
+    if (receiptStore === undefined) {
+      setReceipt(null);
+      setReceiptLoaded(true);
+      return () => {
+        active = false;
+      };
+    }
+    setReceiptLoaded(false);
+    void receiptStore
+      .get(form.schema.id, form.schema.version)
+      .then((stored) => {
+        if (active) setReceipt(stored);
+      })
+      .catch(() => {
+        if (active) setReceipt(null);
+      })
+      .finally(() => {
+        if (active) setReceiptLoaded(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.schema.id, form.schema.version, receiptStore]);
 
   useEffect(() => {
     if (pages === undefined || visiblePageIndexes.length === 0) {
@@ -396,6 +462,7 @@ function ContextFormRenderer({
   };
 
   const handleNext = () => {
+    if (interactionLocked) return;
     const result = form.validatePage(currentPageIndex);
     if (!result.valid) {
       focusFirstIssue(result.issues[0]?.fieldId);
@@ -405,41 +472,153 @@ function ContextFormRenderer({
     if (nextPageIndex !== undefined) setCurrentPageIndex(nextPageIndex);
   };
 
-  const submitValues = async (): Promise<SubmitResult> => {
+  const runSubmissionGuards = async (
+    guards: readonly SubmissionGuard[]
+  ): Promise<
+    | { readonly status: "allow" }
+    | {
+        readonly status: "confirm" | "block";
+        readonly findings: readonly SensitiveDataFinding[];
+        readonly message?: string;
+      }
+  > => {
+    const findings: SensitiveDataFinding[] = [];
+    let confirmationMessage: string | undefined;
+    let requiresConfirmation = false;
+    for (const guard of guards) {
+      const result = await guard(form.schema, selectVisibleAnswers(form.schema, form.values));
+      if (result.status === "allow") continue;
+      findings.push(...result.findings);
+      if (result.status === "block") {
+        return {
+          status: "block",
+          findings,
+          ...(result.message === undefined ? {} : { message: result.message })
+        };
+      }
+      requiresConfirmation = true;
+      confirmationMessage ??= result.message;
+    }
+    return !requiresConfirmation
+      ? { status: "allow" }
+      : {
+          status: "confirm",
+          findings,
+          ...(confirmationMessage === undefined ? {} : { message: confirmationMessage })
+        };
+  };
+
+  const submitValues = async (guardsConfirmed = false): Promise<SubmitResult> => {
+    if (rendererSubmissionInFlight.current || (confirmation !== null && !guardsConfirmed)) {
+      return { status: "cancelled" };
+    }
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
-    const result = await form.submit(beforeSubmit);
-    if (result.status === "invalid") {
-      const invalidPageIndex = pages?.findIndex((page) =>
-        firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
-      );
-      if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
-      focusFirstIssue(firstInvalidFieldId);
+    if (validation.valid && !guardsConfirmed && submissionGuards.length > 0) {
+      rendererSubmissionInFlight.current = true;
+      try {
+        const guardResult = await runSubmissionGuards(submissionGuards);
+        if (guardResult.status === "block") {
+          setGuardMessage(guardResult.message ?? "Submission blocked because sensitive data was detected.");
+          return { status: "cancelled" };
+        }
+        if (guardResult.status === "confirm") {
+          setGuardMessage(null);
+          setConfirmation({
+            findings: guardResult.findings,
+            ...(guardResult.message === undefined ? {} : { message: guardResult.message })
+          });
+          return { status: "cancelled" };
+        }
+      } finally {
+        rendererSubmissionInFlight.current = false;
+      }
+    }
+    setGuardMessage(null);
+    rendererSubmissionInFlight.current = true;
+    try {
+      const result = await form.submit(beforeSubmit);
+      if (result.status === "invalid") {
+        const invalidPageIndex = pages?.findIndex((page) =>
+          firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
+        );
+        if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
+        focusFirstIssue(firstInvalidFieldId);
+        return result;
+      }
+      if (result.status !== "success") return result;
+      if (receiptStore !== undefined) {
+        const storedReceipt: SubmissionReceipt = {
+          formId: form.schema.id,
+          formVersion: form.schema.version,
+          submittedAt: new Date().toISOString()
+        };
+        await receiptStore.save(storedReceipt);
+        setReceipt(storedReceipt);
+      }
+      if (autoSaveKey !== undefined && typeof globalThis.localStorage !== "undefined") {
+        globalThis.localStorage.removeItem(autoSaveKey);
+        setDraftRestored(false);
+      }
+      setCurrentPageIndex(visiblePageIndexes[0] ?? 0);
       return result;
+    } finally {
+      rendererSubmissionInFlight.current = false;
     }
-    if (result.status !== "success") return result;
-    if (autoSaveKey !== undefined && typeof globalThis.localStorage !== "undefined") {
-      globalThis.localStorage.removeItem(autoSaveKey);
-      setDraftRestored(false);
-    }
-    setCurrentPageIndex(visiblePageIndexes[0] ?? 0);
-    return result;
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (interactionLocked) return;
     void submitValues();
+  };
+
+  const confirmSubmission = () => {
+    setConfirmation(null);
+    void submitValues(true);
+  };
+
+  const cancelSubmission = () => {
+    setConfirmation(null);
+  };
+
+  const resetReceipt = async () => {
+    if (receiptStore === undefined) return;
+    await receiptStore.remove(form.schema.id, form.schema.version);
+    setReceipt(null);
+    form.reset();
   };
 
   const validationIssues = Object.values(form.errors).filter((issue): issue is ValidationIssue => issue !== undefined);
   const canPrev = pages !== undefined && activeVisibleIndex > 0;
   const canNext = pages !== undefined && activeVisibleIndex < visiblePageIndexes.length - 1;
   const renderSubmitButton = () =>
-    slots.renderSubmitButton?.({ isSubmitting: form.isSubmitting, onSubmit: () => void submitValues() }) ?? (
-      <button className="fe-submit" type="submit" disabled={form.isSubmitting}>
+    slots.renderSubmitButton?.({ isSubmitting: interactionLocked, onSubmit: () => void submitValues() }) ?? (
+      <button className="fe-submit" type="submit" disabled={interactionLocked}>
         {form.translate(form.schema.submitLabelKey ?? "form.submit")}
       </button>
     );
+
+  if (!receiptLoaded) return null;
+  if (receipt !== null) {
+    return (
+      <div className={`fe-form fe-already-submitted ${className}`.trim()}>
+        {slots.renderAlreadySubmitted?.({
+          receipt,
+          ...(receiptStore === undefined ? {} : { onReset: () => void resetReceipt() })
+        }) ?? (
+          <div role="status">
+            Already submitted.
+            {receiptStore === undefined ? null : (
+              <button type="button" onClick={() => void resetReceipt()}>
+                Submit another response
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <form ref={formRef} className={`fe-form ${className}`.trim()} noValidate onSubmit={handleSubmit}>
@@ -499,7 +678,8 @@ function ContextFormRenderer({
               translate: form.translate,
               inputId: `${prefix}-${field.id}`,
               errorId: `${prefix}-${field.id}-error`,
-              helpId: `${prefix}-${field.id}-help`
+              helpId: `${prefix}-${field.id}-help`,
+              ...(slots.renderCharacterCount === undefined ? {} : { renderCharacterCount: slots.renderCharacterCount })
             };
             if (slots.renderField !== undefined) {
               return (
@@ -523,6 +703,24 @@ function ContextFormRenderer({
             );
           })}
       </div>
+      {guardMessage === null ? null : <div role="alert">{guardMessage}</div>}
+      {confirmation === null
+        ? null
+        : (slots.renderSubmissionConfirmation?.({
+            findings: confirmation.findings,
+            onConfirm: confirmSubmission,
+            onCancel: cancelSubmission
+          }) ?? (
+            <div className="fe-submission-confirmation" role="dialog" aria-modal="true">
+              <p>{confirmation.message ?? "Sensitive data may be included. Confirm before submitting."}</p>
+              <button type="button" onClick={confirmSubmission}>
+                Confirm submission
+              </button>
+              <button type="button" onClick={cancelSubmission}>
+                Cancel
+              </button>
+            </div>
+          ))}
       {validationIssues.length === 0
         ? null
         : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
@@ -549,7 +747,9 @@ function ContextFormRenderer({
             totalPages: visiblePageIndexes.length,
             canPrev,
             canNext,
-            onPrev: () => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0),
+            onPrev: () => {
+              if (!interactionLocked) setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
+            },
             onNext: handleNext
           }) ?? (
             <>
@@ -557,13 +757,14 @@ function ContextFormRenderer({
                 <button
                   className="btn-prev"
                   type="button"
+                  disabled={interactionLocked}
                   onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
                 >
                   {form.translate("form.back")}
                 </button>
               ) : null}
               {canNext ? (
-                <button className="btn-next" type="button" onClick={handleNext}>
+                <button className="btn-next" type="button" disabled={interactionLocked} onClick={handleNext}>
                   {form.translate("form.next")}
                 </button>
               ) : null}

@@ -42,6 +42,9 @@ export interface TranslationBatchReport {
   readonly totalCharacters: number;
   readonly retryAttempts: number;
   readonly durationMs: number;
+  readonly cacheHitCount: number;
+  readonly cacheMissCount: number;
+  readonly evictionCount: number;
 }
 
 const DEFAULT_ENDPOINT = "https://translation.googleapis.com/v3";
@@ -254,7 +257,9 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     }
     const target = requireNonEmpty(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? undefined : requireNonEmpty(sourceLocale, "sourceLocale");
-    const chunks = splitTranslationBatch(texts, batchLimits);
+    const nonEmptyEntries = texts.flatMap((text, index) => (text.trim().length === 0 ? [] : [{ text, index }]));
+    const nonEmptyTexts = nonEmptyEntries.map((entry) => entry.text);
+    const chunks = splitTranslationBatch(nonEmptyTexts, batchLimits);
     const startedAt = now();
     const translated: string[] = [];
     let retryAttempts = 0;
@@ -263,13 +268,22 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
       translated.push(...result.translations);
       retryAttempts += result.retryAttempts;
     }
+    const restored = Array.from({ length: texts.length }, () => "");
+    for (const [translatedIndex, entry] of nonEmptyEntries.entries()) {
+      const value = translated[translatedIndex];
+      if (value === undefined) throw new Error("Google Translation Advanced returned an incomplete translation batch.");
+      restored[entry.index] = value;
+    }
     options.onBatchReport?.({
       totalChunks: chunks.length,
-      totalCharacters: texts.reduce((total, text) => total + [...text].length, 0),
+      totalCharacters: nonEmptyTexts.reduce((total, text) => total + [...text].length, 0),
       retryAttempts,
-      durationMs: Math.max(0, now() - startedAt)
+      durationMs: Math.max(0, now() - startedAt),
+      cacheHitCount: 0,
+      cacheMissCount: nonEmptyTexts.length,
+      evictionCount: 0
     });
-    return translated;
+    return restored;
   };
 
   return {

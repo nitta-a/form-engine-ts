@@ -12,13 +12,16 @@ pnpm add @form-engine-ts/core @form-engine-ts/translator-cache
 ## Usage
 
 ```ts
-import { withTranslationCache } from "@form-engine-ts/translator-cache";
+import { createMemoryTranslationCache, withTranslationCache } from "@form-engine-ts/translator-cache";
 
-const translator = withTranslationCache(baseTranslator, cacheStorage, {
+const cache = createMemoryTranslationCache({ maxEntries: 500, ttlMs: 5 * 60 * 1000 });
+const translator = withTranslationCache(baseTranslator, cache, {
   ttlMs: 60 * 60 * 1000,
-  keyPrefix: "survey-translations"
+  keyPrefix: "survey-translations",
+  adapterName: "google-v3"
 });
 ```
 
-Keys isolate source locale, target locale, and a deterministic UTF-8 hash of the source text. Batch misses are deduplicated,
-translated once in source order, cached, and restored to their original positions.
+Keys isolate adapter name, source locale, target locale, and a deterministic UTF-8 hash of the source text. Batch misses
+are deduplicated, translated once in source order, cached, and restored to their original positions. The built-in memory
+cache applies both TTL expiration and bounded LRU eviction and exposes `size`, `evictionCount`, and `clear()` diagnostics.

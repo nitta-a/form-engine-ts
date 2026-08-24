@@ -32,5 +32,6 @@ Keep OAuth access tokens on a trusted server. `translateBatch` defaults to at mo
 request (hard limits: 1,024 items and 30,000 bytes). Network errors, HTTP 429, and HTTP 5xx responses are retried; customize
 batch and retry behavior with `batchLimits` and `retry`.
 
-`onBatchReport` receives `totalChunks`, Unicode-code-point `totalCharacters`, aggregate retry attempts, and total duration
-after each `translateBatch` call.
+Blank and whitespace-only inputs are omitted from API requests and restored as empty output strings in their original
+positions. `onBatchReport` receives `totalChunks`, Unicode-code-point `totalCharacters`, aggregate retry attempts, total
+duration, `cacheHitCount`, `cacheMissCount`, and `evictionCount` after each `translateBatch` call.

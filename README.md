@@ -23,6 +23,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
 | Translator adapter | `@form-engine-ts/translator-google-v3` | Google Cloud Translation Advanced v3 with glossaries, labels, chunking, and retry |
 | Translator utility | `@form-engine-ts/translator-cache` | Storage-neutral TTL cache wrapper for asynchronous translation adapters |
+| Privacy utility | `@form-engine-ts/privacy` | Standard and extensible sensitive-data detection for text answers |
 | Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
 | Demo app | `@form-engine-ts/preview` | Private Vite sandbox for building, responding, switching storage, analytics, and CSV export |
 
@@ -59,7 +60,7 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security, v2 extensibility, and v2.6 domain/infrastructure APIs
+### v1.1.1 security, v2 extensibility, and v2.7 domain/infrastructure APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
@@ -103,6 +104,15 @@ revision-based atomic commits to MongoDB. Azure Table paging now uses one native
 continuation tokens, injectable entity codecs, separate schema/submission clients, and scalar metadata-to-OData filters.
 Google Translation Advanced reports per-batch metrics, CSV custom columns may resolve asynchronously, and the new
 `@form-engine-ts/translator-cache` provides deterministic TTL caching without coupling Core to a cache vendor.
+
+v2.7 adds auditable clone/delete version-transition plans, typed atomic storage commits, a composable submission-filter
+AST, and text-answer paging. MongoDB persists complete version state and audit events; Azure Table accepts arbitrary
+entity layouts through a codec and per-form client resolver while bounding native-page scans. React can run ordered
+privacy guards before submission, request explicit confirmation, persist SSR-safe submission receipts, and enforce native
+text constraints. The new `@form-engine-ts/privacy` package detects common sensitive-data patterns without coupling Core
+to a privacy implementation. Translation caching now provides bounded LRU/TTL memory storage and adapter-isolated keys,
+while Google v3 skips blank API inputs and reports cache statistics. Release CI verifies public declaration snapshots and
+waits up to three minutes for npm availability before producing package-specific release notes.
 
 ### Define and render a form
 
@@ -371,6 +381,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
 | Translator Adapter | `@form-engine-ts/translator-google-v3` | 用語集・label・分割送信・retry対応のGoogle Cloud Translation Advanced v3連携 |
 | Translator Utility | `@form-engine-ts/translator-cache` | 非同期翻訳adapter向けのstorage非依存TTL cache wrapper |
+| Privacy Utility | `@form-engine-ts/privacy` | テキスト回答向けの標準・拡張可能な機密データ検出 |
 | Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
 | デモアプリ | `@form-engine-ts/preview` | Builder・回答・集計/CSVの3タブを備えた非公開Viteサンドボックス |
 
@@ -407,7 +418,7 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応、v2拡張、v2.6ドメイン／インフラAPI
+### v1.1.1セキュリティ対応、v2拡張、v2.7ドメイン／インフラAPI
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
@@ -448,6 +459,14 @@ MongoDBへrevisionベースのatomic commitを追加しました。Azure Table�
 1 requestにつきnative pageを1件だけ取得します。entity codec注入、schema/submission client分離、scalar metadataの
 OData変換にも対応しました。Google Translation Advancedのbatch report、非同期CSVカスタム列、およびvendor非依存の
 TTL cache utility `@form-engine-ts/translator-cache`も追加しています。
+
+v2.7ではclone/deleteの監査可能なversion遷移plan、型付きatomic storage commit、合成可能な回答filter AST、
+text回答paginationを追加しました。MongoDBは完全なversion stateと監査eventを永続化し、Azure Tableはcodecと
+form単位client resolverにより任意entity layoutへ対応しつつnative page scanを上限付きにします。Reactは送信前に
+順序付きprivacy guardを実行し、明示確認、SSR-safeな送信receipt、native text制約を利用できます。新しい
+`@form-engine-ts/privacy`はCoreを特定実装へ結合せず、標準的な機密データpatternを検出します。翻訳cacheには
+上限付きLRU/TTL memory storageとadapter分離keyを追加し、Google v3は空文字をAPI送信せずcache統計をreportします。
+Release CIは公開宣言snapshotを検証し、npm反映を最大3分待ってpackage別release noteを生成します。
 
 ### フォームの定義とレンダリング
 

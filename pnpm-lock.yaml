@@ -83,11 +83,20 @@ importers:
 
   packages/core: {}
 
+  packages/privacy:
+    dependencies:
+      '@form-engine-ts/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/react:
     dependencies:
       '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
+      '@form-engine-ts/privacy':
+        specifier: workspace:*
+        version: link:../privacy
       react:
         specifier: '>=18.2 <20'
         version: 19.2.8

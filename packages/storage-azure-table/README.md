@@ -25,9 +25,13 @@ const storage = createAzureTableStorage({ schemasTableClient, submissionsTableCl
 const page = await storage.listSubmissionPage("contact", { pageSize: 500, locale: "ja" });
 ```
 
-Submission entities use `formId` as `PartitionKey` and `submittedAt_responseId` as `RowKey`. Built-in date, locale,
-version, and cursor constraints are sent as OData filters. `listSubmissionPage` calls the Azure iterator's
-`.byPage({ maxPageSize, continuationToken })` and consumes exactly one native page per request; the returned service token
-remains opaque. Scalar metadata filters can be converted to OData with `metadataFiltersToOData` or a custom
-`toODataFilter`. Supply `submissionCodec` for custom entity layouts. The deprecated single `client` option remains
-available for compatibility. The caller owns table creation, credentials, retries, and the client lifecycle.
+The default codec uses `formId` as `PartitionKey` and `submittedAt_responseId` as `RowKey`. Supply an
+`AzureTableSubmissionCodec` to define a completely different entity layout, key strategy, deserializer, and client-side
+matcher; custom entities are not polluted with default discriminator fields. `clientResolver` can select a table client
+per form and operation. Date, locale, version, cursor, metadata, and supported filter-AST constraints are sent as OData;
+unsupported expressions remain client-filtered with identical semantics.
+
+`listSubmissionPage` follows opaque Azure continuation tokens and scans at most `maxScanPages` native pages (default 5)
+to fill the requested logical page after client-side filtering. `buildSubmissionFilter` can replace filter generation.
+The deprecated `client`, `submissionCodec`, and `toODataFilter` options remain available for compatibility. The caller
+owns table creation, credentials, retries, and client lifecycle.

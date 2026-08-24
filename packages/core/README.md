@@ -77,11 +77,13 @@ Results are ordered by `submittedAt`, then submission ID. Both boundaries are in
 ## Versioning, incremental analytics, and paged storage
 
 `cloneVersionToDraft`, asynchronous `publishDraft`, and `deleteDraft` implement revision-checked version transitions as
-pure functions.
+pure functions. `createCloneTransitionPlan`, `createPublishTransitionPlan`, and `createDeleteDraftTransitionPlan` produce
+complete persistence plans with the next state, affected records, and immutable audit events.
 Clone/delete operations accept `expectedRevision`; cloning rejects non-published sources, publish validation failures are
 returned as typed `validation_failed` issues, and successful publishing archives only a supplied actual published record,
 preserving its schema and metadata. `createPublishTransitionPlan` returns complete records plus expected/next revisions for
-storage adapters implementing `VersionedFormStorageAdapter` to commit atomically.
+storage adapters implementing `VersionedFormStorageAdapter` to commit atomically. Versioned adapters expose state/record
+reads and return a typed `Result` from `commitVersionTransition`, including the actual revision on concurrency conflicts.
 `createResponseAccumulator` incrementally counts choices, answered/unanswered values, and numeric summaries without retaining
 free-text bodies. In lenient mode, mismatched responses are skipped and exposed by `addMany()` and `getReport()` instead of
 being included silently. Independent accumulators for the same schema can be merged, and `finalize()` matches
@@ -94,6 +96,8 @@ Formula-injection neutralization applies to both default and custom columns.
 
 Adapters implementing `PagedSubmissionStorageAdapter` expose `listSubmissionPage(formId, options)`. The opaque Base64
 cursor combines `submittedAt` and response ID, so equal timestamps do not produce gaps or duplicates. `metadataFilters`
-and `filter` are applied before page sizing.
+and `filter` are applied before page sizing. `filter` accepts a composable `eq`/`in`/`range`/`exists` and/or AST; adapters
+may push supported nodes to their native query language while preserving identical client-side semantics. Adapters that
+implement `listTextAnswerPage` expose stable cursor pagination over individual text answers.
 
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.

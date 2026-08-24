@@ -1,0 +1,49 @@
+{
+  "name": "@form-engine-ts/privacy",
+  "version": "2.7.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitta-a/form-engine-ts.git",
+    "directory": "packages/privacy"
+  },
+  "bugs": {
+    "url": "https://github.com/nitta-a/form-engine-ts/issues"
+  },
+  "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
+  "keywords": [
+    "form",
+    "privacy",
+    "pii",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@form-engine-ts/core": "workspace:*"
+  }
+}

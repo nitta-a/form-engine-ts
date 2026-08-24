@@ -8,8 +8,10 @@ import type {
   TranslationReport,
   ValidationError
 } from "@form-engine-ts/core";
+import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import type { ComponentType, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import type { FormBuilderResult } from "./hooks/useFormBuilder";
+import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
 
 export interface ComponentBaseProps {
   readonly id?: string;
@@ -209,6 +211,18 @@ export type SubmitResult =
   | { readonly status: "success" }
   | { readonly status: "error"; readonly error: Error };
 
+export type SubmissionGuardResult =
+  | { readonly status: "allow" }
+  | { readonly status: "confirm"; readonly findings: readonly SensitiveDataFinding[]; readonly message?: string }
+  | { readonly status: "block"; readonly findings: readonly SensitiveDataFinding[]; readonly message?: string };
+
+export type SubmissionGuard = (
+  schema: FormSchema,
+  values: Record<string, unknown>
+) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
+
+export type FormSubmitState = "idle" | "submitting" | "confirming" | "success" | "error";
+
 export interface FormRendererSlots {
   readonly renderHeader?: (props: { readonly title: string; readonly description?: string }) => ReactNode;
   readonly renderPageHeader?: (props: {
@@ -234,6 +248,25 @@ export interface FormRendererSlots {
   readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
   readonly renderCompletion?: (props: { readonly message: string }) => ReactNode;
   readonly renderSubmitError?: (props: { readonly error: Error; readonly onRetry?: () => void }) => ReactNode;
+  readonly renderSubmissionConfirmation?: (props: {
+    readonly findings: readonly SensitiveDataFinding[];
+    readonly onConfirm: () => void;
+    readonly onCancel: () => void;
+  }) => ReactNode;
+  readonly renderAlreadySubmitted?: (props: {
+    readonly receipt: SubmissionReceipt;
+    readonly onReset?: () => void;
+  }) => ReactNode;
+  readonly renderCharacterCount?: (props: {
+    readonly fieldId: string;
+    readonly current: number;
+    readonly max: number;
+  }) => ReactNode;
+}
+
+export interface SubmissionProtectionProps {
+  readonly submissionGuards?: readonly SubmissionGuard[];
+  readonly receiptStore?: SubmissionReceiptStore;
 }
 
 export type BeforeSubmit = (

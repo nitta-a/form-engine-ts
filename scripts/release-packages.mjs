@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { appendFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -91,6 +91,70 @@ export async function publishUnpublishedPackages(packages, options = {}) {
   return { published, skipped };
 }
 
+export async function waitForPublishedPackages(packages, options = {}) {
+  const execute = options.runCommand ?? runCommand;
+  const timeoutMs = options.timeoutMs ?? 180_000;
+  const initialDelayMs = options.initialDelayMs ?? 1000;
+  const maxDelayMs = options.maxDelayMs ?? 15_000;
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const startedAt = now();
+  let delayMs = initialDelayMs;
+  let unavailable = packages;
+  while (unavailable.length > 0) {
+    const checks = await Promise.all(
+      unavailable.map(async (pkg) => {
+        const identifier = `${pkg.manifest.name}@${pkg.manifest.version}`;
+        const result = await execute("npm", ["view", identifier, "version", "--json"], { capture: true });
+        if (result.code !== 0) return pkg;
+        try {
+          return JSON.parse(result.stdout) === pkg.manifest.version ? null : pkg;
+        } catch {
+          return pkg;
+        }
+      })
+    );
+    unavailable = checks.filter((pkg) => pkg !== null);
+    if (unavailable.length === 0) return;
+    const elapsed = now() - startedAt;
+    if (elapsed >= timeoutMs) {
+      throw new Error(
+        `npm publication verification timed out for: ${unavailable.map((pkg) => `${pkg.manifest.name}@${pkg.manifest.version}`).join(", ")}`
+      );
+    }
+    const waitMs = Math.min(delayMs, maxDelayMs, timeoutMs - elapsed);
+    options.onStatus?.(`waiting ${waitMs}ms for ${unavailable.length} npm package(s)`);
+    await sleep(waitMs);
+    delayMs = Math.min(maxDelayMs, delayMs * 2);
+  }
+}
+
+export function formatReleaseNotes(version, result) {
+  const list = (items) => (items.length === 0 ? "- None" : items.map((item) => `- \`${item}\``).join("\n"));
+  return [
+    `## Package publication (${version})`,
+    "",
+    "### Published",
+    list(result.published),
+    "",
+    "### Already available",
+    list(result.skipped)
+  ].join("\n");
+}
+
+async function writeGitHubOutputs(version, result) {
+  const outputPath = process.env.GITHUB_OUTPUT;
+  if (outputPath === undefined) return;
+  await appendFile(
+    outputPath,
+    `${[
+      `version=${version}`,
+      `published_json=${JSON.stringify(result.published)}`,
+      `skipped_json=${JSON.stringify(result.skipped)}`
+    ].join("\n")}\n`
+  );
+}
+
 async function main() {
   const command = process.argv[2];
   const expectedVersion = (process.env.RELEASE_TAG ?? "").replace(/^v/, "");
@@ -100,8 +164,11 @@ async function main() {
     return;
   }
   if (command === "publish") {
-    const packages = await discoverReleasePackages();
+    const packages =
+      expectedVersion.length === 0 ? await discoverReleasePackages() : await validateReleasePackages(expectedVersion);
     const result = await publishUnpublishedPackages(packages, { onStatus: console.log, env: process.env });
+    await waitForPublishedPackages(packages, { onStatus: console.log });
+    await writeGitHubOutputs(expectedVersion || String(packages[0]?.manifest.version ?? "unknown"), result);
     console.log(`Published ${result.published.length}; skipped ${result.skipped.length}.`);
     return;
   }
