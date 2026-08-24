@@ -1,5 +1,5 @@
 {
-  "name": "@form-engine-ts/storage-memory",
+  "name": "@form-engine-ts/translator-google-v3",
   "version": "2.5.0",
   "publishConfig": {
     "access": "public"
@@ -25,7 +25,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nitta-a/form-engine-ts.git",
-    "directory": "packages/storage-memory"
+    "directory": "packages/translator-google-v3"
   },
   "bugs": {
     "url": "https://github.com/nitta-a/form-engine-ts/issues"
@@ -33,9 +33,10 @@
   "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
   "keywords": [
     "form",
-    "survey",
-    "storage",
-    "memory",
+    "translation",
+    "google-cloud",
+    "translation-advanced",
+    "translator",
     "typescript"
   ],
   "scripts": {

@@ -1,6 +1,6 @@
 import { type FormSchema, type FormValues, validateAnswers, validatePageAnswers } from "@form-engine-ts/core";
 import type { ZodIssue, ZodSafeParseResult } from "zod";
-import { createZodFormSchema } from "../src";
+import { createZodFormCodec, createZodFormSchema } from "../src";
 
 const schema = {
   id: "survey",
@@ -234,5 +234,65 @@ describe("createZodFormSchema", () => {
       false
     );
     expect(createZodFormSchema(schema).safeParse({ ...validValues, metadata: new Date() }).success).toBe(false);
+  });
+});
+
+describe("createZodFormCodec", () => {
+  const conditional: FormSchema = {
+    id: "codec",
+    version: 1,
+    title: "Codec",
+    fields: [
+      {
+        id: "choice",
+        type: "select",
+        title: "Choice",
+        required: true,
+        options: [
+          { id: "yes", label: "Yes" },
+          { id: "no", label: "No" }
+        ]
+      },
+      {
+        id: "details",
+        type: "text",
+        title: "Details",
+        required: true,
+        displayCondition: { questionId: "choice", operator: "equals", value: "yes" }
+      },
+      { id: "note", type: "text", title: "Note", required: false }
+    ]
+  };
+
+  it("trims strings and strips hidden and unknown answers before validation", () => {
+    const input = {
+      choice: " no ",
+      details: " stale answer ",
+      note: " kept ",
+      external: "remove me",
+      metadata: { source: "ARGS" }
+    };
+    expect(
+      createZodFormCodec(conditional, {
+        trimStrings: true,
+        stripHiddenFields: true,
+        stripUnknownFields: true
+      }).safeParse(input)
+    ).toEqual({
+      success: true,
+      data: { choice: "no", note: "kept", metadata: { source: "ARGS" } }
+    });
+    expect(input).toEqual({
+      choice: " no ",
+      details: " stale answer ",
+      note: " kept ",
+      external: "remove me",
+      metadata: { source: "ARGS" }
+    });
+  });
+
+  it("keeps visible-field validation after normalization", () => {
+    const codec = createZodFormCodec(conditional, { trimStrings: true, stripHiddenFields: true });
+    expect(hasCoreIssue(codec.safeParse({ choice: " yes ", details: " " }), "required")).toBe(true);
   });
 });

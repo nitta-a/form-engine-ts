@@ -167,6 +167,27 @@ textarea {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.domain-api-demo {
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+}
+
+.domain-api-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.domain-api-demo output {
+  color: #3156d3;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 700;
+}
+
 .builder-action-status {
   border-left: 3px solid var(--accent);
   padding-left: 0.75rem;
@@ -194,6 +215,15 @@ textarea {
   border-radius: 0.35rem;
   font: inherit;
   padding: 0.55rem 0.7rem;
+}
+
+.preview-mui-field {
+  display: inline-grid;
+  gap: 0.2rem;
+}
+
+.preview-mui-field small {
+  color: #b3261e;
 }
 
 .preview-slot-page-header,

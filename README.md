@@ -20,6 +20,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Translator adapter | `@form-engine-ts/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
 | Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
+| Translator adapter | `@form-engine-ts/translator-google-v3` | Google Cloud Translation Advanced v3 with glossaries, labels, chunking, and retry |
 | Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
 | Demo app | `@form-engine-ts/preview` | Private Vite sandbox for building, responding, switching storage, analytics, and CSV export |
 
@@ -56,7 +57,7 @@ The builder exposes page membership and locale override controls. Core also prov
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 
-### v1.1.1 security, v2 extensibility, and v2.2 authoring APIs
+### v1.1.1 security, v2 extensibility, and v2.5 domain/infrastructure APIs
 
 CSV export neutralizes formula-like string cells after leading whitespace by default; pass
 `{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
@@ -83,6 +84,12 @@ The Visual Builder also exposes orthogonal `components` and `slots` extension la
 Primitive controls can be adapted to MUI/Tailwind components while domain surfaces—including only the automatic
 translation actions—can be replaced independently. Core locale collection now scans translation and translation-metadata
 keys on every schema node, closing unregistered, disallowed, and maximum-locale policy gaps.
+
+v2.4 adds pure form-version transitions with optimistic revisions, mergeable incremental response analytics,
+`AsyncIterable` CSV streaming with custom columns, MUI-oriented Builder input props, translation slot status, and a Zod
+normalization codec. v2.5 adds stable keyset pagination to Memory, MongoDB, and PostgreSQL storage and introduces
+`@form-engine-ts/translator-google-v3` for Translation Advanced glossaries, labels, automatic chunking, and exponential
+retry on HTTP 429/5xx responses.
 
 ### Define and render a form
 
@@ -346,6 +353,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Translator Adapter | `@form-engine-ts/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
+| Translator Adapter | `@form-engine-ts/translator-google-v3` | 用語集・label・分割送信・retry対応のGoogle Cloud Translation Advanced v3連携 |
 | Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
 | デモアプリ | `@form-engine-ts/preview` | Builder・回答・集計/CSVの3タブを備えた非公開Viteサンドボックス |
 
@@ -382,7 +390,7 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 
-### v1.1.1セキュリティ対応、v2拡張、v2.2編集API
+### v1.1.1セキュリティ対応、v2拡張、v2.5ドメイン／インフラAPI
 
 CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
 `{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
@@ -405,6 +413,12 @@ v2.2ではVisual Builderに`readOnly`と表示領域別の`features`制御を追
 Visual Builderはデザインシステム統合向けに、直交する`components`と`slots`の拡張層も公開します。MUI/Tailwind等へ
 プリミティブ部品を差し替えつつ、自動翻訳actionだけを含むdomain領域を独立して置換できます。Coreのロケール収集は
 全スキーマノードの翻訳・翻訳metadataキーを走査し、未登録・非許可・上限超過の抜け道を防ぎます。
+
+v2.4では楽観revision付きの純粋なフォーム版遷移、結合可能な増分回答集計、カスタム列対応の
+`AsyncIterable` CSVストリーム、MUI向けBuilder入力props、翻訳slot状態、Zod正規化codecを追加しました。
+v2.5ではMemory・MongoDB・PostgreSQL Storageへ安定したkeyset paginationを追加し、Translation Advancedの
+用語集・label・自動chunk分割・HTTP 429/5xx指数backoff retryに対応する`@form-engine-ts/translator-google-v3`を
+新設しました。
 
 ### フォームの定義とレンダリング
 

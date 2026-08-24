@@ -32,6 +32,17 @@ function clientWithRows(...rows: readonly unknown[][]) {
   return { client: { query } as PostgresClientLike, query };
 }
 
+function submissionRow(value: FormSubmission) {
+  return {
+    response_id: value.id,
+    form_id: value.formId,
+    form_version: value.formVersion,
+    locale: value.locale,
+    submitted_at: new Date(value.submittedAt),
+    submission_json: JSON.stringify(value)
+  };
+}
+
 describe("createPostgresStorage", () => {
   it("accepts the node-postgres Pool query shape", () => {
     expectTypeOf<Pool["query"]>().toMatchTypeOf<PostgresClientLike["query"]>();
@@ -88,6 +99,32 @@ describe("createPostgresStorage", () => {
     ).resolves.toEqual([stored]);
     expect(query.mock.calls[1]?.[0]).toMatch(/form_version = \$2.*submitted_at >= \$3.*submitted_at <= \$4/s);
     expect(query.mock.calls[1]?.[1]).toEqual(["form", 2, "2025-01-01T00:00:00.000Z", "2025-01-03T00:00:00.000Z"]);
+  });
+
+  it("uses a stable timestamp and response ID cursor for paged queries", async () => {
+    const timestamp = "2025-01-02T00:00:00.000Z";
+    const first = submission("a", timestamp);
+    const second = submission("b", timestamp);
+    const third = submission("c", timestamp);
+    const { client, query } = clientWithRows(
+      [submissionRow(first), submissionRow(second), submissionRow(third)],
+      [submissionRow(third)]
+    );
+    const storage = createPostgresStorage({ client });
+    const firstPage = await storage.listSubmissionPage("form", { version: 2, locale: "en", pageSize: 2 });
+    expect(firstPage.items.map((item) => item.id)).toEqual(["a", "b"]);
+    expect(firstPage.hasMore).toBe(true);
+    expect(firstPage.nextCursor).toBeDefined();
+    if (firstPage.nextCursor === undefined) throw new Error("Expected a cursor");
+    const secondPage = await storage.listSubmissionPage("form", {
+      pageSize: 2,
+      cursor: firstPage.nextCursor
+    });
+    expect(secondPage).toEqual({ items: [third], hasMore: false });
+    expect(query.mock.calls[0]?.[0]).toMatch(/form_version = \$2.*locale = \$3.*LIMIT \$4/s);
+    expect(query.mock.calls[0]?.[1]).toEqual(["form", 2, "en", 3]);
+    expect(query.mock.calls[1]?.[0]).toMatch(/submitted_at > \$2.*response_id > \$3.*LIMIT \$4/s);
+    expect(query.mock.calls[1]?.[1]).toEqual(["form", timestamp, "b", 3]);
   });
 
   it("runs lazy migration exactly once and uses customized safe identifiers", async () => {

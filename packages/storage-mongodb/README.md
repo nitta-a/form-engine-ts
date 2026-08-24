@@ -26,3 +26,6 @@ const submissions = await storage.listSubmissions(schema.id, schema.version, {
 ```
 
 The caller owns the MongoDB connection lifecycle. Collection names can be customized in the factory options. `createIndexes()` creates named indexes for form/timestamp range scans and locale queries. Range boundaries are inclusive, and MongoDB sorts by submission time and then ID. `clearResponses(formId)` preserves schemas and other forms; `clear()` removes documents only from the configured collections and does not drop collections or indexes.
+
+`listSubmissionPage(formId, { version, pageSize, cursor, since, until, locale })` performs bounded reads using the
+compound `submittedAt`/response-ID cursor. Run `createIndexes()` after upgrading to create the matching compound index.

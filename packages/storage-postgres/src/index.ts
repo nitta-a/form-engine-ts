@@ -1,5 +1,10 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine-ts/core";
-import { assertValidFormSchema } from "@form-engine-ts/core";
+import type { FormSchema, FormSubmission, FormValue, PagedSubmissionStorageAdapter } from "@form-engine-ts/core";
+import {
+  assertValidFormSchema,
+  decodeSubmissionCursor,
+  encodeSubmissionCursor,
+  normalizeSubmissionPageSize
+} from "@form-engine-ts/core";
 
 export interface PostgresClientLike {
   query(text: string, params?: unknown[]): Promise<{ readonly rows: readonly unknown[] }>;
@@ -112,7 +117,7 @@ function identifier(value: string | undefined, fallback: string, optionName: str
   return `"${name}"`;
 }
 
-export function createPostgresStorage(options: PostgresStorageOptions): FormStorageAdapter {
+export function createPostgresStorage(options: PostgresStorageOptions): PagedSubmissionStorageAdapter {
   if (options?.client === undefined || typeof options.client.query !== "function") {
     throw new TypeError("client with a query function is required.");
   }
@@ -218,6 +223,55 @@ export function createPostgresStorage(options: PostgresStorageOptions): FormStor
         params
       );
       return result.rows.map(parseSubmissionRow);
+    },
+    async listSubmissionPage(formId, queryOptions = {}) {
+      await ensureReady();
+      const pageSize = normalizeSubmissionPageSize(queryOptions.pageSize);
+      const cursor = queryOptions.cursor === undefined ? undefined : decodeSubmissionCursor(queryOptions.cursor);
+      const conditions = ["form_id = $1"];
+      const params: unknown[] = [formId];
+      if (queryOptions.version !== undefined) {
+        params.push(queryOptions.version);
+        conditions.push(`form_version = $${params.length}`);
+      }
+      if (queryOptions.since !== undefined) {
+        params.push(queryOptions.since);
+        conditions.push(`submitted_at >= $${params.length}::timestamptz`);
+      }
+      if (queryOptions.until !== undefined) {
+        params.push(queryOptions.until);
+        conditions.push(`submitted_at <= $${params.length}::timestamptz`);
+      }
+      if (queryOptions.locale !== undefined) {
+        params.push(queryOptions.locale);
+        conditions.push(`locale = $${params.length}`);
+      }
+      if (cursor !== undefined) {
+        params.push(cursor.submittedAt);
+        const timestampParameter = params.length;
+        params.push(cursor.responseId);
+        conditions.push(
+          `(submitted_at > $${timestampParameter}::timestamptz OR ` +
+            `(submitted_at = $${timestampParameter}::timestamptz AND response_id > $${params.length}))`
+        );
+      }
+      params.push(pageSize + 1);
+      const result = await options.client.query(
+        `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
+         FROM ${responsesTable} WHERE ${conditions.join(" AND ")}
+         ORDER BY submitted_at, response_id LIMIT $${params.length}`,
+        params
+      );
+      const hasMore = result.rows.length > pageSize;
+      const items = result.rows.slice(0, pageSize).map(parseSubmissionRow);
+      const last = items.at(-1);
+      return {
+        items,
+        hasMore,
+        ...(hasMore && last !== undefined
+          ? { nextCursor: encodeSubmissionCursor({ submittedAt: last.submittedAt, responseId: last.id }) }
+          : {})
+      };
     },
     async deleteSubmission(submissionId) {
       await ensureReady();

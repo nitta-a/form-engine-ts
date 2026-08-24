@@ -5,6 +5,7 @@ import type {
   FormPolicy,
   FormSchema,
   JsonValue,
+  TranslationReport,
   ValidationError
 } from "@form-engine-ts/core";
 import type { ComponentType, MouseEvent as ReactMouseEvent, ReactNode } from "react";
@@ -33,11 +34,19 @@ export interface BuilderIconButtonProps extends ComponentBaseProps {
   readonly title: string;
 }
 
-export interface BuilderTextInputProps extends ComponentBaseProps {
+export interface InputComponentProps extends ComponentBaseProps {
+  readonly name?: string;
+  readonly label?: string;
+  readonly required?: boolean;
+  readonly error?: boolean;
+  readonly helperText?: string;
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly placeholder?: string;
   readonly maxLength?: number;
+}
+
+export interface BuilderTextInputProps extends InputComponentProps {
   readonly inputMode?: "text" | "numeric";
   readonly type?: "text" | "number";
   readonly min?: number;
@@ -45,12 +54,8 @@ export interface BuilderTextInputProps extends ComponentBaseProps {
   readonly step?: number;
 }
 
-export interface BuilderTextAreaProps extends ComponentBaseProps {
-  readonly value: string;
-  readonly onChange: (value: string) => void;
+export interface BuilderTextAreaProps extends InputComponentProps {
   readonly rows?: number;
-  readonly placeholder?: string;
-  readonly maxLength?: number;
 }
 
 export interface BuilderSelectOption {
@@ -59,9 +64,7 @@ export interface BuilderSelectOption {
   readonly disabled?: boolean;
 }
 
-export interface BuilderSelectProps extends ComponentBaseProps {
-  readonly value: string;
-  readonly onChange: (value: string) => void;
+export interface BuilderSelectProps extends InputComponentProps {
   readonly options: readonly BuilderSelectOption[];
 }
 
@@ -151,6 +154,9 @@ export interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps
   readonly currentLocale: string;
   readonly onAutoTranslate: () => void;
   readonly isTranslating: boolean;
+  readonly translationError?: string;
+  readonly translationReport?: TranslationReport;
+  readonly onClearTranslationError?: () => void;
 }
 
 export interface FormBuilderSlots {

@@ -78,6 +78,11 @@ surfaces: `toolbar`, `fieldEditor`, `optionEditor`, `pages`, `localization`, or 
 policy-aware `actions`; a custom `translationActions` slot can therefore call an application-specific AI mutation while
 the standard manual localization editors remain unchanged.
 
+Input primitives receive design-system-friendly `name`, `label`, `required`, `error`, and `helperText` props in addition
+to their normalized string-value callbacks. The `translationActions` slot also receives `translationError`, the latest
+`translationReport`, and `onClearTranslationError`, allowing a custom MUI action surface to represent the complete
+translation lifecycle.
+
 ```tsx
 <FormBuilder
   schema={schema}

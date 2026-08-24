@@ -2,7 +2,10 @@ import {
   aggregateResponses,
   calculateCrossTabulation,
   calculateFieldVisibility,
+  cloneVersionToDraft,
+  createResponseAccumulator,
   createSubmission,
+  deleteDraft,
   dispatchWebhook,
   exportResponsesToCsv,
   type FormAnalytics,
@@ -12,7 +15,9 @@ import {
   type FormStorageAdapter,
   type FormSubmission,
   type FormValues,
+  type FormVersionState,
   populateSchemaTranslations,
+  publishDraft,
   type QuestionAggregate,
   type SelectField,
   validateFormSchema
@@ -74,6 +79,11 @@ function PreviewMuiButton({
 
 function PreviewMuiTextInput({
   id,
+  name,
+  label,
+  required,
+  error,
+  helperText,
   value,
   onChange,
   disabled,
@@ -89,22 +99,28 @@ function PreviewMuiTextInput({
   "aria-label": ariaLabel
 }: BuilderTextInputProps) {
   return (
-    <input
-      id={id}
-      className={`preview-mui-input ${className}`.trim()}
-      value={value}
-      disabled={disabled}
-      readOnly={readOnly}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      type={type}
-      min={min}
-      max={max}
-      step={step}
-      inputMode={inputMode}
-      aria-label={ariaLabel}
-      onChange={(event) => onChange(event.currentTarget.value)}
-    />
+    <span className="preview-mui-field">
+      <input
+        id={id}
+        name={name}
+        className={`preview-mui-input ${className}`.trim()}
+        value={value}
+        disabled={disabled}
+        readOnly={readOnly}
+        required={required}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        type={type}
+        min={min}
+        max={max}
+        step={step}
+        inputMode={inputMode}
+        aria-label={ariaLabel ?? label}
+        aria-invalid={error === true ? true : undefined}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+    </span>
   );
 }
 
@@ -161,6 +177,95 @@ function HeadlessBuilderDemo({
       >
         Set completion via headless action
       </button>
+    </fieldset>
+  );
+}
+
+function DomainApiDemo({ schema }: { readonly schema: FormSchema }) {
+  const [versionState, setVersionState] = useState<FormVersionState>({
+    formId: schema.id,
+    publishedVersion: schema.version,
+    nextVersion: schema.version + 1,
+    revision: 0
+  });
+  const [draftSchema, setDraftSchema] = useState<FormSchema | null>(null);
+  const [transitionStatus, setTransitionStatus] = useState(`Published v${schema.version}`);
+  const incremental = useMemo(() => {
+    const accumulator = createResponseAccumulator(schema);
+    accumulator.addMany([
+      {
+        id: "preview-incremental-1",
+        formId: schema.id,
+        formVersion: schema.version,
+        locale: schema.defaultLocale ?? "en",
+        submittedAt: "2026-08-24T00:00:00.000Z",
+        values: {}
+      },
+      {
+        id: "preview-incremental-2",
+        formId: schema.id,
+        formVersion: schema.version,
+        locale: schema.defaultLocale ?? "en",
+        submittedAt: "2026-08-24T00:00:01.000Z",
+        values: {}
+      }
+    ]);
+    return accumulator.finalize();
+  }, [schema]);
+
+  const cloneDraft = () => {
+    const result = cloneVersionToDraft(versionState, schema);
+    if (!result.success) {
+      setTransitionStatus(result.error.type);
+      return;
+    }
+    setVersionState(result.value.nextState);
+    setDraftSchema(result.value.draftSchema);
+    setTransitionStatus(`Draft v${result.value.draftSchema.version}`);
+  };
+  const publish = () => {
+    if (draftSchema === null) return;
+    const result = publishDraft(versionState, draftSchema, {
+      expectedRevision: versionState.revision,
+      timestamp: "2026-08-24T09:00:00.000Z"
+    });
+    if (!result.success) {
+      setTransitionStatus(result.error.type);
+      return;
+    }
+    setVersionState(result.value.nextState);
+    setDraftSchema(null);
+    setTransitionStatus(
+      `Published v${result.value.publishedRecord.version}; archived v${result.value.archivedVersion ?? "none"}`
+    );
+  };
+  const discard = () => {
+    const result = deleteDraft(versionState);
+    if (!result.success) {
+      setTransitionStatus(result.error.type);
+      return;
+    }
+    setVersionState(result.value.nextState);
+    setDraftSchema(null);
+    setTransitionStatus("Draft deleted");
+  };
+
+  return (
+    <fieldset className="domain-api-demo">
+      <legend>v2.4 Versioning &amp; incremental analytics</legend>
+      <div className="domain-api-actions">
+        <button type="button" disabled={draftSchema !== null} onClick={cloneDraft}>
+          Clone published version to draft
+        </button>
+        <button type="button" disabled={draftSchema === null} onClick={publish}>
+          Publish draft
+        </button>
+        <button type="button" disabled={draftSchema === null} onClick={discard}>
+          Delete draft
+        </button>
+      </div>
+      <output>{transitionStatus}</output>
+      <output>Incremental submissions: {incremental.submissionCount}</output>
     </fieldset>
   );
 }
@@ -765,8 +870,9 @@ export default function App() {
                 {translationReport === null ? null : <output>{translationReport}</output>}
               </fieldset>
               <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
+              <DomainApiDemo schema={schema} />
               <fieldset className="renderer-demo-controls">
-                <legend>v2.2 Builder capabilities</legend>
+                <legend>v2.4 MUI-compatible Builder components</legend>
                 <label>
                   <input
                     type="checkbox"

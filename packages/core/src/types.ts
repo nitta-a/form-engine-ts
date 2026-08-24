@@ -202,6 +202,25 @@ export interface FormStorageAdapter extends StorageAdapter {
   deleteSubmission(submissionId: string): Promise<void>;
 }
 
+export interface SubmissionPageQueryOptions {
+  readonly version?: number;
+  readonly cursor?: string;
+  readonly pageSize?: number;
+  readonly since?: string;
+  readonly until?: string;
+  readonly locale?: string;
+}
+
+export interface SubmissionPage {
+  readonly items: readonly FormSubmission[];
+  readonly nextCursor?: string;
+  readonly hasMore: boolean;
+}
+
+export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
+  listSubmissionPage(formId: string, options?: SubmissionPageQueryOptions): Promise<SubmissionPage>;
+}
+
 interface BaseQuestionAggregate {
   readonly fieldId: string;
   readonly answeredCount: number;

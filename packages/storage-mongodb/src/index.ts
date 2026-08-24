@@ -1,6 +1,11 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine-ts/core";
-import { assertValidFormSchema } from "@form-engine-ts/core";
-import type { Db, Document } from "mongodb";
+import type { FormSchema, FormSubmission, FormValue, PagedSubmissionStorageAdapter } from "@form-engine-ts/core";
+import {
+  assertValidFormSchema,
+  decodeSubmissionCursor,
+  encodeSubmissionCursor,
+  normalizeSubmissionPageSize
+} from "@form-engine-ts/core";
+import type { Db, Document, Filter } from "mongodb";
 
 export interface MongoDbStorageOptions {
   readonly db: Db;
@@ -8,7 +13,7 @@ export interface MongoDbStorageOptions {
   readonly responsesCollectionName?: string;
 }
 
-export interface MongoDbStorageAdapter extends FormStorageAdapter {
+export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter {
   createIndexes(): Promise<void>;
 }
 
@@ -162,6 +167,46 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         .toArray();
       return documents.map(parseSubmissionDocument);
     },
+    async listSubmissionPage(formId, options = {}) {
+      const pageSize = normalizeSubmissionPageSize(options.pageSize);
+      const cursor = options.cursor === undefined ? undefined : decodeSubmissionCursor(options.cursor);
+      const submittedAt =
+        options.since === undefined && options.until === undefined
+          ? undefined
+          : {
+              ...(options.since === undefined ? {} : { $gte: options.since }),
+              ...(options.until === undefined ? {} : { $lte: options.until })
+            };
+      const filter: Filter<StoredSubmissionDocument> = {
+        formId,
+        ...(options.version === undefined ? {} : { formVersion: options.version }),
+        ...(options.locale === undefined ? {} : { "submission.locale": options.locale }),
+        ...(submittedAt === undefined ? {} : { submittedAt }),
+        ...(cursor === undefined
+          ? {}
+          : {
+              $or: [
+                { submittedAt: { $gt: cursor.submittedAt } },
+                { submittedAt: cursor.submittedAt, _id: { $gt: cursor.responseId } }
+              ]
+            })
+      };
+      const documents = await submissions
+        .find(filter)
+        .sort({ submittedAt: 1, _id: 1 })
+        .limit(pageSize + 1)
+        .toArray();
+      const hasMore = documents.length > pageSize;
+      const items = documents.slice(0, pageSize).map(parseSubmissionDocument);
+      const last = items.at(-1);
+      return {
+        items,
+        hasMore,
+        ...(hasMore && last !== undefined
+          ? { nextCursor: encodeSubmissionCursor({ submittedAt: last.submittedAt, responseId: last.id }) }
+          : {})
+      };
+    },
     async deleteSubmission(submissionId) {
       await submissions.deleteOne({ _id: submissionId });
     },
@@ -173,7 +218,7 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
     },
     async createIndexes() {
       await submissions.createIndexes([
-        { key: { formId: 1, submittedAt: 1 }, name: "form_responses_form_submitted_at" },
+        { key: { formId: 1, submittedAt: 1, _id: 1 }, name: "form_responses_form_submitted_at_id" },
         { key: { "submission.locale": 1 }, name: "form_responses_locale" }
       ]);
     }

@@ -1,5 +1,16 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue, FormValues } from "@form-engine-ts/core";
-import { assertValidFormSchema } from "@form-engine-ts/core";
+import type {
+  FormSchema,
+  FormSubmission,
+  FormValue,
+  FormValues,
+  PagedSubmissionStorageAdapter
+} from "@form-engine-ts/core";
+import {
+  assertValidFormSchema,
+  decodeSubmissionCursor,
+  encodeSubmissionCursor,
+  normalizeSubmissionPageSize
+} from "@form-engine-ts/core";
 
 function cloneValue(value: FormValue): FormValue {
   return Array.isArray(value) ? [...value] : value;
@@ -32,7 +43,7 @@ function schemaKey(formId: string, formVersion: number): string {
   return `${formId}@${formVersion}`;
 }
 
-export function createMemoryStorageAdapter(): FormStorageAdapter {
+export function createMemoryStorageAdapter(): PagedSubmissionStorageAdapter {
   const submissions = new Map<string, FormSubmission>();
   const schemas = new Map<string, FormSchema>();
 
@@ -68,6 +79,33 @@ export function createMemoryStorageAdapter(): FormStorageAdapter {
         )
         .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id))
         .map(cloneSubmission);
+    },
+    async listSubmissionPage(formId, options = {}) {
+      const pageSize = normalizeSubmissionPageSize(options.pageSize);
+      const cursor = options.cursor === undefined ? undefined : decodeSubmissionCursor(options.cursor);
+      const candidates = [...submissions.values()]
+        .filter(
+          (submission) =>
+            submission.formId === formId &&
+            (options.version === undefined || submission.formVersion === options.version) &&
+            (options.since === undefined || submission.submittedAt >= options.since) &&
+            (options.until === undefined || submission.submittedAt <= options.until) &&
+            (options.locale === undefined || submission.locale === options.locale) &&
+            (cursor === undefined ||
+              submission.submittedAt > cursor.submittedAt ||
+              (submission.submittedAt === cursor.submittedAt && submission.id > cursor.responseId))
+        )
+        .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id));
+      const hasMore = candidates.length > pageSize;
+      const items = candidates.slice(0, pageSize).map(cloneSubmission);
+      const last = items.at(-1);
+      return {
+        items,
+        hasMore,
+        ...(hasMore && last !== undefined
+          ? { nextCursor: encodeSubmissionCursor({ submittedAt: last.submittedAt, responseId: last.id }) }
+          : {})
+      };
     },
     async deleteSubmission(submissionId) {
       submissions.delete(submissionId);

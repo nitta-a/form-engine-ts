@@ -63,6 +63,32 @@ describe("createMemoryStorageAdapter", () => {
     ).toEqual(["a", "z", "late"]);
   });
 
+  it("pages 500 items at a time without gaps or duplicates when timestamps match", async () => {
+    const storage = createMemoryStorageAdapter();
+    const timestamp = "2025-01-02T00:00:00.000Z";
+    const expectedIds = Array.from({ length: 1001 }, (_, index) => `response-${String(index).padStart(4, "0")}`);
+    await Promise.all(expectedIds.map((id) => storage.saveSubmission(submission(id, 1, "form", timestamp))));
+
+    const receivedIds: string[] = [];
+    let cursor: string | undefined;
+    const pageSizes: number[] = [];
+    do {
+      const page = await storage.listSubmissionPage("form", {
+        version: 1,
+        pageSize: 500,
+        ...(cursor === undefined ? {} : { cursor })
+      });
+      pageSizes.push(page.items.length);
+      receivedIds.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor;
+      if (!page.hasMore) expect(page.nextCursor).toBeUndefined();
+    } while (cursor !== undefined);
+
+    expect(pageSizes).toEqual([500, 500, 1]);
+    expect(receivedIds).toEqual(expectedIds);
+    expect(new Set(receivedIds).size).toBe(1001);
+  });
+
   it("stores, lists, updates, and deletes schemas", async () => {
     const storage = createMemoryStorageAdapter();
     const schema = {

@@ -74,4 +74,16 @@ const submissions = await storage.listSubmissions("contact", 1, range);
 
 Results are ordered by `submittedAt`, then submission ID. Both boundaries are inclusive.
 
+## Versioning, incremental analytics, and paged storage
+
+`cloneVersionToDraft`, `publishDraft`, and `deleteDraft` implement revision-checked version transitions as pure functions.
+`createResponseAccumulator` incrementally counts choices, answered/unanswered values, and numeric summaries without retaining
+free-text bodies. Independent accumulators for the same schema can be merged, and `finalize()` matches `aggregateResponses`.
+
+`exportResponsesToCsvStream` accepts an `AsyncIterable`, emits the BOM/header and one chunk per response, and supports
+custom `CsvColumnDef` columns. Formula-injection neutralization applies to both default and custom columns.
+
+Adapters implementing `PagedSubmissionStorageAdapter` expose `listSubmissionPage(formId, options)`. The opaque Base64
+cursor combines `submittedAt` and response ID, so equal timestamps do not produce gaps or duplicates.
+
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.

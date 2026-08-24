@@ -16,14 +16,20 @@ function property(document: TestDocument, path: string): unknown {
 
 function matches(document: TestDocument, filter: Record<string, unknown>): boolean {
   return Object.entries(filter).every(([key, value]) => {
+    if (key === "$or") {
+      return Array.isArray(value) && value.some((candidate) => matches(document, candidate as Record<string, unknown>));
+    }
     const actual = property(document, key);
     if (typeof value !== "object" || value === null || Array.isArray(value)) return actual === value;
     const operators = value as Record<string, unknown>;
     const minimum = operators.$gte;
     const maximum = operators.$lte;
+    const greaterThan = operators.$gt;
     return (
       (minimum === undefined || (typeof actual === "string" && typeof minimum === "string" && actual >= minimum)) &&
-      (maximum === undefined || (typeof actual === "string" && typeof maximum === "string" && actual <= maximum))
+      (maximum === undefined || (typeof actual === "string" && typeof maximum === "string" && actual <= maximum)) &&
+      (greaterThan === undefined ||
+        (typeof actual === "string" && typeof greaterThan === "string" && actual > greaterThan))
     );
   });
 }
@@ -64,11 +70,19 @@ function createDbStub() {
                 }
                 return 0;
               });
-            return {
+            const sortedResult = {
               async toArray() {
                 return sorted.map(clone);
+              },
+              limit(count: number) {
+                return {
+                  async toArray() {
+                    return sorted.slice(0, count).map(clone);
+                  }
+                };
               }
             };
+            return sortedResult;
           },
           async toArray() {
             return [...documents.values()].filter((document) => matches(document, filter)).map(clone);
@@ -187,9 +201,24 @@ describe("createMongoDbStorage", () => {
     const adapter = createMongoDbStorage({ db });
     await adapter.createIndexes();
     expect(indexes.get("form_responses")).toEqual([
-      { key: { formId: 1, submittedAt: 1 }, name: "form_responses_form_submitted_at" },
+      { key: { formId: 1, submittedAt: 1, _id: 1 }, name: "form_responses_form_submitted_at_id" },
       { key: { "submission.locale": 1 }, name: "form_responses_locale" }
     ]);
+  });
+
+  it("pages deterministically across equal timestamps and filters locale", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    const timestamp = "2025-01-02T00:00:00.000Z";
+    await adapter.saveSubmission(submission("c", "form", 1, timestamp));
+    await adapter.saveSubmission(submission("a", "form", 1, timestamp));
+    await adapter.saveSubmission(submission("b", "form", 1, timestamp));
+    const first = await adapter.listSubmissionPage("form", { version: 1, locale: "en", pageSize: 2 });
+    expect(first.items.map((item) => item.id)).toEqual(["a", "b"]);
+    expect(first.nextCursor).toBeDefined();
+    if (first.nextCursor === undefined) throw new Error("Expected a cursor");
+    const second = await adapter.listSubmissionPage("form", { pageSize: 2, cursor: first.nextCursor });
+    expect(second).toEqual({ items: [submission("c", "form", 1, timestamp)], hasMore: false });
   });
 
   it("clears one form across versions without deleting schemas or other forms", async () => {

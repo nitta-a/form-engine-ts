@@ -1,5 +1,6 @@
 import {
   assertValidFormSchema,
+  calculateFieldVisibility,
   type FormSchema,
   type FormValues,
   type JsonValue,
@@ -79,4 +80,44 @@ export function createZodFormSchema(
         });
       }
     });
+}
+
+export interface ZodTransformOptions {
+  readonly stripHiddenFields?: boolean;
+  readonly stripUnknownFields?: boolean;
+  readonly trimStrings?: boolean;
+}
+
+function normalizeCodecValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "string" ? item.trim() : item)).filter((item) => item !== "");
+  }
+  return value;
+}
+
+export function createZodFormCodec(schema: FormSchema, options: ZodTransformOptions = {}) {
+  assertValidFormSchema(schema);
+  const stableSchema = cloneSchema(schema);
+  const fieldIds = new Set(stableSchema.fields.map((field) => field.id));
+  const recognizedExtensionKeys = new Set(["metadata", "translationMetadata"]);
+  return z.preprocess((input) => {
+    if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
+    const entries = Object.entries(input);
+    const normalized = Object.fromEntries(
+      entries
+        .filter(([key]) => options.stripUnknownFields !== true || fieldIds.has(key) || recognizedExtensionKeys.has(key))
+        .map(([key, value]) => [key, options.trimStrings === true ? normalizeCodecValue(value) : value])
+    );
+    if (options.stripHiddenFields === true) {
+      const visibility = calculateFieldVisibility(stableSchema, normalized);
+      for (const field of stableSchema.fields) {
+        if (visibility[field.id] !== true) delete normalized[field.id];
+      }
+    }
+    return normalized;
+  }, createZodFormSchema(stableSchema));
 }

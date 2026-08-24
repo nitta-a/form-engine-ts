@@ -32,3 +32,15 @@ const firstPageResult = createZodFormSchema(schema, { pageIndex: 0 }).safeParse(
 
 Zod is a `^4.0.0` peer dependency. Schema metadata is checked by Core before validator creation, and parsed answer
 objects retain passthrough values. Required, choice, visibility, and page-scoped issue codes match Core validation.
+
+Use `createZodFormCodec(schema, options)` for a validation-and-normalization pipeline. It can trim strings, remove answers
+for currently hidden fields, and strip fields that are not defined by the schema:
+
+```ts
+const codec = createZodFormCodec(schema, {
+  trimStrings: true,
+  stripHiddenFields: true,
+  stripUnknownFields: true
+});
+const normalized = codec.parse(values);
+```

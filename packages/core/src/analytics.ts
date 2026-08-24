@@ -4,9 +4,11 @@ import type {
   CrossTabulationResult,
   FormAnalytics,
   FormField,
+  FormResponse,
   FormSchema,
   FormSubmission,
   FormValue,
+  FormValues,
   QuestionAggregate
 } from "./types";
 import { calculateFieldVisibility, selectVisibleAnswers } from "./visibility";
@@ -184,6 +186,202 @@ export function aggregateResponses(schema: FormSchema, submissions: readonly For
   };
 }
 
+export type AccumulatorResponse = FormSubmission | FormResponse;
+
+export interface ResponseAccumulator {
+  add(submission: AccumulatorResponse): { readonly success: boolean; readonly error?: string };
+  addMany(submissions: Iterable<AccumulatorResponse>): void;
+  merge(other: ResponseAccumulator): ResponseAccumulator;
+  finalize(): FormAnalytics;
+}
+
+export interface ResponseAccumulatorOptions {
+  readonly mode?: "strict" | "lenient";
+}
+
+interface FieldAccumulator {
+  answeredCount: number;
+  total: number;
+  minimum: number | null;
+  maximum: number | null;
+  trueCount: number;
+  falseCount: number;
+  readonly optionCounts: Map<string, number>;
+}
+
+function responseValues(submission: AccumulatorResponse): Readonly<Record<string, unknown>> {
+  return "values" in submission ? submission.values : submission.answers;
+}
+
+function responseIdentifier(submission: AccumulatorResponse): string {
+  return "id" in submission ? submission.id : submission.responseId;
+}
+
+function responseMismatch(schema: FormSchema, submission: AccumulatorResponse): string | undefined {
+  if (submission.formId !== schema.id) {
+    return `Submission ${responseIdentifier(submission)} does not match form ${schema.id}.`;
+  }
+  if ("formVersion" in submission && submission.formVersion !== schema.version) {
+    return `Submission ${responseIdentifier(submission)} does not match ${schema.id}@${schema.version}.`;
+  }
+  return undefined;
+}
+
+class IncrementalResponseAccumulator implements ResponseAccumulator {
+  readonly #schema: FormSchema;
+  readonly #mode: "strict" | "lenient";
+  readonly #fields: Map<string, FieldAccumulator>;
+  #submissionCount = 0;
+
+  constructor(schema: FormSchema, options: ResponseAccumulatorOptions) {
+    assertValidFormSchema(schema);
+    this.#schema = JSON.parse(JSON.stringify(schema)) as FormSchema;
+    this.#mode = options.mode ?? "strict";
+    this.#fields = new Map(
+      schema.fields.map((field) => [
+        field.id,
+        {
+          answeredCount: 0,
+          total: 0,
+          minimum: null,
+          maximum: null,
+          trueCount: 0,
+          falseCount: 0,
+          optionCounts: new Map("options" in field ? field.options.map((option) => [option.id, 0]) : [])
+        }
+      ])
+    );
+  }
+
+  add(submission: AccumulatorResponse): { readonly success: boolean; readonly error?: string } {
+    const mismatch = responseMismatch(this.#schema, submission);
+    if (mismatch !== undefined && this.#mode === "strict") return { success: false, error: mismatch };
+    const values = responseValues(submission);
+    const visibility = calculateFieldVisibility(this.#schema, values);
+    for (const field of this.#schema.fields) {
+      const accumulator = this.#fields.get(field.id);
+      if (accumulator === undefined) throw new Error(`Accumulator for ${field.id} is unavailable.`);
+      const candidate = values[field.id];
+      if (visibility[field.id] !== true || !valueIsValid(field, candidate as FormValue)) continue;
+      accumulator.answeredCount += 1;
+      if ((field.type === "number" || field.type === "rating") && typeof candidate === "number") {
+        accumulator.total += candidate;
+        accumulator.minimum = accumulator.minimum === null ? candidate : Math.min(accumulator.minimum, candidate);
+        accumulator.maximum = accumulator.maximum === null ? candidate : Math.max(accumulator.maximum, candidate);
+      } else if (field.type === "checkbox") {
+        if (candidate === true) accumulator.trueCount += 1;
+        if (candidate === false) accumulator.falseCount += 1;
+      } else if ("options" in field) {
+        const selections = Array.isArray(candidate) ? candidate : typeof candidate === "string" ? [candidate] : [];
+        for (const selection of selections) {
+          accumulator.optionCounts.set(selection, (accumulator.optionCounts.get(selection) ?? 0) + 1);
+        }
+      }
+    }
+    this.#submissionCount += 1;
+    return { success: true };
+  }
+
+  addMany(submissions: Iterable<AccumulatorResponse>): void {
+    for (const submission of submissions) {
+      const result = this.add(submission);
+      if (!result.success) throw new TypeError(result.error ?? "Submission could not be accumulated.");
+    }
+  }
+
+  merge(other: ResponseAccumulator): ResponseAccumulator {
+    if (!(other instanceof IncrementalResponseAccumulator)) {
+      throw new TypeError("Only form-engine response accumulators can be merged.");
+    }
+    if (
+      other.#schema.id !== this.#schema.id ||
+      other.#schema.version !== this.#schema.version ||
+      JSON.stringify(other.#schema.fields) !== JSON.stringify(this.#schema.fields)
+    ) {
+      throw new TypeError("Response accumulators must use the same schema.");
+    }
+    this.#submissionCount += other.#submissionCount;
+    for (const [fieldId, source] of other.#fields) {
+      const target = this.#fields.get(fieldId);
+      if (target === undefined) throw new Error(`Accumulator for ${fieldId} is unavailable.`);
+      target.answeredCount += source.answeredCount;
+      target.total += source.total;
+      target.minimum =
+        target.minimum === null
+          ? source.minimum
+          : source.minimum === null
+            ? target.minimum
+            : Math.min(target.minimum, source.minimum);
+      target.maximum =
+        target.maximum === null
+          ? source.maximum
+          : source.maximum === null
+            ? target.maximum
+            : Math.max(target.maximum, source.maximum);
+      target.trueCount += source.trueCount;
+      target.falseCount += source.falseCount;
+      for (const [optionId, count] of source.optionCounts) {
+        target.optionCounts.set(optionId, (target.optionCounts.get(optionId) ?? 0) + count);
+      }
+    }
+    return this;
+  }
+
+  finalize(): FormAnalytics {
+    return {
+      formId: this.#schema.id,
+      formVersion: this.#schema.version,
+      submissionCount: this.#submissionCount,
+      questions: this.#schema.fields.map((field): QuestionAggregate => {
+        const accumulator = this.#fields.get(field.id);
+        if (accumulator === undefined) throw new Error(`Accumulator for ${field.id} is unavailable.`);
+        const base = {
+          fieldId: field.id,
+          answeredCount: accumulator.answeredCount,
+          unansweredCount: this.#submissionCount - accumulator.answeredCount
+        };
+        if (field.type === "text" || field.type === "textarea") return { ...base, kind: field.type };
+        if (field.type === "number" || field.type === "rating") {
+          return {
+            ...base,
+            kind: field.type,
+            minimum: accumulator.minimum,
+            maximum: accumulator.maximum,
+            average: accumulator.answeredCount === 0 ? null : accumulator.total / accumulator.answeredCount,
+            total: accumulator.total
+          };
+        }
+        if (field.type === "checkbox") {
+          return {
+            ...base,
+            kind: "checkbox",
+            trueCount: accumulator.trueCount,
+            falseCount: accumulator.falseCount,
+            truePercentageOfSubmissions: percentage(accumulator.trueCount, this.#submissionCount),
+            falsePercentageOfSubmissions: percentage(accumulator.falseCount, this.#submissionCount)
+          };
+        }
+        if (!("options" in field)) throw new TypeError(`Field ${field.id} cannot be aggregated.`);
+        return {
+          ...base,
+          kind: field.type,
+          options: field.options.map((option) => {
+            const count = accumulator.optionCounts.get(option.id) ?? 0;
+            return { id: option.id, count, percentageOfSubmissions: percentage(count, this.#submissionCount) };
+          })
+        };
+      })
+    };
+  }
+}
+
+export function createResponseAccumulator(
+  schema: FormSchema,
+  options: ResponseAccumulatorOptions = {}
+): ResponseAccumulator {
+  return new IncrementalResponseAccumulator(schema, options);
+}
+
 export function escapeCsvCell(value: string | number | boolean | null | undefined, neutralizeFormulas = true): string {
   if (value === null || value === undefined) return "";
   let stringValue = String(value);
@@ -206,6 +404,71 @@ function serializeValue(value: FormValue): string | number | boolean {
 export interface CsvExportOptions {
   readonly withBom?: boolean;
   readonly neutralizeFormulas?: boolean;
+}
+
+export interface CsvColumnDef {
+  readonly header: string;
+  readonly getValue: (submission: FormResponse) => string | number | boolean | null | undefined;
+}
+
+export interface StreamCsvOptions extends CsvExportOptions {
+  readonly columns?: readonly CsvColumnDef[];
+  readonly includeDefaultColumns?: boolean;
+}
+
+function asFormResponse(submission: AccumulatorResponse): FormResponse {
+  if (!("values" in submission)) return submission;
+  return {
+    responseId: submission.id,
+    formId: submission.formId,
+    sourceLocale: submission.locale,
+    answers: submission.values,
+    submittedAt: submission.submittedAt,
+    ...(submission.metadata === undefined ? {} : { metadata: submission.metadata }),
+    ...(submission.translationMetadata === undefined ? {} : { translationMetadata: submission.translationMetadata })
+  };
+}
+
+function serializeUnknown(value: unknown): string | number | boolean {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  return JSON.stringify(value);
+}
+
+export async function* exportResponsesToCsvStream(
+  schema: FormSchema,
+  submissions: AsyncIterable<AccumulatorResponse>,
+  options: StreamCsvOptions = {}
+): AsyncIterable<string> {
+  assertValidFormSchema(schema);
+  const includeDefaultColumns = options.includeDefaultColumns ?? true;
+  const customColumns = options.columns ?? [];
+  const headers = [
+    ...(includeDefaultColumns
+      ? ["submissionId", "submittedAt", "locale", ...schema.fields.map((field) => field.id)]
+      : []),
+    ...customColumns.map((column) => column.header)
+  ];
+  const neutralizeFormulas = options.neutralizeFormulas ?? true;
+  const header = headers.map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",");
+  yield `${(options.withBom ?? true) ? "\uFEFF" : ""}${header}`;
+  for await (const submission of submissions) {
+    const mismatch = responseMismatch(schema, submission);
+    if (mismatch !== undefined) throw new TypeError(mismatch);
+    const response = asFormResponse(submission);
+    const answers = response.answers;
+    const visible = selectVisibleAnswers(schema, answers as FormValues);
+    const defaultCells = includeDefaultColumns
+      ? [
+          response.responseId,
+          response.submittedAt,
+          response.sourceLocale ?? "",
+          ...schema.fields.map((field) => serializeUnknown(visible[field.id]))
+        ]
+      : [];
+    const customCells = customColumns.map((column) => column.getValue(response));
+    yield `\r\n${[...defaultCells, ...customCells].map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",")}`;
+  }
 }
 
 export function exportResponsesToCsv(

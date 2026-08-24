@@ -227,6 +227,32 @@ describe("FormBuilder v2.2", () => {
     expect(screen.getAllByRole("textbox").every((input) => input.matches(":disabled"))).toBe(true);
   });
 
+  it("passes MUI-compatible state and labeling props to injected text inputs", () => {
+    const observed = vi.fn();
+    function MuiTextField(props: BuilderTextInputProps) {
+      observed(props);
+      return (
+        <input
+          aria-label={props.label}
+          value={props.value}
+          required={props.required}
+          aria-invalid={props.error}
+          onChange={(event) => props.onChange(event.currentTarget.value)}
+        />
+      );
+    }
+    render(<FormBuilder schema={schema} onChange={vi.fn()} components={{ TextInput: MuiTextField }} />);
+    const fieldTitleProps = observed.mock.calls
+      .map(([props]) => props as BuilderTextInputProps)
+      .find((props) => props.name === "fields.name.title");
+    expect(fieldTitleProps).toMatchObject({
+      label: "質問文 / Question Title",
+      required: true,
+      error: false,
+      helperText: ""
+    });
+  });
+
   it("fully replaces translation actions and exposes policy-aware builder actions", () => {
     function CustomActions({ actions }: BuilderTranslationActionsSlotProps) {
       return (
@@ -254,6 +280,56 @@ describe("FormBuilder v2.2", () => {
     expect(screen.queryByRole("button", { name: "Translate all text" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Run ARGS AI translation" }));
     expect(screen.getByTestId("slot-schema")).toHaveTextContent('"supportedLocales":["en","ja"]');
+  });
+
+  it("exposes translation errors, clearing, and successful reports to the translation-actions slot", async () => {
+    const translateBatch = vi
+      .fn<(texts: readonly string[]) => Promise<readonly string[]>>()
+      .mockRejectedValueOnce(new Error("translation failed"))
+      .mockImplementation(async (texts) => texts.map((text) => `translated:${text}`));
+    function TranslationActions({
+      onAutoTranslate,
+      translationError,
+      translationReport,
+      onClearTranslationError
+    }: BuilderTranslationActionsSlotProps) {
+      return (
+        <div>
+          <button type="button" onClick={onAutoTranslate}>
+            Run translation
+          </button>
+          {translationError === undefined ? null : <output>{translationError}</output>}
+          {onClearTranslationError === undefined ? null : (
+            <button type="button" onClick={onClearTranslationError}>
+              Clear translation error
+            </button>
+          )}
+          {translationReport === undefined ? null : (
+            <output>Updated slots: {translationReport.updatedSlots.length}</output>
+          )}
+        </div>
+      );
+    }
+    function Harness() {
+      const [current, setCurrent] = useState<FormSchema>({ ...schema, supportedLocales: ["en", "ja"] });
+      return (
+        <FormBuilder
+          schema={current}
+          onChange={setCurrent}
+          translationAdapter={{ translateText: vi.fn(), translateBatch }}
+          slots={{ translationActions: TranslationActions }}
+        />
+      );
+    }
+
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Edit locale"), { target: { value: "ja" } });
+    fireEvent.click(screen.getByRole("button", { name: "Run translation" }));
+    expect(await screen.findAllByText("translation failed")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Clear translation error" }));
+    expect(screen.queryAllByText("translation failed")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Run translation" }));
+    expect(await screen.findByText(/Updated slots: [1-9]/)).toBeInTheDocument();
   });
 
   it("keeps the default DOM unchanged when component and slot overrides are omitted or empty", () => {

@@ -24,3 +24,6 @@ const responses = await storage.listSubmissions(schema.id, schema.version, {
 ```
 
 Date boundaries are inclusive, and results are ordered by submission time and then ID. Data is cleared when the JavaScript process is restarted.
+
+For bounded reads, call `listSubmissionPage(formId, { version, pageSize, cursor, since, until, locale })`. Pass the
+returned `nextCursor` to the next call while `hasMore` is true. The opaque cursor remains stable when submissions share a timestamp.

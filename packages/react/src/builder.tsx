@@ -87,6 +87,11 @@ function DefaultTextInput({
   disabled,
   readOnly,
   "aria-label": ariaLabel,
+  name,
+  label,
+  required,
+  error,
+  helperText,
   value,
   onChange,
   placeholder,
@@ -98,22 +103,28 @@ function DefaultTextInput({
   step
 }: BuilderTextInputProps) {
   return (
-    <input
-      id={id}
-      className={className}
-      disabled={disabled}
-      readOnly={readOnly}
-      aria-label={ariaLabel}
-      type={type === "text" ? undefined : type}
-      inputMode={inputMode}
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      onChange={(event) => onChange(event.currentTarget.value)}
-    />
+    <>
+      <input
+        id={id}
+        name={name}
+        className={className}
+        disabled={disabled}
+        readOnly={readOnly}
+        required={required}
+        aria-label={ariaLabel ?? label}
+        aria-invalid={error === true ? true : undefined}
+        type={type === "text" ? undefined : type}
+        inputMode={inputMode}
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+    </>
   );
 }
 
@@ -123,6 +134,11 @@ function DefaultTextArea({
   disabled,
   readOnly,
   "aria-label": ariaLabel,
+  name,
+  label,
+  required,
+  error,
+  helperText,
   value,
   onChange,
   rows,
@@ -130,18 +146,24 @@ function DefaultTextArea({
   maxLength
 }: BuilderTextAreaProps) {
   return (
-    <textarea
-      id={id}
-      className={className}
-      disabled={disabled}
-      readOnly={readOnly}
-      aria-label={ariaLabel}
-      value={value}
-      rows={rows}
-      placeholder={placeholder}
-      maxLength={maxLength}
-      onChange={(event) => onChange(event.currentTarget.value)}
-    />
+    <>
+      <textarea
+        id={id}
+        name={name}
+        className={className}
+        disabled={disabled}
+        readOnly={readOnly}
+        required={required}
+        aria-label={ariaLabel ?? label}
+        aria-invalid={error === true ? true : undefined}
+        value={value}
+        rows={rows}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+    </>
   );
 }
 
@@ -150,25 +172,36 @@ function DefaultSelect({
   className,
   disabled,
   "aria-label": ariaLabel,
+  name,
+  label,
+  required,
+  error,
+  helperText,
   value,
   onChange,
   options
 }: BuilderSelectProps) {
   return (
-    <select
-      id={id}
-      className={className}
-      disabled={disabled}
-      aria-label={ariaLabel}
-      value={value}
-      onChange={(event) => onChange(event.currentTarget.value)}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value} disabled={option.disabled}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <>
+      <select
+        id={id}
+        name={name}
+        className={className}
+        disabled={disabled}
+        required={required}
+        aria-label={ariaLabel ?? label}
+        aria-invalid={error === true ? true : undefined}
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+    </>
   );
 }
 
@@ -559,6 +592,7 @@ export function FormBuilder({
   const [editingLocale, setEditingLocale] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationReport, setTranslationReport] = useState<TranslationReport>();
   const translate = (key: string, params: Readonly<Record<string, string | number>> = {}) => {
     const translated = translator?.translate(key, locale, params);
     return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
@@ -696,8 +730,10 @@ export function FormBuilder({
         ...(translationPolicy === undefined ? {} : { policy: translationPolicy })
       });
       onChange(populated.schema);
+      setTranslationReport(populated.report);
       onTranslationReport?.(populated.report);
     } catch (cause) {
+      setTranslationReport(undefined);
       setTranslationError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setIsTranslating(false);
@@ -1205,6 +1241,9 @@ export function FormBuilder({
                       currentLocale={editingLocale}
                       onAutoTranslate={() => void translateAll()}
                       isTranslating={isTranslating}
+                      {...(translationError === null ? {} : { translationError })}
+                      {...(translationReport === undefined ? {} : { translationReport })}
+                      onClearTranslationError={() => setTranslationError(null)}
                       readOnly={readOnly}
                       actions={actions}
                       components={components}
@@ -1322,6 +1361,11 @@ export function FormBuilder({
                     <label>
                       {translate("builder.questionTitle")}
                       <TextInput
+                        name={`fields.${field.id}.title`}
+                        label={translate("builder.questionTitle")}
+                        required={true}
+                        error={field.title.trim().length === 0}
+                        helperText={field.title.trim().length === 0 ? translate("builder.required") : ""}
                         value={field.title}
                         placeholder={translate("builder.questionTitlePlaceholder")}
                         onChange={(value) =>

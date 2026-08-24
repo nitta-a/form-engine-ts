@@ -66,6 +66,16 @@ describe("preview application", () => {
     );
   });
 
+  it("simulates draft publication and incremental analytics", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.getByText("Incremental submissions: 2")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clone published version to draft" }));
+    expect(screen.getByText("Draft v2")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Publish draft" }));
+    expect(screen.getByText("Published v2; archived v1")).toBeInTheDocument();
+  });
+
   it("demonstrates Visual Builder defaults and manual translation metadata", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -200,7 +210,7 @@ describe("preview application", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText(/"release": "v2.3.0"/)).toBeInTheDocument();
+    expect(screen.getByText(/"release": "v2.5.0"/)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByLabelText("LocalStorage"));
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
