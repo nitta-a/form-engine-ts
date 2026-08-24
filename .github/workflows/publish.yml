@@ -43,33 +43,10 @@ jobs:
       - name: Check package versions
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFile } from "node:fs/promises";
+        run: node scripts/release-packages.mjs validate
 
-          const expectedVersion = process.env.RELEASE_TAG.replace(/^v/, "");
-          const packages = [
-            "packages/core/package.json",
-            "packages/react/package.json",
-            "packages/storage-memory/package.json",
-            "packages/storage-mongodb/package.json",
-            "packages/translator-azure/package.json",
-            "packages/translator-deepl/package.json",
-            "packages/translator-google/package.json",
-            "packages/translator-mock/package.json",
-            "packages/zod/package.json"
-          ];
-
-          for (const path of packages) {
-            const packageJson = JSON.parse(await readFile(path, "utf8"));
-            if (packageJson.version !== expectedVersion) {
-              throw new Error(`${path} is ${packageJson.version}; expected ${expectedVersion}`);
-            }
-            if (packageJson.private === true) {
-              throw new Error(`${path} is still marked private`);
-            }
-          }
-          NODE
+      - name: Test release package discovery and idempotency
+        run: node --test scripts/release-packages.test.mjs
 
   npm:
     name: Publish packages to npm
@@ -103,7 +80,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
-        run: pnpm --filter "./packages/*" publish --access public --no-git-checks
+        run: node scripts/release-packages.mjs publish
 
   github:
     name: Create GitHub release

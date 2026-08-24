@@ -27,3 +27,4 @@ Date boundaries are inclusive, and results are ordered by submission time and th
 
 For bounded reads, call `listSubmissionPage(formId, { version, pageSize, cursor, since, until, locale })`. Pass the
 returned `nextCursor` to the next call while `hasMore` is true. The opaque cursor remains stable when submissions share a timestamp.
+Use `metadataFilters` for exact JSON metadata matching or `filter` for a custom predicate; both run before page sizing.

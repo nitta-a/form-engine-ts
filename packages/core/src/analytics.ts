@@ -188,11 +188,24 @@ export function aggregateResponses(schema: FormSchema, submissions: readonly For
 
 export type AccumulatorResponse = FormSubmission | FormResponse;
 
+export type AccumulatorSkipReason = "form_id_mismatch" | "version_mismatch" | "invalid_structure";
+
+export interface AccumulatorReport {
+  readonly processedCount: number;
+  readonly skippedCount: number;
+  readonly skipReasons: readonly { readonly responseId: string; readonly reason: AccumulatorSkipReason }[];
+}
+
 export interface ResponseAccumulator {
-  add(submission: AccumulatorResponse): { readonly success: boolean; readonly error?: string };
-  addMany(submissions: Iterable<AccumulatorResponse>): void;
+  add(submission: AccumulatorResponse): {
+    readonly success: boolean;
+    readonly skipped?: boolean;
+    readonly error?: string;
+  };
+  addMany(submissions: Iterable<AccumulatorResponse>): AccumulatorReport;
   merge(other: ResponseAccumulator): ResponseAccumulator;
   finalize(): FormAnalytics;
+  getReport(): AccumulatorReport;
 }
 
 export interface ResponseAccumulatorOptions {
@@ -209,20 +222,55 @@ interface FieldAccumulator {
   readonly optionCounts: Map<string, number>;
 }
 
-function responseValues(submission: AccumulatorResponse): Readonly<Record<string, unknown>> {
-  return "values" in submission ? submission.values : submission.answers;
+function responseValues(submission: AccumulatorResponse): unknown {
+  if (typeof submission !== "object" || submission === null) return undefined;
+  if ("values" in submission) return submission.values;
+  return "answers" in submission ? submission.answers : undefined;
 }
 
 function responseIdentifier(submission: AccumulatorResponse): string {
-  return "id" in submission ? submission.id : submission.responseId;
+  if (typeof submission !== "object" || submission === null) return "<unknown>";
+  if ("id" in submission && typeof submission.id === "string" && submission.id.length > 0) return submission.id;
+  if ("responseId" in submission && typeof submission.responseId === "string" && submission.responseId.length > 0) {
+    return submission.responseId;
+  }
+  return "<unknown>";
 }
 
-function responseMismatch(schema: FormSchema, submission: AccumulatorResponse): string | undefined {
-  if (submission.formId !== schema.id) {
-    return `Submission ${responseIdentifier(submission)} does not match form ${schema.id}.`;
+function isAnswerRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function responseProblem(
+  schema: FormSchema,
+  submission: AccumulatorResponse
+): { readonly reason: AccumulatorSkipReason; readonly error: string } | undefined {
+  if (typeof submission !== "object" || submission === null) {
+    return { reason: "invalid_structure", error: "Submission structure is invalid." };
   }
-  if ("formVersion" in submission && submission.formVersion !== schema.version) {
-    return `Submission ${responseIdentifier(submission)} does not match ${schema.id}@${schema.version}.`;
+  const identifier = responseIdentifier(submission);
+  const values = responseValues(submission);
+  if (
+    typeof identifier !== "string" ||
+    identifier.length === 0 ||
+    typeof submission.formId !== "string" ||
+    typeof submission.submittedAt !== "string" ||
+    !isAnswerRecord(values)
+  ) {
+    return { reason: "invalid_structure", error: `Submission ${String(identifier)} structure is invalid.` };
+  }
+  if (submission.formId !== schema.id) {
+    return { reason: "form_id_mismatch", error: `Submission ${identifier} does not match form ${schema.id}.` };
+  }
+  if (
+    "formVersion" in submission &&
+    submission.formVersion !== undefined &&
+    submission.formVersion !== schema.version
+  ) {
+    return {
+      reason: "version_mismatch",
+      error: `Submission ${identifier} does not match ${schema.id}@${schema.version}.`
+    };
   }
   return undefined;
 }
@@ -231,6 +279,7 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
   readonly #schema: FormSchema;
   readonly #mode: "strict" | "lenient";
   readonly #fields: Map<string, FieldAccumulator>;
+  readonly #skipReasons: { responseId: string; reason: AccumulatorSkipReason }[] = [];
   #submissionCount = 0;
 
   constructor(schema: FormSchema, options: ResponseAccumulatorOptions) {
@@ -253,10 +302,19 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
     );
   }
 
-  add(submission: AccumulatorResponse): { readonly success: boolean; readonly error?: string } {
-    const mismatch = responseMismatch(this.#schema, submission);
-    if (mismatch !== undefined && this.#mode === "strict") return { success: false, error: mismatch };
+  add(submission: AccumulatorResponse): {
+    readonly success: boolean;
+    readonly skipped?: boolean;
+    readonly error?: string;
+  } {
+    const problem = responseProblem(this.#schema, submission);
+    if (problem !== undefined) {
+      if (this.#mode === "strict") return { success: false, error: problem.error };
+      this.#skipReasons.push({ responseId: responseIdentifier(submission), reason: problem.reason });
+      return { success: true, skipped: true };
+    }
     const values = responseValues(submission);
+    if (!isAnswerRecord(values)) throw new Error("Validated response answers are unavailable.");
     const visibility = calculateFieldVisibility(this.#schema, values);
     for (const field of this.#schema.fields) {
       const accumulator = this.#fields.get(field.id);
@@ -282,11 +340,12 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
     return { success: true };
   }
 
-  addMany(submissions: Iterable<AccumulatorResponse>): void {
+  addMany(submissions: Iterable<AccumulatorResponse>): AccumulatorReport {
     for (const submission of submissions) {
       const result = this.add(submission);
       if (!result.success) throw new TypeError(result.error ?? "Submission could not be accumulated.");
     }
+    return this.getReport();
   }
 
   merge(other: ResponseAccumulator): ResponseAccumulator {
@@ -301,6 +360,7 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
       throw new TypeError("Response accumulators must use the same schema.");
     }
     this.#submissionCount += other.#submissionCount;
+    this.#skipReasons.push(...other.#skipReasons);
     for (const [fieldId, source] of other.#fields) {
       const target = this.#fields.get(fieldId);
       if (target === undefined) throw new Error(`Accumulator for ${fieldId} is unavailable.`);
@@ -325,6 +385,14 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
       }
     }
     return this;
+  }
+
+  getReport(): AccumulatorReport {
+    return {
+      processedCount: this.#submissionCount,
+      skippedCount: this.#skipReasons.length,
+      skipReasons: this.#skipReasons.map((reason) => ({ ...reason }))
+    };
   }
 
   finalize(): FormAnalytics {
@@ -408,7 +476,13 @@ export interface CsvExportOptions {
 
 export interface CsvColumnDef {
   readonly header: string;
-  readonly getValue: (submission: FormResponse) => string | number | boolean | null | undefined;
+  readonly getValue: (context: CsvColumnContext) => string | number | boolean | null | undefined;
+}
+
+export interface CsvColumnContext extends FormResponse {
+  readonly submission: FormResponse;
+  readonly formVersion: number;
+  readonly schema: FormSchema;
 }
 
 export interface StreamCsvOptions extends CsvExportOptions {
@@ -422,6 +496,7 @@ function asFormResponse(submission: AccumulatorResponse): FormResponse {
     responseId: submission.id,
     formId: submission.formId,
     sourceLocale: submission.locale,
+    formVersion: submission.formVersion,
     answers: submission.values,
     submittedAt: submission.submittedAt,
     ...(submission.metadata === undefined ? {} : { metadata: submission.metadata }),
@@ -453,8 +528,8 @@ export async function* exportResponsesToCsvStream(
   const header = headers.map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",");
   yield `${(options.withBom ?? true) ? "\uFEFF" : ""}${header}`;
   for await (const submission of submissions) {
-    const mismatch = responseMismatch(schema, submission);
-    if (mismatch !== undefined) throw new TypeError(mismatch);
+    const problem = responseProblem(schema, submission);
+    if (problem !== undefined) throw new TypeError(problem.error);
     const response = asFormResponse(submission);
     const answers = response.answers;
     const visible = selectVisibleAnswers(schema, answers as FormValues);
@@ -466,8 +541,84 @@ export async function* exportResponsesToCsvStream(
           ...schema.fields.map((field) => serializeUnknown(visible[field.id]))
         ]
       : [];
-    const customCells = customColumns.map((column) => column.getValue(response));
+    const context: CsvColumnContext = {
+      ...response,
+      submission: response,
+      formVersion: response.formVersion ?? schema.version,
+      schema
+    };
+    const customCells = customColumns.map((column) => column.getValue(context));
     yield `\r\n${[...defaultCells, ...customCells].map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",")}`;
+  }
+}
+
+export interface NodeWritableStream {
+  write(chunk: Uint8Array): boolean;
+  once(event: "drain", listener: () => void): unknown;
+  once(event: "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "drain", listener: () => void): unknown;
+  removeListener(event: "error", listener: (error: Error) => void): unknown;
+  end(callback: () => void): unknown;
+}
+
+function isWebWritableStream(
+  writable: WritableStream<Uint8Array> | NodeWritableStream
+): writable is WritableStream<Uint8Array> {
+  return "getWriter" in writable && typeof writable.getWriter === "function";
+}
+
+async function writeNodeChunk(
+  writable: NodeWritableStream,
+  chunk: Uint8Array,
+  streamError: Promise<never>
+): Promise<void> {
+  if (writable.write(chunk)) return;
+  let onDrain: (() => void) | undefined;
+  const drain = new Promise<void>((resolve) => {
+    onDrain = resolve;
+    writable.once("drain", resolve);
+  });
+  try {
+    await Promise.race([drain, streamError]);
+  } finally {
+    if (onDrain !== undefined) writable.removeListener("drain", onDrain);
+  }
+}
+
+export async function pipeResponsesToCsvStream(
+  schema: FormSchema,
+  submissions: AsyncIterable<AccumulatorResponse>,
+  writable: WritableStream<Uint8Array> | NodeWritableStream,
+  options: StreamCsvOptions = {}
+): Promise<void> {
+  const encoder = new TextEncoder();
+  if (isWebWritableStream(writable)) {
+    const writer = writable.getWriter();
+    try {
+      for await (const chunk of exportResponsesToCsvStream(schema, submissions, options)) {
+        await writer.write(encoder.encode(chunk));
+      }
+      await writer.close();
+    } catch (cause) {
+      await writer.abort(cause);
+      throw cause;
+    } finally {
+      writer.releaseLock();
+    }
+    return;
+  }
+  let onStreamError: ((error: Error) => void) | undefined;
+  const streamError = new Promise<never>((_resolve, reject) => {
+    onStreamError = reject;
+    writable.once("error", reject);
+  });
+  try {
+    for await (const chunk of exportResponsesToCsvStream(schema, submissions, options)) {
+      await writeNodeChunk(writable, encoder.encode(chunk), streamError);
+    }
+    await Promise.race([new Promise<void>((resolve) => writable.end(resolve)), streamError]);
+  } finally {
+    if (onStreamError !== undefined) writable.removeListener("error", onStreamError);
   }
 }
 

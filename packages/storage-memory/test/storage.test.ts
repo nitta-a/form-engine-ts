@@ -89,6 +89,32 @@ describe("createMemoryStorageAdapter", () => {
     expect(new Set(receivedIds).size).toBe(1001);
   });
 
+  it("applies custom predicates and metadata filters before page sizing", async () => {
+    const storage = createMemoryStorageAdapter();
+    await storage.saveSubmission(submission("one"));
+    await storage.saveSubmission({ ...submission("two"), metadata: { channel: "ARGS", tier: 2 } });
+    await storage.saveSubmission({ ...submission("three"), metadata: { channel: "other", tier: 2 } });
+    const page = await storage.listSubmissionPage("form", {
+      pageSize: 1,
+      metadataFilters: { tier: 2 },
+      filter: (item) => item.metadata?.channel === "ARGS"
+    });
+    expect(page).toEqual({ items: [{ ...submission("two"), metadata: { channel: "ARGS", tier: 2 } }], hasMore: false });
+  });
+
+  it("compares nested metadata as JSON values independent of object key order", async () => {
+    const storage = createMemoryStorageAdapter();
+    const stored = {
+      ...submission("nested"),
+      metadata: { profile: { first: "Ada", score: 2 } }
+    };
+    await storage.saveSubmission(stored);
+    const page = await storage.listSubmissionPage("form", {
+      metadataFilters: { profile: { score: 2, first: "Ada" } }
+    });
+    expect(page).toEqual({ items: [stored], hasMore: false });
+  });
+
   it("stores, lists, updates, and deletes schemas", async () => {
     const storage = createMemoryStorageAdapter();
     const schema = {

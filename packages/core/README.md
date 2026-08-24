@@ -77,13 +77,21 @@ Results are ordered by `submittedAt`, then submission ID. Both boundaries are in
 ## Versioning, incremental analytics, and paged storage
 
 `cloneVersionToDraft`, `publishDraft`, and `deleteDraft` implement revision-checked version transitions as pure functions.
+Clone/delete operations accept `expectedRevision`; cloning rejects non-published sources, publish validation failures are
+returned as typed `validation_failed` issues, and successful publishing reports every archived record. Storage adapters
+that can commit the resulting changes atomically implement `VersionedFormStorageAdapter` and `VersionTransitionPlan`.
 `createResponseAccumulator` incrementally counts choices, answered/unanswered values, and numeric summaries without retaining
-free-text bodies. Independent accumulators for the same schema can be merged, and `finalize()` matches `aggregateResponses`.
+free-text bodies. In lenient mode, mismatched responses are skipped and exposed by `addMany()` and `getReport()` instead of
+being included silently. Independent accumulators for the same schema can be merged, and `finalize()` matches
+`aggregateResponses`.
 
 `exportResponsesToCsvStream` accepts an `AsyncIterable`, emits the BOM/header and one chunk per response, and supports
-custom `CsvColumnDef` columns. Formula-injection neutralization applies to both default and custom columns.
+custom `CsvColumnDef` columns. Custom getters receive the submission, form version, and schema. Use
+`pipeResponsesToCsvStream` to write to a Web `WritableStream` or Node-compatible writable while honoring backpressure.
+Formula-injection neutralization applies to both default and custom columns.
 
 Adapters implementing `PagedSubmissionStorageAdapter` expose `listSubmissionPage(formId, options)`. The opaque Base64
-cursor combines `submittedAt` and response ID, so equal timestamps do not produce gaps or duplicates.
+cursor combines `submittedAt` and response ID, so equal timestamps do not produce gaps or duplicates. `metadataFilters`
+and `filter` are applied before page sizing.
 
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.

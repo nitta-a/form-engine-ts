@@ -3,6 +3,7 @@ import {
   assertValidFormSchema,
   decodeSubmissionCursor,
   encodeSubmissionCursor,
+  matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
 } from "@form-engine-ts/core";
 
@@ -255,15 +256,19 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
             `(submitted_at = $${timestampParameter}::timestamptz AND response_id > $${params.length}))`
         );
       }
-      params.push(pageSize + 1);
+      const requiresClientFiltering = queryOptions.filter !== undefined || queryOptions.metadataFilters !== undefined;
+      if (!requiresClientFiltering) params.push(pageSize + 1);
       const result = await options.client.query(
         `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
          FROM ${responsesTable} WHERE ${conditions.join(" AND ")}
-         ORDER BY submitted_at, response_id LIMIT $${params.length}`,
+         ORDER BY submitted_at, response_id${requiresClientFiltering ? "" : ` LIMIT $${params.length}`}`,
         params
       );
-      const hasMore = result.rows.length > pageSize;
-      const items = result.rows.slice(0, pageSize).map(parseSubmissionRow);
+      const candidates = result.rows
+        .map(parseSubmissionRow)
+        .filter((item) => matchesSubmissionPageFilters(item, queryOptions));
+      const hasMore = candidates.length > pageSize;
+      const items = candidates.slice(0, pageSize);
       const last = items.at(-1);
       return {
         items,

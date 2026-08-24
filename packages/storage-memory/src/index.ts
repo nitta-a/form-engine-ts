@@ -9,6 +9,7 @@ import {
   assertValidFormSchema,
   decodeSubmissionCursor,
   encodeSubmissionCursor,
+  matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
 } from "@form-engine-ts/core";
 
@@ -93,7 +94,8 @@ export function createMemoryStorageAdapter(): PagedSubmissionStorageAdapter {
             (options.locale === undefined || submission.locale === options.locale) &&
             (cursor === undefined ||
               submission.submittedAt > cursor.submittedAt ||
-              (submission.submittedAt === cursor.submittedAt && submission.id > cursor.responseId))
+              (submission.submittedAt === cursor.submittedAt && submission.id > cursor.responseId)) &&
+            matchesSubmissionPageFilters(submission, options)
         )
         .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id));
       const hasMore = candidates.length > pageSize;

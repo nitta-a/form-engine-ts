@@ -16,6 +16,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Storage adapter | `@form-engine-ts/storage-postgres` | PostgreSQL storage through an injected node-postgres-compatible query client |
 | Storage adapter | `@form-engine-ts/storage-sqlite` | Driver-neutral SQLite storage through synchronous or asynchronous executors |
 | Storage adapter | `@form-engine-ts/storage-d1` | Cloudflare D1 storage using prepared statements and transactional batches |
+| Storage adapter | `@form-engine-ts/storage-azure-table` | Azure Table Storage through an injected `@azure/data-tables`-compatible client |
 | Translator adapter | `@form-engine-ts/translator-mock` | English/Japanese synchronous catalogs plus deterministic async batch translation for demos |
 | Translator adapter | `@form-engine-ts/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
@@ -90,6 +91,11 @@ v2.4 adds pure form-version transitions with optimistic revisions, mergeable inc
 normalization codec. v2.5 adds stable keyset pagination to Memory, MongoDB, and PostgreSQL storage and introduces
 `@form-engine-ts/translator-google-v3` for Translation Advanced glossaries, labels, automatic chunking, and exponential
 retry on HTTP 429/5xx responses.
+
+The v2.5.1 release hardens version transitions with typed validation/CAS failures, makes lenient incremental analytics
+report skipped responses, and adds response-aware CSV columns plus Web/Node writable-stream piping. Paged storage can apply
+metadata filters and predicates before sizing, including the new Azure Table adapter. Google Translation Advanced batches
+by both item count and UTF-8 byte size and retries transient network/HTTP failures with `Retry-After`-aware full jitter.
 
 ### Define and render a form
 
@@ -349,6 +355,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Storage Adapter | `@form-engine-ts/storage-postgres` | node-postgres互換query clientを注入するPostgreSQLストレージ |
 | Storage Adapter | `@form-engine-ts/storage-sqlite` | 同期・非同期executorに対応するdriver非依存SQLiteストレージ |
 | Storage Adapter | `@form-engine-ts/storage-d1` | prepared statementとtransactional batchを使うCloudflare D1ストレージ |
+| Storage Adapter | `@form-engine-ts/storage-azure-table` | `@azure/data-tables`互換clientを注入するAzure Table Storage |
 | Translator Adapter | `@form-engine-ts/translator-mock` | 英語・日本語の同期カタログとデモ用の決定的な非同期バッチ翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
@@ -419,6 +426,12 @@ v2.4では楽観revision付きの純粋なフォーム版遷移、結合可能�
 v2.5ではMemory・MongoDB・PostgreSQL Storageへ安定したkeyset paginationを追加し、Translation Advancedの
 用語集・label・自動chunk分割・HTTP 429/5xx指数backoff retryに対応する`@form-engine-ts/translator-google-v3`を
 新設しました。
+
+v2.5.1では、version遷移に型付きvalidation/CAS失敗を追加し、lenient増分集計がスキップした回答をレポート
+できるようにしました。CSVのカスタム列は回答・版・スキーマcontextを受け取り、Web/Node writable streamへ
+backpressure対応で直接出力できます。ページングはページサイズ確定前のmetadata/predicate filterに対応し、Azure
+Tableアダプターも追加しました。Google Translation Advancedは件数とUTF-8 byte数の両方でbatchを分割し、
+`Retry-After`を尊重するfull jitter付きで一時的なnetwork/HTTPエラーをretryします。
 
 ### フォームの定義とレンダリング
 

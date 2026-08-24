@@ -3,6 +3,7 @@ import {
   assertValidFormSchema,
   decodeSubmissionCursor,
   encodeSubmissionCursor,
+  matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
 } from "@form-engine-ts/core";
 import type { Db, Document, Filter } from "mongodb";
@@ -191,13 +192,14 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
               ]
             })
       };
-      const documents = await submissions
-        .find(filter)
-        .sort({ submittedAt: 1, _id: 1 })
-        .limit(pageSize + 1)
-        .toArray();
-      const hasMore = documents.length > pageSize;
-      const items = documents.slice(0, pageSize).map(parseSubmissionDocument);
+      const sorted = submissions.find(filter).sort({ submittedAt: 1, _id: 1 });
+      const requiresClientFiltering = options.filter !== undefined || options.metadataFilters !== undefined;
+      const documents = requiresClientFiltering ? await sorted.toArray() : await sorted.limit(pageSize + 1).toArray();
+      const candidates = documents
+        .map(parseSubmissionDocument)
+        .filter((item) => matchesSubmissionPageFilters(item, options));
+      const hasMore = candidates.length > pageSize;
+      const items = candidates.slice(0, pageSize);
       const last = items.at(-1);
       return {
         items,

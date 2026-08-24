@@ -29,3 +29,4 @@ The caller owns the MongoDB connection lifecycle. Collection names can be custom
 
 `listSubmissionPage(formId, { version, pageSize, cursor, since, until, locale })` performs bounded reads using the
 compound `submittedAt`/response-ID cursor. Run `createIndexes()` after upgrading to create the matching compound index.
+`metadataFilters` and custom `filter` predicates are applied before page sizing.

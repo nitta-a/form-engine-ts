@@ -1,3 +1,5 @@
+import type { FormSubmission, JsonValue, SubmissionPageQueryOptions } from "./types";
+
 export interface SubmissionCursorValue {
   readonly submittedAt: string;
   readonly responseId: string;
@@ -70,4 +72,45 @@ export function normalizeSubmissionPageSize(pageSize: number | undefined, fallba
   const value = pageSize ?? fallback;
   if (!Number.isSafeInteger(value) || value < 1) throw new TypeError("pageSize must be a positive safe integer.");
   return value;
+}
+
+function isJsonArray(value: JsonValue): value is readonly JsonValue[] {
+  return Array.isArray(value);
+}
+
+function isJsonObject(value: JsonValue): value is Readonly<Record<string, JsonValue>> {
+  return typeof value === "object" && value !== null && !isJsonArray(value);
+}
+
+function jsonValuesEqual(left: JsonValue | undefined, right: JsonValue | undefined): boolean {
+  if (left === right) return true;
+  if (left === undefined || left === null || right === undefined || right === null || typeof left !== typeof right) {
+    return false;
+  }
+  if (isJsonArray(left) || isJsonArray(right)) {
+    return (
+      isJsonArray(left) &&
+      isJsonArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => jsonValuesEqual(value, right[index]))
+    );
+  }
+  if (!isJsonObject(left) || !isJsonObject(right)) return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => Object.hasOwn(right, key) && jsonValuesEqual(left[key], right[key]))
+  );
+}
+
+export function matchesSubmissionPageFilters(
+  submission: FormSubmission,
+  options: Pick<SubmissionPageQueryOptions, "filter" | "metadataFilters">
+): boolean {
+  if (options.filter !== undefined && !options.filter(submission)) return false;
+  if (options.metadataFilters === undefined) return true;
+  return Object.entries(options.metadataFilters).every(([key, value]) =>
+    jsonValuesEqual(submission.metadata?.[key], value)
+  );
 }

@@ -127,6 +127,21 @@ describe("createPostgresStorage", () => {
     expect(query.mock.calls[1]?.[1]).toEqual(["form", timestamp, "b", 3]);
   });
 
+  it("applies metadata and predicate filters before page sizing", async () => {
+    const first = { ...submission("a"), metadata: { channel: "other", tier: 2 } };
+    const expected = { ...submission("b"), metadata: { channel: "ARGS", tier: 2 } };
+    const third = { ...submission("c"), metadata: { channel: "ARGS", tier: 3 } };
+    const { client, query } = clientWithRows([submissionRow(first), submissionRow(expected), submissionRow(third)]);
+    const storage = createPostgresStorage({ client });
+    const page = await storage.listSubmissionPage("form", {
+      pageSize: 1,
+      metadataFilters: { tier: 2 },
+      filter: (item) => item.metadata?.channel === "ARGS"
+    });
+    expect(page).toEqual({ items: [expected], hasMore: false });
+    expect(query.mock.calls[0]?.[0]).not.toContain("LIMIT");
+  });
+
   it("runs lazy migration exactly once and uses customized safe identifiers", async () => {
     const { client, query } = clientWithRows([], [], []);
     const storage = createPostgresStorage({

@@ -1,3 +1,5 @@
+import type { FormVersionState } from "./versioning";
+
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
 
 export interface FormPolicy {
@@ -209,6 +211,8 @@ export interface SubmissionPageQueryOptions {
   readonly since?: string;
   readonly until?: string;
   readonly locale?: string;
+  readonly filter?: (submission: FormSubmission) => boolean;
+  readonly metadataFilters?: Readonly<Record<string, JsonValue>>;
 }
 
 export interface SubmissionPage {
@@ -219,6 +223,18 @@ export interface SubmissionPage {
 
 export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
   listSubmissionPage(formId: string, options?: SubmissionPageQueryOptions): Promise<SubmissionPage>;
+}
+
+export interface VersionTransitionPlan {
+  readonly state: FormVersionState;
+  readonly expectedRevision: number;
+  readonly draftToPublish?: FormSchema;
+  readonly versionsToArchive: readonly number[];
+  readonly versionsToDelete: readonly number[];
+}
+
+export interface VersionedFormStorageAdapter extends FormStorageAdapter {
+  commitVersionTransition(plan: VersionTransitionPlan): Promise<{ readonly success: boolean; readonly error?: string }>;
 }
 
 interface BaseQuestionAggregate {
@@ -277,6 +293,7 @@ export type ChoiceOption = FieldOption;
 export interface FormResponse extends ExtensibleNode {
   readonly responseId: string;
   readonly formId: string;
+  readonly formVersion?: number;
   readonly sourceLocale?: string;
   readonly answers: Readonly<Record<string, unknown>>;
   readonly submittedAt: string;

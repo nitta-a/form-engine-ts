@@ -13,14 +13,34 @@ export interface GoogleV3TranslatorOptions {
   readonly labels?: Readonly<Record<string, string>>;
   readonly fetchFn?: typeof fetch;
   readonly apiEndpoint?: string;
+  readonly batchLimits?: BatchSplitLimits;
+  readonly retry?: RetryConfig;
   readonly maxBatchSize?: number;
   readonly maxRetries?: number;
   readonly retryBaseDelayMs?: number;
+  readonly maxRetryDelayMs?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
+  readonly random?: () => number;
+  readonly now?: () => number;
+}
+
+export interface BatchSplitLimits {
+  readonly maxItems?: number;
+  /** UTF-8 bytes across all text items in a request. */
+  readonly maxCharacters?: number;
+}
+
+export interface RetryConfig {
+  readonly maxRetries?: number;
+  readonly baseDelayMs?: number;
+  readonly maxDelayMs?: number;
 }
 
 const DEFAULT_ENDPOINT = "https://translation.googleapis.com/v3";
-const DEFAULT_BATCH_SIZE = 100;
+const DEFAULT_MAX_ITEMS = 250;
+const DEFAULT_MAX_CHARACTERS = 25_000;
+const HARD_MAX_ITEMS = 1024;
+const HARD_MAX_CHARACTERS = 30_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -42,6 +62,37 @@ function positiveInteger(value: number | undefined, fallback: number, name: stri
   const resolved = nonNegativeInteger(value, fallback, name);
   if (resolved < 1) throw new TypeError(`${name} must be greater than zero.`);
   return resolved;
+}
+
+export function splitTranslationBatch(texts: readonly string[], limits: BatchSplitLimits = {}): string[][] {
+  if (!Array.isArray(texts) || texts.some((text) => typeof text !== "string")) {
+    throw new TypeError("texts must be an array of strings.");
+  }
+  const maxItems = positiveInteger(limits.maxItems, DEFAULT_MAX_ITEMS, "maxItems");
+  const maxCharacters = positiveInteger(limits.maxCharacters, DEFAULT_MAX_CHARACTERS, "maxCharacters");
+  if (maxItems > HARD_MAX_ITEMS) throw new TypeError(`maxItems cannot exceed ${HARD_MAX_ITEMS}.`);
+  if (maxCharacters > HARD_MAX_CHARACTERS) {
+    throw new TypeError(`maxCharacters cannot exceed ${HARD_MAX_CHARACTERS}.`);
+  }
+  const encoder = new TextEncoder();
+  const chunks: string[][] = [];
+  let chunk: string[] = [];
+  let chunkBytes = 0;
+  for (const text of texts) {
+    const textBytes = encoder.encode(text).length;
+    if (textBytes > maxCharacters) {
+      throw new TypeError(`A text item uses ${textBytes} UTF-8 bytes; maxCharacters is ${maxCharacters}.`);
+    }
+    if (chunk.length > 0 && (chunk.length >= maxItems || chunkBytes + textBytes > maxCharacters)) {
+      chunks.push(chunk);
+      chunk = [];
+      chunkBytes = 0;
+    }
+    chunk.push(text);
+    chunkBytes += textBytes;
+  }
+  if (chunk.length > 0) chunks.push(chunk);
+  return chunks;
 }
 
 function endpoint(value: string | undefined): string {
@@ -89,6 +140,14 @@ function validateLabels(
   return { ...labels };
 }
 
+function retryAfterMilliseconds(value: string | null, now: () => number): number | undefined {
+  if (value === null) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - now()) : undefined;
+}
+
 export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): AsyncTranslationAdapter {
   const projectId = requireNonEmpty(options?.projectId, "projectId");
   const location = requireNonEmpty(options.location ?? "global", "location");
@@ -97,10 +156,24 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
   const fetchImpl = options.fetchFn ?? globalThis.fetch;
   if (typeof fetchImpl !== "function")
     throw new Error("Fetch is unavailable. Pass fetchFn when creating the translator.");
-  const batchSize = positiveInteger(options.maxBatchSize, DEFAULT_BATCH_SIZE, "maxBatchSize");
-  const maxRetries = nonNegativeInteger(options.maxRetries, 3, "maxRetries");
-  const retryBaseDelayMs = nonNegativeInteger(options.retryBaseDelayMs, 250, "retryBaseDelayMs");
+  const batchLimits: BatchSplitLimits = {
+    maxItems: options.batchLimits?.maxItems ?? options.maxBatchSize ?? DEFAULT_MAX_ITEMS,
+    maxCharacters: options.batchLimits?.maxCharacters ?? DEFAULT_MAX_CHARACTERS
+  };
+  const maxRetries = nonNegativeInteger(options.retry?.maxRetries ?? options.maxRetries, 4, "maxRetries");
+  const retryBaseDelayMs = nonNegativeInteger(
+    options.retry?.baseDelayMs ?? options.retryBaseDelayMs,
+    500,
+    "baseDelayMs"
+  );
+  const maxRetryDelayMs = nonNegativeInteger(
+    options.retry?.maxDelayMs ?? options.maxRetryDelayMs,
+    10_000,
+    "maxDelayMs"
+  );
   const sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const random = options.random ?? Math.random;
+  const now = options.now ?? Date.now;
   const labels = validateLabels(options.labels);
   const glossaryConfig =
     options.glossaryConfig === undefined
@@ -126,7 +199,7 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
       ...(labels === undefined ? {} : { labels })
     });
     for (let attempt = 0; ; attempt += 1) {
-      let response: Response;
+      let response: Response | undefined;
       try {
         response = await fetchImpl(requestUrl, {
           method: "POST",
@@ -134,14 +207,25 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
           body
         });
       } catch (cause) {
-        throw new Error("Google Translation Advanced request failed before receiving an HTTP response.", { cause });
+        if (attempt >= maxRetries) {
+          throw new Error("Google Translation Advanced request failed before receiving an HTTP response.", { cause });
+        }
       }
-      if (response.ok) return parseTranslations(await response.text(), texts.length, glossaryConfig !== undefined);
-      const retryable = response.status === 429 || (response.status >= 500 && response.status <= 599);
+      if (response?.ok === true) {
+        return parseTranslations(await response.text(), texts.length, glossaryConfig !== undefined);
+      }
+      const retryable =
+        response === undefined || response.status === 429 || (response.status >= 500 && response.status <= 599);
       if (retryable && attempt < maxRetries) {
-        await sleep(retryBaseDelayMs * 2 ** attempt);
+        const retryAfter =
+          response === undefined ? undefined : retryAfterMilliseconds(response.headers.get("retry-after"), now);
+        if (response !== undefined) await response.text();
+        const exponentialCap = Math.min(maxRetryDelayMs, retryBaseDelayMs * 2 ** attempt);
+        const jitter = Math.floor(random() * exponentialCap);
+        await sleep(Math.max(retryAfter ?? 0, jitter));
         continue;
       }
+      if (response === undefined) throw new Error("Google Translation Advanced request failed.");
       const detail = (await response.text()).replaceAll(token, "[redacted]");
       throw new Error(
         `Google Translation Advanced request failed with HTTP ${response.status}${detail.length === 0 ? "." : `: ${detail}`}`
@@ -160,8 +244,8 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     const target = requireNonEmpty(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? undefined : requireNonEmpty(sourceLocale, "sourceLocale");
     const translated: string[] = [];
-    for (let index = 0; index < texts.length; index += batchSize) {
-      translated.push(...(await translateChunk(texts.slice(index, index + batchSize), target, source)));
+    for (const chunk of splitTranslationBatch(texts, batchLimits)) {
+      translated.push(...(await translateChunk(chunk, target, source)));
     }
     return translated;
   };

@@ -221,6 +221,21 @@ describe("createMongoDbStorage", () => {
     expect(second).toEqual({ items: [submission("c", "form", 1, timestamp)], hasMore: false });
   });
 
+  it("applies metadata and predicate filters before page sizing", async () => {
+    const { db } = createDbStub();
+    const adapter = createMongoDbStorage({ db });
+    await adapter.saveSubmission({ ...submission("a"), metadata: { channel: "other", tier: 2 } });
+    const expected = { ...submission("b"), metadata: { channel: "ARGS", tier: 2 } };
+    await adapter.saveSubmission(expected);
+    await adapter.saveSubmission({ ...submission("c"), metadata: { channel: "ARGS", tier: 3 } });
+    const page = await adapter.listSubmissionPage("form", {
+      pageSize: 1,
+      metadataFilters: { tier: 2 },
+      filter: (item) => item.metadata?.channel === "ARGS"
+    });
+    expect(page).toEqual({ items: [expected], hasMore: false });
+  });
+
   it("clears one form across versions without deleting schemas or other forms", async () => {
     const { db } = createDbStub();
     const adapter = createMongoDbStorage({ db });

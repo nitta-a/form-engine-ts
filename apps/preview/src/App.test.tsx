@@ -210,7 +210,7 @@ describe("preview application", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByText(/"release": "v2.5.0"/)).toBeInTheDocument();
+    expect(screen.getByText(/"release": "v2.5.1"/)).toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
     await user.click(screen.getByLabelText("LocalStorage"));
     await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());

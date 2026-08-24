@@ -1,4 +1,4 @@
-import type { FormSchema } from "./types";
+import type { FormSchema, SchemaIssue } from "./types";
 
 export type Result<T, E> =
   | { readonly success: true; readonly value: T }
@@ -28,18 +28,47 @@ export type VersionTransitionError =
   | { readonly type: "draft_already_exists"; readonly currentDraftVersion: number }
   | { readonly type: "draft_not_found" }
   | { readonly type: "revision_conflict"; readonly expectedRevision: number; readonly actualRevision: number }
+  | { readonly type: "invalid_source_version"; readonly requestedVersion: number; readonly publishedVersion?: number }
   | { readonly type: "version_immutable"; readonly status: FormVersionStatus }
-  | { readonly type: "max_version_exceeded"; readonly max: number };
+  | { readonly type: "max_version_exceeded"; readonly max: number }
+  | { readonly type: "validation_failed"; readonly issues: readonly SchemaIssue[] };
 
 export interface CloneVersionOptions {
   readonly maxVersions?: number;
+  readonly expectedRevision?: number;
+  /** Additional known published versions that may be used as a clone source. */
+  readonly allowedSourceVersions?: readonly number[];
 }
 
 export interface PublishDraftOptions {
   readonly expectedRevision?: number;
-  readonly validate?: (schema: FormSchema) => boolean;
+  readonly validate?: (schema: FormSchema) => boolean | readonly SchemaIssue[];
   /** Supplies deterministic record timestamps while keeping the transition pure. */
   readonly timestamp?: string;
+}
+
+export interface DeleteDraftOptions {
+  readonly expectedRevision?: number;
+}
+
+export interface PublishDraftResult {
+  readonly nextState: FormVersionState;
+  readonly publishedRecord: FormVersionRecord;
+  readonly archivedRecords: readonly FormVersionRecord[];
+  /** @deprecated Read archivedRecords instead. */
+  readonly archivedVersion?: number;
+}
+
+function revisionConflict(
+  state: FormVersionState,
+  expectedRevision: number | undefined
+): { readonly success: false; readonly error: VersionTransitionError } | undefined {
+  return expectedRevision === undefined || expectedRevision === state.revision
+    ? undefined
+    : {
+        success: false,
+        error: { type: "revision_conflict", expectedRevision, actualRevision: state.revision }
+      };
 }
 
 function validateState(state: FormVersionState): void {
@@ -59,8 +88,24 @@ export function cloneVersionToDraft(
 ): Result<{ readonly nextState: FormVersionState; readonly draftSchema: FormSchema }, VersionTransitionError> {
   validateState(state);
   if (sourceSchema.id !== state.formId) throw new TypeError("sourceSchema.id must match state.formId.");
+  const conflict = revisionConflict(state, options.expectedRevision);
+  if (conflict !== undefined) return conflict;
   if (state.draftVersion !== undefined) {
     return { success: false, error: { type: "draft_already_exists", currentDraftVersion: state.draftVersion } };
+  }
+  const allowedSourceVersions = new Set([
+    ...(state.publishedVersion === undefined ? [] : [state.publishedVersion]),
+    ...(options.allowedSourceVersions ?? [])
+  ]);
+  if (!allowedSourceVersions.has(sourceSchema.version)) {
+    return {
+      success: false,
+      error: {
+        type: "invalid_source_version",
+        requestedVersion: sourceSchema.version,
+        ...(state.publishedVersion === undefined ? {} : { publishedVersion: state.publishedVersion })
+      }
+    };
   }
   const maxVersions = options.maxVersions ?? Number.MAX_SAFE_INTEGER;
   if (!Number.isSafeInteger(maxVersions) || maxVersions < 1) {
@@ -88,25 +133,10 @@ export function publishDraft(
   state: FormVersionState,
   draftSchema: FormSchema,
   options: PublishDraftOptions = {}
-): Result<
-  {
-    readonly nextState: FormVersionState;
-    readonly publishedRecord: FormVersionRecord;
-    readonly archivedVersion?: number;
-  },
-  VersionTransitionError
-> {
+): Result<PublishDraftResult, VersionTransitionError> {
   validateState(state);
-  if (options.expectedRevision !== undefined && options.expectedRevision !== state.revision) {
-    return {
-      success: false,
-      error: {
-        type: "revision_conflict",
-        expectedRevision: options.expectedRevision,
-        actualRevision: state.revision
-      }
-    };
-  }
+  const conflict = revisionConflict(state, options.expectedRevision);
+  if (conflict !== undefined) return conflict;
   if (
     state.draftVersion === undefined ||
     draftSchema.id !== state.formId ||
@@ -114,10 +144,30 @@ export function publishDraft(
   ) {
     return { success: false, error: { type: "draft_not_found" } };
   }
-  if (options.validate?.(draftSchema) === false) throw new TypeError("Draft schema validation failed.");
+  const validation = options.validate?.(draftSchema);
+  if (validation === false || (Array.isArray(validation) && validation.length > 0)) {
+    return {
+      success: false,
+      error: { type: "validation_failed", issues: Array.isArray(validation) ? validation : [] }
+    };
+  }
   const timestamp = options.timestamp ?? "1970-01-01T00:00:00.000Z";
   if (!Number.isFinite(Date.parse(timestamp))) throw new TypeError("timestamp must be a valid date string.");
   const archivedVersion = state.publishedVersion;
+  const archivedRecords: readonly FormVersionRecord[] =
+    archivedVersion === undefined
+      ? []
+      : [
+          {
+            formId: state.formId,
+            version: archivedVersion,
+            status: "archived",
+            schema: { ...draftSchema, version: archivedVersion },
+            createdAt: timestamp,
+            publishedAt: timestamp,
+            archivedAt: timestamp
+          }
+        ];
   const { draftVersion: _draftVersion, ...stateWithoutDraft } = state;
   return {
     success: true,
@@ -135,15 +185,19 @@ export function publishDraft(
         createdAt: timestamp,
         publishedAt: timestamp
       },
+      archivedRecords,
       ...(archivedVersion === undefined ? {} : { archivedVersion })
     }
   };
 }
 
 export function deleteDraft(
-  state: FormVersionState
+  state: FormVersionState,
+  options: DeleteDraftOptions = {}
 ): Result<{ readonly nextState: FormVersionState }, VersionTransitionError> {
   validateState(state);
+  const conflict = revisionConflict(state, options.expectedRevision);
+  if (conflict !== undefined) return conflict;
   if (state.draftVersion === undefined) return { success: false, error: { type: "draft_not_found" } };
   const { draftVersion: _draftVersion, ...stateWithoutDraft } = state;
   return {

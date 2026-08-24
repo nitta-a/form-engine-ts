@@ -1,8 +1,27 @@
-import { createGoogleV3Translator } from "../src";
+import { createGoogleV3Translator, splitTranslationBatch } from "../src";
 
-function response(status: number, body: unknown): Response {
-  return new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+function response(status: number, body: unknown, headers?: HeadersInit): Response {
+  return new Response(typeof body === "string" ? body : JSON.stringify(body), {
+    status,
+    ...(headers === undefined ? {} : { headers })
+  });
 }
+
+describe("splitTranslationBatch", () => {
+  it("splits by both item count and UTF-8 byte limits", () => {
+    expect(splitTranslationBatch(["a", "b", "c"], { maxItems: 2, maxCharacters: 10 })).toEqual([["a", "b"], ["c"]]);
+    expect(splitTranslationBatch(["あ", "い", "う"], { maxItems: 10, maxCharacters: 6 })).toEqual([
+      ["あ", "い"],
+      ["う"]
+    ]);
+  });
+
+  it("rejects limits beyond Google request boundaries and oversized individual items", () => {
+    expect(() => splitTranslationBatch(["a"], { maxItems: 1025 })).toThrow(/1024/);
+    expect(() => splitTranslationBatch(["a"], { maxCharacters: 30_001 })).toThrow(/30000/);
+    expect(() => splitTranslationBatch(["too-large"], { maxCharacters: 2 })).toThrow(/UTF-8 bytes/);
+  });
+});
 
 describe("createGoogleV3Translator", () => {
   it("chunks requests and preserves translated result order", async () => {
@@ -24,6 +43,23 @@ describe("createGoogleV3Translator", () => {
       "ja:e"
     ]);
     expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("splits text arrays above 30,000 UTF-8 bytes into safe requests", async () => {
+    const requestSizes: number[] = [];
+    const fetchFn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { contents: string[] };
+      requestSizes.push(body.contents.reduce((total, text) => total + new TextEncoder().encode(text).length, 0));
+      return response(200, { translations: body.contents.map((text) => ({ translatedText: text })) });
+    });
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      fetchFn
+    });
+    const texts = ["a".repeat(10_000), "b".repeat(10_000), "c".repeat(10_000), "d".repeat(10_000)];
+    await expect(translator.translateBatch(texts, "ja")).resolves.toEqual(texts);
+    expect(requestSizes).toEqual([20_000, 20_000]);
   });
 
   it("sends project, location, glossary, and labels to Translation Advanced", async () => {
@@ -68,11 +104,48 @@ describe("createGoogleV3Translator", () => {
       fetchFn,
       retryBaseDelayMs: 10,
       maxRetries: 2,
+      random: () => 1,
       sleep
     });
     await expect(translator.translateText("text", "ja")).resolves.toBe("ok");
     expect(sleep.mock.calls).toEqual([[10], [20]]);
     expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it("honors Retry-After while applying full-jitter exponential retry", async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response(429, "busy", { "Retry-After": "2" }))
+      .mockResolvedValueOnce(response(200, { translations: [{ translatedText: "ok" }] }));
+    const sleep = vi.fn(async () => undefined);
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      fetchFn,
+      retry: { maxRetries: 1, baseDelayMs: 500, maxDelayMs: 10_000 },
+      random: () => 0.5,
+      sleep
+    });
+    await expect(translator.translateText("text", "ja")).resolves.toBe("ok");
+    expect(sleep).toHaveBeenCalledWith(2000);
+  });
+
+  it("retries temporary network errors", async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockRejectedValueOnce(new Error("ECONNRESET"))
+      .mockResolvedValueOnce(response(200, { translations: [{ translatedText: "ok" }] }));
+    const sleep = vi.fn(async () => undefined);
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      fetchFn,
+      retry: { maxRetries: 1, baseDelayMs: 10 },
+      random: () => 0.5,
+      sleep
+    });
+    await expect(translator.translateText("text", "ja")).resolves.toBe("ok");
+    expect(sleep).toHaveBeenCalledWith(5);
   });
 
   it("does not retry non-retryable failures and redacts access tokens", async () => {
