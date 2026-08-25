@@ -15,7 +15,14 @@ import {
   validatePageAnswers
 } from "@form-engine-ts/core";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { BeforeSubmit, FormSubmitHandler, SubmitResult } from "./types";
+import {
+  type BeforeSubmit,
+  type FormServerErrorPayload,
+  FormSubmissionError,
+  type FormSubmitHandler,
+  type SubmitContext,
+  type SubmitResult
+} from "./types";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -35,10 +42,7 @@ export interface FormContextValue {
   readonly restoreValues: (values: FormValues) => void;
   readonly validatePage: (pageIndex: number) => AnswerValidationResult;
   readonly reset: () => void;
-  readonly submit: (
-    beforeSubmit?: BeforeSubmit,
-    prepareSubmission?: (values: FormValues) => FormValues | Promise<FormValues>
-  ) => Promise<SubmitResult>;
+  readonly submit: (beforeSubmit?: BeforeSubmit, submitContext?: SubmitContext) => Promise<SubmitResult>;
   readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }
 
@@ -48,6 +52,28 @@ function issuesByField(issues: readonly ValidationIssue[]): Record<string, Valid
   const result: Record<string, ValidationIssue | undefined> = {};
   for (const issue of issues) result[issue.fieldId] ??= issue;
   return result;
+}
+
+function defaultAttemptId(): string {
+  const randomUuid = globalThis.crypto?.randomUUID;
+  if (typeof randomUuid === "function") return randomUuid.call(globalThis.crypto);
+  return `attempt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function isServerErrorPayload(value: unknown): value is FormServerErrorPayload {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const fieldErrors = record.fieldErrors;
+  const formError = record.formError;
+  return (
+    (Object.hasOwn(record, "fieldErrors") || Object.hasOwn(record, "formError")) &&
+    (fieldErrors === undefined ||
+      (typeof fieldErrors === "object" &&
+        fieldErrors !== null &&
+        !Array.isArray(fieldErrors) &&
+        Object.values(fieldErrors).every((message) => typeof message === "string"))) &&
+    (formError === undefined || typeof formError === "string")
+  );
 }
 
 export interface FormProviderProps {
@@ -154,10 +180,7 @@ export function FormProvider({
   }, [initialValues]);
 
   const submit = useCallback(
-    async (
-      beforeSubmit?: BeforeSubmit,
-      prepareSubmission?: (values: FormValues) => FormValues | Promise<FormValues>
-    ): Promise<SubmitResult> => {
+    async (beforeSubmit?: BeforeSubmit, submitContext?: SubmitContext): Promise<SubmitResult> => {
       if (submissionInFlight.current) return { status: "cancelled" };
       const validation = validateAnswers(validSchema, values);
       if (!validation.valid) {
@@ -178,14 +201,26 @@ export function FormProvider({
           setSubmitStatus("idle");
           return { status: "cancelled" };
         }
-        const submissionValues =
-          prepareSubmission === undefined ? visibleValues : await prepareSubmission(visibleValues);
-        const response = await onSubmit(submissionValues);
+        const context = submitContext ?? {
+          attemptId: defaultAttemptId(),
+          formId: validSchema.id,
+          formVersion: validSchema.version,
+          locale,
+          submittedAt: new Date().toISOString()
+        };
+        const response = await onSubmit({ ...visibleValues }, context);
         if (resetOnSuccess) setValues({ ...initialValues });
         setSubmitStatus("success");
         return response === undefined ? { status: "success" } : { status: "success", response };
       } catch (cause) {
-        const error = cause instanceof Error ? cause : new Error(String(cause));
+        const error = isServerErrorPayload(cause)
+          ? new FormSubmissionError(
+              cause.formError ?? (cause instanceof Error ? cause.message : "Form submission failed."),
+              cause
+            )
+          : cause instanceof Error
+            ? cause
+            : new Error(String(cause));
         setSubmitError(error);
         setSubmitStatus("error");
         return { status: "error", error };
@@ -193,7 +228,7 @@ export function FormProvider({
         submissionInFlight.current = false;
       }
     },
-    [initialValues, onSubmit, resetOnSuccess, validSchema, values]
+    [initialValues, locale, onSubmit, resetOnSuccess, validSchema, values]
   );
 
   const translate = useCallback(

@@ -20,6 +20,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
     helperText,
     value,
     onChange,
+    onKeyDown,
     placeholder,
     maxLength,
     inputMode,
@@ -61,6 +62,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
         size={resolved.size}
         variant={resolved.variant}
         onChange={(event) => onChange(event.currentTarget.value)}
+        onKeyDown={onKeyDown}
       />
     );
   };

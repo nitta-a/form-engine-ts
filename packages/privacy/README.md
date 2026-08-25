@@ -6,6 +6,9 @@ injectable, and findings are advisory so applications can choose confirm, block,
 
 Overlapping or contained findings with the same field and type are merged into one source range.
 
+`SensitiveDataFinding` also supports optional `fieldTitle`, `typeLabel`, and `maskedText` values so a renderer can show a
+localized, privacy-safe confirmation summary without exposing the original match.
+
 ```ts
 import { createStandardPrivacyDetector } from "@form-engine-ts/privacy";
 

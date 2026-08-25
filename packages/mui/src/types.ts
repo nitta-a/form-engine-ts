@@ -1,20 +1,33 @@
-import type { BuilderActionIconType } from "@form-engine-ts/react";
+import type { BuilderActionIconType, LocalizationSummaryContext } from "@form-engine-ts/react";
 import type { AccordionProps, CardProps, PaperProps, StackProps } from "@mui/material";
+import type { ReactNode } from "react";
 
 export type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization";
 
 export type MuiButtonVariant = "contained" | "outlined" | "text";
+
+export interface LocaleOptionItem {
+  readonly value: string;
+  readonly label: string;
+}
+
+export type LocalizationSectionPlacement = "top" | "beforeQuestions" | "afterQuestions" | "bottom";
 
 export interface MuiLayoutOptions {
   readonly sectionOrder?: readonly BuilderSectionName[];
 }
 
 export interface MuiLocalizationOptions {
+  readonly availableLocales?: readonly (LocaleOptionItem | string)[];
+  readonly placement?: LocalizationSectionPlacement;
   readonly collapsible?: boolean;
   readonly defaultExpanded?: boolean | "when-configured" | "always";
   readonly showSummary?: boolean;
+  readonly renderSummary?: (context: LocalizationSummaryContext) => ReactNode;
   readonly emptyStateMessage?: string;
   readonly defaultLocaleControl?: "editable" | "readOnly" | "hidden";
+  readonly noWrapActions?: boolean;
+  readonly autoFocusNewTab?: boolean;
 }
 
 export interface MuiFieldEditorOptions {
@@ -74,8 +87,18 @@ export const DEFAULT_MUI_SECTION_ORDER: readonly BuilderSectionName[] = [
   "basicSettings",
   "questions",
   "addQuestion",
-  "localization"
+  "localization",
+  "completionMessage"
 ];
+
+export const MUI_LOCALIZATION_SECTION_ORDERS: Readonly<
+  Record<LocalizationSectionPlacement, readonly BuilderSectionName[]>
+> = {
+  top: ["localization", "basicSettings", "completionMessage", "questions", "addQuestion"],
+  beforeQuestions: ["basicSettings", "localization", "completionMessage", "questions", "addQuestion"],
+  afterQuestions: ["basicSettings", "questions", "addQuestion", "localization", "completionMessage"],
+  bottom: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
+};
 
 export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): ResolvedMuiAdapterOptions {
   const buttonVariant = options.buttonVariant ?? "contained";
@@ -102,10 +125,21 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
       collapsible: options.localizationOptions?.collapsible ?? false,
       defaultExpanded: options.localizationOptions?.defaultExpanded ?? false,
       showSummary: options.localizationOptions?.showSummary ?? false,
+      ...(options.localizationOptions?.availableLocales === undefined
+        ? {}
+        : { availableLocales: options.localizationOptions.availableLocales }),
+      ...(options.localizationOptions?.placement === undefined
+        ? {}
+        : { placement: options.localizationOptions.placement }),
+      ...(options.localizationOptions?.renderSummary === undefined
+        ? {}
+        : { renderSummary: options.localizationOptions.renderSummary }),
       ...(options.localizationOptions?.emptyStateMessage === undefined
         ? {}
         : { emptyStateMessage: options.localizationOptions.emptyStateMessage }),
-      defaultLocaleControl: options.localizationOptions?.defaultLocaleControl ?? "editable"
+      defaultLocaleControl: options.localizationOptions?.defaultLocaleControl ?? "editable",
+      noWrapActions: options.localizationOptions?.noWrapActions ?? true,
+      autoFocusNewTab: options.localizationOptions?.autoFocusNewTab ?? true
     },
     muiSlotProps: options.muiSlotProps ?? {}
   };

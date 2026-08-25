@@ -379,7 +379,7 @@ describe("FormRenderer v2 lifecycle and slots", () => {
       result = await formApi?.submit();
     });
     expect(result).toEqual({ status: "success" });
-    expect(onSubmit).toHaveBeenCalledWith({ name: "Ada" });
+    expect(onSubmit).toHaveBeenCalledWith({ name: "Ada" }, expect.objectContaining({ formId: "renderer-v2" }));
     onSubmit.mockRejectedValueOnce(new Error("boom"));
     await act(async () => {
       result = await formApi?.submit();
@@ -442,7 +442,9 @@ describe("FormRenderer v2 lifecycle and slots", () => {
     expect(screen.getByTestId("slot-navigation")).toHaveTextContent("pages:1");
     await user.click(screen.getByTestId("slot-field"));
     await user.click(screen.getByTestId("slot-submit"));
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ name: "Grace" }));
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ name: "Grace" }, expect.objectContaining({ formId: "renderer-v2" }))
+    );
     expect(screen.getByTestId("slot-completion")).toHaveTextContent("custom:Complete");
   });
 

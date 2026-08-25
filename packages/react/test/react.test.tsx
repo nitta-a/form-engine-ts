@@ -104,7 +104,10 @@ describe("React form engine", () => {
     await user.type(screen.getByLabelText(/Name/), "Ada");
     await user.click(screen.getByRole("button", { name: "en:submit" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("en:success"));
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: "Ada" }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Ada" }),
+      expect.objectContaining({ formId: "test", formVersion: 1 })
+    );
     expect(screen.getByLabelText(/Name/)).toHaveValue("");
     unmount();
 
@@ -183,7 +186,7 @@ describe("React form engine", () => {
     expect(screen.getByLabelText("details")).toHaveValue("kept");
     await user.selectOptions(screen.getByLabelText("show"), "no");
     await user.click(screen.getByRole("button", { name: "en:form.submit" }));
-    expect(onSubmit).toHaveBeenCalledWith({ show: "no" });
+    expect(onSubmit).toHaveBeenCalledWith({ show: "no" }, expect.objectContaining({ formId: "conditional" }));
   });
 
   it("navigates pages, blocks invalid steps, updates progress, and preserves answers on Back", async () => {

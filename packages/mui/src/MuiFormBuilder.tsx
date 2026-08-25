@@ -8,7 +8,13 @@ import { useMemo } from "react";
 import { muiBuilderComponents } from "./components";
 import { MuiFormBuilderContext, mergeMuiAdapterOptions } from "./context";
 import { muiBuilderSlots } from "./slots";
-import type { MuiAdapterOptions, MuiBuilderSlotProps, MuiLayoutOptions, MuiLocalizationOptions } from "./types";
+import {
+  MUI_LOCALIZATION_SECTION_ORDERS,
+  type MuiAdapterOptions,
+  type MuiBuilderSlotProps,
+  type MuiLayoutOptions,
+  type MuiLocalizationOptions
+} from "./types";
 
 export interface MuiFormBuilderProps
   extends Omit<FormBuilderProps, "components" | "disableDefaultStyles" | "slots" | "unstyled"> {
@@ -42,7 +48,10 @@ export function MuiFormBuilder({
   const contextValue = useMemo(() => ({ options: contextOptions }), [contextOptions]);
   const components = useMemo(() => ({ ...muiBuilderComponents, ...customComponents }), [customComponents]);
   const slots = useMemo(() => ({ ...muiBuilderSlots, ...customSlots }), [customSlots]);
-  const resolvedSectionOrder = sectionOrder ?? contextOptions.layoutOptions?.sectionOrder;
+  const placement = contextOptions.localizationOptions?.placement;
+  const resolvedSectionOrder =
+    sectionOrder ??
+    (placement === undefined ? contextOptions.layoutOptions?.sectionOrder : MUI_LOCALIZATION_SECTION_ORDERS[placement]);
   return (
     <MuiFormBuilderContext.Provider value={contextValue}>
       <FormBuilder

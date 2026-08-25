@@ -1092,6 +1092,11 @@ export default function App() {
                     collapsible: true,
                     defaultExpanded: "when-configured",
                     showSummary: true,
+                    availableLocales: [
+                      { value: "ja", label: "日本語" },
+                      { value: "en", label: "English" }
+                    ],
+                    placement: "beforeQuestions",
                     defaultLocaleControl: "readOnly"
                   }}
                   muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}

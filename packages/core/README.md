@@ -29,7 +29,8 @@ if (!result.valid) console.error(result.issues);
 Add `pages` to partition every field into an accessible wizard and use `validatePageAnswers(schema, pageIndex, values)`
 for step-scoped validation. Schemas without `pages` remain single-page forms.
 
-Store authoring-time translations on forms, fields, options, and pages. `resolveLocalizedSchema` applies them synchronously,
+Store authoring-time translations on forms, fields, options, and pages. `resolveLocalizedSchema(schema, locale)` applies
+them synchronously and returns the original schema when no locale is supplied,
 while `populateSchemaTranslations` fills them through an injected `AsyncTranslationAdapter`. Population defaults to
 `overwrite: "missing-only"`, accepts per-slot `shouldOverwrite` and `createMetadata` callbacks, and returns
 `{ schema, report }` with updated and skipped translation slots.

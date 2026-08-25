@@ -139,7 +139,7 @@ describe("FormRenderer submission presentation", () => {
     expect(screen.getByRole("button", { name: "Submit" })).toBeDisabled();
     expect(onSubmit).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "Confirm submission" }));
+    await user.click(screen.getByRole("button", { name: "Proceed" }));
     const completion = await screen.findByRole("status");
     expect(completion).toHaveFocus();
     expect(onSubmit).toHaveBeenCalledOnce();

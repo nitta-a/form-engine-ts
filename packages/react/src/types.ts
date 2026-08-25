@@ -11,7 +11,12 @@ import type {
   ValidationError
 } from "@form-engine-ts/core";
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
-import type { ComponentType, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type {
+  ComponentType,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactNode
+} from "react";
 import type { SubmissionAttemptStore } from "./attempt";
 import type { BuilderActionResult, FormBuilderResult } from "./hooks/useFormBuilder";
 import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
@@ -39,6 +44,7 @@ export type BuilderActionIconType =
 
 export interface BuilderButtonProps extends ComponentBaseProps {
   readonly onClick?: () => void;
+  readonly noWrap?: boolean;
   readonly variant?: "primary" | "secondary" | "danger";
   readonly children: ReactNode;
   readonly title?: string;
@@ -68,6 +74,7 @@ export interface InputComponentProps extends ComponentBaseProps {
   readonly helperText?: string;
   readonly value: string;
   readonly onChange: (value: string) => void;
+  readonly onKeyDown?: (event: ReactKeyboardEvent<HTMLElement>) => void;
   readonly placeholder?: string;
   readonly maxLength?: number;
 }
@@ -212,6 +219,12 @@ export interface BuilderLocalizationSlotProps extends BuilderSlotBaseProps {
   readonly translationAdapterAvailable?: boolean;
 }
 
+export interface LocalizationSummaryContext {
+  readonly defaultLocale: string;
+  readonly supportedLocales: readonly string[];
+  readonly totalLocales: number;
+}
+
 export interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps {
   readonly currentLocale: string;
   readonly onAutoTranslate: () => void;
@@ -286,6 +299,28 @@ export interface SubmitResponse {
   readonly submittedAt?: string;
 }
 
+export interface SubmitContext {
+  readonly attemptId: string;
+  readonly formId: string;
+  readonly formVersion: number;
+  readonly locale?: string;
+  readonly submittedAt: string;
+}
+
+export interface FormRendererMessages {
+  readonly submitButton?: string;
+  readonly submittingButton?: string;
+  readonly retryButton?: string;
+  readonly requiredField?: string;
+  readonly alreadySubmittedTitle?: string;
+  readonly alreadySubmittedMessage?: string;
+  readonly serverErrorSummary?: string;
+  readonly confirmSensitiveDataTitle?: string;
+  readonly confirmSensitiveDataMessage?: string;
+  readonly confirmButton?: string;
+  readonly cancelButton?: string;
+}
+
 export interface FormSubmittedAnswerItem {
   readonly fieldId: string;
   readonly title: string;
@@ -299,7 +334,7 @@ export interface FormSubmittedAnswerItem {
 export interface FormCompletionSlotProps {
   readonly message?: string;
   readonly schema: FormSchema;
-  readonly answers: Record<string, unknown>;
+  readonly answers: Readonly<Record<string, unknown>>;
   readonly submittedItems: readonly FormSubmittedAnswerItem[];
   readonly response?: SubmitResponse;
   readonly onReset?: () => void;
@@ -321,7 +356,8 @@ export class FormSubmissionError extends Error {
 }
 
 export type FormSubmitHandler = (
-  answers: FormValues
+  answers: FormValues,
+  context: SubmitContext
 ) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
 
 export type SubmissionGuardResult =
@@ -387,8 +423,7 @@ export interface FormRendererSlots {
   }) => ReactNode;
   readonly renderSubmitButton?: (props: RenderSubmitButtonProps) => ReactNode;
   readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
-  /** Additional completion data is supplied at runtime; use renderSubmittedValues for typed summary rendering. */
-  readonly renderCompletion?: (props: { readonly message: string }) => ReactNode;
+  readonly renderCompletion?: (props: FormCompletionSlotProps & { readonly message: string }) => ReactNode;
   readonly renderSubmittedValues?: (props: {
     readonly items: readonly FormSubmittedAnswerItem[];
     readonly schema: FormSchema;

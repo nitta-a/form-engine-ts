@@ -14,6 +14,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
     "aria-describedby": ariaDescribedBy,
     "aria-labelledby": ariaLabelledBy,
     onClick,
+    noWrap,
     children,
     title,
     variant,
@@ -38,7 +39,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
         color={variant === "danger" ? "error" : "primary"}
         variant={resolved.buttonVariants?.[variant ?? "primary"] ?? resolved.buttonVariant}
         fullWidth={resolved.buttonFullWidth ?? false}
-        sx={{ whiteSpace: "nowrap" }}
+        sx={{ whiteSpace: noWrap === false ? "normal" : "nowrap" }}
       >
         {children}
       </Button>

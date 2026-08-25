@@ -2,10 +2,13 @@ import type { FormSchema } from "@form-engine-ts/core";
 
 export interface SensitiveDataFinding {
   readonly fieldId: string;
+  readonly fieldTitle?: string;
   readonly type: "email" | "phone" | "url" | "postal_code" | string;
+  readonly typeLabel?: string;
   readonly start?: number;
   readonly end?: number;
   readonly matchedText?: string;
+  readonly maskedText?: string;
 }
 
 export interface SensitiveDataDetectorRule {

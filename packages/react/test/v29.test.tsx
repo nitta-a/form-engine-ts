@@ -93,20 +93,18 @@ describe("v2.9 receipt resilience and submission attempts", () => {
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    expect(onSubmit).toHaveBeenLastCalledWith({
-      comment: "retry me",
-      attemptId: "attempt-29",
-      submissionId: "attempt-29"
-    });
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      { comment: "retry me" },
+      expect.objectContaining({ attemptId: "attempt-29", formId: "v29", formVersion: 9 })
+    );
     await expect(attemptStore.get("v29", 9)).resolves.toMatchObject({ attemptId: "attempt-29" });
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
-    expect(onSubmit).toHaveBeenLastCalledWith({
-      comment: "retry me",
-      attemptId: "attempt-29",
-      submissionId: "attempt-29"
-    });
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      { comment: "retry me" },
+      expect.objectContaining({ attemptId: "attempt-29", formId: "v29", formVersion: 9 })
+    );
     await waitFor(() => expect(receipt).toMatchObject({ submissionId: "attempt-29" }));
     await expect(attemptStore.get("v29", 9)).resolves.toBeNull();
   });

@@ -92,6 +92,27 @@
   font-size: 0.875rem;
   font-weight: 600;
 }
+.fe-character-count {
+  color: #667085;
+  font-size: 0.8rem;
+  text-align: right;
+}
+.fe-spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.4em;
+  border: 0.12em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: fe-spin 0.8s linear infinite;
+  vertical-align: -0.1em;
+}
+@keyframes fe-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .fe-check-label {
   align-items: flex-start;
   display: flex;
@@ -298,4 +319,13 @@
   color: CanvasText;
   border-radius: 0.5rem;
   box-shadow: 0 1rem 3rem rgb(0 0 0 / 25%);
+}
+.fe-sensitive-type {
+  border-radius: 999px;
+  background: #f2f4f7;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.8rem;
+}
+.fe-sensitive-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }

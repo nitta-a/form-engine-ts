@@ -27,6 +27,7 @@ import { FormProvider, useForm } from "./context";
 import type { SubmissionReceipt } from "./receipt";
 import type {
   BeforeSubmit,
+  FormRendererMessages,
   FormRendererSlots,
   FormSubmitHandler,
   FormSubmitStatus,
@@ -271,11 +272,15 @@ function DefaultField(props: FieldComponentProps) {
       {label}
       {control}
       {(field.type === "text" || field.type === "textarea") && field.maxLength !== undefined
-        ? props.renderCharacterCount?.({
+        ? (props.renderCharacterCount?.({
             fieldId: field.id,
             current: typeof value === "string" ? value.length : 0,
             max: field.maxLength
-          })
+          }) ?? (
+            <div className="fe-character-count" aria-live="polite">
+              {typeof value === "string" ? value.length : 0} / {field.maxLength}
+            </div>
+          ))
         : null}
       <FieldMessage props={props} />
     </div>
@@ -297,6 +302,9 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly hideFormOnSuccess?: boolean;
   readonly successMessageKey?: string;
   readonly errorMessageKey?: string;
+  readonly attemptIdFactory?: () => string;
+  readonly messages?: Partial<FormRendererMessages>;
+  readonly messageResolver?: (key: keyof FormRendererMessages, defaultText: string) => string;
   readonly autoSaveKey?: string;
   readonly beforeSubmit?: BeforeSubmit;
   readonly onDraftSave?: (draft: FormValues) => void;
@@ -396,11 +404,61 @@ function parseDraft(serialized: string): StoredDraft | null {
   }
 }
 
+const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessages>> = {
+  en: {
+    submitButton: "Submit",
+    submittingButton: "Submitting...",
+    retryButton: "Retry",
+    requiredField: "This field is required.",
+    alreadySubmittedTitle: "Already Submitted",
+    alreadySubmittedMessage: "Already submitted.",
+    serverErrorSummary: "Submission failed. Please check your answers and try again.",
+    confirmSensitiveDataTitle: "Sensitive data may be included",
+    confirmSensitiveDataMessage: "The following answers may contain personal information. Continue submitting?",
+    confirmButton: "Proceed",
+    cancelButton: "Cancel"
+  },
+  ja: {
+    submitButton: "送信する",
+    submittingButton: "送信中...",
+    retryButton: "再送信する",
+    requiredField: "この項目は必須です",
+    alreadySubmittedTitle: "回答済みです",
+    alreadySubmittedMessage: "このアンケートにはすでに回答しています。",
+    serverErrorSummary: "送信に失敗しました。内容をご確認の上、再度お試しください。",
+    confirmSensitiveDataTitle: "個人情報が含まれている可能性があります",
+    confirmSensitiveDataMessage: "以下の項目に個人情報とみられる記述があります。このまま送信してもよろしいですか？",
+    confirmButton: "このまま送信",
+    cancelButton: "修正する"
+  }
+};
+
+function createRendererAttemptId(): string {
+  const randomUuid = globalThis.crypto?.randomUUID;
+  if (typeof randomUuid === "function") return randomUuid.call(globalThis.crypto);
+  return `attempt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function maskSensitiveValue(finding: SensitiveDataFinding): string | undefined {
+  if (finding.maskedText !== undefined) return finding.maskedText;
+  const value = finding.matchedText;
+  if (value === undefined) return undefined;
+  if (finding.type === "email") {
+    const separator = value.indexOf("@");
+    if (separator > 0) return `${value.slice(0, Math.min(2, separator))}***${value.slice(separator)}`;
+  }
+  if (finding.type === "phone" || finding.type === "postal_code") return "***";
+  return value.length <= 2 ? "***" : `${value.slice(0, 2)}***`;
+}
+
 function ContextFormRenderer({
   components = {},
   className = "",
   successMessageKey,
   errorMessageKey,
+  attemptIdFactory,
+  messages = {},
+  messageResolver,
   autoSaveKey,
   beforeSubmit,
   onDraftSave,
@@ -430,12 +488,13 @@ function ContextFormRenderer({
   const [guardsPending, setGuardsPending] = useState(false);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
   const [completionData, setCompletionData] = useState<{
-    readonly answers: Record<string, unknown>;
+    readonly answers: Readonly<Record<string, unknown>>;
     readonly submittedItems: readonly FormSubmittedAnswerItem[];
     readonly response?: SubmitResponse;
   } | null>(null);
   const [receiptLoaded, setReceiptLoaded] = useState(receiptStore === undefined);
   const rendererSubmissionInFlight = useRef(false);
+  const fallbackAttemptId = useRef<string | null>(null);
   const completionRef = useRef<HTMLDivElement>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   const pages = form.schema.pages;
@@ -451,6 +510,24 @@ function ContextFormRenderer({
   const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
+
+  const resolveMessage = useCallback(
+    (key: keyof FormRendererMessages, fallback?: string): string => {
+      const defaultText =
+        fallback ?? DEFAULT_RENDERER_MESSAGES[form.locale.toLowerCase().startsWith("ja") ? "ja" : "en"][key] ?? key;
+      const configured = messages[key];
+      return messageResolver?.(key, configured ?? defaultText) ?? configured ?? defaultText;
+    },
+    [form.locale, messageResolver, messages]
+  );
+
+  const fieldTranslate = useCallback(
+    (key: string, params?: Readonly<Record<string, string | number>>) =>
+      key === "validation.required" && (messages.requiredField !== undefined || messageResolver !== undefined)
+        ? resolveMessage("requiredField")
+        : form.translate(key, params),
+    [form.translate, messageResolver, messages.requiredField, resolveMessage]
+  );
 
   const focusSubmitButton = useCallback(() => {
     const button = formRef.current?.querySelector<HTMLElement>(".fe-submit, button[type='submit'], button");
@@ -498,6 +575,7 @@ function ContextFormRenderer({
     );
     const control = fieldContainer?.querySelector<HTMLElement>("input, select, textarea");
     if (control !== undefined && control !== null) {
+      control.scrollIntoView?.({ behavior: "smooth", block: "center" });
       control.focus();
       setFocusFieldId(null);
     }
@@ -518,6 +596,23 @@ function ContextFormRenderer({
         event.preventDefault();
         setConfirmation(null);
         globalThis.setTimeout(focusSubmitButton, 0);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [
+        ...(confirmationRef.current?.querySelectorAll<HTMLElement>(
+          "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        ) ?? [])
+      ].filter((element) => !element.hasAttribute("disabled"));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
       }
     };
     globalThis.addEventListener("keydown", onKeyDown);
@@ -641,19 +736,24 @@ function ContextFormRenderer({
     rendererSubmissionInFlight.current = true;
     try {
       let submissionAttempt: SubmissionAttempt | undefined;
-      const result = await form.submit(
-        beforeSubmit,
-        attemptStore === undefined
-          ? undefined
-          : async (values) => {
-              submissionAttempt = await attemptStore.getOrCreate(form.schema.id, form.schema.version);
-              return {
-                ...values,
-                attemptId: submissionAttempt.attemptId,
-                submissionId: submissionAttempt.attemptId
-              };
-            }
-      );
+      let attemptId = fallbackAttemptId.current;
+      if (attemptStore !== undefined) {
+        submissionAttempt = await attemptStore.getOrCreate(form.schema.id, form.schema.version, attemptIdFactory);
+        attemptId = submissionAttempt.attemptId;
+      } else if (attemptId === null) {
+        attemptId = attemptIdFactory?.() ?? createRendererAttemptId();
+        fallbackAttemptId.current = attemptId;
+      }
+      if (attemptId === null) throw new Error("Unable to create a submission attempt id.");
+      const submittedAt = new Date().toISOString();
+      const submitContext = {
+        attemptId,
+        formId: form.schema.id,
+        formVersion: form.schema.version,
+        locale: form.locale,
+        submittedAt
+      };
+      const result = await form.submit(beforeSubmit, submitContext);
       if (result.status === "invalid") {
         const invalidPageIndex = pages?.findIndex((page) =>
           firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
@@ -666,7 +766,8 @@ function ContextFormRenderer({
         if (result.error instanceof FormSubmissionError) {
           const fieldErrors = result.error.payload.fieldErrors ?? {};
           form.setServerErrors?.(fieldErrors);
-          const firstServerFieldId = Object.keys(fieldErrors)[0];
+          const firstServerFieldId =
+            form.schema.fields.find((field) => Object.hasOwn(fieldErrors, field.id))?.id ?? Object.keys(fieldErrors)[0];
           if (firstServerFieldId !== undefined) {
             const invalidPageIndex = pages?.findIndex((page) => page.questionIds.includes(firstServerFieldId));
             if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
@@ -691,11 +792,11 @@ function ContextFormRenderer({
       });
       if (receiptStore !== undefined) {
         const response = result.response;
-        const submissionId = response?.submissionId ?? submissionAttempt?.attemptId;
+        const submissionId = response?.submissionId ?? submissionAttempt?.attemptId ?? attemptId;
         const storedReceipt: SubmissionReceipt = {
           formId: form.schema.id,
           formVersion: form.schema.version,
-          submittedAt: response?.submittedAt ?? new Date().toISOString(),
+          submittedAt: response?.submittedAt ?? submittedAt,
           ...(submissionId === undefined ? {} : { submissionId })
         };
         try {
@@ -716,6 +817,7 @@ function ContextFormRenderer({
           // Attempt cleanup must not change a successful server submission result.
         }
       }
+      if (attemptStore === undefined) fallbackAttemptId.current = null;
       if (autoSaveKey !== undefined && typeof globalThis.localStorage !== "undefined") {
         globalThis.localStorage.removeItem(autoSaveKey);
         setDraftRestored(false);
@@ -763,7 +865,10 @@ function ContextFormRenderer({
     return (
       slots.renderSubmitButton?.(submitButtonProps) ?? (
         <button className="fe-submit" type="submit" disabled={submitButtonProps.disabled}>
-          {form.translate(form.schema.submitLabelKey ?? "form.submit")}
+          {submitState === "submitting" ? <span className="fe-spinner" aria-hidden="true" /> : null}
+          {submitState === "submitting"
+            ? resolveMessage("submittingButton")
+            : resolveMessage("submitButton", form.translate(form.schema.submitLabelKey ?? "form.submit"))}
         </button>
       )
     );
@@ -805,19 +910,44 @@ function ContextFormRenderer({
     >
       {slots.renderSubmissionConfirmation?.({
         findings: confirmation?.findings ?? [],
-        message: confirmation?.message ?? form.translate("form.confirmSensitiveData"),
+        message:
+          confirmation?.message ??
+          resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData")),
         schema: form.schema,
         visibleValues,
         onConfirm: confirmSubmission,
         onCancel: cancelSubmission
       }) ?? (
         <>
-          <p>{confirmation?.message ?? form.translate("form.confirmSensitiveData")}</p>
+          <h2>{resolveMessage("confirmSensitiveDataTitle")}</h2>
+          <p>
+            {confirmation?.message ??
+              resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData"))}
+          </p>
+          {(confirmation?.findings ?? []).length === 0 ? null : (
+            <ul>
+              {(confirmation?.findings ?? []).map((finding, index) => {
+                const field = form.schema.fields.find((candidate) => candidate.id === finding.fieldId);
+                const typeLabels: Readonly<Record<string, string>> = form.locale.toLowerCase().startsWith("ja")
+                  ? { email: "メールアドレス", phone: "電話番号", url: "URL", postal_code: "郵便番号" }
+                  : { email: "Email address", phone: "Phone number", url: "URL", postal_code: "Postal code" };
+                const typeLabel = finding.typeLabel ?? typeLabels[finding.type] ?? finding.type;
+                const value = maskSensitiveValue(finding);
+                return (
+                  <li key={`${finding.fieldId}-${finding.type}-${finding.start ?? index}`}>
+                    <span>{finding.fieldTitle ?? field?.title ?? finding.fieldId}</span>{" "}
+                    <span className="fe-sensitive-type">{typeLabel}</span>
+                    {value === undefined ? null : <span className="fe-sensitive-value"> {value}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <button type="button" data-fe-confirm="true" onClick={confirmSubmission}>
-            {form.translate("form.confirmSubmission")}
+            {resolveMessage("confirmButton", form.translate("form.confirmSubmission"))}
           </button>
           <button type="button" onClick={cancelSubmission}>
-            {form.translate("form.cancelSubmission")}
+            {resolveMessage("cancelButton", form.translate("form.cancelSubmission"))}
           </button>
         </>
       )}
@@ -833,10 +963,11 @@ function ContextFormRenderer({
           ...(receiptStore === undefined ? {} : { onReset: () => void resetReceipt() })
         }) ?? (
           <div role="status">
-            {form.translate("form.alreadySubmitted")}
+            <h2>{resolveMessage("alreadySubmittedTitle")}</h2>
+            <p>{resolveMessage("alreadySubmittedMessage", form.translate("form.alreadySubmitted"))}</p>
             {receiptStore === undefined ? null : (
               <button type="button" onClick={() => void resetReceipt()}>
-                {form.translate("form.submitAnother")}
+                {resolveMessage("submitButton", form.translate("form.submitAnother"))}
               </button>
             )}
           </div>
@@ -915,7 +1046,7 @@ function ContextFormRenderer({
                 value: form.values[field.id],
                 error,
                 setValue: (value) => form.setValue(field.id, value),
-                translate: form.translate,
+                translate: fieldTranslate,
                 inputId: `${prefix}-${field.id}`,
                 errorId: `${prefix}-${field.id}-error`,
                 helpId: `${prefix}-${field.id}-help`,
@@ -1010,9 +1141,21 @@ function ContextFormRenderer({
           {form.submitStatus === "error" && form.submitError !== null
             ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??
               (form.submitError instanceof FormSubmissionError && form.submitError.payload.formError !== undefined ? (
-                <div role="alert">{form.submitError.payload.formError}</div>
-              ) : errorMessageKey === undefined ? null : (
-                <div role="alert">{form.translate(errorMessageKey)}</div>
+                <div role="alert">
+                  {form.submitError.payload.formError}
+                  <button type="button" onClick={() => void submitValues()}>
+                    {resolveMessage("retryButton")}
+                  </button>
+                </div>
+              ) : (
+                <div role="alert">
+                  {errorMessageKey === undefined
+                    ? resolveMessage("serverErrorSummary")
+                    : form.translate(errorMessageKey)}
+                  <button type="button" onClick={() => void submitValues()}>
+                    {resolveMessage("retryButton")}
+                  </button>
+                </div>
               )))
             : null}
         </div>
@@ -1034,7 +1177,7 @@ const RENDERER_MESSAGES: Readonly<Record<string, string>> = {
   "form.draftRestored": "Draft restored",
   "form.submissionBlocked": "Submission blocked because sensitive data was detected.",
   "form.confirmSensitiveData": "Sensitive data may be included. Confirm before submitting.",
-  "form.confirmSubmission": "Confirm submission",
+  "form.confirmSubmission": "Proceed",
   "form.cancelSubmission": "Cancel",
   "form.yes": "Yes",
   "form.no": "No",
@@ -1043,9 +1186,27 @@ const RENDERER_MESSAGES: Readonly<Record<string, string>> = {
   "validation.required": "This field is required."
 };
 
+const RENDERER_MESSAGES_JA: Readonly<Record<string, string>> = {
+  "form.submit": "送信する",
+  "form.back": "戻る",
+  "form.next": "次へ",
+  "form.step": "{{current}} / {{total}}",
+  "form.draftRestored": "下書きを復元しました",
+  "form.submissionBlocked": "個人情報が検出されたため送信できません。",
+  "form.confirmSensitiveData": "個人情報が含まれている可能性があります。送信前に確認してください。",
+  "form.confirmSubmission": "このまま送信",
+  "form.cancelSubmission": "修正する",
+  "form.yes": "はい",
+  "form.no": "いいえ",
+  "form.alreadySubmitted": "回答済みです",
+  "form.submitAnother": "別の回答を送信",
+  "validation.required": "この項目は必須です"
+};
+
 const defaultRendererTranslator: TranslationAdapter = {
-  translate(key, _locale, params = {}) {
-    return (RENDERER_MESSAGES[key] ?? key).replace(/\{\{(\w+)\}\}/g, (token, name: string) =>
+  translate(key, locale, params = {}) {
+    const localizedMessages = locale.toLowerCase().startsWith("ja") ? RENDERER_MESSAGES_JA : RENDERER_MESSAGES;
+    return (localizedMessages[key] ?? key).replace(/\{\{(\w+)\}\}/g, (token, name: string) =>
       Object.hasOwn(params, name) ? String(params[name]) : token
     );
   }

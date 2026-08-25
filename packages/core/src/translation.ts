@@ -244,8 +244,8 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
   return descriptors;
 }
 
-export function resolveLocalizedSchema(schema: FormSchema, targetLocale: string): FormSchema {
-  if (targetLocale.length === 0 || targetLocale === schema.defaultLocale) return schema;
+export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string): FormSchema {
+  if (targetLocale === undefined || targetLocale.length === 0 || targetLocale === schema.defaultLocale) return schema;
   const formTranslation = schema.translations?.[targetLocale];
   const completionMessage = formTranslation?.completionMessage ?? schema.completionMessage;
   return {

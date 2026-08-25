@@ -21,6 +21,7 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
     helperText,
     value,
     onChange,
+    onKeyDown,
     options: selectOptions
   }: BuilderSelectProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
@@ -45,7 +46,9 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
           name={name}
           label={label}
           value={value}
+          disabled={disabled}
           onChange={handleChange}
+          onKeyDown={onKeyDown}
           required={required}
           readOnly={readOnly}
           inputProps={{

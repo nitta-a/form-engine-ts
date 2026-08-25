@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/translator-google-v3",
-  "version": "2.9.6",
+  "version": "2.9.7",
   "publishConfig": {
     "access": "public"
   },

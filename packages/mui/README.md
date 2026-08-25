@@ -25,6 +25,11 @@ import { MuiFormBuilder } from "@form-engine-ts/mui";
     sectionOrder: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
   }}
   localizationOptions={{
+    availableLocales: [
+      { value: "ja", label: "日本語" },
+      { value: "en", label: "English" }
+    ],
+    placement: "afterQuestions",
     collapsible: true,
     defaultExpanded: "when-configured",
     showSummary: true,
@@ -56,9 +61,12 @@ slots as it does for the standard builder.
 width options. `fieldEditorOptions.description` and `localizationOptions.defaultLocaleControl` independently make those
 controls editable, read-only, or hidden. Set `dense` to reduce section, editor, option, and toolbar spacing.
 `buttonVariants` can override the MUI variant for `primary`, `secondary`, and `danger` actions independently.
-`localizationOptions.showSummary` adds a locale summary badge to the localization heading, and
-`localizationOptions.emptyStateMessage` customizes the guidance shown before a translation locale is added. The
-`defaultExpanded` option also accepts `"always"`.
+`localizationOptions.availableLocales` supplies display-ready locale candidates independently from the policy; when
+both are present, only candidates allowed by `allowedLocales` are shown. `placement` supports `top`,
+`beforeQuestions`, `afterQuestions`, and `bottom` section presets. `showSummary` renders a status alert, while
+`renderSummary` can provide a custom summary. `emptyStateMessage` customizes the guidance shown before a translation
+locale is added. `defaultExpanded` also accepts `"always"`; `autoFocusNewTab` focuses a newly added locale tab by
+default.
 `layoutOptions`, `localizationOptions`, and `muiSlotProps` are also accepted in `muiOptions` for low-level factories such
 as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
 
