@@ -1,11 +1,10 @@
 import type { BuilderSectionProps } from "@form-engine-ts/react";
 import { Paper, Typography } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiSectionAdapter(options?: MuiAdapterOptions): ComponentType<BuilderSectionProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiSection({
     id,
     className,
@@ -16,6 +15,7 @@ export function createMuiSectionAdapter(options?: MuiAdapterOptions): ComponentT
     onClickCapture,
     children
   }: BuilderSectionProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     return (
       <Paper
         {...resolved.muiSlotProps?.paper}

@@ -1,11 +1,10 @@
 import type { BuilderTextAreaProps } from "@form-engine-ts/react";
 import { TextField } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiTextAreaAdapter(options?: MuiAdapterOptions): ComponentType<BuilderTextAreaProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiTextArea({
     id,
     className,
@@ -25,6 +24,7 @@ export function createMuiTextAreaAdapter(options?: MuiAdapterOptions): Component
     maxLength,
     rows
   }: BuilderTextAreaProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     return (
       <TextField
         id={id}
@@ -39,6 +39,7 @@ export function createMuiTextAreaAdapter(options?: MuiAdapterOptions): Component
         slotProps={{
           htmlInput: {
             maxLength,
+            readOnly,
             "aria-label": ariaLabel,
             "aria-describedby": ariaDescribedBy,
             "aria-labelledby": ariaLabelledBy
@@ -49,7 +50,7 @@ export function createMuiTextAreaAdapter(options?: MuiAdapterOptions): Component
         multiline
         rows={rows}
         placeholder={placeholder}
-        fullWidth={resolved.fullWidth}
+        fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
         size={resolved.size}
         variant={resolved.variant}
         onChange={(event) => onChange(event.currentTarget.value)}

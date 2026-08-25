@@ -33,6 +33,7 @@ import {
   FormProvider,
   FormRenderer,
   type FormRendererSlots,
+  type FormSuccessRenderMode,
   useFormBuilder
 } from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
@@ -680,6 +681,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [useCustomSlots, setUseCustomSlots] = useState(false);
+  const [successRenderMode, setSuccessRenderMode] = useState<FormSuccessRenderMode>("append");
   const [cancelNextSubmit, setCancelNextSubmit] = useState(false);
   const [lifecycleStatus, setLifecycleStatus] = useState<string | null>(null);
   const [translationOverwrite, setTranslationOverwrite] = useState<"missing-only" | "all">("missing-only");
@@ -1056,13 +1058,20 @@ export default function App() {
                   muiOptions={{
                     size: "small",
                     dense: true,
+                    inputFullWidth: true,
+                    buttonFullWidth: false,
+                    fieldEditorOptions: { description: "hidden" },
                     getLocaleLabel: (targetLocale) => ({ ja: "日本語", en: "English" })[targetLocale] ?? targetLocale,
                     buttonVariants: { primary: "contained", secondary: "outlined", danger: "outlined" }
                   }}
                   layoutOptions={{
                     sectionOrder: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
                   }}
-                  localizationOptions={{ collapsible: true, defaultExpanded: "when-configured" }}
+                  localizationOptions={{
+                    collapsible: true,
+                    defaultExpanded: "when-configured",
+                    defaultLocaleControl: "readOnly"
+                  }}
                   muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
                 />
               </ThemeProvider>
@@ -1095,12 +1104,21 @@ export default function App() {
                 />
                 Cancel next submission in beforeSubmit
               </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={successRenderMode === "replace"}
+                  onChange={(event) => setSuccessRenderMode(event.currentTarget.checked ? "replace" : "append")}
+                />
+                Replace form after successful submission
+              </label>
             </fieldset>
             {lifecycleStatus === null ? null : <p className="lifecycle-status">{lifecycleStatus}</p>}
             <FormProvider schema={schema} locale={locale} translator={mockTranslator} onSubmit={submit} resetOnSuccess>
               <FormRenderer
                 successMessageKey="preview.success"
                 errorMessageKey="preview.error"
+                successRenderMode={successRenderMode}
                 autoSaveKey={`form-engine-preview-draft:${schema.id}:${schema.version}`}
                 beforeSubmit={() => {
                   if (!cancelNextSubmit) return "continue";

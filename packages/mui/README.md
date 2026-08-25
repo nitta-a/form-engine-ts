@@ -15,13 +15,20 @@ import { MuiFormBuilder } from "@form-engine-ts/mui";
     size: "small",
     variant: "outlined",
     dense: true,
+    inputFullWidth: true,
+    buttonFullWidth: false,
+    fieldEditorOptions: { description: "hidden" },
     getLocaleLabel: (locale) => localeNames[locale] ?? locale,
     buttonVariants: { primary: "contained", secondary: "outlined", danger: "outlined" }
   }}
   layoutOptions={{
     sectionOrder: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
   }}
-  localizationOptions={{ collapsible: true, defaultExpanded: "when-configured" }}
+  localizationOptions={{
+    collapsible: true,
+    defaultExpanded: "when-configured",
+    defaultLocaleControl: "readOnly"
+  }}
   muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
 />;
 ```
@@ -38,8 +45,18 @@ All MUI builder slots use the `FormBuilder` translator for labels, actions, tool
 `getLocaleLabel` for application-specific locale names. The localization UI excludes `schema.defaultLocale` from its
 translation tabs and follows `allowedLocales` and `maxLocales` from the builder policy.
 
-`MuiAdapterOptions` defaults to `size: "medium"`, `variant: "outlined"`, `buttonVariant: "contained"`, and
-`fullWidth: true`. Set `dense` to reduce section, editor, option, and toolbar spacing. `buttonVariants` can override the
-MUI variant for `primary`, `secondary`, and `danger` actions independently. `layoutOptions`, `localizationOptions`, and
-`muiSlotProps` are also accepted in `muiOptions` for low-level factories such as `createMuiBuilderSlots`; the dedicated
-`MuiFormBuilder` props take precedence.
+Manual edits from the form, field, and option translation controls use the React builder's `setManualTranslation`
+action. Consequently, `createManualTranslationMetadata` receives the same source text and existing metadata for the MUI
+slots as it does for the standard builder.
+
+`MuiAdapterOptions` defaults to `size: "medium"`, `variant: "outlined"`, `buttonVariant: "contained"`,
+`inputFullWidth: true`, and `buttonFullWidth: false`. The legacy `fullWidth` option remains the fallback for both new
+width options. `fieldEditorOptions.description` and `localizationOptions.defaultLocaleControl` independently make those
+controls editable, read-only, or hidden. Set `dense` to reduce section, editor, option, and toolbar spacing.
+`buttonVariants` can override the MUI variant for `primary`, `secondary`, and `danger` actions independently.
+`layoutOptions`, `localizationOptions`, and `muiSlotProps` are also accepted in `muiOptions` for low-level factories such
+as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
+
+`MuiFormBuilder` supplies options through `MuiFormBuilderContext` to module-stable adapter and slot component types.
+Controlled schema updates therefore preserve input focus and uncontrolled MUI state such as an open localization
+accordion even when the parent passes inline option objects.

@@ -1,11 +1,10 @@
 import type { BuilderCheckboxProps } from "@form-engine-ts/react";
 import { Checkbox, FormControl, FormControlLabel, FormHelperText } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): ComponentType<BuilderCheckboxProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiCheckbox({
     id,
     className,
@@ -22,6 +21,7 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
     onChange,
     label
   }: BuilderCheckboxProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     return (
       <FormControl className={className} error={Boolean(error)} required={required} disabled={disabled || readOnly}>
         <FormControlLabel

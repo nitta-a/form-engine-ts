@@ -28,7 +28,9 @@ import type {
   BeforeSubmit,
   FormRendererSlots,
   FormSubmitHandler,
-  FormSubmitState,
+  FormSubmitStatus,
+  FormSuccessRenderMode,
+  RenderSubmitButtonProps,
   SubmissionGuard,
   SubmissionProtectionProps,
   SubmitResult
@@ -278,6 +280,13 @@ function DefaultField(props: FieldComponentProps) {
 export interface FormRendererPresentationProps extends SubmissionProtectionProps {
   readonly components?: FieldComponents;
   readonly className?: string;
+  /**
+   * Controls where the completion message is rendered after a successful submission.
+   * Defaults to "append" for backwards compatibility.
+   */
+  readonly successRenderMode?: FormSuccessRenderMode;
+  /** @deprecated Use successRenderMode="replace" instead. */
+  readonly hideFormOnSuccess?: boolean;
   readonly successMessageKey?: string;
   readonly errorMessageKey?: string;
   readonly autoSaveKey?: string;
@@ -353,6 +362,8 @@ function ContextFormRenderer({
   autoSaveKey,
   beforeSubmit,
   onDraftSave,
+  successRenderMode = "append",
+  hideFormOnSuccess = false,
   submissionGuards = [],
   receiptStore,
   attemptStore,
@@ -371,9 +382,11 @@ function ContextFormRenderer({
     readonly message?: string;
   } | null>(null);
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
+  const [guardsPending, setGuardsPending] = useState(false);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
   const [receiptLoaded, setReceiptLoaded] = useState(receiptStore === undefined);
   const rendererSubmissionInFlight = useRef(false);
+  const completionRef = useRef<HTMLDivElement>(null);
   const pages = form.schema.pages;
   const visiblePageIndexes = useMemo(
     () =>
@@ -384,8 +397,9 @@ function ContextFormRenderer({
   const activeVisibleIndex = visiblePageIndexes.indexOf(currentPageIndex);
   const fieldIds = activePage === undefined ? undefined : new Set(activePage.questionIds);
   const visibleValues = useMemo(() => selectVisibleAnswers(form.schema, form.values), [form.schema, form.values]);
-  const submitState: FormSubmitState = confirmation === null ? form.submitStatus : "confirming";
+  const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
+  const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
 
   useEffect(() => {
     let active = true;
@@ -432,6 +446,11 @@ function ContextFormRenderer({
       setFocusFieldId(null);
     }
   }, [focusFieldId]);
+
+  useEffect(() => {
+    if (!isReplaceMode || form.submitStatus !== "success") return;
+    completionRef.current?.focus();
+  }, [form.submitStatus, isReplaceMode]);
 
   useEffect(() => {
     if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
@@ -514,13 +533,19 @@ function ContextFormRenderer({
   };
 
   const submitValues = async (guardsConfirmed = false): Promise<SubmitResult> => {
-    if (rendererSubmissionInFlight.current || (confirmation !== null && !guardsConfirmed)) {
+    if (
+      rendererSubmissionInFlight.current ||
+      submitState === "submitting" ||
+      submitState === "success" ||
+      (confirmation !== null && !guardsConfirmed)
+    ) {
       return { status: "cancelled" };
     }
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
     if (validation.valid && !guardsConfirmed && submissionGuards.length > 0) {
       rendererSubmissionInFlight.current = true;
+      setGuardsPending(true);
       try {
         const guardResult = await runSubmissionGuards(submissionGuards);
         if (guardResult.status === "block") {
@@ -537,6 +562,7 @@ function ContextFormRenderer({
         }
       } finally {
         rendererSubmissionInFlight.current = false;
+        setGuardsPending(false);
       }
     }
     setGuardMessage(null);
@@ -576,7 +602,6 @@ function ContextFormRenderer({
         };
         try {
           await receiptStore.save(storedReceipt);
-          setReceipt(storedReceipt);
         } catch (cause) {
           const error = cause instanceof Error ? cause : new Error(String(cause));
           try {
@@ -606,7 +631,7 @@ function ContextFormRenderer({
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (interactionLocked) return;
+    if (submitState === "submitting" || submitState === "confirming" || submitState === "success") return;
     void submitValues();
   };
 
@@ -629,12 +654,30 @@ function ContextFormRenderer({
   const validationIssues = Object.values(form.errors).filter((issue): issue is ValidationIssue => issue !== undefined);
   const canPrev = pages !== undefined && activeVisibleIndex > 0;
   const canNext = pages !== undefined && activeVisibleIndex < visiblePageIndexes.length - 1;
-  const renderSubmitButton = () =>
-    slots.renderSubmitButton?.({ isSubmitting: interactionLocked, onSubmit: () => void submitValues() }) ?? (
-      <button className="fe-submit" type="submit" disabled={interactionLocked}>
-        {form.translate(form.schema.submitLabelKey ?? "form.submit")}
-      </button>
+  const renderSubmitButton = () => {
+    const submitButtonProps: RenderSubmitButtonProps = {
+      isSubmitting: submitState === "submitting",
+      submitStatus: submitState,
+      disabled: interactionLocked || submitState === "success",
+      onSubmit: () => void submitValues()
+    };
+    return (
+      slots.renderSubmitButton?.(submitButtonProps) ?? (
+        <button className="fe-submit" type="submit" disabled={submitButtonProps.disabled}>
+          {form.translate(form.schema.submitLabelKey ?? "form.submit")}
+        </button>
+      )
     );
+  };
+
+  const completionMessage =
+    form.schema.completionMessage ??
+    (successMessageKey === undefined ? "Submitted." : form.translate(successMessageKey));
+  const completionRegion = (
+    <div ref={completionRef} className="fe-completion" role="status" aria-live="polite" tabIndex={-1}>
+      {slots.renderCompletion?.({ message: completionMessage }) ?? <div>{completionMessage}</div>}
+    </div>
+  );
 
   if (!receiptLoaded) return null;
   if (receipt !== null) {
@@ -655,6 +698,10 @@ function ContextFormRenderer({
         )}
       </div>
     );
+  }
+
+  if (form.submitStatus === "success" && isReplaceMode) {
+    return <div className={`fe-form ${className}`.trim()}>{completionRegion}</div>;
   }
 
   return (
@@ -814,18 +861,7 @@ function ContextFormRenderer({
         </div>
       )}
       <div className="fe-status" aria-live="polite">
-        {form.submitStatus === "success"
-          ? (slots.renderCompletion?.({
-              message:
-                form.schema.completionMessage ??
-                (successMessageKey === undefined ? "Submitted." : form.translate(successMessageKey))
-            }) ?? (
-              <div role="status">
-                {form.schema.completionMessage ??
-                  (successMessageKey === undefined ? "Submitted." : form.translate(successMessageKey))}
-              </div>
-            ))
-          : null}
+        {form.submitStatus === "success" ? completionRegion : null}
         {form.submitStatus === "error" && form.submitError !== null
           ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??
             (errorMessageKey === undefined ? null : <div role="alert">{form.translate(errorMessageKey)}</div>))

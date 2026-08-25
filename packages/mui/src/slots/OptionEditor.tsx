@@ -1,11 +1,10 @@
 import type { BuilderOptionEditorSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
 import { Stack } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): ComponentType<BuilderOptionEditorSlotProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiOptionEditor({
     field,
     option,
@@ -16,6 +15,7 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
     components,
     translate
   }: BuilderOptionEditorSlotProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     const { IconButton, TextInput } = components;
     const describedBy = option.label.trim().length === 0 ? `mui-option-${option.id}-error` : undefined;
     return (
@@ -62,7 +62,7 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
             value={option.translations?.[currentLocale] ?? ""}
             disabled={readOnly}
             onChange={(value) =>
-              actions.setLocaleTranslation(currentLocale, { kind: "option", id: option.id }, "label", value)
+              actions.setManualTranslation(currentLocale, { kind: "option", id: option.id }, "label", value)
             }
           />
         )}

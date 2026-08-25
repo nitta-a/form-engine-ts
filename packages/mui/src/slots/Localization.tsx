@@ -1,13 +1,12 @@
 import type { BuilderLocalizationSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
 import { ExpandMore } from "@mui/icons-material";
-import { Accordion, AccordionDetails, AccordionSummary, Box, Stack, Tab, Tabs, Typography } from "@mui/material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Chip, Stack, Tab, Tabs, Typography } from "@mui/material";
 import type { ComponentType, ReactNode, SyntheticEvent } from "react";
 import { useState } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiLocalizationSlot(options?: MuiAdapterOptions): ComponentType<BuilderLocalizationSlotProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiLocalization({
     schema,
     currentLocale,
@@ -22,6 +21,7 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
     components,
     translate
   }: BuilderLocalizationSlotProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     const { Button, ErrorMessage, Select, TextArea, TextInput } = components;
     const [newLocale, setNewLocale] = useState("");
     const locales = Array.from(
@@ -52,6 +52,7 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
     };
     const stackProps = resolved.muiSlotProps?.stack;
     const collapsible = resolved.localizationOptions?.collapsible ?? false;
+    const defaultLocaleControl = resolved.localizationOptions?.defaultLocaleControl ?? "editable";
     const content = (
       <Stack {...stackProps} spacing={resolved.dense ? 1 : 2}>
         {!collapsible ? (
@@ -60,16 +61,28 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
           </Typography>
         ) : null}
         <Stack {...stackProps} direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
-          <TextInput
-            id="mui-builder-default-locale"
-            label={translate("builder.defaultLocale")}
-            value={schema.defaultLocale ?? ""}
-            disabled={readOnly}
-            onChange={(value) => {
-              const result = actions.setDefaultLocale(value);
-              if (result.success && value === currentLocale) onCurrentLocaleChange("");
-            }}
-          />
+          {defaultLocaleControl === "hidden" ? null : defaultLocaleControl === "readOnly" ? (
+            <Stack spacing={0.5}>
+              <Typography variant="caption" color="text.secondary">
+                {translate("builder.defaultLocale")}
+              </Typography>
+              <Chip
+                label={resolved.getLocaleLabel?.(schema.defaultLocale ?? "") ?? schema.defaultLocale ?? ""}
+                size={resolved.size}
+              />
+            </Stack>
+          ) : (
+            <TextInput
+              id="mui-builder-default-locale"
+              label={translate("builder.defaultLocale")}
+              value={schema.defaultLocale ?? ""}
+              disabled={readOnly}
+              onChange={(value) => {
+                const result = actions.setDefaultLocale(value);
+                if (result.success && value === currentLocale) onCurrentLocaleChange("");
+              }}
+            />
+          )}
           {availableAllowedLocales === undefined ? (
             <TextInput
               id="mui-builder-new-locale"
@@ -137,14 +150,14 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
               label={translate("builder.translatedFormTitle")}
               value={schema.translations?.[currentLocale]?.title ?? ""}
               disabled={readOnly}
-              onChange={(value) => actions.setLocaleTranslation(currentLocale, { kind: "form" }, "title", value)}
+              onChange={(value) => actions.setManualTranslation(currentLocale, { kind: "form" }, "title", value)}
             />
             <TextArea
               id={`mui-builder-${currentLocale}-form-description`}
               label={translate("builder.translatedFormDescription")}
               value={schema.translations?.[currentLocale]?.description ?? ""}
               disabled={readOnly}
-              onChange={(value) => actions.setLocaleTranslation(currentLocale, { kind: "form" }, "description", value)}
+              onChange={(value) => actions.setManualTranslation(currentLocale, { kind: "form" }, "description", value)}
             />
             <TextInput
               id={`mui-builder-${currentLocale}-completion-message`}
@@ -152,7 +165,7 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
               value={schema.translations?.[currentLocale]?.completionMessage ?? ""}
               disabled={readOnly}
               onChange={(value) =>
-                actions.setLocaleTranslation(currentLocale, { kind: "form" }, "completionMessage", value)
+                actions.setManualTranslation(currentLocale, { kind: "form" }, "completionMessage", value)
               }
             />
           </Stack>

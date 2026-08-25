@@ -1,5 +1,5 @@
 import type { TranslationAdapter } from "@form-engine-ts/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type {
   BuilderFieldEditorSlotProps,
   BuilderLocalizationSlotProps,
@@ -8,7 +8,8 @@ import type {
   BuilderTextInputProps,
   BuilderToolbarSlotProps,
   BuilderTranslationActionsSlotProps,
-  FormBuilderComponents
+  FormBuilderComponents,
+  ManualTranslationContext
 } from "../src";
 import { FormBuilder } from "../src";
 
@@ -163,5 +164,58 @@ describe("FormBuilder design-system interop", () => {
     expect(screen.getByTestId("translated-pages")).toHaveTextContent("translated:builder.pages");
     expect(screen.getByTestId("translated-localization")).toHaveTextContent("translated:builder.localization");
     expect(screen.getByTestId("translated-actions")).toHaveTextContent("translated:builder.autoTranslate");
+  });
+
+  it("resolves source and existing metadata for manual page translations from slot actions", () => {
+    const onChange = vi.fn();
+    const createManualTranslationMetadata = vi.fn((context: ManualTranslationContext) => ({
+      translationSource: "MANUAL",
+      sourceText: context.sourceText
+    }));
+    const Pages = ({ actions }: BuilderPagesSlotProps) => (
+      <button
+        type="button"
+        onClick={() => actions.setManualTranslation("ja", { kind: "page", id: "page-1" }, "title", "ページ")}
+      >
+        Translate page manually
+      </button>
+    );
+    render(
+      <FormBuilder
+        schema={{
+          ...schema,
+          defaultLocale: "en",
+          supportedLocales: ["ja"],
+          pages: [
+            {
+              id: "page-1",
+              title: "Page source",
+              questionIds: ["name"],
+              translationMetadata: { ja: { title: { previous: true } } }
+            }
+          ]
+        }}
+        onChange={onChange}
+        createManualTranslationMetadata={createManualTranslationMetadata}
+        slots={{ pages: Pages }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Translate page manually" }));
+
+    expect(createManualTranslationMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "page",
+        nodeId: "page-1",
+        sourceText: "Page source",
+        existingTranslationMetadata: { previous: true },
+        translatedText: "ページ"
+      })
+    );
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pages: [expect.objectContaining({ translationMetadata: { ja: { title: expect.any(Object) } } })]
+      })
+    );
   });
 });

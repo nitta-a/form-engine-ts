@@ -1,12 +1,12 @@
 import type { BuilderFieldsetProps } from "@form-engine-ts/react";
 import { Box, Typography } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiFieldsetAdapter(options?: MuiAdapterOptions): ComponentType<BuilderFieldsetProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiFieldset({ className, legend, disabled, children }: BuilderFieldsetProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     return (
       <Box
         component="fieldset"

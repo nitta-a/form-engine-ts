@@ -12,7 +12,8 @@ import {
   createMuiIconButtonAdapter,
   createMuiTextInputAdapter,
   MuiButtonAdapter,
-  MuiFormBuilder
+  MuiFormBuilder,
+  type MuiFormBuilderProps
 } from "../src";
 
 const schema: FormSchema = {
@@ -46,6 +47,42 @@ function Harness({ translationAdapter }: { readonly translationAdapter?: AsyncTr
         {...(translationAdapter === undefined ? {} : { translationAdapter })}
       />
       <output data-testid="schema-state">{JSON.stringify(current)}</output>
+    </>
+  );
+}
+
+function MetadataHarness({
+  createManualTranslationMetadata
+}: {
+  readonly createManualTranslationMetadata: NonNullable<MuiFormBuilderProps["createManualTranslationMetadata"]>;
+}) {
+  const [current, setCurrent] = useState<FormSchema>({
+    ...schema,
+    translationMetadata: { ja: { title: { previous: "metadata" } } }
+  });
+  return (
+    <>
+      <MuiFormBuilder
+        schema={current}
+        onChange={setCurrent}
+        createManualTranslationMetadata={createManualTranslationMetadata}
+      />
+      <output data-testid="metadata-schema-state">{JSON.stringify(current)}</output>
+    </>
+  );
+}
+
+function InlineOptionsControlledHarness() {
+  const [current, setCurrent] = useState(schema);
+  return (
+    <>
+      <MuiFormBuilder
+        schema={current}
+        onChange={setCurrent}
+        muiOptions={{ size: "small" }}
+        localizationOptions={{ collapsible: true }}
+      />
+      <output data-testid="focus-schema-state">{JSON.stringify(current)}</output>
     </>
   );
 }
@@ -349,6 +386,120 @@ describe("MuiFormBuilder", () => {
     expect(screen.getByRole("button", { name: "Danger action" })).toHaveClass("MuiButton-outlinedError");
     const fieldEditor = container.querySelector<HTMLElement>('[data-mui-slot="field-editor"]');
     expect(fieldEditor === null ? "" : getComputedStyle(fieldEditor).padding).toBe("40px");
+  });
+
+  it("stores metadata for manual form, field, and option translations from MUI slots", async () => {
+    const user = userEvent.setup();
+    const metadataFactory: NonNullable<MuiFormBuilderProps["createManualTranslationMetadata"]> = vi.fn((context) => ({
+      isManuallyEdited: true,
+      translationSource: "MANUAL",
+      sourceText: context.sourceText
+    }));
+    render(<MetadataHarness createManualTranslationMetadata={metadataFactory} />);
+
+    await user.click(screen.getByRole("tab", { name: "ja" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Translated form title" }), {
+      target: { value: "フォーム" }
+    });
+    fireEvent.change(await screen.findByRole("textbox", { name: "Translated question title" }), {
+      target: { value: "質問" }
+    });
+    const optionTranslation = document.getElementById("mui-option-first-ja");
+    expect(optionTranslation).not.toBeNull();
+    if (optionTranslation === null) return;
+    fireEvent.change(optionTranslation, { target: { value: "選択肢" } });
+
+    await waitFor(() => {
+      const current = JSON.parse(screen.getByTestId("metadata-schema-state").textContent ?? "{}");
+      expect(current.translationMetadata.ja.title).toEqual({
+        isManuallyEdited: true,
+        translationSource: "MANUAL",
+        sourceText: "MUI integrated form"
+      });
+      expect(current.fields[0].translationMetadata.ja.title.sourceText).toBe("Choice");
+      expect(current.fields[0].options[0].translationMetadata.ja.label.sourceText).toBe("First");
+    });
+    expect(metadataFactory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "form",
+        sourceText: "MUI integrated form",
+        existingTranslationMetadata: { previous: "metadata" }
+      })
+    );
+  });
+
+  it("controls description/default-locale visibility and separates input and button widths", async () => {
+    const user = userEvent.setup();
+    render(
+      <MuiFormBuilder
+        schema={{
+          ...schema,
+          fields: schema.fields.map((field, index) =>
+            index === 0 ? { ...field, description: "Source description" } : field
+          )
+        }}
+        onChange={() => undefined}
+        muiOptions={{
+          inputFullWidth: true,
+          buttonFullWidth: false,
+          fieldEditorOptions: { description: "hidden" }
+        }}
+        localizationOptions={{ defaultLocaleControl: "readOnly" }}
+      />
+    );
+
+    expect(screen.queryByRole("textbox", { name: "Description" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Default locale" })).not.toBeInTheDocument();
+    expect(screen.getByText("en")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "ja" }));
+    expect(screen.queryByRole("textbox", { name: "Translated description" })).not.toBeInTheDocument();
+    const formTitle = screen.getByRole("textbox", { name: "Form title" });
+    expect(formTitle.closest(".MuiTextField-root")).toHaveClass("MuiFormControl-fullWidth");
+    expect(screen.getByRole("button", { name: "Add question" })).not.toHaveClass("MuiButton-fullWidth");
+  });
+
+  it("supports read-only descriptions and a fully hidden default-locale control", async () => {
+    const user = userEvent.setup();
+    render(
+      <MuiFormBuilder
+        schema={{
+          ...schema,
+          fields: schema.fields.map((field, index) =>
+            index === 0 ? { ...field, description: "Source description" } : field
+          )
+        }}
+        onChange={() => undefined}
+        muiOptions={{ fieldEditorOptions: { description: "readOnly" } }}
+        localizationOptions={{ defaultLocaleControl: "hidden" }}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "Description" })).toHaveAttribute("readonly");
+    expect(screen.queryByRole("textbox", { name: "Default locale" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Default locale")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "ja" }));
+    expect(screen.getByRole("textbox", { name: "Translated description" })).toHaveAttribute("readonly");
+  });
+
+  it("preserves controlled input focus and accordion state when inline options change identity", async () => {
+    const user = userEvent.setup();
+    render(<InlineOptionsControlledHarness />);
+
+    const accordion = screen.getByRole("button", { name: "Localization" });
+    await user.click(accordion);
+    expect(accordion).toHaveAttribute("aria-expanded", "true");
+    const fieldEditor = screen.getByText("Choice").closest<HTMLElement>('[data-mui-slot="field-editor"]');
+    expect(fieldEditor).not.toBeNull();
+    if (fieldEditor === null) return;
+    const titleInput = within(fieldEditor).getByRole("textbox", { name: "質問文 / Question Title" });
+    await user.type(titleInput, " Hello World");
+
+    expect(titleInput).toHaveValue("Choice Hello World");
+    expect(titleInput).toHaveFocus();
+    expect(within(fieldEditor).getByRole("textbox", { name: "質問文 / Question Title" })).toBe(titleInput);
+    expect(screen.getByRole("button", { name: "Localization" })).toBe(accordion);
+    expect(accordion).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("focus-schema-state")).toHaveTextContent("Choice Hello World");
   });
 
   it("exports low-level builder props and individual adapter factories", () => {

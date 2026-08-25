@@ -8,13 +8,37 @@ import {
   createMuiSectionAdapter,
   createMuiSelectAdapter,
   createMuiTextAreaAdapter,
-  createMuiTextInputAdapter
+  createMuiTextInputAdapter,
+  MuiButtonAdapter,
+  MuiCheckboxAdapter,
+  MuiErrorMessageAdapter,
+  MuiFieldsetAdapter,
+  MuiIconButtonAdapter,
+  MuiSectionAdapter,
+  MuiSelectAdapter,
+  MuiTextAreaAdapter,
+  MuiTextInputAdapter
 } from "./adapters";
 import { muiDefaultIconResolver } from "./icons";
 import type { MuiAdapterOptions } from "./types";
 
 function isAdapterOptions(value: MuiAdapterOptions | Partial<FormBuilderComponents>): value is MuiAdapterOptions {
-  return "size" in value || "variant" in value || "buttonVariant" in value || "fullWidth" in value || "dense" in value;
+  return (
+    "size" in value ||
+    "variant" in value ||
+    "buttonVariant" in value ||
+    "buttonVariants" in value ||
+    "fullWidth" in value ||
+    "inputFullWidth" in value ||
+    "buttonFullWidth" in value ||
+    "dense" in value ||
+    "fieldEditorOptions" in value ||
+    "localizationOptions" in value ||
+    "layoutOptions" in value ||
+    "muiSlotProps" in value ||
+    "getLocaleLabel" in value ||
+    "getActionLabel" in value
+  );
 }
 
 function buildMuiBuilderComponents(options?: MuiAdapterOptions): FormBuilderComponents {
@@ -32,7 +56,18 @@ function buildMuiBuilderComponents(options?: MuiAdapterOptions): FormBuilderComp
   };
 }
 
-export const muiBuilderComponents: FormBuilderComponents = buildMuiBuilderComponents();
+export const muiBuilderComponents: FormBuilderComponents = {
+  Button: MuiButtonAdapter,
+  IconButton: MuiIconButtonAdapter,
+  TextInput: MuiTextInputAdapter,
+  TextArea: MuiTextAreaAdapter,
+  Select: MuiSelectAdapter,
+  Checkbox: MuiCheckboxAdapter,
+  Section: MuiSectionAdapter,
+  Fieldset: MuiFieldsetAdapter,
+  ErrorMessage: MuiErrorMessageAdapter,
+  renderIcon: muiDefaultIconResolver
+};
 
 export function createMuiBuilderComponents(customOverrides?: Partial<FormBuilderComponents>): FormBuilderComponents;
 export function createMuiBuilderComponents(
@@ -45,5 +80,5 @@ export function createMuiBuilderComponents(
 ): FormBuilderComponents {
   const options = isAdapterOptions(optionsOrOverrides) ? optionsOrOverrides : undefined;
   const overrides = customOverrides ?? (options === undefined ? optionsOrOverrides : {});
-  return { ...buildMuiBuilderComponents(options), ...overrides };
+  return { ...(options === undefined ? muiBuilderComponents : buildMuiBuilderComponents(options)), ...overrides };
 }

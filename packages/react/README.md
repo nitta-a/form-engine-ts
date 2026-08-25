@@ -81,6 +81,11 @@ relevant feature state, while localization slots receive policy and translation-
 editors remain unchanged. A slot collection can set `sectionOrder` to arrange `basicSettings`, `completionMessage`,
 `questions`, `addQuestion`, and `localization` as independent authoring sections.
 
+Slot actions include `setManualTranslation(locale, target, property, text)`. It resolves the target's source text and
+existing translation metadata, invokes `createManualTranslationMetadata`, and then stores the translated text and
+generated metadata together. Custom field, page, option, and localization slots should use this action for user-edited
+translations; `setLocaleTranslation` remains available for callers that already provide explicit metadata.
+
 Input primitives receive design-system-friendly `name`, `label`, `required`, `error`, and `helperText` props in addition
 to their normalized string-value callbacks. The `translationActions` slot also receives `translationError`, the latest
 `translationReport`, and `onClearTranslationError`, allowing a custom MUI action surface to represent the complete
@@ -114,8 +119,8 @@ own labels. Builder action icons can be supplied with `renderIcon`, which resolv
     renderHeader: ({ title }) => <MyHeader>{title}</MyHeader>,
     renderPageHeader: ({ page }) => <MyPageHeader page={page} />,
     renderField: (props) => <MyField {...props} />,
-    renderSubmitButton: ({ isSubmitting, onSubmit }) => (
-      <MyButton disabled={isSubmitting} onClick={onSubmit}>Save</MyButton>
+    renderSubmitButton: ({ isSubmitting, disabled, onSubmit }) => (
+      <MyButton loading={isSubmitting} disabled={disabled} onClick={onSubmit}>Save</MyButton>
     ),
     renderSubmitError: ({ error, onRetry }) => <MyError error={error} onRetry={onRetry} />
   }}
@@ -124,7 +129,11 @@ own labels. Builder action icons can be supplied with `renderIcon`, which resolv
 
 Validation runs before `beforeSubmit`. A `"cancel"` result does not call `onSubmit` and preserves values and drafts.
 Header, page-header, field, navigation, submit, validation-summary, completion, and submit-error slots can replace the
-default UI. The localized `completionMessage` is displayed after a successful submission.
+default UI. The localized `completionMessage` is displayed after a successful submission. Set
+`successRenderMode="replace"` to remove the questions, navigation, and submit button after success and focus the
+completion status region; the default `"append"` mode preserves the existing form UI. `hideFormOnSuccess` is retained
+as a deprecated alias for `successRenderMode="replace"`. The submit-button slot receives `submitStatus` and `disabled`
+in addition to `isSubmitting` and `onSubmit`.
 
 Pass ordered `submissionGuards` to allow, block, or require confirmation before `onSubmit`. Confirmation receives all
 guard findings through `renderSubmissionConfirmation`. A `receiptStore` prevents accidental repeat submissions and can

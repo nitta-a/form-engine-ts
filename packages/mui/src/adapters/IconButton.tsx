@@ -1,8 +1,8 @@
 import type { BuilderActionIconType, BuilderIconButtonProps } from "@form-engine-ts/react";
 import { IconButton, Tooltip } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 const FALLBACK_ACTION_LABELS: Readonly<Record<BuilderActionIconType, string>> = {
   moveUp: "Move up",
@@ -17,7 +17,6 @@ const FALLBACK_ACTION_LABELS: Readonly<Record<BuilderActionIconType, string>> = 
 };
 
 export function createMuiIconButtonAdapter(options?: MuiAdapterOptions): ComponentType<BuilderIconButtonProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiIconButton({
     id,
     className,
@@ -31,6 +30,7 @@ export function createMuiIconButtonAdapter(options?: MuiAdapterOptions): Compone
     actionType,
     title
   }: BuilderIconButtonProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     const actionLabel =
       actionType === undefined
         ? "Action"

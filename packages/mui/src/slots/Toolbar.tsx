@@ -1,11 +1,10 @@
 import type { BuilderToolbarSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
 import { Stack } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiToolbarSlot(options?: MuiAdapterOptions): ComponentType<BuilderToolbarSlotProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiToolbar({
     kind,
     index,
@@ -18,6 +17,7 @@ export function createMuiToolbarSlot(options?: MuiAdapterOptions): ComponentType
     components,
     translate
   }: BuilderToolbarSlotProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     const { IconButton } = components;
     return (
       <Stack

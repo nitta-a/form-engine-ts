@@ -12,6 +12,11 @@ export interface MuiLayoutOptions {
 export interface MuiLocalizationOptions {
   readonly collapsible?: boolean;
   readonly defaultExpanded?: boolean | "when-configured";
+  readonly defaultLocaleControl?: "editable" | "readOnly" | "hidden";
+}
+
+export interface MuiFieldEditorOptions {
+  readonly description?: "editable" | "readOnly" | "hidden";
 }
 
 export interface MuiBuilderSlotProps {
@@ -31,10 +36,13 @@ export interface MuiAdapterOptions {
     readonly danger?: MuiButtonVariant;
   };
   readonly fullWidth?: boolean;
+  readonly inputFullWidth?: boolean;
+  readonly buttonFullWidth?: boolean;
   readonly dense?: boolean;
   readonly getLocaleLabel?: (locale: string) => string;
   readonly getActionLabel?: (actionType: BuilderActionIconType) => string;
   readonly layoutOptions?: MuiLayoutOptions;
+  readonly fieldEditorOptions?: MuiFieldEditorOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
   readonly muiSlotProps?: MuiBuilderSlotProps;
 }
@@ -49,10 +57,13 @@ export interface ResolvedMuiAdapterOptions {
     readonly danger: MuiButtonVariant;
   };
   readonly fullWidth: boolean;
+  readonly inputFullWidth?: boolean;
+  readonly buttonFullWidth?: boolean;
   readonly dense: boolean;
   readonly getLocaleLabel?: (locale: string) => string;
   readonly getActionLabel?: (actionType: BuilderActionIconType) => string;
   readonly layoutOptions?: MuiLayoutOptions;
+  readonly fieldEditorOptions?: MuiFieldEditorOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
   readonly muiSlotProps?: MuiBuilderSlotProps;
 }
@@ -76,13 +87,19 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
       danger: options.buttonVariants?.danger ?? buttonVariant
     },
     fullWidth: options.fullWidth ?? true,
+    inputFullWidth: options.inputFullWidth ?? options.fullWidth ?? true,
+    buttonFullWidth: options.buttonFullWidth ?? options.fullWidth ?? false,
     dense: options.dense ?? false,
     getLocaleLabel: options.getLocaleLabel ?? ((locale) => locale),
     ...(options.getActionLabel === undefined ? {} : { getActionLabel: options.getActionLabel }),
     layoutOptions: options.layoutOptions ?? {},
+    fieldEditorOptions: {
+      description: options.fieldEditorOptions?.description ?? "editable"
+    },
     localizationOptions: {
       collapsible: options.localizationOptions?.collapsible ?? false,
-      defaultExpanded: options.localizationOptions?.defaultExpanded ?? false
+      defaultExpanded: options.localizationOptions?.defaultExpanded ?? false,
+      defaultLocaleControl: options.localizationOptions?.defaultLocaleControl ?? "editable"
     },
     muiSlotProps: options.muiSlotProps ?? {}
   };

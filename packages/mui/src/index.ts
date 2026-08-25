@@ -1,6 +1,7 @@
 export * from "./adapters";
 export * from "./builderProps";
 export * from "./components";
+export * from "./context";
 export * from "./icons";
 export * from "./MuiFormBuilder";
 export * from "./slots";

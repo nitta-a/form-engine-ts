@@ -1,11 +1,10 @@
 import type { BuilderTextInputProps } from "@form-engine-ts/react";
 import { TextField } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiTextInputAdapter(options?: MuiAdapterOptions): ComponentType<BuilderTextInputProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiTextInput({
     id,
     className,
@@ -29,6 +28,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
     max,
     step
   }: BuilderTextInputProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     return (
       <TextField
         id={id}
@@ -47,6 +47,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
             max,
             step,
             inputMode,
+            readOnly,
             "aria-label": ariaLabel,
             "aria-describedby": ariaDescribedBy,
             "aria-labelledby": ariaLabelledBy
@@ -56,7 +57,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
         }}
         type={type}
         placeholder={placeholder}
-        fullWidth={resolved.fullWidth}
+        fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
         size={resolved.size}
         variant={resolved.variant}
         onChange={(event) => onChange(event.currentTarget.value)}

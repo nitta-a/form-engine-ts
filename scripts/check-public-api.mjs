@@ -62,6 +62,35 @@ function isOptional(node) {
   return node.questionToken !== undefined || node.initializer !== undefined;
 }
 
+function resolveObjectMembers(node, sourceFile, seen = new Set()) {
+  if (node === undefined) return undefined;
+  if (ts.isTypeLiteralNode(node)) return node.members;
+  if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName) || seen.has(node.typeName.text)) {
+    return undefined;
+  }
+  seen.add(node.typeName.text);
+  const declaration = sourceFile.statements.find((statement) => declarationName(statement) === node.typeName.text);
+  if (ts.isInterfaceDeclaration(declaration)) return declaration.members;
+  if (ts.isTypeAliasDeclaration(declaration)) return resolveObjectMembers(declaration.type, sourceFile, seen);
+  return undefined;
+}
+
+function isAdditiveObjectParameter(previousType, currentType, previousFile, currentFile) {
+  const previousMembers = resolveObjectMembers(previousType, previousFile);
+  const currentMembers = resolveObjectMembers(currentType, currentFile);
+  if (previousMembers === undefined || currentMembers === undefined) return false;
+  const currentByName = new Map(
+    currentMembers
+      .filter((member) => member.name !== undefined)
+      .map((member) => [compactText(member.name, currentFile), member])
+  );
+  return previousMembers.every((member) => {
+    if (member.name === undefined) return false;
+    const currentMember = currentByName.get(compactText(member.name, previousFile));
+    return currentMember !== undefined && compactText(member, previousFile) === compactText(currentMember, currentFile);
+  });
+}
+
 function compareSignatures(name, previous, current, previousFile, currentFile) {
   const changes = [];
   const previousTypeParameters =
@@ -80,7 +109,8 @@ function compareSignatures(name, previous, current, previousFile, currentFile) {
     const oldType = oldParameter.type === undefined ? "unknown" : compactText(oldParameter.type, previousFile);
     const newType = newParameter.type === undefined ? "unknown" : compactText(newParameter.type, currentFile);
     if (
-      oldType !== newType ||
+      (oldType !== newType &&
+        !isAdditiveObjectParameter(oldParameter.type, newParameter.type, previousFile, currentFile)) ||
       (oldParameter.dotDotDotToken !== undefined) !== (newParameter.dotDotDotToken !== undefined)
     ) {
       changes.push(`${name}: parameter ${index + 1} changed from ${oldType} to ${newType}`);

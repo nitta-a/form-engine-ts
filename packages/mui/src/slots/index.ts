@@ -1,9 +1,9 @@
 import type { FormBuilderSlots } from "@form-engine-ts/react";
 import { DEFAULT_MUI_SECTION_ORDER, type MuiAdapterOptions } from "../types";
-import { createMuiFieldEditorSlot } from "./FieldEditor";
-import { createMuiLocalizationSlot } from "./Localization";
-import { createMuiOptionEditorSlot } from "./OptionEditor";
-import { createMuiToolbarSlot } from "./Toolbar";
+import { createMuiFieldEditorSlot, MuiFieldEditorSlot } from "./FieldEditor";
+import { createMuiLocalizationSlot, MuiLocalizationSlot } from "./Localization";
+import { createMuiOptionEditorSlot, MuiOptionEditorSlot } from "./OptionEditor";
+import { createMuiToolbarSlot, MuiToolbarSlot } from "./Toolbar";
 
 export * from "./FieldEditor";
 export * from "./Localization";
@@ -12,10 +12,10 @@ export * from "./Toolbar";
 
 export const muiBuilderSlots: FormBuilderSlots = {
   sectionOrder: DEFAULT_MUI_SECTION_ORDER,
-  toolbar: createMuiToolbarSlot(),
-  fieldEditor: createMuiFieldEditorSlot(),
-  optionEditor: createMuiOptionEditorSlot(),
-  localization: createMuiLocalizationSlot()
+  toolbar: MuiToolbarSlot,
+  fieldEditor: MuiFieldEditorSlot,
+  optionEditor: MuiOptionEditorSlot,
+  localization: MuiLocalizationSlot
 };
 
 export function createMuiBuilderSlots(

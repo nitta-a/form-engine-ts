@@ -186,7 +186,7 @@ describe("v2.8 React authoring and receipts", () => {
     blocked.unmount();
 
     const store = createReceiptStore();
-    render(
+    const view = render(
       <FormRenderer
         schema={schema}
         translator={protectionTranslator}
@@ -199,6 +199,16 @@ describe("v2.8 React authoring and receipts", () => {
     expect(await screen.findByRole("dialog")).toHaveTextContent("Localized confirmation");
     expect(screen.getByRole("button", { name: "Localized cancel" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Localized confirm" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Submitted.");
+    view.unmount();
+    render(
+      <FormRenderer
+        schema={schema}
+        translator={protectionTranslator}
+        onSubmit={() => ({ submissionId: "localized-28" })}
+        receiptStore={store}
+      />
+    );
     expect(await screen.findByRole("status")).toHaveTextContent("Localized already submitted");
   });
 });

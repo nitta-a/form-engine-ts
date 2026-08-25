@@ -12,7 +12,7 @@ import type {
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import type { ComponentType, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import type { SubmissionAttemptStore } from "./attempt";
-import type { FormBuilderResult } from "./hooks/useFormBuilder";
+import type { BuilderActionResult, FormBuilderResult } from "./hooks/useFormBuilder";
 import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
 
 export interface ComponentBaseProps {
@@ -140,10 +140,24 @@ export interface FormBuilderComponents {
 
 export type FormBuilderActions = Omit<FormBuilderResult, "schema" | "validationIssues">;
 
+export interface ManualTranslationTarget {
+  readonly kind: "form" | "page" | "field" | "option";
+  readonly id?: string;
+}
+
+export interface BuilderSlotActions extends FormBuilderActions {
+  readonly setManualTranslation: (
+    locale: string,
+    target: ManualTranslationTarget,
+    property: "title" | "description" | "label" | "completionMessage",
+    text: string
+  ) => BuilderActionResult;
+}
+
 interface BuilderSlotBaseProps {
   readonly schema: FormSchema;
   readonly readOnly: boolean;
-  readonly actions: FormBuilderActions;
+  readonly actions: BuilderSlotActions;
   readonly components: Required<FormBuilderComponents>;
   readonly translate: (key: string, params?: Record<string, unknown>) => string;
 }
@@ -244,7 +258,8 @@ export interface BuilderActionContext {
     | "setDefaultLocale"
     | "setDisplayCondition"
     | "setSourceText"
-    | "setLocaleTranslation";
+    | "setLocaleTranslation"
+    | "setManualTranslation";
   readonly targetId?: string;
   readonly params?: Record<string, unknown>;
 }
@@ -284,7 +299,19 @@ export type SubmissionGuard = (
   values: Record<string, unknown>
 ) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
 
+export type FormSuccessRenderMode = "append" | "replace";
+
+export type FormSubmitStatus = "idle" | "submitting" | "confirming" | "success" | "error";
+
+/** @deprecated Use FormSubmitStatus instead. */
 export type FormSubmitState = "idle" | "submitting" | "confirming" | "success" | "error";
+
+export interface RenderSubmitButtonProps {
+  readonly isSubmitting: boolean;
+  readonly submitStatus: FormSubmitStatus;
+  readonly disabled: boolean;
+  readonly onSubmit: () => void;
+}
 
 export interface SubmissionConfirmationSlotProps {
   readonly findings: readonly SensitiveDataFinding[];
@@ -316,7 +343,7 @@ export interface FormRendererSlots {
     readonly onPrev: () => void;
     readonly onNext: () => void;
   }) => ReactNode;
-  readonly renderSubmitButton?: (props: { readonly isSubmitting: boolean; readonly onSubmit: () => void }) => ReactNode;
+  readonly renderSubmitButton?: (props: RenderSubmitButtonProps) => ReactNode;
   readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
   readonly renderCompletion?: (props: { readonly message: string }) => ReactNode;
   readonly renderSubmitError?: (props: { readonly error: Error; readonly onRetry?: () => void }) => ReactNode;

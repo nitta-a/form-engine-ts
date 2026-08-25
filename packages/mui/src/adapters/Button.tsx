@@ -1,11 +1,10 @@
 import type { BuilderButtonProps } from "@form-engine-ts/react";
 import { Button } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentType<BuilderButtonProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiButton({
     id,
     className,
@@ -21,6 +20,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
     action,
     targetId
   }: BuilderButtonProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     return (
       <Button
         id={id}
@@ -37,7 +37,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
         onClick={onClick}
         color={variant === "danger" ? "error" : "primary"}
         variant={resolved.buttonVariants?.[variant ?? "primary"] ?? resolved.buttonVariant}
-        fullWidth={resolved.fullWidth}
+        fullWidth={resolved.buttonFullWidth ?? false}
       >
         {children}
       </Button>

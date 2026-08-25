@@ -229,10 +229,17 @@ interface FormBuilderComponents {
     readonly renderIcon?: (actionType: BuilderActionIconType) => ReactNode;
 }
 type FormBuilderActions = Omit<FormBuilderResult, "schema" | "validationIssues">;
+interface ManualTranslationTarget {
+    readonly kind: "form" | "page" | "field" | "option";
+    readonly id?: string;
+}
+interface BuilderSlotActions extends FormBuilderActions {
+    readonly setManualTranslation: (locale: string, target: ManualTranslationTarget, property: "title" | "description" | "label" | "completionMessage", text: string) => BuilderActionResult;
+}
 interface BuilderSlotBaseProps {
     readonly schema: FormSchema;
     readonly readOnly: boolean;
-    readonly actions: FormBuilderActions;
+    readonly actions: BuilderSlotActions;
     readonly components: Required<FormBuilderComponents>;
     readonly translate: (key: string, params?: Record<string, unknown>) => string;
 }
@@ -302,7 +309,7 @@ interface FormBuilderSlots {
     readonly sectionOrder?: readonly FormBuilderSectionName[];
 }
 interface BuilderActionContext {
-    readonly action: "addField" | "removeField" | "moveField" | "changeFieldType" | "updateField" | "addOption" | "removeOption" | "moveOption" | "updateOption" | "addPage" | "removePage" | "movePage" | "updatePage" | "assignFieldToPage" | "addLocale" | "setDefaultLocale" | "setDisplayCondition" | "setSourceText" | "setLocaleTranslation";
+    readonly action: "addField" | "removeField" | "moveField" | "changeFieldType" | "updateField" | "addOption" | "removeOption" | "moveOption" | "updateOption" | "addPage" | "removePage" | "movePage" | "updatePage" | "assignFieldToPage" | "addLocale" | "setDefaultLocale" | "setDisplayCondition" | "setSourceText" | "setLocaleTranslation" | "setManualTranslation";
     readonly targetId?: string;
     readonly params?: Record<string, unknown>;
 }
@@ -344,7 +351,16 @@ type SubmissionGuardResult = {
     readonly message?: string;
 };
 type SubmissionGuard = (schema: FormSchema, values: Record<string, unknown>) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
+type FormSuccessRenderMode = "append" | "replace";
+type FormSubmitStatus = "idle" | "submitting" | "confirming" | "success" | "error";
+/** @deprecated Use FormSubmitStatus instead. */
 type FormSubmitState = "idle" | "submitting" | "confirming" | "success" | "error";
+interface RenderSubmitButtonProps {
+    readonly isSubmitting: boolean;
+    readonly submitStatus: FormSubmitStatus;
+    readonly disabled: boolean;
+    readonly onSubmit: () => void;
+}
 interface SubmissionConfirmationSlotProps {
     readonly findings: readonly SensitiveDataFinding[];
     readonly message?: string;
@@ -377,10 +393,7 @@ interface FormRendererSlots {
         readonly onPrev: () => void;
         readonly onNext: () => void;
     }) => ReactNode;
-    readonly renderSubmitButton?: (props: {
-        readonly isSubmitting: boolean;
-        readonly onSubmit: () => void;
-    }) => ReactNode;
+    readonly renderSubmitButton?: (props: RenderSubmitButtonProps) => ReactNode;
     readonly renderValidationSummary?: (props: {
         readonly issues: readonly ValidationError[];
     }) => ReactNode;
@@ -494,6 +507,13 @@ type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentPro
 interface FormRendererPresentationProps extends SubmissionProtectionProps {
     readonly components?: FieldComponents;
     readonly className?: string;
+    /**
+     * Controls where the completion message is rendered after a successful submission.
+     * Defaults to "append" for backwards compatibility.
+     */
+    readonly successRenderMode?: FormSuccessRenderMode;
+    /** @deprecated Use successRenderMode="replace" instead. */
+    readonly hideFormOnSuccess?: boolean;
     readonly successMessageKey?: string;
     readonly errorMessageKey?: string;
     readonly autoSaveKey?: string;
@@ -512,4 +532,4 @@ interface StandaloneFormRendererProps extends FormRendererPresentationProps {
 type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
 declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
 
-export { type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldState, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormContextValue, FormProvider, type FormProviderProps, FormRenderer, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlots, type FormSubmitHandler, type FormSubmitState, type IconButtonProps, type InputComponentProps, type ManualTranslationContext, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, resolveInitialFieldType, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };
+export { type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldState, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormContextValue, FormProvider, type FormProviderProps, FormRenderer, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlots, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSuccessRenderMode, type IconButtonProps, type InputComponentProps, type ManualTranslationContext, type ManualTranslationTarget, type RenderSubmitButtonProps, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, resolveInitialFieldType, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };

@@ -2,11 +2,10 @@ import type { BuilderSelectProps } from "@form-engine-ts/react";
 import { FormControl, FormHelperText, InputLabel, MenuItem, Select } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material/Select";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 
 export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentType<BuilderSelectProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   return function MuiSelect({
     id,
     className,
@@ -24,12 +23,13 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
     onChange,
     options: selectOptions
   }: BuilderSelectProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     const labelId = id === undefined || label === undefined ? undefined : `${id}-label`;
     const handleChange = (event: SelectChangeEvent<string>) => onChange(event.target.value);
     return (
       <FormControl
         className={className}
-        fullWidth={resolved.fullWidth}
+        fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
         size={resolved.size}
         variant={resolved.variant}
         error={Boolean(error)}

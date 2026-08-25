@@ -2,8 +2,8 @@ import type { ConditionOperator, FieldType, FormField } from "@form-engine-ts/co
 import type { BuilderFieldEditorSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
 import { Card, Stack, Typography } from "@mui/material";
 import type { ComponentType } from "react";
+import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
-import { resolveMuiAdapterOptions } from "../types";
 import { createMuiOptionEditorSlot } from "./OptionEditor";
 import { createMuiToolbarSlot } from "./Toolbar";
 
@@ -49,7 +49,6 @@ function updateBound(field: FormField, property: "min" | "max", value: string): 
 }
 
 export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): ComponentType<BuilderFieldEditorSlotProps> {
-  const resolved = resolveMuiAdapterOptions(options);
   const Toolbar = createMuiToolbarSlot(options);
   const OptionEditor = createMuiOptionEditorSlot(options);
   return function MuiFieldEditor({
@@ -64,12 +63,14 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     components,
     translate
   }: BuilderFieldEditorSlotProps) {
+    const resolved = useResolvedMuiAdapterOptions(options);
     const { Button, Checkbox, Select, TextArea, TextInput } = components;
     const allowedTypes = policy?.allowedFieldTypes ?? FIELD_TYPES;
     const pageId = schema.pages?.find((page) => page.questionIds.includes(field.id))?.id ?? "";
     const condition = field.displayCondition;
     const conditionSources = schema.fields.slice(0, index);
     const conditionSource = conditionSources.find((source) => source.id === condition?.questionId);
+    const descriptionMode = resolved.fieldEditorOptions?.description ?? "editable";
     const titleErrorId = field.title.trim().length === 0 ? `mui-field-${field.id}-title-error` : undefined;
     return (
       <Card
@@ -125,15 +126,18 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               }}
             />
           </Stack>
-          <TextArea
-            id={`mui-field-${field.id}-description`}
-            name={`fields.${field.id}.description`}
-            label={translate("builder.description")}
-            value={field.description ?? ""}
-            rows={resolved.dense ? 2 : 3}
-            disabled={readOnly}
-            onChange={(value) => actions.setSourceText({ kind: "field", id: field.id }, "description", value)}
-          />
+          {descriptionMode === "hidden" ? null : (
+            <TextArea
+              id={`mui-field-${field.id}-description`}
+              name={`fields.${field.id}.description`}
+              label={translate("builder.description")}
+              value={field.description ?? ""}
+              rows={resolved.dense ? 2 : 3}
+              disabled={readOnly}
+              readOnly={descriptionMode === "readOnly"}
+              onChange={(value) => actions.setSourceText({ kind: "field", id: field.id }, "description", value)}
+            />
+          )}
           <Checkbox
             id={`mui-field-${field.id}-required`}
             name={`fields.${field.id}.required`}
@@ -239,18 +243,21 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                 value={field.translations?.[currentLocale]?.title ?? ""}
                 disabled={readOnly}
                 onChange={(value) =>
-                  actions.setLocaleTranslation(currentLocale, { kind: "field", id: field.id }, "title", value)
+                  actions.setManualTranslation(currentLocale, { kind: "field", id: field.id }, "title", value)
                 }
               />
-              <TextArea
-                id={`mui-field-${field.id}-${currentLocale}-description`}
-                label={translate("builder.translatedDescription")}
-                value={field.translations?.[currentLocale]?.description ?? ""}
-                disabled={readOnly}
-                onChange={(value) =>
-                  actions.setLocaleTranslation(currentLocale, { kind: "field", id: field.id }, "description", value)
-                }
-              />
+              {descriptionMode === "hidden" ? null : (
+                <TextArea
+                  id={`mui-field-${field.id}-${currentLocale}-description`}
+                  label={translate("builder.translatedDescription")}
+                  value={field.translations?.[currentLocale]?.description ?? ""}
+                  disabled={readOnly}
+                  readOnly={descriptionMode === "readOnly"}
+                  onChange={(value) =>
+                    actions.setManualTranslation(currentLocale, { kind: "field", id: field.id }, "description", value)
+                  }
+                />
+              )}
             </Stack>
           )}
           {"options" in field ? (

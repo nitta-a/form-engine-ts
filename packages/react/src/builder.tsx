@@ -34,13 +34,14 @@ import type {
   BuilderIconButtonProps,
   BuilderSectionProps,
   BuilderSelectProps,
+  BuilderSlotActions,
   BuilderTextAreaProps,
   BuilderTextInputProps,
-  FormBuilderActions,
   FormBuilderComponents,
   FormBuilderSectionName,
   FormBuilderSlots,
-  ManualTranslationContext
+  ManualTranslationContext,
+  ManualTranslationTarget
 } from "./types";
 
 function DefaultButton({
@@ -390,7 +391,7 @@ function BuilderButton(props: BuilderButtonProps) {
       {...props}
       className={primitiveClassName(props.className, "feb-button", context.unstyled)}
       disabled={context.readOnly || props.disabled === true}
-      readOnly={context.readOnly}
+      readOnly={context.readOnly || props.readOnly === true}
     />
   );
 }
@@ -408,7 +409,7 @@ function BuilderIconButton(props: BuilderIconButtonProps) {
       icon={icon}
       className={primitiveClassName(props.className, "feb-icon-button", context.unstyled)}
       disabled={context.readOnly || props.disabled === true}
-      readOnly={context.readOnly}
+      readOnly={context.readOnly || props.readOnly === true}
     />
   );
 }
@@ -421,7 +422,7 @@ function BuilderTextInput(props: BuilderTextInputProps) {
       {...props}
       className={primitiveClassName(props.className, "feb-input", context.unstyled)}
       disabled={context.readOnly || props.disabled === true}
-      readOnly={context.readOnly}
+      readOnly={context.readOnly || props.readOnly === true}
     />
   );
 }
@@ -434,7 +435,7 @@ function BuilderTextArea(props: BuilderTextAreaProps) {
       {...props}
       className={primitiveClassName(props.className, "feb-textarea", context.unstyled)}
       disabled={context.readOnly || props.disabled === true}
-      readOnly={context.readOnly}
+      readOnly={context.readOnly || props.readOnly === true}
     />
   );
 }
@@ -447,7 +448,7 @@ function BuilderSelect(props: BuilderSelectProps) {
       {...props}
       className={primitiveClassName(props.className, "feb-select", context.unstyled)}
       disabled={context.readOnly || props.disabled === true}
-      readOnly={context.readOnly}
+      readOnly={context.readOnly || props.readOnly === true}
     />
   );
 }
@@ -460,7 +461,7 @@ function BuilderCheckbox(props: BuilderCheckboxProps) {
       {...props}
       className={primitiveClassName(props.className, "feb-checkbox", context.unstyled)}
       disabled={context.readOnly || props.disabled === true}
-      readOnly={context.readOnly}
+      readOnly={context.readOnly || props.readOnly === true}
     />
   );
 }
@@ -631,6 +632,77 @@ function fieldTypeKey(type: FieldType): string {
 
 function operatorKey(operator: ConditionOperator): string {
   return `builder.operator.${operator}`;
+}
+
+function manualTranslationContext(
+  schema: FormSchema,
+  locale: string,
+  target: ManualTranslationTarget,
+  property: "title" | "description" | "label" | "completionMessage",
+  translatedText: string
+): ManualTranslationContext | undefined {
+  if (target.kind === "form") {
+    if (property !== "title" && property !== "description" && property !== "completionMessage") return undefined;
+    return {
+      locale,
+      kind: "form",
+      nodeId: schema.id,
+      property,
+      sourceText: schema[property] ?? "",
+      translatedText,
+      ...(schema.translationMetadata?.[locale]?.[property] === undefined
+        ? {}
+        : { existingTranslationMetadata: schema.translationMetadata[locale]?.[property] })
+    };
+  }
+  if (target.id === undefined) return undefined;
+  if (target.kind === "field") {
+    const field = schema.fields.find((candidate) => candidate.id === target.id);
+    if (field === undefined || (property !== "title" && property !== "description")) return undefined;
+    return {
+      locale,
+      kind: "field",
+      nodeId: field.id,
+      property,
+      sourceText: field[property] ?? "",
+      translatedText,
+      ...(field.translationMetadata?.[locale]?.[property] === undefined
+        ? {}
+        : { existingTranslationMetadata: field.translationMetadata[locale]?.[property] })
+    };
+  }
+  if (target.kind === "page") {
+    const page = schema.pages?.find((candidate) => candidate.id === target.id);
+    if (page === undefined || (property !== "title" && property !== "description")) return undefined;
+    return {
+      locale,
+      kind: "page",
+      nodeId: page.id,
+      property,
+      sourceText: page[property] ?? "",
+      translatedText,
+      ...(page.translationMetadata?.[locale]?.[property] === undefined
+        ? {}
+        : { existingTranslationMetadata: page.translationMetadata[locale]?.[property] })
+    };
+  }
+  if (property !== "label") return undefined;
+  const option = schema.fields
+    .filter((field) => "options" in field)
+    .flatMap((field) => field.options)
+    .find((candidate) => candidate.id === target.id);
+  if (option === undefined) return undefined;
+  return {
+    locale,
+    kind: "option",
+    nodeId: option.id,
+    property,
+    sourceText: option.label,
+    translatedText,
+    ...(option.translationMetadata?.[locale]?.[property] === undefined
+      ? {}
+      : { existingTranslationMetadata: option.translationMetadata[locale]?.[property] })
+  };
 }
 
 function defaultConditionValue(field: FormField): ConditionValue {
@@ -954,26 +1026,37 @@ export function FormBuilder({
     }
   };
 
-  const updateManualTranslation = (context: ManualTranslationContext) => {
-    if (readOnly) return;
-    const metadata = createManualTranslationMetadata?.(context);
-    const target =
-      context.kind === "form" ? ({ kind: "form" } as const) : ({ kind: context.kind, id: context.nodeId } as const);
-    executeAction(
+  const setManualTranslation = (
+    targetLocale: string,
+    target: ManualTranslationTarget,
+    property: "title" | "description" | "label" | "completionMessage",
+    text: string
+  ): BuilderActionResult => {
+    if (readOnly) return { success: true };
+    const normalizedLocale = targetLocale.trim();
+    const context = manualTranslationContext(schema, normalizedLocale, target, property, text);
+    const metadata = context === undefined ? undefined : createManualTranslationMetadata?.(context);
+    return executeAction(
       () =>
         headless.setLocaleTranslation(
-          context.locale,
+          normalizedLocale,
           target,
-          context.property,
-          context.translatedText,
+          property,
+          text,
           metadata === undefined ? undefined : { metadata }
         ),
       {
-        action: "setLocaleTranslation",
-        targetId: context.nodeId,
-        params: { locale: context.locale, kind: context.kind, property: context.property }
+        action: "setManualTranslation",
+        ...(target.id === undefined ? {} : { targetId: target.id }),
+        params: { locale: normalizedLocale, kind: target.kind, property }
       }
     );
+  };
+
+  const updateManualTranslation = (context: ManualTranslationContext) => {
+    const target: ManualTranslationTarget =
+      context.kind === "form" ? { kind: "form" } : { kind: context.kind, id: context.nodeId };
+    setManualTranslation(context.locale, target, context.property, context.translatedText);
   };
 
   const updateFormTranslation = (property: "title" | "description" | "completionMessage", translatedText: string) => {
@@ -1029,7 +1112,7 @@ export function FormBuilder({
   ]);
   const availableAllowedLocales = policy?.allowedLocales?.filter((candidate) => !registeredLocales.has(candidate));
   const localeLimitReached = policy?.maxLocales !== undefined && registeredLocales.size >= policy.maxLocales;
-  const actions: FormBuilderActions = {
+  const actions: BuilderSlotActions = {
     addField: (type, pageId) =>
       executeAction(() => headless.addField(type, pageId), {
         action: "addField",
@@ -1110,6 +1193,7 @@ export function FormBuilder({
         ...(target.id === undefined ? {} : { targetId: target.id }),
         params: { locale: targetLocale, property }
       }),
+    setManualTranslation,
     addLocale: (targetLocale) =>
       executeAction(() => headless.addLocale(targetLocale), {
         action: "addLocale",

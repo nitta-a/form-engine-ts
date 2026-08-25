@@ -102,7 +102,7 @@ describe("v2.7 submission protection", () => {
     await user.click(screen.getByRole("button", { name: "Confirm guarded submission (1)" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
     expect(receiptStore.save).toHaveBeenCalledOnce();
-    expect(await screen.findByTestId("already-submitted")).toBeInTheDocument();
+    expect(await screen.findByRole("status")).toHaveTextContent("Submitted.");
 
     view.unmount();
     render(
