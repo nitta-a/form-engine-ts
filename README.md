@@ -51,6 +51,13 @@ pnpm test
 
 `pnpm lint` uses Biome to verify formatting, recommended lint rules, and import organization.
 
+### Current release
+
+The latest release is **v2.9.6** (2026-08-26). All public packages are currently published at version `2.9.6`.
+This release adds server-validation error handling, richer submission completion and confirmation rendering, and
+localization-editor improvements for the MUI Builder. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history
+and the [GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v2.9.6).
+
 ### Authoring and respondent experience
 
 Optional `pages` turn a schema into a validated wizard with conditional page skipping and accessible progress. The React
@@ -59,73 +66,6 @@ schema, populated in batches through `populateSchemaTranslations`, and applied s
 The builder exposes page membership and locale override controls. Core also provides `calculateCrossTabulation` for
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
-
-### v1.1.1 security, v2 extensibility, and v2.9 resilience APIs
-
-CSV export neutralizes formula-like string cells after leading whitespace by default; pass
-`{ neutralizeFormulas: false }` only for trusted data. The v2 APIs add JSON-only `metadata`/`translationMetadata` to every
-schema node and submission, localized `completionMessage`, translation overwrite policies and reports, the policy-aware
-`useFormBuilder` headless API, cancellable `beforeSubmit`, and replaceable renderer UI slots. All storage adapters preserve
-extension metadata. `@form-engine-ts/zod` now uses Zod 4 as a peer dependency.
-
-v2.1 moves `FormPolicy` and policy-aware `validateFormSchema` into Core so server and React validation return the same
-issues. `transformFieldType` protects authoring translations and extension data during type changes. The headless builder
-now owns all field/option/page/text/condition mutations, supports factory injection and typed ID failures, and the visual
-builder exposes completion-message editing plus translation options/reports. Translation slots separate node metadata
-from existing per-locale metadata, while Renderer adds page-header and submit-error slots.
-
-The v2.1.1 patch adds Visual Builder `defaultFieldType`, typed `onActionError` notifications, and manual-translation
-metadata creation. Its automatic translation default is now consistently `missing-only`, and field creation is disabled
-when policy permits no type or the field limit is reached.
-
-v2.2 adds `readOnly` and per-surface `features` controls to Visual Builder. `FormPolicy.allowedLocales` and `maxLocales`
-now constrain schema validation and the headless/visual locale actions; allowed locale additions are presented as an
-unregistered-locale selector. Page updates and locale mutations use the same typed `onActionError` pipeline as every
-other visual action.
-
-The Visual Builder also exposes orthogonal `components` and `slots` extension layers for design-system integration.
-Primitive controls can be adapted to MUI/Tailwind components while domain surfaces—including only the automatic
-translation actions—can be replaced independently. Core locale collection now scans translation and translation-metadata
-keys on every schema node, closing unregistered, disallowed, and maximum-locale policy gaps.
-
-v2.4 adds pure form-version transitions with optimistic revisions, mergeable incremental response analytics,
-`AsyncIterable` CSV streaming with custom columns, MUI-oriented Builder input props, translation slot status, and a Zod
-normalization codec. v2.5 adds stable keyset pagination to Memory, MongoDB, and PostgreSQL storage and introduces
-`@form-engine-ts/translator-google-v3` for Translation Advanced glossaries, labels, automatic chunking, and exponential
-retry on HTTP 429/5xx responses.
-
-The v2.5.1 release hardens version transitions with typed validation/CAS failures, makes lenient incremental analytics
-report skipped responses, and adds response-aware CSV columns plus Web/Node writable-stream piping. Paged storage can apply
-metadata filters and predicates before sizing, including the new Azure Table adapter. Google Translation Advanced batches
-by both item count and UTF-8 byte size and retries transient network/HTTP failures with `Retry-After`-aware full jitter.
-
-v2.6 makes publish plans fully persistence-ready and asynchronous, preserving the actual archived record and adding
-revision-based atomic commits to MongoDB. Azure Table paging now uses one native bounded page request with opaque service
-continuation tokens, injectable entity codecs, separate schema/submission clients, and scalar metadata-to-OData filters.
-Google Translation Advanced reports per-batch metrics, CSV custom columns may resolve asynchronously, and the new
-`@form-engine-ts/translator-cache` provides deterministic TTL caching without coupling Core to a cache vendor.
-
-v2.7 adds auditable clone/delete version-transition plans, typed atomic storage commits, a composable submission-filter
-AST, and text-answer paging. MongoDB persists complete version state and audit events; Azure Table accepts arbitrary
-entity layouts through a codec and per-form client resolver while bounding native-page scans. React can run ordered
-privacy guards before submission, request explicit confirmation, persist SSR-safe submission receipts, and enforce native
-text constraints. The new `@form-engine-ts/privacy` package detects common sensitive-data patterns without coupling Core
-to a privacy implementation. Translation caching now provides bounded LRU/TTL memory storage and adapter-isolated keys,
-while Google v3 skips blank API inputs and reports cache statistics. Release CI verifies public declaration snapshots and
-waits up to three minutes for npm availability before producing package-specific release notes.
-
-v2.8 guarantees that publishing an existing form version requires the complete current Published record and enforces one
-Draft and one Published record per form in MongoDB while retaining multiple Archived records. Azure Table adds bounded,
-item-level text-answer paging with cursors that resume inside an entity. React Builder edits source form text directly;
-Renderer confirmation slots receive schema and visible answers, `onSubmit` response IDs flow into receipts, and batch
-receipt hooks support dashboard views. Privacy detection recognizes `www.` URLs and merges overlapping findings. The
-translation cache adds variant/custom keys and cumulative hit, miss, eviction, and size reporting.
-
-v2.9 makes receipt persistence best-effort and adds SSR-safe submission attempts so network retries reuse a reserved ID.
-Core provides abortable, cycle-safe page iteration and stricter Published-record guards. Azure text-answer cursors are
-bound to their exact query by a SHA-256 fingerprint; MongoDB version commits fail fast when transactions are unavailable;
-translation caches can bypass backend failures or propagate them by policy. Release CI now blocks incompatible public API
-changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ### Define and render a form
 
@@ -422,6 +362,12 @@ pnpm test
 
 `pnpm lint`では、Biomeによりフォーマット、推奨リントルール、インポート順を検証します。
 
+### 最新リリース
+
+最新版は **v2.9.6**（2026-08-26）です。公開パッケージはすべてバージョン `2.9.6` で公開されています。
+本リリースでは、サーバー側バリデーションエラー、送信完了・確認画面の拡張、MUI Builderの言語設定編集を強化しました。
+全更新履歴は [RELEASE_NOTES.md](RELEASE_NOTES.md) と [GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v2.9.6) を参照してください。
+
 ### 編集・回答体験
 
 任意の`pages`を定義すると、条件付きページの自動スキップ、ページ検証、アクセシブルな進捗表示を備えた
@@ -430,68 +376,6 @@ pnpm test
 `resolveLocalizedSchema`でAPI通信なしに同期解決します。Builderはページ所属と各言語の手動訳文を編集できます。
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
-
-### v1.1.1セキュリティ対応、v2拡張、v2.9耐障害性API
-
-CSV出力は先頭空白類の後が`=`, `+`, `-`, `@`で始まる文字列をデフォルトで無害化します。信頼済みデータでは
-`{ neutralizeFormulas: false }`で無効化できます。v2 APIでは全スキーマノードと回答にJSON限定の
-`metadata`/`translationMetadata`、多言語`completionMessage`、翻訳上書きポリシーとレポート、ポリシー対応の
-Headless `useFormBuilder`、キャンセル可能な`beforeSubmit`、完全置換可能なRenderer UI Slotを追加しました。
-全ストレージアダプターが拡張metadataを保持し、`@form-engine-ts/zod`はZod 4をpeer dependencyとして利用します。
-
-v2.1では`FormPolicy`とポリシー対応`validateFormSchema`をCoreへ移し、サーバーとReactで同一issueを返します。
-`transformFieldType`は形式変更時の原文・翻訳・拡張データを保全します。Headless Builderへfield/option/page/文言/条件の
-全更新を集約し、factory注入と型付きID失敗を追加しました。Visual Builderは完了メッセージと翻訳設定・レポートを公開し、
-翻訳slotはnode metadataと既存言語別metadataを分離します。Rendererにはpage headerとsubmit error slotを追加しました。
-
-v2.1.1パッチではVisual Builderに`defaultFieldType`、型付き`onActionError`通知、手動翻訳metadata生成を追加しました。
-自動翻訳の既定値を`missing-only`へ統一し、ポリシー上追加可能な型がない場合や設問上限到達時は追加を無効化します。
-
-v2.2ではVisual Builderに`readOnly`と表示領域別の`features`制御を追加しました。`FormPolicy.allowedLocales`と
-`maxLocales`はスキーマ検証およびHeadless/Visual Builderの言語操作に適用され、許可ロケールは未登録候補から選択できます。
-ページ更新と言語操作も他のVisual actionと同じ型付き`onActionError`パイプラインを通ります。
-
-Visual Builderはデザインシステム統合向けに、直交する`components`と`slots`の拡張層も公開します。MUI/Tailwind等へ
-プリミティブ部品を差し替えつつ、自動翻訳actionだけを含むdomain領域を独立して置換できます。Coreのロケール収集は
-全スキーマノードの翻訳・翻訳metadataキーを走査し、未登録・非許可・上限超過の抜け道を防ぎます。
-
-v2.4では楽観revision付きの純粋なフォーム版遷移、結合可能な増分回答集計、カスタム列対応の
-`AsyncIterable` CSVストリーム、MUI向けBuilder入力props、翻訳slot状態、Zod正規化codecを追加しました。
-v2.5ではMemory・MongoDB・PostgreSQL Storageへ安定したkeyset paginationを追加し、Translation Advancedの
-用語集・label・自動chunk分割・HTTP 429/5xx指数backoff retryに対応する`@form-engine-ts/translator-google-v3`を
-新設しました。
-
-v2.5.1では、version遷移に型付きvalidation/CAS失敗を追加し、lenient増分集計がスキップした回答をレポート
-できるようにしました。CSVのカスタム列は回答・版・スキーマcontextを受け取り、Web/Node writable streamへ
-backpressure対応で直接出力できます。ページングはページサイズ確定前のmetadata/predicate filterに対応し、Azure
-Tableアダプターも追加しました。Google Translation Advancedは件数とUTF-8 byte数の両方でbatchを分割し、
-`Retry-After`を尊重するfull jitter付きで一時的なnetwork/HTTPエラーをretryします。
-
-v2.6ではpublish planを非同期かつそのまま永続化できる完全なrecord構成にし、実際の旧公開recordを保全して
-MongoDBへrevisionベースのatomic commitを追加しました。Azure Tableはserviceのopaque continuation tokenを使い、
-1 requestにつきnative pageを1件だけ取得します。entity codec注入、schema/submission client分離、scalar metadataの
-OData変換にも対応しました。Google Translation Advancedのbatch report、非同期CSVカスタム列、およびvendor非依存の
-TTL cache utility `@form-engine-ts/translator-cache`も追加しています。
-
-v2.7ではclone/deleteの監査可能なversion遷移plan、型付きatomic storage commit、合成可能な回答filter AST、
-text回答paginationを追加しました。MongoDBは完全なversion stateと監査eventを永続化し、Azure Tableはcodecと
-form単位client resolverにより任意entity layoutへ対応しつつnative page scanを上限付きにします。Reactは送信前に
-順序付きprivacy guardを実行し、明示確認、SSR-safeな送信receipt、native text制約を利用できます。新しい
-`@form-engine-ts/privacy`はCoreを特定実装へ結合せず、標準的な機密データpatternを検出します。翻訳cacheには
-上限付きLRU/TTL memory storageとadapter分離keyを追加し、Google v3は空文字をAPI送信せずcache統計をreportします。
-Release CIは公開宣言snapshotを検証し、npm反映を最大3分待ってpackage別release noteを生成します。
-
-v2.8では既存フォームの公開時に完全な現Published recordを必須化し、MongoDBでフォームごとにDraft/Publishedを
-各1件へ制約しつつ複数Archived recordを保持します。Azure Tableはentity内の途中から再開できるcursorを備えた、
-item単位のbounded自由記述pagingに対応しました。React Builderはフォーム原文を直接編集でき、Rendererの確認slotへ
-schemaと表示中回答を渡し、`onSubmit`の回答IDをreceiptへ保存し、batch receipt hookで一覧取得できます。Privacyは
-`www.` URLと重複finding集約に対応し、翻訳cacheはvariant/custom keyおよびhit/miss/eviction/size統計を公開します。
-
-v2.9ではreceipt保存をbest-effort化し、SSR-safeなsubmission attemptにより通信失敗後も予約済みIDで再送できます。
-Coreはabort・cursor循環・空page・件数上限に対応するpage iteratorとPublished recordの厳密検証を追加しました。
-Azureの自由記述cursorはSHA-256検索指紋でqueryへ固定され、MongoDBのversion commitはtransaction非対応時に部分更新せず
-fail-fastします。翻訳cacheはbackend障害をbypassまたはthrowするpolicyを選択できます。Release CIはmajor releaseを
-伴わない破壊的public API変更を拒否し、npm provenanceとAPI migration noteを生成します。
 
 ### フォームの定義とレンダリング
 
