@@ -28,6 +28,12 @@ const translator = createGoogleV3Translator({
 const japanese = await translator.translateText("Thank you", "ja", "en");
 ```
 
+Set `glossaryConfig` to a glossary ID or full resource name. An ID is expanded using the configured project and
+location. Use `glossaryResolver` to select a glossary per source/target locale pair; returning `undefined` omits the
+glossary from that request. Glossary responses prefer `glossaryTranslations` and fall back to `translations` per item.
+When this adapter is wrapped with `@form-engine-ts/translator-cache`, the applied glossary resource is included in the
+cache variant automatically.
+
 Keep OAuth access tokens on a trusted server. `translateBatch` defaults to at most 250 items and 25,000 UTF-8 bytes per
 request (hard limits: 1,024 items and 30,000 bytes). Network errors, HTTP 429, and HTTP 5xx responses are retried; customize
 batch and retry behavior with `batchLimits` and `retry`.

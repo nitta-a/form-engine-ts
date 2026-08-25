@@ -1,16 +1,29 @@
 import { AsyncTranslationAdapter } from '@form-engine-ts/core';
 
 interface GoogleV3GlossaryConfig {
+    /** Glossary ID or fully qualified glossary resource name. */
     readonly glossary: string;
+    /** Whether glossary matching should ignore case. */
     readonly ignoreCase?: boolean;
+}
+type GlossaryResolver = (context: {
+    readonly sourceLocale: string;
+    readonly targetLocale: string;
+}) => string | GoogleV3GlossaryConfig | undefined;
+interface GoogleV3TranslationAdapter extends AsyncTranslationAdapter {
+    /** Returns the glossary resource used for a locale pair, for cache-key isolation. */
+    getCacheVariant(targetLocale: string, sourceLocale?: string): string | undefined;
 }
 interface GoogleV3TranslatorOptions {
     readonly projectId: string;
     readonly location?: string;
-    readonly getAccessToken: () => Promise<string> | string;
-    readonly glossaryConfig?: GoogleV3GlossaryConfig;
+    readonly getAccessToken?: () => Promise<string> | string;
+    readonly apiKey?: string;
+    readonly glossaryConfig?: GoogleV3GlossaryConfig | string;
+    readonly glossaryResolver?: GlossaryResolver;
     readonly labels?: Readonly<Record<string, string>>;
     readonly fetchFn?: typeof fetch;
+    readonly fetchImpl?: typeof fetch;
     readonly apiEndpoint?: string;
     readonly batchLimits?: BatchSplitLimits;
     readonly retry?: RetryConfig;
@@ -41,8 +54,9 @@ interface TranslationBatchReport {
     readonly cacheHitCount: number;
     readonly cacheMissCount: number;
     readonly evictionCount: number;
+    readonly glossary?: string;
 }
 declare function splitTranslationBatch(texts: readonly string[], limits?: BatchSplitLimits): string[][];
 declare function createGoogleV3Translator(options: GoogleV3TranslatorOptions): AsyncTranslationAdapter;
 
-export { type BatchSplitLimits, type GoogleV3GlossaryConfig, type GoogleV3TranslatorOptions, type RetryConfig, type TranslationBatchReport, createGoogleV3Translator, splitTranslationBatch };
+export { type BatchSplitLimits, type GlossaryResolver, type GoogleV3GlossaryConfig, type GoogleV3TranslationAdapter, type GoogleV3TranslatorOptions, type RetryConfig, type TranslationBatchReport, createGoogleV3Translator, splitTranslationBatch };

@@ -91,6 +91,90 @@ describe("createGoogleV3Translator", () => {
     });
   });
 
+  it("normalizes a glossary ID and reports the applied glossary", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () =>
+      response(200, { glossaryTranslations: [{ translatedText: "用語集訳" }] })
+    );
+    const onBatchReport = vi.fn();
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      location: "us-central1",
+      getAccessToken: () => "token",
+      glossaryConfig: { glossary: "survey-terms", ignoreCase: true },
+      fetchFn,
+      onBatchReport
+    });
+
+    await expect(translator.translateText("term", "en", "ja")).resolves.toBe("用語集訳");
+    expect(JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body))).toMatchObject({
+      glossaryConfig: {
+        glossary: "projects/project/locations/us-central1/glossaries/survey-terms",
+        ignoreCase: true
+      }
+    });
+    expect(onBatchReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        glossary: "projects/project/locations/us-central1/glossaries/survey-terms"
+      })
+    );
+  });
+
+  it("prefers glossary translations per index and falls back to regular translations", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () =>
+      response(200, {
+        glossaryTranslations: [{ translatedText: "glossary:a" }],
+        translations: [{ translatedText: "regular:a" }, { translatedText: "regular:b" }]
+      })
+    );
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      glossaryConfig: "terms",
+      fetchFn
+    });
+
+    await expect(translator.translateBatch(["a", "b"], "en", "ja")).resolves.toEqual(["glossary:a", "regular:b"]);
+  });
+
+  it("resolves glossaries independently for each locale pair", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { contents: string[] };
+      return response(200, { translations: body.contents.map((text) => ({ translatedText: text })) });
+    });
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      glossaryResolver: ({ sourceLocale, targetLocale }) =>
+        sourceLocale === "ja" && targetLocale === "en" ? "glossary-en" : undefined,
+      fetchFn
+    });
+
+    await translator.translateText("hello", "en", "ja");
+    await translator.translateText("你好", "zh", "ja");
+    expect(JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body))).toHaveProperty(
+      "glossaryConfig.glossary",
+      "projects/project/locations/global/glossaries/glossary-en"
+    );
+    expect(JSON.parse(String(fetchFn.mock.calls[1]?.[1]?.body))).not.toHaveProperty("glossaryConfig");
+  });
+
+  it("keeps the legacy payload and translation response when no glossary is configured", async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => response(200, { translations: [{ translatedText: "ok" }] }));
+    const translator = createGoogleV3Translator({
+      projectId: "project",
+      getAccessToken: () => "token",
+      fetchFn
+    });
+
+    await expect(translator.translateText("text", "en", "ja")).resolves.toBe("ok");
+    expect(JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body))).toEqual({
+      contents: ["text"],
+      mimeType: "text/plain",
+      targetLanguageCode: "en",
+      sourceLanguageCode: "ja"
+    });
+  });
+
   it("retries 429 and 5xx responses with exponential backoff", async () => {
     const fetchFn = vi
       .fn<typeof fetch>()

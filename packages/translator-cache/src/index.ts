@@ -32,6 +32,10 @@ export interface TranslationCacheOptions {
   readonly onCacheError?: (error: Error, operation: "get" | "set") => void;
 }
 
+interface TranslationCacheVariantProvider {
+  getCacheVariant(targetLocale: string, sourceLocale?: string): string | undefined;
+}
+
 export interface MemoryTranslationCacheOptions {
   readonly maxEntries?: number;
   readonly ttlMs?: number;
@@ -74,6 +78,14 @@ function nonNegativeDuration(value: number | undefined, fallback: number, name: 
     throw new TypeError(`${name} must be a non-negative safe integer.`);
   }
   return resolved;
+}
+
+function getVariantProvider(adapter: AsyncTranslationAdapter): TranslationCacheVariantProvider | undefined {
+  if (typeof adapter !== "object" || adapter === null) return undefined;
+  const candidate = adapter as AsyncTranslationAdapter & Partial<TranslationCacheVariantProvider>;
+  return typeof candidate.getCacheVariant === "function"
+    ? { getCacheVariant: candidate.getCacheVariant.bind(adapter) }
+    : undefined;
 }
 
 export function createMemoryTranslationCache(options: MemoryTranslationCacheOptions = {}): MemoryTranslationCache {
@@ -159,6 +171,7 @@ export function withTranslationCache(
   const initialEvictionCount = cache.evictionCount ?? 0;
   let hits = 0;
   let misses = 0;
+  const variantProvider = getVariantProvider(baseAdapter);
 
   const handleCacheError = (cause: unknown, operation: "get" | "set"): Error => {
     const error = cause instanceof Error ? cause : new Error(String(cause));
@@ -209,16 +222,26 @@ export function withTranslationCache(
     }
     const target = requireLocale(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? "auto" : requireLocale(sourceLocale, "sourceLocale");
+    const automaticVariant = variantProvider?.getCacheVariant(target, sourceLocale);
+    if (automaticVariant !== undefined && automaticVariant.trim().length === 0) {
+      throw new TypeError("baseAdapter cache variant must not be empty.");
+    }
+    const variant =
+      options.variant === undefined
+        ? automaticVariant
+        : automaticVariant === undefined
+          ? options.variant
+          : `${options.variant}:${automaticVariant}`;
     const keys = texts.map((text) => {
       const context: TranslationCacheKeyContext = {
         sourceText: text,
         sourceLocale: source,
         targetLocale: target,
-        ...(options.variant === undefined ? {} : { variant: options.variant })
+        ...(variant === undefined ? {} : { variant })
       };
       const key =
         options.buildKey?.(context) ??
-        `${prefix}:${adapterName}:${options.variant === undefined ? "" : `${options.variant}:`}${source}:${target}:${hashTranslationText(text)}`;
+        `${prefix}:${adapterName}:${variant === undefined ? "" : `${variant}:`}${source}:${target}:${hashTranslationText(text)}`;
       if (typeof key !== "string" || key.length === 0) throw new TypeError("Translation cache key must not be empty.");
       return key;
     });

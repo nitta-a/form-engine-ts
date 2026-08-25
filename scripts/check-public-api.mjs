@@ -108,6 +108,13 @@ function memberKey(member, sourceFile, index) {
   return `[[member:${index}]]`;
 }
 
+function isWidenedType(previousType, currentType, previousFile, currentFile) {
+  if (previousType === undefined || currentType === undefined) return false;
+  const previousParts = unionParts(previousType, previousFile);
+  const currentParts = unionParts(currentType, currentFile);
+  return [...previousParts].every((part) => currentParts.has(part));
+}
+
 function compareMembers(name, previous, current, previousFile, currentFile) {
   const changes = [];
   const oldMembers = new Map(previous.members.map((member, index) => [memberKey(member, previousFile, index), member]));
@@ -134,7 +141,9 @@ function compareMembers(name, previous, current, previousFile, currentFile) {
       } else {
         const oldType = oldMember.type === undefined ? "unknown" : compactText(oldMember.type, previousFile);
         const newType = newMember.type === undefined ? "unknown" : compactText(newMember.type, currentFile);
-        if (oldType !== newType) changes.push(`${name}.${key}: type changed from ${oldType} to ${newType}`);
+        if (oldType !== newType && !isWidenedType(oldMember.type, newMember.type, previousFile, currentFile)) {
+          changes.push(`${name}.${key}: type changed from ${oldType} to ${newType}`);
+        }
       }
       continue;
     }

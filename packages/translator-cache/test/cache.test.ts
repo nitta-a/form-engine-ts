@@ -118,6 +118,35 @@ describe("withTranslationCache", () => {
     expect(set).toHaveBeenCalledWith("model-2:hello", "hello", undefined);
   });
 
+  it("automatically isolates cache keys by a base adapter glossary", async () => {
+    const { cache, set } = createCache();
+    const translateBatch = vi.fn(async (texts: readonly string[]) => texts.map((text) => text.toUpperCase()));
+    const base: AsyncTranslationAdapter & {
+      getCacheVariant: (targetLocale: string, sourceLocale?: string) => string | undefined;
+    } = {
+      translateText: async (text) => text.toUpperCase(),
+      translateBatch,
+      getCacheVariant: (targetLocale, sourceLocale) =>
+        targetLocale === "en" && sourceLocale === "ja" ? "projects/p/locations/global/glossaries/en" : undefined
+    };
+    const translator = withTranslationCache(base, cache, { adapterName: "google-v3" });
+
+    await translator.translateText("term", "en", "ja");
+    await translator.translateText("term", "zh", "ja");
+    expect(set).toHaveBeenNthCalledWith(
+      1,
+      `form-engine-ts:google-v3:projects/p/locations/global/glossaries/en:ja:en:${hashTranslationText("term")}`,
+      "TERM",
+      undefined
+    );
+    expect(set).toHaveBeenNthCalledWith(
+      2,
+      `form-engine-ts:google-v3:ja:zh:${hashTranslationText("term")}`,
+      "TERM",
+      undefined
+    );
+  });
+
   it("bypasses cache get and set failures while reporting them", async () => {
     const getError = new Error("cache get unavailable");
     const setError = new Error("cache set unavailable");

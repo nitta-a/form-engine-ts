@@ -26,6 +26,8 @@ Keys isolate adapter name, source locale, target locale, and a deterministic UTF
 are deduplicated, translated once in source order, cached, and restored to their original positions. The built-in memory
 cache applies both TTL expiration and bounded LRU eviction and exposes `size`, `evictionCount`, and `clear()` diagnostics.
 Use `variant` to isolate glossary/model/configuration revisions, or `buildKey` for complete key control.
+Adapters that expose a locale-aware cache variant (such as `@form-engine-ts/translator-google-v3` with a glossary)
+are isolated automatically; an explicit `variant` is combined with that adapter variant.
 `onStatsReport` receives cumulative real cache hits, misses, evictions, and current size after successful translations.
 Cache backend failures default to `cacheErrorPolicy: "bypass"`: `onCacheError` is notified and translation continues
 through the wrapped adapter. Use `cacheErrorPolicy: "throw"` when cache availability is mandatory.

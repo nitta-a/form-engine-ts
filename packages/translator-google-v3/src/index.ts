@@ -1,17 +1,32 @@
 import type { AsyncTranslationAdapter } from "@form-engine-ts/core";
 
 export interface GoogleV3GlossaryConfig {
+  /** Glossary ID or fully qualified glossary resource name. */
   readonly glossary: string;
+  /** Whether glossary matching should ignore case. */
   readonly ignoreCase?: boolean;
+}
+
+export type GlossaryResolver = (context: {
+  readonly sourceLocale: string;
+  readonly targetLocale: string;
+}) => string | GoogleV3GlossaryConfig | undefined;
+
+export interface GoogleV3TranslationAdapter extends AsyncTranslationAdapter {
+  /** Returns the glossary resource used for a locale pair, for cache-key isolation. */
+  getCacheVariant(targetLocale: string, sourceLocale?: string): string | undefined;
 }
 
 export interface GoogleV3TranslatorOptions {
   readonly projectId: string;
   readonly location?: string;
-  readonly getAccessToken: () => Promise<string> | string;
-  readonly glossaryConfig?: GoogleV3GlossaryConfig;
+  readonly getAccessToken?: () => Promise<string> | string;
+  readonly apiKey?: string;
+  readonly glossaryConfig?: GoogleV3GlossaryConfig | string;
+  readonly glossaryResolver?: GlossaryResolver;
   readonly labels?: Readonly<Record<string, string>>;
   readonly fetchFn?: typeof fetch;
+  readonly fetchImpl?: typeof fetch;
   readonly apiEndpoint?: string;
   readonly batchLimits?: BatchSplitLimits;
   readonly retry?: RetryConfig;
@@ -45,6 +60,7 @@ export interface TranslationBatchReport {
   readonly cacheHitCount: number;
   readonly cacheMissCount: number;
   readonly evictionCount: number;
+  readonly glossary?: string;
 }
 
 const DEFAULT_ENDPOINT = "https://translation.googleapis.com/v3";
@@ -114,30 +130,47 @@ function endpoint(value: string | undefined): string {
   }
 }
 
-function parseTranslations(body: string, expected: number, useGlossary: boolean): readonly string[] {
+function parseTranslations(body: string, expected: number): readonly string[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(body) as unknown;
   } catch (cause) {
     throw new Error("Google Translation Advanced returned invalid JSON.", { cause });
   }
-  const preferredKey = useGlossary ? "glossaryTranslations" : "translations";
-  const fallbackKey = useGlossary ? "translations" : "glossaryTranslations";
-  const values = isRecord(parsed)
-    ? Array.isArray(parsed[preferredKey])
-      ? parsed[preferredKey]
-      : parsed[fallbackKey]
-    : undefined;
-  if (!Array.isArray(values)) throw new Error("Google Translation Advanced response is missing translations.");
-  if (values.length !== expected) {
-    throw new Error(`Google Translation Advanced returned ${values.length} translations for ${expected} texts.`);
+  const glossaryTranslations =
+    isRecord(parsed) && Array.isArray(parsed.glossaryTranslations) ? parsed.glossaryTranslations : [];
+  const translations = isRecord(parsed) && Array.isArray(parsed.translations) ? parsed.translations : [];
+  if (glossaryTranslations.length === 0 && translations.length === 0) {
+    throw new Error("Google Translation Advanced response is missing translations.");
   }
-  return values.map((value, index) => {
-    if (!isRecord(value) || typeof value.translatedText !== "string") {
-      throw new Error(`Google Translation Advanced result at index ${index} is invalid.`);
+  return Array.from({ length: expected }, (_, index) => {
+    const glossaryValue = glossaryTranslations[index];
+    if (isRecord(glossaryValue) && typeof glossaryValue.translatedText === "string") {
+      return glossaryValue.translatedText;
     }
-    return value.translatedText;
+    const value = translations[index];
+    if (isRecord(value) && typeof value.translatedText === "string") return value.translatedText;
+    throw new Error(`Google Translation Advanced result at index ${index} is invalid.`);
   });
+}
+
+function normalizeGlossary(
+  value: string | GoogleV3GlossaryConfig,
+  projectId: string,
+  location: string,
+  name: string
+): GoogleV3GlossaryConfig & { readonly glossary: string } {
+  const config = typeof value === "string" ? { glossary: value } : value;
+  const glossary = requireNonEmpty(config.glossary, `${name}.glossary`);
+  if (config.ignoreCase !== undefined && typeof config.ignoreCase !== "boolean") {
+    throw new TypeError(`${name}.ignoreCase must be a boolean.`);
+  }
+  return {
+    glossary: glossary.startsWith("projects/")
+      ? glossary
+      : `projects/${projectId}/locations/${location}/glossaries/${glossary}`,
+    ...(config.ignoreCase === undefined ? {} : { ignoreCase: config.ignoreCase })
+  };
 }
 
 function validateLabels(
@@ -162,11 +195,14 @@ function retryAfterMilliseconds(value: string | null, now: () => number): number
 export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): AsyncTranslationAdapter {
   const projectId = requireNonEmpty(options?.projectId, "projectId");
   const location = requireNonEmpty(options.location ?? "global", "location");
-  if (typeof options.getAccessToken !== "function") throw new TypeError("getAccessToken must be a function.");
   const apiEndpoint = endpoint(options.apiEndpoint);
-  const fetchImpl = options.fetchFn ?? globalThis.fetch;
+  const fetchImpl = options.fetchFn ?? options.fetchImpl ?? globalThis.fetch;
   if (typeof fetchImpl !== "function")
     throw new Error("Fetch is unavailable. Pass fetchFn when creating the translator.");
+  if (typeof options.getAccessToken !== "function" && options.apiKey === undefined) {
+    throw new TypeError("getAccessToken or apiKey must be provided.");
+  }
+  const apiKey = options.apiKey === undefined ? undefined : requireNonEmpty(options.apiKey, "apiKey");
   const batchLimits: BatchSplitLimits = {
     maxItems: options.batchLimits?.maxItems ?? options.maxBatchSize ?? DEFAULT_MAX_ITEMS,
     maxCharacters: options.batchLimits?.maxCharacters ?? DEFAULT_MAX_CHARACTERS
@@ -186,21 +222,43 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
   const random = options.random ?? Math.random;
   const now = options.now ?? Date.now;
   const labels = validateLabels(options.labels);
-  const glossaryConfig =
+  if (options.glossaryResolver !== undefined && typeof options.glossaryResolver !== "function") {
+    throw new TypeError("glossaryResolver must be a function.");
+  }
+  const staticGlossaryConfig =
     options.glossaryConfig === undefined
       ? undefined
-      : {
-          glossary: requireNonEmpty(options.glossaryConfig.glossary, "glossaryConfig.glossary"),
-          ...(options.glossaryConfig.ignoreCase === undefined ? {} : { ignoreCase: options.glossaryConfig.ignoreCase })
-        };
-  const requestUrl = `${apiEndpoint}/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(location)}:translateText`;
+      : normalizeGlossary(options.glossaryConfig, projectId, location, "glossaryConfig");
+  const baseRequestUrl = `${apiEndpoint}/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(location)}:translateText`;
+  const requestUrl = apiKey === undefined ? baseRequestUrl : `${baseRequestUrl}?key=${encodeURIComponent(apiKey)}`;
+
+  const resolveGlossary = (
+    sourceLocale: string | undefined,
+    targetLocale: string
+  ): GoogleV3GlossaryConfig | undefined => {
+    if (options.glossaryResolver !== undefined) {
+      const resolved = options.glossaryResolver({ sourceLocale: sourceLocale ?? "auto", targetLocale });
+      return resolved === undefined
+        ? undefined
+        : normalizeGlossary(resolved, projectId, location, "glossaryResolver result");
+    }
+    return staticGlossaryConfig;
+  };
+
+  const getCacheVariant = (targetLocale: string, sourceLocale?: string): string | undefined => {
+    const target = requireNonEmpty(targetLocale, "targetLocale");
+    const source = sourceLocale === undefined ? undefined : requireNonEmpty(sourceLocale, "sourceLocale");
+    return resolveGlossary(source, target)?.glossary;
+  };
 
   const translateChunk = async (
     texts: readonly string[],
     targetLocale: string,
-    sourceLocale: string | undefined
+    sourceLocale: string | undefined,
+    glossaryConfig: GoogleV3GlossaryConfig | undefined
   ): Promise<{ readonly translations: readonly string[]; readonly retryAttempts: number }> => {
-    const token = requireNonEmpty(await options.getAccessToken(), "accessToken");
+    const token =
+      options.getAccessToken === undefined ? undefined : requireNonEmpty(await options.getAccessToken(), "accessToken");
     const body = JSON.stringify({
       contents: texts,
       mimeType: "text/plain",
@@ -214,7 +272,10 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
       try {
         response = await fetchImpl(requestUrl, {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          headers: {
+            ...(token === undefined ? {} : { Authorization: `Bearer ${token}` }),
+            "Content-Type": "application/json"
+          },
           body
         });
       } catch (cause) {
@@ -224,7 +285,7 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
       }
       if (response?.ok === true) {
         return {
-          translations: parseTranslations(await response.text(), texts.length, glossaryConfig !== undefined),
+          translations: parseTranslations(await response.text(), texts.length),
           retryAttempts: attempt
         };
       }
@@ -240,7 +301,8 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
         continue;
       }
       if (response === undefined) throw new Error("Google Translation Advanced request failed.");
-      const detail = (await response.text()).replaceAll(token, "[redacted]");
+      const responseText = await response.text();
+      const detail = token === undefined ? responseText : responseText.replaceAll(token, "[redacted]");
       throw new Error(
         `Google Translation Advanced request failed with HTTP ${response.status}${detail.length === 0 ? "." : `: ${detail}`}`
       );
@@ -257,6 +319,7 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     }
     const target = requireNonEmpty(targetLocale, "targetLocale");
     const source = sourceLocale === undefined ? undefined : requireNonEmpty(sourceLocale, "sourceLocale");
+    const glossary = resolveGlossary(source, target);
     const nonEmptyEntries = texts.flatMap((text, index) => (text.trim().length === 0 ? [] : [{ text, index }]));
     const nonEmptyTexts = nonEmptyEntries.map((entry) => entry.text);
     const chunks = splitTranslationBatch(nonEmptyTexts, batchLimits);
@@ -264,7 +327,7 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     const translated: string[] = [];
     let retryAttempts = 0;
     for (const chunk of chunks) {
-      const result = await translateChunk(chunk, target, source);
+      const result = await translateChunk(chunk, target, source, glossary);
       translated.push(...result.translations);
       retryAttempts += result.retryAttempts;
     }
@@ -281,12 +344,14 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
       durationMs: Math.max(0, now() - startedAt),
       cacheHitCount: 0,
       cacheMissCount: nonEmptyTexts.length,
-      evictionCount: 0
+      evictionCount: 0,
+      ...(glossary === undefined ? {} : { glossary: glossary.glossary })
     });
     return restored;
   };
 
-  return {
+  const translator: GoogleV3TranslationAdapter = {
+    getCacheVariant,
     async translateText(text, targetLocale, sourceLocale) {
       if (typeof text !== "string") throw new TypeError("text must be a string.");
       const translated = await translateBatch([text], targetLocale, sourceLocale);
@@ -296,4 +361,5 @@ export function createGoogleV3Translator(options: GoogleV3TranslatorOptions): As
     },
     translateBatch
   };
+  return translator;
 }

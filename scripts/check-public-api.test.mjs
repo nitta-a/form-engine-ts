@@ -55,3 +55,9 @@ test("allows additive unions, optional members, and trailing optional parameters
   );
   assert.deepEqual(findBreakingApiChanges(previous, current, "fixture"), []);
 });
+
+test("allows widening an interface property with an additive union", () => {
+  const previous = report("interface Options { readonly value?: string; }", "type Options");
+  const current = report("interface Options { readonly value?: string | number; }", "type Options");
+  assert.deepEqual(findBreakingApiChanges(previous, current, "fixture"), []);
+});
