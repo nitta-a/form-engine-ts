@@ -345,6 +345,26 @@ interface SubmitResponse {
     readonly submissionId?: string;
     readonly submittedAt?: string;
 }
+interface SubmitContext {
+    readonly attemptId: string;
+    readonly formId: string;
+    readonly formVersion: number;
+    readonly locale?: string;
+    readonly submittedAt: string;
+}
+interface FormRendererMessages {
+    readonly submitButton?: string;
+    readonly submittingButton?: string;
+    readonly retryButton?: string;
+    readonly requiredField?: string;
+    readonly alreadySubmittedTitle?: string;
+    readonly alreadySubmittedMessage?: string;
+    readonly serverErrorSummary?: string;
+    readonly confirmSensitiveDataTitle?: string;
+    readonly confirmSensitiveDataMessage?: string;
+    readonly confirmButton?: string;
+    readonly cancelButton?: string;
+}
 interface FormSubmittedAnswerItem {
     readonly fieldId: string;
     readonly title: string;
@@ -357,7 +377,7 @@ interface FormSubmittedAnswerItem {
 interface FormCompletionSlotProps {
     readonly message?: string;
     readonly schema: FormSchema;
-    readonly answers: Record<string, unknown>;
+    readonly answers: Readonly<Record<string, unknown>>;
     readonly submittedItems: readonly FormSubmittedAnswerItem[];
     readonly response?: SubmitResponse;
     readonly onReset?: () => void;
@@ -370,7 +390,7 @@ declare class FormSubmissionError extends Error {
     readonly payload: FormServerErrorPayload;
     constructor(message: string, payload?: FormServerErrorPayload);
 }
-type FormSubmitHandler = (answers: FormValues) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
+type FormSubmitHandler = (answers: FormValues, context: SubmitContext) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
 type SubmissionGuardResult = {
     readonly status: "allow";
 } | {
@@ -434,8 +454,7 @@ interface FormRendererSlots {
     readonly renderValidationSummary?: (props: {
         readonly issues: readonly ValidationError[];
     }) => ReactNode;
-    /** Additional completion data is supplied at runtime; use renderSubmittedValues for typed summary rendering. */
-    readonly renderCompletion?: (props: {
+    readonly renderCompletion?: (props: FormCompletionSlotProps & {
         readonly message: string;
     }) => ReactNode;
     readonly renderSubmittedValues?: (props: {
@@ -514,7 +533,7 @@ interface FormContextValue {
     readonly restoreValues: (values: FormValues) => void;
     readonly validatePage: (pageIndex: number) => AnswerValidationResult;
     readonly reset: () => void;
-    readonly submit: (beforeSubmit?: BeforeSubmit, prepareSubmission?: (values: FormValues) => FormValues | Promise<FormValues>) => Promise<SubmitResult>;
+    readonly submit: (beforeSubmit?: BeforeSubmit, submitContext?: SubmitContext) => Promise<SubmitResult>;
     readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
 }
 interface FormProviderProps {
@@ -563,6 +582,9 @@ interface FormRendererPresentationProps extends SubmissionProtectionProps {
     readonly hideFormOnSuccess?: boolean;
     readonly successMessageKey?: string;
     readonly errorMessageKey?: string;
+    readonly attemptIdFactory?: () => string;
+    readonly messages?: Partial<FormRendererMessages>;
+    readonly messageResolver?: (key: keyof FormRendererMessages, defaultText: string) => string;
     readonly autoSaveKey?: string;
     readonly beforeSubmit?: BeforeSubmit;
     readonly onDraftSave?: (draft: FormValues) => void;

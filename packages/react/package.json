@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/react",
-  "version": "2.9.7",
+  "version": "3.0.0",
   "publishConfig": {
     "access": "public"
   },

@@ -611,7 +611,7 @@ interface TranslationReport {
     readonly updatedSlots: readonly TranslationSlot[];
     readonly skippedSlots: readonly TranslationSlot[];
 }
-declare function resolveLocalizedSchema(schema: FormSchema, targetLocale: string): FormSchema;
+declare function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string): FormSchema;
 declare function populateSchemaTranslations(schema: FormSchema, targetLocales: readonly string[], adapter: AsyncTranslationAdapter, options?: PopulateTranslationOptions): Promise<{
     readonly schema: FormSchema;
     readonly report: TranslationReport;
