@@ -18,7 +18,7 @@
       "@form-engine-ts/core": ["./packages/core/src/index.ts"],
       "@form-engine-ts/privacy": ["./packages/privacy/src/index.ts"],
       "@form-engine-ts/react": ["./packages/react/src/index.ts"],
-      "@form-engine-ts/mui": ["./packages/mui/src/index.tsx"],
+      "@form-engine-ts/mui": ["./packages/mui/src/index.ts"],
       "@form-engine-ts/storage-azure-table": ["./packages/storage-azure-table/src/index.ts"],
       "@form-engine-ts/storage-d1": ["./packages/storage-d1/src/index.ts"],
       "@form-engine-ts/storage-localstorage": ["./packages/storage-localstorage/src/index.ts"],

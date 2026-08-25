@@ -262,23 +262,38 @@ function DefaultCheckbox({
   id,
   className,
   disabled,
+  readOnly,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-labelledby": ariaLabelledBy,
+  name,
+  required,
+  error,
+  helperText,
   checked,
   onChange,
   label
 }: BuilderCheckboxProps) {
   return (
-    <label className={className}>
-      <input
-        id={id}
-        type="checkbox"
-        disabled={disabled}
-        aria-label={ariaLabel}
-        checked={checked}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-      />
-      {label}
-    </label>
+    <>
+      <label className={className}>
+        <input
+          id={id}
+          name={name}
+          type="checkbox"
+          disabled={disabled || readOnly}
+          required={required}
+          aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
+          aria-labelledby={ariaLabelledBy}
+          aria-invalid={error === true ? true : undefined}
+          checked={checked}
+          onChange={(event) => onChange(event.currentTarget.checked)}
+        />
+        {label}
+      </label>
+      {helperText === undefined || helperText.length === 0 ? null : <small id={ariaDescribedBy}>{helperText}</small>}
+    </>
   );
 }
 

@@ -23,7 +23,7 @@ import {
   type SelectField,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { muiBuilderComponents } from "@form-engine-ts/mui";
+import { MuiFormBuilder } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
@@ -1039,7 +1039,7 @@ export default function App() {
             <section className="workspace-card">
               <h2>MUI Mode</h2>
               <ThemeProvider theme={muiPreviewTheme}>
-                <FormBuilder
+                <MuiFormBuilder
                   schema={schema}
                   locale={locale}
                   translator={mockTranslator}
@@ -1053,7 +1053,7 @@ export default function App() {
                     localization: localizationEnabled,
                     conditions: conditionsEnabled
                   }}
-                  components={muiBuilderComponents}
+                  muiOptions={{ size: "small", dense: true }}
                 />
               </ThemeProvider>
             </section>

@@ -94,6 +94,10 @@ export interface BuilderSelectProps extends InputComponentProps {
 }
 
 export interface BuilderCheckboxProps extends ComponentBaseProps {
+  readonly name?: string;
+  readonly required?: boolean;
+  readonly error?: boolean;
+  readonly helperText?: string;
   readonly checked: boolean;
   readonly onChange: (checked: boolean) => void;
   readonly label: string;

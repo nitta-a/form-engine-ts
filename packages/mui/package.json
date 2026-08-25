@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/mui",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "publishConfig": {
     "access": "public"
   },
@@ -40,7 +40,7 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.tsx --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
