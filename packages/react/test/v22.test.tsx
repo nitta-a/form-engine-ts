@@ -186,28 +186,34 @@ describe("FormBuilder v2.2", () => {
         </button>
       );
     }
-    function CustomTextInput({ value, onChange, disabled, id, "aria-label": ariaLabel }: BuilderTextInputProps) {
+    function CustomTextInput({ value, onChange, disabled, id, label, "aria-label": ariaLabel }: BuilderTextInputProps) {
       return (
-        <input
-          id={id}
-          data-design-system="text-input"
-          disabled={disabled}
-          aria-label={ariaLabel}
-          value={value}
-          onChange={(event) => onChange(event.currentTarget.value)}
-        />
+        <>
+          {label === undefined ? null : <label htmlFor={id}>{label}</label>}
+          <input
+            id={id}
+            data-design-system="text-input"
+            disabled={disabled}
+            aria-label={ariaLabel}
+            value={value}
+            onChange={(event) => onChange(event.currentTarget.value)}
+          />
+        </>
       );
     }
-    function CustomTextArea({ value, onChange, disabled, id, "aria-label": ariaLabel }: BuilderTextAreaProps) {
+    function CustomTextArea({ value, onChange, disabled, id, label, "aria-label": ariaLabel }: BuilderTextAreaProps) {
       return (
-        <textarea
-          id={id}
-          data-design-system="text-input"
-          disabled={disabled}
-          aria-label={ariaLabel}
-          value={value}
-          onChange={(event) => onChange(event.currentTarget.value)}
-        />
+        <>
+          {label === undefined ? null : <label htmlFor={id}>{label}</label>}
+          <textarea
+            id={id}
+            data-design-system="text-input"
+            disabled={disabled}
+            aria-label={ariaLabel}
+            value={value}
+            onChange={(event) => onChange(event.currentTarget.value)}
+          />
+        </>
       );
     }
     function Harness({ readOnly = false }: { readonly readOnly?: boolean }) {

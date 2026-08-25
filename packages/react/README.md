@@ -83,6 +83,12 @@ to their normalized string-value callbacks. The `translationActions` slot also r
 `translationReport`, and `onClearTranslationError`, allowing a custom MUI action surface to represent the complete
 translation lifecycle.
 
+`FormBuilder` adds `disableDefaultStyles` and its `unstyled` alias for design systems that provide their own styling.
+When either is enabled, the builder omits its `form-engine-builder` and `feb-*` classes. Injected `TextInput`, `TextArea`,
+and `Select` components receive the field `label` and accessibility attributes and are responsible for rendering their
+own labels. Builder action icons can be supplied with `renderIcon`, which resolves `actionType` values such as
+`moveUp`, `moveDown`, `delete`, and `add`.
+
 ```tsx
 <FormBuilder
   schema={schema}

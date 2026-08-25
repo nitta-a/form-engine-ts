@@ -12,10 +12,15 @@
   },
   "dependencies": {
     "@form-engine-ts/core": "workspace:*",
+    "@form-engine-ts/mui": "workspace:*",
     "@form-engine-ts/react": "workspace:*",
     "@form-engine-ts/storage-localstorage": "workspace:*",
     "@form-engine-ts/storage-memory": "workspace:*",
     "@form-engine-ts/translator-mock": "workspace:*",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   }

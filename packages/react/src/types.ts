@@ -17,11 +17,24 @@ import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
 
 export interface ComponentBaseProps {
   readonly id?: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
   readonly disabled?: boolean;
   readonly readOnly?: boolean;
-  readonly "aria-label"?: string;
+  readonly "aria-label"?: string | undefined;
+  readonly "aria-describedby"?: string | undefined;
+  readonly "aria-labelledby"?: string | undefined;
 }
+
+export type BuilderActionIconType =
+  | "moveUp"
+  | "moveDown"
+  | "delete"
+  | "add"
+  | "edit"
+  | "settings"
+  | "translate"
+  | "close"
+  | "dragHandle";
 
 export interface BuilderButtonProps extends ComponentBaseProps {
   readonly onClick?: () => void;
@@ -32,10 +45,18 @@ export interface BuilderButtonProps extends ComponentBaseProps {
   readonly targetId?: string;
 }
 
+export interface IconButtonProps extends ComponentBaseProps {
+  readonly onClick?: () => void;
+  readonly icon?: string | ReactNode;
+  readonly actionType?: BuilderActionIconType;
+  readonly title?: string;
+}
+
 export interface BuilderIconButtonProps extends ComponentBaseProps {
   readonly onClick?: () => void;
-  readonly icon: string;
-  readonly title: string;
+  readonly icon?: string | ReactNode;
+  readonly actionType?: BuilderActionIconType;
+  readonly title?: string;
 }
 
 export interface InputComponentProps extends ComponentBaseProps {
@@ -80,7 +101,7 @@ export interface BuilderCheckboxProps extends ComponentBaseProps {
 
 export interface BuilderSectionProps {
   readonly id?: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
   readonly title?: string;
   readonly description?: string;
   readonly headingId?: string;
@@ -90,10 +111,14 @@ export interface BuilderSectionProps {
 }
 
 export interface BuilderFieldsetProps {
-  readonly className?: string;
+  readonly className?: string | undefined;
   readonly legend?: string;
   readonly disabled?: boolean;
   readonly children: ReactNode;
+}
+
+export interface BuilderErrorMessageProps extends ComponentBaseProps {
+  readonly message: string;
 }
 
 export interface FormBuilderComponents {
@@ -106,6 +131,7 @@ export interface FormBuilderComponents {
   readonly Section?: ComponentType<BuilderSectionProps>;
   readonly Fieldset?: ComponentType<BuilderFieldsetProps>;
   readonly ErrorMessage?: ComponentType<{ readonly message: string }>;
+  readonly renderIcon?: (actionType: BuilderActionIconType) => ReactNode;
 }
 
 export type FormBuilderActions = Omit<FormBuilderResult, "schema" | "validationIssues">;

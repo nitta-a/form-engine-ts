@@ -15,6 +15,7 @@ import {
   type TranslationAdapter,
   type TranslationReport
 } from "@form-engine-ts/core";
+import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 import {
   type BuilderActionError,
@@ -25,8 +26,10 @@ import {
 } from "./hooks/useFormBuilder";
 import type {
   BuilderActionContext,
+  BuilderActionIconType,
   BuilderButtonProps,
   BuilderCheckboxProps,
+  BuilderErrorMessageProps,
   BuilderFieldsetProps,
   BuilderIconButtonProps,
   BuilderSectionProps,
@@ -44,6 +47,8 @@ function DefaultButton({
   className,
   disabled,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-labelledby": ariaLabelledBy,
   onClick,
   children,
   title,
@@ -57,6 +62,8 @@ function DefaultButton({
       type="button"
       disabled={disabled}
       aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      aria-labelledby={ariaLabelledBy}
       title={title}
       data-builder-action={action}
       data-target-id={targetId}
@@ -74,11 +81,36 @@ function DefaultIconButton(props: BuilderIconButtonProps) {
       {...(props.className === undefined ? {} : { className: props.className })}
       {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
       aria-label={props["aria-label"] ?? props.title}
+      aria-describedby={props["aria-describedby"]}
+      aria-labelledby={props["aria-labelledby"]}
+      {...(props.title === undefined ? {} : { title: props.title })}
       {...(props.onClick === undefined ? {} : { onClick: props.onClick })}
     >
       {props.icon}
     </DefaultButton>
   );
+}
+
+function defaultIconFor(actionType: BuilderActionIconType): ReactNode {
+  switch (actionType) {
+    case "moveUp":
+      return "↑";
+    case "moveDown":
+      return "↓";
+    case "delete":
+    case "close":
+      return "×";
+    case "add":
+      return "+";
+    case "dragHandle":
+      return "⠿";
+    case "edit":
+      return "✎";
+    case "settings":
+      return "⚙";
+    case "translate":
+      return "文";
+  }
 }
 
 function DefaultTextInput({
@@ -87,6 +119,8 @@ function DefaultTextInput({
   disabled,
   readOnly,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-labelledby": ariaLabelledBy,
   name,
   label,
   required,
@@ -102,8 +136,11 @@ function DefaultTextInput({
   max,
   step
 }: BuilderTextInputProps) {
+  const labelElement =
+    label === undefined ? null : id === undefined ? <span>{label}</span> : <label htmlFor={id}>{label}</label>;
   return (
     <>
+      {labelElement}
       <input
         id={id}
         name={name}
@@ -111,7 +148,9 @@ function DefaultTextInput({
         disabled={disabled}
         readOnly={readOnly}
         required={required}
-        aria-label={ariaLabel ?? label}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-labelledby={ariaLabelledBy}
         aria-invalid={error === true ? true : undefined}
         type={type === "text" ? undefined : type}
         inputMode={inputMode}
@@ -123,7 +162,7 @@ function DefaultTextInput({
         maxLength={maxLength}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
-      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+      {helperText === undefined || helperText.length === 0 ? null : <small id={ariaDescribedBy}>{helperText}</small>}
     </>
   );
 }
@@ -134,6 +173,8 @@ function DefaultTextArea({
   disabled,
   readOnly,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-labelledby": ariaLabelledBy,
   name,
   label,
   required,
@@ -145,8 +186,11 @@ function DefaultTextArea({
   placeholder,
   maxLength
 }: BuilderTextAreaProps) {
+  const labelElement =
+    label === undefined ? null : id === undefined ? <span>{label}</span> : <label htmlFor={id}>{label}</label>;
   return (
     <>
+      {labelElement}
       <textarea
         id={id}
         name={name}
@@ -154,7 +198,9 @@ function DefaultTextArea({
         disabled={disabled}
         readOnly={readOnly}
         required={required}
-        aria-label={ariaLabel ?? label}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-labelledby={ariaLabelledBy}
         aria-invalid={error === true ? true : undefined}
         value={value}
         rows={rows}
@@ -162,7 +208,7 @@ function DefaultTextArea({
         maxLength={maxLength}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
-      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+      {helperText === undefined || helperText.length === 0 ? null : <small id={ariaDescribedBy}>{helperText}</small>}
     </>
   );
 }
@@ -172,6 +218,8 @@ function DefaultSelect({
   className,
   disabled,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-labelledby": ariaLabelledBy,
   name,
   label,
   required,
@@ -181,15 +229,20 @@ function DefaultSelect({
   onChange,
   options
 }: BuilderSelectProps) {
+  const labelElement =
+    label === undefined ? null : id === undefined ? <span>{label}</span> : <label htmlFor={id}>{label}</label>;
   return (
     <>
+      {labelElement}
       <select
         id={id}
         name={name}
         className={className}
         disabled={disabled}
         required={required}
-        aria-label={ariaLabel ?? label}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-labelledby={ariaLabelledBy}
         aria-invalid={error === true ? true : undefined}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
@@ -200,7 +253,7 @@ function DefaultSelect({
           </option>
         ))}
       </select>
-      {helperText === undefined || helperText.length === 0 ? null : <small>{helperText}</small>}
+      {helperText === undefined || helperText.length === 0 ? null : <small id={ariaDescribedBy}>{helperText}</small>}
     </>
   );
 }
@@ -263,8 +316,8 @@ function DefaultFieldset({ className, legend, disabled, children }: BuilderField
   );
 }
 
-function DefaultErrorMessage({ message }: { readonly message: string }) {
-  return <p className="form-engine-builder__error">{message}</p>;
+function DefaultErrorMessage({ className, message }: BuilderErrorMessageProps) {
+  return <p className={className}>{message}</p>;
 }
 
 const DEFAULT_COMPONENTS: Required<FormBuilderComponents> = {
@@ -276,53 +329,124 @@ const DEFAULT_COMPONENTS: Required<FormBuilderComponents> = {
   Checkbox: DefaultCheckbox,
   Section: DefaultSection,
   Fieldset: DefaultFieldset,
-  ErrorMessage: DefaultErrorMessage
+  ErrorMessage: DefaultErrorMessage,
+  renderIcon: defaultIconFor
 };
 
 interface BuilderPrimitiveContextValue {
   readonly components: Required<FormBuilderComponents>;
   readonly readOnly: boolean;
+  readonly unstyled: boolean;
 }
 
 const BuilderPrimitiveContext = createContext<BuilderPrimitiveContextValue>({
   components: DEFAULT_COMPONENTS,
-  readOnly: false
+  readOnly: false,
+  unstyled: false
 });
+
+function withoutDefaultStyleClasses(className: string | undefined): string | undefined {
+  const filtered = className
+    ?.split(/\s+/u)
+    .filter((name) => name.length > 0 && !name.startsWith("form-engine-builder") && !name.startsWith("feb-"))
+    .join(" ");
+  return filtered === undefined || filtered.length === 0 ? undefined : filtered;
+}
+
+function primitiveClassName(
+  className: string | undefined,
+  defaultClassName: string,
+  unstyled: boolean
+): string | undefined {
+  const userClassName = unstyled ? withoutDefaultStyleClasses(className) : className;
+  return (
+    [unstyled ? undefined : defaultClassName, userClassName]
+      .filter((value): value is string => value !== undefined)
+      .join(" ") || undefined
+  );
+}
 
 function BuilderButton(props: BuilderButtonProps) {
   const context = useContext(BuilderPrimitiveContext);
   const Component = context.components.Button;
-  return <Component {...props} disabled={context.readOnly || props.disabled === true} readOnly={context.readOnly} />;
+  return (
+    <Component
+      {...props}
+      className={primitiveClassName(props.className, "feb-button", context.unstyled)}
+      disabled={context.readOnly || props.disabled === true}
+      readOnly={context.readOnly}
+    />
+  );
 }
 
 function BuilderIconButton(props: BuilderIconButtonProps) {
   const context = useContext(BuilderPrimitiveContext);
   const Component = context.components.IconButton;
-  return <Component {...props} disabled={context.readOnly || props.disabled === true} readOnly={context.readOnly} />;
+  const icon =
+    props.actionType === undefined
+      ? (props.icon ?? undefined)
+      : (context.components.renderIcon(props.actionType) ?? props.icon ?? defaultIconFor(props.actionType));
+  return (
+    <Component
+      {...props}
+      icon={icon}
+      className={primitiveClassName(props.className, "feb-icon-button", context.unstyled)}
+      disabled={context.readOnly || props.disabled === true}
+      readOnly={context.readOnly}
+    />
+  );
 }
 
 function BuilderTextInput(props: BuilderTextInputProps) {
   const context = useContext(BuilderPrimitiveContext);
   const Component = context.components.TextInput;
-  return <Component {...props} disabled={context.readOnly || props.disabled === true} readOnly={context.readOnly} />;
+  return (
+    <Component
+      {...props}
+      className={primitiveClassName(props.className, "feb-input", context.unstyled)}
+      disabled={context.readOnly || props.disabled === true}
+      readOnly={context.readOnly}
+    />
+  );
 }
 
 function BuilderTextArea(props: BuilderTextAreaProps) {
   const context = useContext(BuilderPrimitiveContext);
   const Component = context.components.TextArea;
-  return <Component {...props} disabled={context.readOnly || props.disabled === true} readOnly={context.readOnly} />;
+  return (
+    <Component
+      {...props}
+      className={primitiveClassName(props.className, "feb-textarea", context.unstyled)}
+      disabled={context.readOnly || props.disabled === true}
+      readOnly={context.readOnly}
+    />
+  );
 }
 
 function BuilderSelect(props: BuilderSelectProps) {
   const context = useContext(BuilderPrimitiveContext);
   const Component = context.components.Select;
-  return <Component {...props} disabled={context.readOnly || props.disabled === true} readOnly={context.readOnly} />;
+  return (
+    <Component
+      {...props}
+      className={primitiveClassName(props.className, "feb-select", context.unstyled)}
+      disabled={context.readOnly || props.disabled === true}
+      readOnly={context.readOnly}
+    />
+  );
 }
 
 function BuilderCheckbox(props: BuilderCheckboxProps) {
   const context = useContext(BuilderPrimitiveContext);
   const Component = context.components.Checkbox;
-  return <Component {...props} disabled={context.readOnly || props.disabled === true} readOnly={context.readOnly} />;
+  return (
+    <Component
+      {...props}
+      className={primitiveClassName(props.className, "feb-checkbox", context.unstyled)}
+      disabled={context.readOnly || props.disabled === true}
+      readOnly={context.readOnly}
+    />
+  );
 }
 
 function BuilderSection(props: BuilderSectionProps) {
@@ -336,12 +460,17 @@ function BuilderFieldset(props: BuilderFieldsetProps) {
   return <Component {...props} disabled={context.readOnly || props.disabled === true} />;
 }
 
-function BuilderErrorMessage(props: { readonly message: string }) {
-  const Component = useContext(BuilderPrimitiveContext).components.ErrorMessage;
-  return <Component {...props} />;
+function BuilderErrorMessage(props: BuilderErrorMessageProps) {
+  const context = useContext(BuilderPrimitiveContext);
+  const Component = context.components.ErrorMessage;
+  return (
+    <div className={primitiveClassName(props.className, "form-engine-builder__error", context.unstyled)}>
+      <Component message={props.message} />
+    </div>
+  );
 }
 
-const GUARDED_COMPONENTS: Required<FormBuilderComponents> = {
+const GUARDED_COMPONENTS: Omit<Required<FormBuilderComponents>, "renderIcon"> = {
   Button: BuilderButton,
   IconButton: BuilderIconButton,
   TextInput: BuilderTextInput,
@@ -552,6 +681,8 @@ export interface FormBuilderProps {
   readonly features?: FormBuilderFeatures;
   readonly components?: FormBuilderComponents;
   readonly slots?: FormBuilderSlots;
+  readonly disableDefaultStyles?: boolean;
+  readonly unstyled?: boolean;
 }
 
 export function FormBuilder({
@@ -572,10 +703,17 @@ export function FormBuilder({
   readOnly = false,
   features,
   components: componentOverrides,
-  slots
+  slots,
+  disableDefaultStyles = false,
+  unstyled = false
 }: FormBuilderProps) {
   const resolvedComponents: Required<FormBuilderComponents> = { ...DEFAULT_COMPONENTS, ...componentOverrides };
-  const components = GUARDED_COMPONENTS;
+  const components: Required<FormBuilderComponents> = {
+    ...GUARDED_COMPONENTS,
+    renderIcon: resolvedComponents.renderIcon
+  };
+  const defaultStylesDisabled = disableDefaultStyles || unstyled;
+  const builderClass = (value: string): string | undefined => (defaultStylesDisabled ? undefined : value);
   const { Button, Checkbox, ErrorMessage, Fieldset, IconButton, Section, Select, TextArea, TextInput } = components;
   const ToolbarSlot = slots?.toolbar;
   const FieldEditorSlot = slots?.fieldEditor;
@@ -912,9 +1050,11 @@ export function FormBuilder({
   };
 
   return (
-    <BuilderPrimitiveContext.Provider value={{ components: resolvedComponents, readOnly }}>
+    <BuilderPrimitiveContext.Provider
+      value={{ components: resolvedComponents, readOnly, unstyled: defaultStylesDisabled }}
+    >
       <Section
-        className={`form-engine-builder ${className}`.trim()}
+        className={defaultStylesDisabled ? className || undefined : `form-engine-builder ${className}`.trim()}
         aria-label={translate("builder.formBuilder")}
         onClickCapture={(event) => {
           if (readOnly) return;
@@ -938,39 +1078,42 @@ export function FormBuilder({
           }
         }}
       >
-        <Fieldset className="form-engine-builder__controls" disabled={readOnly}>
+        <Fieldset className={builderClass("form-engine-builder__controls")} disabled={readOnly}>
           <Section
-            className="form-engine-builder__basic-settings"
+            className={builderClass("form-engine-builder__basic-settings")}
             headingId="builder-basic-settings-heading"
             title={translate("builder.basicSettings")}
           >
-            <div className="form-engine-builder__grid">
-              <label>
-                {translate("builder.formTitle")}
+            <div className={builderClass("form-engine-builder__grid")}>
+              <div className={builderClass("form-engine-builder__field")}>
                 <TextInput
+                  id="builder-form-title"
                   name="title"
+                  label={translate("builder.formTitle")}
                   required
                   error={schema.title.trim().length === 0}
                   helperText={schema.title.trim().length === 0 ? translate("builder.required") : ""}
+                  aria-describedby={schema.title.trim().length === 0 ? "builder-form-title-error" : undefined}
                   value={schema.title}
                   onChange={(value) => setSourceText({ kind: "form" }, "title", value)}
                 />
-              </label>
-              <label>
-                {translate("builder.formDescription")}
+              </div>
+              <div className={builderClass("form-engine-builder__field")}>
                 <TextArea
+                  id="builder-form-description"
                   name="description"
+                  label={translate("builder.formDescription")}
                   rows={3}
                   value={schema.description ?? ""}
                   onChange={(value) => setSourceText({ kind: "form" }, "description", value)}
                 />
-              </label>
+              </div>
             </div>
           </Section>
           {pagesEnabled ? (
             PagesSlot === undefined ? (
               <Section
-                className="form-engine-builder__pages"
+                className={builderClass("form-engine-builder__pages")}
                 headingId="builder-pages-heading"
                 title={translate("builder.pages")}
               >
@@ -986,28 +1129,30 @@ export function FormBuilder({
                       const source = schema.fields.find((field) => field.id === page.displayCondition?.questionId);
                       return (
                         <Fieldset
-                          className="form-engine-builder__page"
+                          className={builderClass("form-engine-builder__page")}
                           legend={page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`}
                           key={page.id}
                         >
-                          <div className="form-engine-builder__toolbar">
+                          <div className={builderClass("form-engine-builder__toolbar")}>
                             {ToolbarSlot === undefined ? (
                               <>
                                 <IconButton
-                                  icon="↑"
+                                  actionType="moveUp"
                                   title={translate("builder.moveUp", { title: page.title ?? page.id })}
                                   disabled={pageIndex === 0}
                                   onClick={() => movePage(pageIndex, -1)}
                                 />
                                 <IconButton
-                                  icon="↓"
+                                  actionType="moveDown"
                                   title={translate("builder.moveDown", { title: page.title ?? page.id })}
                                   disabled={pageIndex === (schema.pages?.length ?? 0) - 1}
                                   onClick={() => movePage(pageIndex, 1)}
                                 />
-                                <Button onClick={() => removePage(pageIndex)} variant="danger">
-                                  {translate("builder.deleteAction")}
-                                </Button>
+                                <IconButton
+                                  actionType="delete"
+                                  title={translate("builder.delete", { title: page.title ?? page.id })}
+                                  onClick={() => removePage(pageIndex)}
+                                />
                               </>
                             ) : (
                               <ToolbarSlot
@@ -1026,10 +1171,11 @@ export function FormBuilder({
                               />
                             )}
                           </div>
-                          <div className="form-engine-builder__grid">
-                            <label>
-                              {translate("builder.pageTitle")}
+                          <div className={builderClass("form-engine-builder__grid")}>
+                            <div className={builderClass("form-engine-builder__field")}>
                               <TextInput
+                                id={`builder-page-${page.id}-title`}
+                                label={translate("builder.pageTitle")}
                                 value={page.title ?? ""}
                                 onChange={(value) => {
                                   updatePage(page.id, (current) => {
@@ -1039,10 +1185,11 @@ export function FormBuilder({
                                   });
                                 }}
                               />
-                            </label>
-                            <label>
-                              {translate("builder.pageDescription")}
+                            </div>
+                            <div className={builderClass("form-engine-builder__field")}>
                               <TextInput
+                                id={`builder-page-${page.id}-description`}
+                                label={translate("builder.pageDescription")}
                                 value={page.description ?? ""}
                                 onChange={(value) => {
                                   updatePage(page.id, (current) => {
@@ -1052,15 +1199,16 @@ export function FormBuilder({
                                   });
                                 }}
                               />
-                            </label>
+                            </div>
                           </div>
                           {!localizationEnabled || editingLocale.length === 0 ? null : (
-                            <div className="form-engine-builder__translation-editor">
+                            <div className={builderClass("form-engine-builder__translation-editor")}>
                               <strong>{editingLocale}</strong>
-                              <div className="form-engine-builder__grid">
-                                <label>
-                                  {translate("builder.pageTitle")}
+                              <div className={builderClass("form-engine-builder__grid")}>
+                                <div className={builderClass("form-engine-builder__field")}>
                                   <TextInput
+                                    id={`builder-page-${page.id}-${editingLocale}-title`}
+                                    label={translate("builder.pageTitle")}
                                     value={page.translations?.[editingLocale]?.title ?? ""}
                                     onChange={(value) =>
                                       updateManualTranslation({
@@ -1079,10 +1227,11 @@ export function FormBuilder({
                                       })
                                     }
                                   />
-                                </label>
-                                <label>
-                                  {translate("builder.pageDescription")}
+                                </div>
+                                <div className={builderClass("form-engine-builder__field")}>
                                   <TextInput
+                                    id={`builder-page-${page.id}-${editingLocale}-description`}
+                                    label={translate("builder.pageDescription")}
                                     value={page.translations?.[editingLocale]?.description ?? ""}
                                     onChange={(value) =>
                                       updateManualTranslation({
@@ -1101,15 +1250,16 @@ export function FormBuilder({
                                       })
                                     }
                                   />
-                                </label>
+                                </div>
                               </div>
                             </div>
                           )}
                           {conditionsEnabled ? (
-                            <div className="form-engine-builder__condition">
-                              <label>
-                                {translate("builder.pageCondition")}
+                            <div className={builderClass("form-engine-builder__condition")}>
+                              <div className={builderClass("form-engine-builder__field")}>
                                 <Select
+                                  id={`builder-page-${page.id}-condition`}
+                                  label={translate("builder.pageCondition")}
                                   value={page.displayCondition?.questionId ?? ""}
                                   onChange={(value) => {
                                     const selected = schema.fields.find((field) => field.id === value);
@@ -1133,7 +1283,7 @@ export function FormBuilder({
                                     ...availableSources.map((field) => ({ value: field.id, label: field.title }))
                                   ]}
                                 />
-                              </label>
+                              </div>
                               {page.displayCondition !== undefined && source !== undefined ? (
                                 <>
                                   <Select
@@ -1171,10 +1321,11 @@ export function FormBuilder({
                         </Fieldset>
                       );
                     })}
-                    <div className="form-engine-builder__page-add">
-                      <label>
-                        {translate("builder.pageQuestion")}
+                    <div className={builderClass("form-engine-builder__page-add")}>
+                      <div className={builderClass("form-engine-builder__field")}>
                         <Select
+                          id="builder-page-question"
+                          label={translate("builder.pageQuestion")}
                           value={newPageQuestionId}
                           disabled={movablePageQuestions.length === 0}
                           onChange={setNewPageQuestionId}
@@ -1185,7 +1336,7 @@ export function FormBuilder({
                               .map((field) => ({ value: field.id, label: field.title }))
                           ]}
                         />
-                      </label>
+                      </div>
                       <Button disabled={movablePageQuestions.length === 0} onClick={addPage}>
                         {translate("builder.addPage")}
                       </Button>
@@ -1207,29 +1358,39 @@ export function FormBuilder({
           {localizationEnabled ? (
             LocalizationSlot === undefined ? (
               <Section
-                className="form-engine-builder__localization"
+                className={builderClass("form-engine-builder__localization")}
                 headingId="builder-localization-heading"
                 title={translate("builder.localization")}
               >
-                <label>
-                  {translate("builder.completionMessage")}
+                <div className={builderClass("form-engine-builder__field")}>
                   <TextInput
+                    id="builder-completion-message"
+                    label={translate("builder.completionMessage")}
                     value={schema.completionMessage ?? ""}
                     onChange={(value) => setSourceText({ kind: "form" }, "completionMessage", value)}
                   />
-                </label>
-                <div className="form-engine-builder__grid">
-                  <label>
-                    {translate("builder.defaultLocale")}
-                    <TextInput value={schema.defaultLocale ?? ""} onChange={setDefaultLocale} />
-                  </label>
-                  <label htmlFor="builder-new-locale">
-                    {translate("builder.addLocale")}
+                </div>
+                <div className={builderClass("form-engine-builder__grid")}>
+                  <div className={builderClass("form-engine-builder__field")}>
+                    <TextInput
+                      id="builder-default-locale"
+                      label={translate("builder.defaultLocale")}
+                      value={schema.defaultLocale ?? ""}
+                      onChange={setDefaultLocale}
+                    />
+                  </div>
+                  <div className={builderClass("form-engine-builder__field")}>
                     {availableAllowedLocales === undefined ? (
-                      <TextInput id="builder-new-locale" value={newLocale} onChange={setNewLocale} />
+                      <TextInput
+                        id="builder-new-locale"
+                        label={translate("builder.addLocale")}
+                        value={newLocale}
+                        onChange={setNewLocale}
+                      />
                     ) : (
                       <Select
                         id="builder-new-locale"
+                        label={translate("builder.addLocale")}
                         value={newLocale}
                         onChange={setNewLocale}
                         options={[
@@ -1238,7 +1399,7 @@ export function FormBuilder({
                         ]}
                       />
                     )}
-                  </label>
+                  </div>
                   <Button
                     action="addLocale"
                     disabled={newLocale.trim().length === 0 || localeLimitReached}
@@ -1246,9 +1407,10 @@ export function FormBuilder({
                   >
                     {translate("builder.addLocale")}
                   </Button>
-                  <label>
-                    {translate("builder.editLocale")}
+                  <div className={builderClass("form-engine-builder__field")}>
                     <Select
+                      id="builder-edit-locale"
+                      label={translate("builder.editLocale")}
                       value={editingLocale}
                       onChange={setEditingLocale}
                       options={[
@@ -1258,7 +1420,7 @@ export function FormBuilder({
                           .map((item) => ({ value: item, label: item }))
                       ]}
                     />
-                  </label>
+                  </div>
                   {TranslationActionsSlot === undefined ? (
                     <Button
                       disabled={translationAdapter === undefined || editingLocale.length === 0 || isTranslating}
@@ -1284,28 +1446,31 @@ export function FormBuilder({
                 {translationAdapter === undefined ? <p>{translate("builder.translationUnavailable")}</p> : null}
                 {translationError === null ? null : <ErrorMessage message={translationError} />}
                 {editingLocale.length === 0 ? null : (
-                  <div className="form-engine-builder__grid">
-                    <label>
-                      {translate("builder.questionTitle")}
+                  <div className={builderClass("form-engine-builder__grid")}>
+                    <div className={builderClass("form-engine-builder__field")}>
                       <TextInput
+                        id={`builder-${editingLocale}-form-title`}
+                        label={translate("builder.questionTitle")}
                         value={schema.translations?.[editingLocale]?.title ?? ""}
                         onChange={(value) => updateFormTranslation("title", value)}
                       />
-                    </label>
-                    <label>
-                      {translate("builder.pageDescription")}
+                    </div>
+                    <div className={builderClass("form-engine-builder__field")}>
                       <TextInput
+                        id={`builder-${editingLocale}-form-description`}
+                        label={translate("builder.pageDescription")}
                         value={schema.translations?.[editingLocale]?.description ?? ""}
                         onChange={(value) => updateFormTranslation("description", value)}
                       />
-                    </label>
-                    <label>
-                      {translate("builder.completionMessage")}
+                    </div>
+                    <div className={builderClass("form-engine-builder__field")}>
                       <TextInput
+                        id={`builder-${editingLocale}-completion-message`}
+                        label={translate("builder.completionMessage")}
                         value={schema.translations?.[editingLocale]?.completionMessage ?? ""}
                         onChange={(value) => updateFormTranslation("completionMessage", value)}
                       />
-                    </label>
+                    </div>
                   </div>
                 )}
               </Section>
@@ -1324,7 +1489,7 @@ export function FormBuilder({
             )
           ) : null}
 
-          <div className="form-engine-builder__list">
+          <div className={builderClass("form-engine-builder__list")}>
             {schema.fields.map((field, index) => {
               const condition = field.displayCondition;
               const source =
@@ -1346,30 +1511,29 @@ export function FormBuilder({
                 );
               }
               return (
-                <Fieldset className="form-engine-builder__question" legend={field.title} key={field.id}>
-                  <div className="form-engine-builder__toolbar">
+                <Fieldset className={builderClass("form-engine-builder__question")} legend={field.title} key={field.id}>
+                  <div className={builderClass("form-engine-builder__toolbar")}>
                     {ToolbarSlot === undefined ? (
                       <>
                         <IconButton
-                          icon="↑"
+                          actionType="moveUp"
                           title={translate("builder.moveUp", { title: field.title })}
                           disabled={index === 0}
                           onClick={() => moveField(index, -1)}
                         />
                         <IconButton
-                          icon="↓"
+                          actionType="moveDown"
                           title={translate("builder.moveDown", { title: field.title })}
                           disabled={index === schema.fields.length - 1}
                           onClick={() => moveField(index, 1)}
                         />
-                        <Button
+                        <IconButton
+                          actionType="delete"
                           disabled={schema.fields.length === 1}
                           onClick={() => removeField(field.id)}
                           aria-label={translate("builder.delete", { title: field.title })}
-                          variant="danger"
-                        >
-                          {translate("builder.deleteAction")}
-                        </Button>
+                          title={translate("builder.delete", { title: field.title })}
+                        />
                       </>
                     ) : (
                       <ToolbarSlot
@@ -1388,15 +1552,18 @@ export function FormBuilder({
                       />
                     )}
                   </div>
-                  <div className="form-engine-builder__grid">
-                    <label>
-                      {translate("builder.questionTitle")}
+                  <div className={builderClass("form-engine-builder__grid")}>
+                    <div className={builderClass("form-engine-builder__field")}>
                       <TextInput
+                        id={`builder-field-${field.id}-title`}
                         name={`fields.${field.id}.title`}
                         label={translate("builder.questionTitle")}
                         required={true}
                         error={field.title.trim().length === 0}
                         helperText={field.title.trim().length === 0 ? translate("builder.required") : ""}
+                        aria-describedby={
+                          field.title.trim().length === 0 ? `builder-field-${field.id}-title-error` : undefined
+                        }
                         value={field.title}
                         placeholder={translate("builder.questionTitlePlaceholder")}
                         onChange={(value) =>
@@ -1406,19 +1573,20 @@ export function FormBuilder({
                           }))
                         }
                       />
-                    </label>
-                    <label>
-                      {translate("builder.type")}
+                    </div>
+                    <div className={builderClass("form-engine-builder__field")}>
                       <Select
+                        id={`builder-field-${field.id}-type`}
+                        label={translate("builder.type")}
                         value={field.type}
                         onChange={(value) => changeType(field.id, value as FieldType)}
                         options={FIELD_TYPES.filter(
                           (type) => policy?.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
                         ).map((type) => ({ value: type, label: translate(fieldTypeKey(type)) }))}
                       />
-                    </label>
+                    </div>
                     <Checkbox
-                      className="form-engine-builder__check"
+                      className={builderClass("form-engine-builder__check")}
                       checked={field.required === true}
                       onChange={(checked) => updateField(field.id, (current) => ({ ...current, required: checked }))}
                       label={translate("builder.required")}
@@ -1426,9 +1594,10 @@ export function FormBuilder({
                   </div>
 
                   {!pagesEnabled || schema.pages === undefined ? null : (
-                    <label>
-                      {translate("builder.questionPage")}
+                    <div className={builderClass("form-engine-builder__field")}>
                       <Select
+                        id={`builder-field-${field.id}-page`}
+                        label={translate("builder.questionPage")}
                         value={pageForField(field.id)?.id ?? ""}
                         onChange={(value) => assignFieldToPage(field.id, value)}
                         options={schema.pages.map((page, pageIndex) => ({
@@ -1436,16 +1605,17 @@ export function FormBuilder({
                           label: page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`
                         }))}
                       />
-                    </label>
+                    </div>
                   )}
 
                   {!localizationEnabled || editingLocale.length === 0 ? null : (
-                    <div className="form-engine-builder__translation-editor">
+                    <div className={builderClass("form-engine-builder__translation-editor")}>
                       <strong>{editingLocale}</strong>
-                      <div className="form-engine-builder__grid">
-                        <label>
-                          {translate("builder.questionTitle")}
+                      <div className={builderClass("form-engine-builder__grid")}>
+                        <div className={builderClass("form-engine-builder__field")}>
                           <TextInput
+                            id={`builder-field-${field.id}-${editingLocale}-title`}
+                            label={translate("builder.questionTitle")}
                             value={field.translations?.[editingLocale]?.title ?? ""}
                             onChange={(value) =>
                               updateManualTranslation({
@@ -1463,10 +1633,11 @@ export function FormBuilder({
                               })
                             }
                           />
-                        </label>
-                        <label>
-                          {translate("builder.pageDescription")}
+                        </div>
+                        <div className={builderClass("form-engine-builder__field")}>
                           <TextInput
+                            id={`builder-field-${field.id}-${editingLocale}-description`}
+                            label={translate("builder.pageDescription")}
                             value={field.translations?.[editingLocale]?.description ?? ""}
                             onChange={(value) =>
                               updateManualTranslation({
@@ -1484,13 +1655,14 @@ export function FormBuilder({
                               })
                             }
                           />
-                        </label>
+                        </div>
                       </div>
                       {"options" in field
                         ? field.options.map((option, optionIndex) => (
-                            <label key={option.id}>
-                              {translate("builder.optionLabel", { index: optionIndex + 1 })} ({editingLocale})
+                            <div className={builderClass("form-engine-builder__field")} key={option.id}>
                               <TextInput
+                                id={`builder-option-${option.id}-${editingLocale}`}
+                                label={`${translate("builder.optionLabel", { index: optionIndex + 1 })} (${editingLocale})`}
                                 value={option.translations?.[editingLocale] ?? ""}
                                 onChange={(value) =>
                                   updateManualTranslation({
@@ -1508,17 +1680,18 @@ export function FormBuilder({
                                   })
                                 }
                               />
-                            </label>
+                            </div>
                           ))
                         : null}
                     </div>
                   )}
 
                   {field.type === "rating" ? (
-                    <div className="form-engine-builder__grid">
-                      <label>
-                        {translate("builder.minimum")}
+                    <div className={builderClass("form-engine-builder__grid")}>
+                      <div className={builderClass("form-engine-builder__field")}>
                         <TextInput
+                          id={`builder-field-${field.id}-minimum`}
+                          label={translate("builder.minimum")}
                           type="number"
                           value={String(field.min ?? 1)}
                           onChange={(value) => {
@@ -1531,10 +1704,11 @@ export function FormBuilder({
                             );
                           }}
                         />
-                      </label>
-                      <label>
-                        {translate("builder.maximum")}
+                      </div>
+                      <div className={builderClass("form-engine-builder__field")}>
                         <TextInput
+                          id={`builder-field-${field.id}-maximum`}
+                          label={translate("builder.maximum")}
                           type="number"
                           value={String(field.max ?? 5)}
                           onChange={(value) => {
@@ -1547,18 +1721,19 @@ export function FormBuilder({
                             );
                           }}
                         />
-                      </label>
+                      </div>
                     </div>
                   ) : null}
 
                   {"options" in field ? (
-                    <div className="form-engine-builder__options">
+                    <div className={builderClass("form-engine-builder__options")}>
                       <strong>{translate("builder.options")}</strong>
                       {field.options.map((option, optionIndex) =>
                         OptionEditorSlot === undefined ? (
-                          <div className="form-engine-builder__option" key={option.id}>
+                          <div className={builderClass("form-engine-builder__option")} key={option.id}>
                             <TextInput
-                              aria-label={translate("builder.optionLabel", { index: optionIndex + 1 })}
+                              id={`builder-option-${option.id}`}
+                              label={translate("builder.optionLabel", { index: optionIndex + 1 })}
                               value={option.label}
                               placeholder={translate("builder.optionLabelPlaceholder")}
                               onChange={(value) =>
@@ -1568,24 +1743,23 @@ export function FormBuilder({
                             {ToolbarSlot === undefined ? (
                               <>
                                 <IconButton
-                                  icon="↑"
+                                  actionType="moveUp"
                                   title={translate("builder.moveUp", { title: option.label })}
                                   disabled={optionIndex === 0}
                                   onClick={() => moveOption(field.id, option.id, optionIndex - 1)}
                                 />
                                 <IconButton
-                                  icon="↓"
+                                  actionType="moveDown"
                                   title={translate("builder.moveDown", { title: option.label })}
                                   disabled={optionIndex === field.options.length - 1}
                                   onClick={() => moveOption(field.id, option.id, optionIndex + 1)}
                                 />
-                                <Button
+                                <IconButton
+                                  actionType="delete"
                                   disabled={field.options.length === 1}
                                   onClick={() => removeOption(field.id, option.id)}
-                                  variant="danger"
-                                >
-                                  {translate("builder.remove")}
-                                </Button>
+                                  title={translate("builder.remove")}
+                                />
                               </>
                             ) : (
                               <ToolbarSlot
@@ -1632,10 +1806,11 @@ export function FormBuilder({
                   ) : null}
 
                   {conditionsEnabled ? (
-                    <div className="form-engine-builder__condition">
-                      <label>
-                        {translate("builder.displayCondition")}
+                    <div className={builderClass("form-engine-builder__condition")}>
+                      <div className={builderClass("form-engine-builder__field")}>
                         <Select
+                          id={`builder-field-${field.id}-condition`}
+                          label={translate("builder.displayCondition")}
                           value={condition?.questionId ?? ""}
                           onChange={(value) => {
                             const selected = schema.fields.find((item) => item.id === value);
@@ -1655,7 +1830,7 @@ export function FormBuilder({
                             ...availableSources.map((candidate) => ({ value: candidate.id, label: candidate.title }))
                           ]}
                         />
-                      </label>
+                      </div>
                       {condition !== undefined && source !== undefined ? (
                         <>
                           <Select
@@ -1689,7 +1864,7 @@ export function FormBuilder({
             })}
           </div>
           <Button
-            className="form-engine-builder__add"
+            className={builderClass("form-engine-builder__add")}
             action="addField"
             disabled={initialFieldType === null || maxFieldsReached}
             onClick={addField}

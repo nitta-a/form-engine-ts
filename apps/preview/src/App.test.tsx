@@ -38,6 +38,18 @@ describe("preview application", () => {
     expect(screen.queryByRole("button", { name: "Add question" })).not.toBeInTheDocument();
   });
 
+  it("opens the MUI mode preview with MUI controls", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("tab", { name: "MUI Mode" }));
+
+    const panel = screen.getByRole("tabpanel", { name: "MUI Mode" });
+    expect(panel).toBeVisible();
+    expect(panel.querySelector("#builder-form-title")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Add question" })).toBeInTheDocument();
+  });
+
   it("runs the translation overwrite policy and displays its report", async () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText("Overwrite"), { target: { value: "all" } });

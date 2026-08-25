@@ -23,6 +23,7 @@ import {
   type SelectField,
   validateFormSchema
 } from "@form-engine-ts/core";
+import { muiBuilderComponents } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
@@ -37,13 +38,15 @@ import {
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customerFeedbackSchema } from "./schema";
 
-type TabId = "builder" | "respondent" | "analytics";
+type TabId = "builder" | "mui" | "respondent" | "analytics";
 type StorageKind = "memory" | "local";
 
-const tabs: readonly TabId[] = ["builder", "respondent", "analytics"];
+const tabs: readonly TabId[] = ["builder", "mui", "respondent", "analytics"];
+const muiPreviewTheme = createTheme();
 const previewPolicy: FormPolicy = {
   maxFields: 20,
   maxOptionsPerField: 10,
@@ -101,6 +104,7 @@ function PreviewMuiTextInput({
 }: BuilderTextInputProps) {
   return (
     <span className="preview-mui-field">
+      {label === undefined ? null : <label htmlFor={id}>{label}</label>}
       <input
         id={id}
         name={name}
@@ -1029,6 +1033,31 @@ export default function App() {
               </pre>
             </section>
           </div>
+        </div>
+        <div id="panel-mui" role="tabpanel" aria-labelledby="tab-mui" hidden={activeTab !== "mui"}>
+          {activeTab !== "mui" ? null : (
+            <section className="workspace-card">
+              <h2>MUI Mode</h2>
+              <ThemeProvider theme={muiPreviewTheme}>
+                <FormBuilder
+                  schema={schema}
+                  locale={locale}
+                  translator={mockTranslator}
+                  translationAdapter={mockAsyncTranslator}
+                  onChange={changeSchema}
+                  policy={previewPolicy}
+                  defaultFieldType="textarea"
+                  readOnly={builderReadOnly}
+                  features={{
+                    pages: pagesEnabled,
+                    localization: localizationEnabled,
+                    conditions: conditionsEnabled
+                  }}
+                  components={muiBuilderComponents}
+                />
+              </ThemeProvider>
+            </section>
+          )}
         </div>
         <div id="panel-respondent" role="tabpanel" aria-labelledby="tab-respondent" hidden={activeTab !== "respondent"}>
           <section className="workspace-card respondent-card">

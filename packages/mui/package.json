@@ -1,0 +1,70 @@
+{
+  "name": "@form-engine-ts/mui",
+  "version": "2.9.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitta-a/form-engine-ts.git",
+    "directory": "packages/mui"
+  },
+  "bugs": {
+    "url": "https://github.com/nitta-a/form-engine-ts/issues"
+  },
+  "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
+  "keywords": [
+    "form",
+    "react",
+    "mui",
+    "material-ui",
+    "form-builder",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup src/index.tsx --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@emotion/react": "^11.0.0",
+    "@emotion/styled": "^11.0.0",
+    "@form-engine-ts/core": "workspace:*",
+    "@form-engine-ts/react": "workspace:*",
+    "@mui/icons-material": "^6.0.0 || ^7.0.0",
+    "@mui/material": "^6.0.0 || ^7.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@form-engine-ts/core": "workspace:*",
+    "@form-engine-ts/react": "workspace:*",
+    "@mui/icons-material": "^7.3.2",
+    "@mui/material": "^7.3.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

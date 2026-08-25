@@ -129,11 +129,14 @@ declare function useSubmissionReceipts(store: SubmissionReceiptStore, queries: r
 
 interface ComponentBaseProps {
     readonly id?: string;
-    readonly className?: string;
+    readonly className?: string | undefined;
     readonly disabled?: boolean;
     readonly readOnly?: boolean;
-    readonly "aria-label"?: string;
+    readonly "aria-label"?: string | undefined;
+    readonly "aria-describedby"?: string | undefined;
+    readonly "aria-labelledby"?: string | undefined;
 }
+type BuilderActionIconType = "moveUp" | "moveDown" | "delete" | "add" | "edit" | "settings" | "translate" | "close" | "dragHandle";
 interface BuilderButtonProps extends ComponentBaseProps {
     readonly onClick?: () => void;
     readonly variant?: "primary" | "secondary" | "danger";
@@ -142,10 +145,17 @@ interface BuilderButtonProps extends ComponentBaseProps {
     readonly action?: string;
     readonly targetId?: string;
 }
+interface IconButtonProps extends ComponentBaseProps {
+    readonly onClick?: () => void;
+    readonly icon?: string | ReactNode;
+    readonly actionType?: BuilderActionIconType;
+    readonly title?: string;
+}
 interface BuilderIconButtonProps extends ComponentBaseProps {
     readonly onClick?: () => void;
-    readonly icon: string;
-    readonly title: string;
+    readonly icon?: string | ReactNode;
+    readonly actionType?: BuilderActionIconType;
+    readonly title?: string;
 }
 interface InputComponentProps extends ComponentBaseProps {
     readonly name?: string;
@@ -183,7 +193,7 @@ interface BuilderCheckboxProps extends ComponentBaseProps {
 }
 interface BuilderSectionProps {
     readonly id?: string;
-    readonly className?: string;
+    readonly className?: string | undefined;
     readonly title?: string;
     readonly description?: string;
     readonly headingId?: string;
@@ -192,10 +202,13 @@ interface BuilderSectionProps {
     readonly children: ReactNode;
 }
 interface BuilderFieldsetProps {
-    readonly className?: string;
+    readonly className?: string | undefined;
     readonly legend?: string;
     readonly disabled?: boolean;
     readonly children: ReactNode;
+}
+interface BuilderErrorMessageProps extends ComponentBaseProps {
+    readonly message: string;
 }
 interface FormBuilderComponents {
     readonly Button?: ComponentType<BuilderButtonProps>;
@@ -209,6 +222,7 @@ interface FormBuilderComponents {
     readonly ErrorMessage?: ComponentType<{
         readonly message: string;
     }>;
+    readonly renderIcon?: (actionType: BuilderActionIconType) => ReactNode;
 }
 type FormBuilderActions = Omit<FormBuilderResult, "schema" | "validationIssues">;
 interface BuilderSlotBaseProps {
@@ -401,8 +415,10 @@ interface FormBuilderProps {
     readonly features?: FormBuilderFeatures;
     readonly components?: FormBuilderComponents;
     readonly slots?: FormBuilderSlots;
+    readonly disableDefaultStyles?: boolean;
+    readonly unstyled?: boolean;
 }
-declare function FormBuilder({ schema, onChange, locale, translator, translationAdapter, translationOptions, onTranslationReport, policy, idFactory, factories, className, defaultFieldType, onActionError, createManualTranslationMetadata, readOnly, features, components: componentOverrides, slots }: FormBuilderProps): react.JSX.Element;
+declare function FormBuilder({ schema, onChange, locale, translator, translationAdapter, translationOptions, onTranslationReport, policy, idFactory, factories, className, defaultFieldType, onActionError, createManualTranslationMetadata, readOnly, features, components: componentOverrides, slots, disableDefaultStyles, unstyled }: FormBuilderProps): react.JSX.Element;
 
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
 interface FormContextValue {
@@ -475,4 +491,4 @@ interface StandaloneFormRendererProps extends FormRendererPresentationProps {
 type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
 declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
 
-export { type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldState, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSlots, type FormContextValue, FormProvider, type FormProviderProps, FormRenderer, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlots, type FormSubmitHandler, type FormSubmitState, type InputComponentProps, type ManualTranslationContext, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, resolveInitialFieldType, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };
+export { type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldState, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSlots, type FormContextValue, FormProvider, type FormProviderProps, FormRenderer, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlots, type FormSubmitHandler, type FormSubmitState, type IconButtonProps, type InputComponentProps, type ManualTranslationContext, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, resolveInitialFieldType, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };
