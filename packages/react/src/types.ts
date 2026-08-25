@@ -145,6 +145,7 @@ interface BuilderSlotBaseProps {
   readonly readOnly: boolean;
   readonly actions: FormBuilderActions;
   readonly components: Required<FormBuilderComponents>;
+  readonly translate: (key: string, params?: Record<string, unknown>) => string;
 }
 
 export interface BuilderToolbarSlotProps extends BuilderSlotBaseProps {
@@ -163,6 +164,11 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
   readonly index: number;
   readonly currentLocale: string;
   readonly policy?: FormPolicy;
+  readonly features?: {
+    readonly pages?: boolean;
+    readonly localization?: boolean;
+    readonly conditions?: boolean;
+  };
 }
 
 export interface BuilderOptionEditorSlotProps extends BuilderSlotBaseProps {
@@ -174,6 +180,11 @@ export interface BuilderOptionEditorSlotProps extends BuilderSlotBaseProps {
 
 export interface BuilderPagesSlotProps extends BuilderSlotBaseProps {
   readonly currentLocale: string;
+  readonly features?: {
+    readonly pages?: boolean;
+    readonly localization?: boolean;
+    readonly conditions?: boolean;
+  };
 }
 
 export interface BuilderLocalizationSlotProps extends BuilderSlotBaseProps {
@@ -182,6 +193,8 @@ export interface BuilderLocalizationSlotProps extends BuilderSlotBaseProps {
   readonly onAutoTranslate: () => void;
   readonly isTranslating: boolean;
   readonly translationError?: string;
+  readonly policy?: FormPolicy;
+  readonly translationAdapterAvailable?: boolean;
 }
 
 export interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps {
@@ -191,7 +204,15 @@ export interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps
   readonly translationError?: string;
   readonly translationReport?: TranslationReport;
   readonly onClearTranslationError?: () => void;
+  readonly translationAdapterAvailable?: boolean;
 }
+
+export type FormBuilderSectionName =
+  | "basicSettings"
+  | "completionMessage"
+  | "questions"
+  | "addQuestion"
+  | "localization";
 
 export interface FormBuilderSlots {
   readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;
@@ -200,6 +221,7 @@ export interface FormBuilderSlots {
   readonly pages?: ComponentType<BuilderPagesSlotProps>;
   readonly localization?: ComponentType<BuilderLocalizationSlotProps>;
   readonly translationActions?: ComponentType<BuilderTranslationActionsSlotProps>;
+  readonly sectionOrder?: readonly FormBuilderSectionName[];
 }
 
 export interface BuilderActionContext {

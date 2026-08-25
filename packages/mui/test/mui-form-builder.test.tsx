@@ -1,4 +1,4 @@
-import type { AsyncTranslationAdapter, FormSchema } from "@form-engine-ts/core";
+import type { AsyncTranslationAdapter, FormSchema, TranslationAdapter } from "@form-engine-ts/core";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -7,6 +7,7 @@ import "@form-engine-ts/react/styles.css";
 import {
   createMuiBuilderComponents,
   createMuiBuilderProps,
+  createMuiButtonAdapter,
   createMuiCheckboxAdapter,
   createMuiIconButtonAdapter,
   createMuiTextInputAdapter,
@@ -101,7 +102,7 @@ describe("MuiFormBuilder", () => {
     expect(fieldEditor).not.toBeNull();
     if (fieldEditor === null) return;
     await user.click(within(fieldEditor).getByRole("combobox", { name: /Type/u }));
-    await user.click(screen.getByRole("option", { name: "radio" }));
+    await user.click(screen.getByRole("option", { name: "Radio" }));
     await waitFor(() => expect(screen.getByTestId("schema-state")).toHaveTextContent('"type":"radio"'));
 
     await user.click(screen.getByRole("button", { name: "Move Second up" }));
@@ -139,7 +140,10 @@ describe("MuiFormBuilder", () => {
     const user = userEvent.setup();
     const TextInput = createMuiTextInputAdapter({ size: "small" });
     const Checkbox = createMuiCheckboxAdapter({ size: "small" });
-    const IconButton = createMuiIconButtonAdapter({ size: "small" });
+    const IconButton = createMuiIconButtonAdapter({
+      size: "small",
+      getActionLabel: (actionType) => `Localized ${actionType}`
+    });
     render(
       <>
         <span id="explicit-label">Explicit label</span>
@@ -183,10 +187,168 @@ describe("MuiFormBuilder", () => {
     expect(checkbox).toBeRequired();
     expect(checkbox).toHaveAttribute("aria-describedby", "native-checkbox-error");
     expect(document.getElementById("native-checkbox-error")).toHaveTextContent("Consent error");
-    const deleteButton = screen.getByRole("button", { name: "削除" });
+    const deleteButton = screen.getByRole("button", { name: "Localized delete" });
     expect(deleteButton).toHaveClass("MuiIconButton-colorError", "MuiIconButton-sizeSmall");
     await user.hover(deleteButton);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("削除");
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Localized delete");
+  });
+
+  it("uses the builder translator and injected locale labels throughout MUI slots", async () => {
+    const user = userEvent.setup();
+    const dictionary: Readonly<Record<string, string>> = {
+      "builder.formBuilder": "JP: builder",
+      "builder.basicSettings": "JP: basic",
+      "builder.formTitle": "JP: form title",
+      "builder.formDescription": "JP: form description",
+      "builder.completionMessage": "JP: completion",
+      "builder.pages": "JP: pages",
+      "builder.enablePages": "JP: enable pages",
+      "builder.questionTitle": "JP: question",
+      "builder.type": "JP: type",
+      "builder.description": "JP: description",
+      "builder.required": "JP: required",
+      "builder.options": "JP: options",
+      "builder.optionLabel": "JP: option {{index}}",
+      "builder.addOption": "JP: add option",
+      "builder.moveUp": "JP: move {{title}} up",
+      "builder.moveDown": "JP: move {{title}} down",
+      "builder.delete": "JP: delete {{title}}",
+      "builder.localization": "JP: localization",
+      "builder.defaultLocale": "JP: default locale",
+      "builder.addLocale": "JP: add locale",
+      "builder.translationLocale": "JP: translation locale",
+      "builder.selectLocale": "JP: select locale",
+      "builder.translatedFormTitle": "JP: translated form title",
+      "builder.translatedFormDescription": "JP: translated form description",
+      "builder.translatedCompletionMessage": "JP: translated completion",
+      "builder.translatedQuestionTitle": "JP: translated question",
+      "builder.translatedDescription": "JP: translated description",
+      "builder.translation": "JP: {{locale}} translation",
+      "builder.fieldType.text": "JP: text",
+      "builder.fieldType.textarea": "JP: textarea",
+      "builder.fieldType.number": "JP: number",
+      "builder.fieldType.rating": "JP: rating",
+      "builder.fieldType.select": "JP: select",
+      "builder.fieldType.multi-select": "JP: multi-select",
+      "builder.fieldType.checkbox": "JP: checkbox",
+      "builder.fieldType.radio": "JP: radio",
+      "builder.addQuestion": "JP: add question"
+    };
+    const translator: TranslationAdapter = {
+      translate: (key, _locale, params = {}) => {
+        const template = dictionary[key] ?? `JP: ${key}`;
+        return template.replace(/\{\{(\w+)\}\}/gu, (token, name: string) =>
+          Object.hasOwn(params, name) ? String(params[name]) : token
+        );
+      }
+    };
+    render(
+      <MuiFormBuilder
+        schema={{
+          ...schema,
+          fields: [...schema.fields, { id: "notes", type: "textarea", title: "Notes", required: false }]
+        }}
+        onChange={() => undefined}
+        locale="ja"
+        translator={translator}
+        muiOptions={{ getLocaleLabel: (locale) => (locale === "ja" ? "日本語" : "English") }}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "JP: form title" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "日本語" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "English" })).not.toBeInTheDocument();
+    const fieldEditor = screen.getByText("Choice").closest<HTMLElement>('[data-mui-slot="field-editor"]');
+    expect(fieldEditor).not.toBeNull();
+    if (fieldEditor === null) return;
+    expect(within(fieldEditor).getByRole("button", { name: "JP: delete Choice" })).toBeInTheDocument();
+    await user.hover(within(fieldEditor).getByRole("button", { name: "JP: delete Choice" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("JP: delete Choice");
+    expect(screen.queryByText("Localization")).not.toBeInTheDocument();
+  });
+
+  it("matches feature and policy guards for conditions, pages, field types, and locales", async () => {
+    const user = userEvent.setup();
+    const guardedSchema: FormSchema = {
+      ...schema,
+      pages: [{ id: "page-1", title: "First page", questionIds: ["source", "choice"] }],
+      fields: [
+        { id: "source", type: "text", title: "Source", required: true },
+        {
+          id: "choice",
+          type: "select",
+          title: "Choice",
+          required: true,
+          displayCondition: { questionId: "source", operator: "equals", value: "show" },
+          options: schema.fields[0]?.type === "select" ? schema.fields[0].options : []
+        }
+      ]
+    };
+    render(
+      <MuiFormBuilder
+        schema={guardedSchema}
+        onChange={() => undefined}
+        features={{ conditions: false, pages: false }}
+        policy={{ allowedFieldTypes: ["select"], allowedLocales: ["en", "ja", "zh"], maxLocales: 2 }}
+        muiOptions={{ getLocaleLabel: (locale) => ({ en: "English", ja: "日本語", zh: "中文" })[locale] ?? locale }}
+      />
+    );
+
+    expect(screen.queryByLabelText("Display condition")).not.toBeInTheDocument();
+    expect(screen.queryByText("Page manager")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Page")).not.toBeInTheDocument();
+    const choiceEditor = screen.getByText("Choice").closest<HTMLElement>('[data-mui-slot="field-editor"]');
+    expect(choiceEditor).not.toBeNull();
+    if (choiceEditor === null) return;
+    await user.click(within(choiceEditor).getByRole("combobox", { name: "Type" }));
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("option", { name: "Select" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tab", { name: "English" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "日本語" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add locale" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Translate all text" })).not.toBeInTheDocument();
+  });
+
+  it("orders independent sections and applies collapsible, semantic variant, and slot-prop options", () => {
+    const Button = createMuiButtonAdapter({
+      buttonVariants: { primary: "contained", danger: "outlined" },
+      fullWidth: false
+    });
+    const { container } = render(
+      <>
+        <MuiFormBuilder
+          schema={schema}
+          onChange={() => undefined}
+          layoutOptions={{
+            sectionOrder: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
+          }}
+          localizationOptions={{ collapsible: true, defaultExpanded: "when-configured" }}
+          muiSlotProps={{ card: { sx: { p: "40px" } }, accordion: { elevation: 0 } }}
+        />
+        <Button variant="danger" onClick={() => undefined}>
+          Danger action
+        </Button>
+      </>
+    );
+
+    const ordered = [
+      document.getElementById("builder-basic-settings-heading"),
+      document.getElementById("builder-completion-message-heading"),
+      container.querySelector('[data-mui-slot="field-editor"]'),
+      screen.getByRole("button", { name: "Add question" }),
+      container.querySelector('[data-mui-slot="localization"]')
+    ];
+    expect(ordered.every((element) => element !== null)).toBe(true);
+    for (let index = 0; index < ordered.length - 1; index += 1) {
+      expect(
+        (ordered[index]?.compareDocumentPosition(ordered[index + 1] as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+    expect(screen.getByRole("button", { name: "Localization" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Danger action" })).toHaveClass("MuiButton-outlinedError");
+    const fieldEditor = container.querySelector<HTMLElement>('[data-mui-slot="field-editor"]');
+    expect(fieldEditor === null ? "" : getComputedStyle(fieldEditor).padding).toBe("40px");
   });
 
   it("exports low-level builder props and individual adapter factories", () => {

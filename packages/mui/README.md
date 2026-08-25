@@ -9,7 +9,20 @@ import { MuiFormBuilder } from "@form-engine-ts/mui";
 <MuiFormBuilder
   schema={schema}
   onChange={setSchema}
-  muiOptions={{ size: "small", variant: "outlined", buttonVariant: "contained", dense: true }}
+  translator={translator}
+  translationAdapter={translationAdapter}
+  muiOptions={{
+    size: "small",
+    variant: "outlined",
+    dense: true,
+    getLocaleLabel: (locale) => localeNames[locale] ?? locale,
+    buttonVariants: { primary: "contained", secondary: "outlined", danger: "outlined" }
+  }}
+  layoutOptions={{
+    sectionOrder: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
+  }}
+  localizationOptions={{ collapsible: true, defaultExpanded: "when-configured" }}
+  muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
 />;
 ```
 
@@ -21,5 +34,12 @@ For low-level composition, `createMuiBuilderProps(options, overrides)` returns `
 factories such as `createMuiTextInputAdapter`, `createMuiIconButtonAdapter`, `createMuiFieldEditorSlot`, and
 `createMuiLocalizationSlot`.
 
+All MUI builder slots use the `FormBuilder` translator for labels, actions, tooltips, and accessible names. Use
+`getLocaleLabel` for application-specific locale names. The localization UI excludes `schema.defaultLocale` from its
+translation tabs and follows `allowedLocales` and `maxLocales` from the builder policy.
+
 `MuiAdapterOptions` defaults to `size: "medium"`, `variant: "outlined"`, `buttonVariant: "contained"`, and
-`fullWidth: true`. Set `dense` to reduce section, editor, option, and toolbar spacing.
+`fullWidth: true`. Set `dense` to reduce section, editor, option, and toolbar spacing. `buttonVariants` can override the
+MUI variant for `primary`, `secondary`, and `danger` actions independently. `layoutOptions`, `localizationOptions`, and
+`muiSlotProps` are also accepted in `muiOptions` for low-level factories such as `createMuiBuilderSlots`; the dedicated
+`MuiFormBuilder` props take precedence.

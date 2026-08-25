@@ -1053,7 +1053,17 @@ export default function App() {
                     localization: localizationEnabled,
                     conditions: conditionsEnabled
                   }}
-                  muiOptions={{ size: "small", dense: true }}
+                  muiOptions={{
+                    size: "small",
+                    dense: true,
+                    getLocaleLabel: (targetLocale) => ({ ja: "日本語", en: "English" })[targetLocale] ?? targetLocale,
+                    buttonVariants: { primary: "contained", secondary: "outlined", danger: "outlined" }
+                  }}
+                  layoutOptions={{
+                    sectionOrder: ["basicSettings", "completionMessage", "questions", "addQuestion", "localization"]
+                  }}
+                  localizationOptions={{ collapsible: true, defaultExpanded: "when-configured" }}
+                  muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
                 />
               </ThemeProvider>
             </section>

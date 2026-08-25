@@ -1,5 +1,15 @@
+import type { TranslationAdapter } from "@form-engine-ts/core";
 import { render, screen } from "@testing-library/react";
-import type { BuilderTextInputProps, FormBuilderComponents } from "../src";
+import type {
+  BuilderFieldEditorSlotProps,
+  BuilderLocalizationSlotProps,
+  BuilderOptionEditorSlotProps,
+  BuilderPagesSlotProps,
+  BuilderTextInputProps,
+  BuilderToolbarSlotProps,
+  BuilderTranslationActionsSlotProps,
+  FormBuilderComponents
+} from "../src";
 import { FormBuilder } from "../src";
 
 const schema = {
@@ -79,5 +89,79 @@ describe("FormBuilder design-system interop", () => {
     expect(screen.getByTestId("icon-moveUp")).toBeInTheDocument();
     expect(screen.getByTestId("icon-moveDown")).toBeInTheDocument();
     expect(screen.getByTestId("icon-delete")).toBeInTheDocument();
+  });
+
+  it("passes the resolved translator to every builder slot", () => {
+    const translator: TranslationAdapter = {
+      translate: (key) => `translated:${key}`
+    };
+    const Toolbar = ({ translate }: BuilderToolbarSlotProps) => (
+      <span data-testid="translated-toolbar">{translate("builder.actions.edit")}</span>
+    );
+    const FieldEditor = ({ translate }: BuilderFieldEditorSlotProps) => (
+      <span data-testid="translated-field">{translate("builder.questionTitle")}</span>
+    );
+    const OptionEditor = ({ translate }: BuilderOptionEditorSlotProps) => (
+      <span data-testid="translated-option">{translate("builder.optionLabel", { index: 1 })}</span>
+    );
+    const Pages = ({ translate }: BuilderPagesSlotProps) => (
+      <span data-testid="translated-pages">{translate("builder.pages")}</span>
+    );
+    const Localization = ({ translate }: BuilderLocalizationSlotProps) => (
+      <span data-testid="translated-localization">{translate("builder.localization")}</span>
+    );
+    const TranslationActions = ({ translate }: BuilderTranslationActionsSlotProps) => (
+      <span data-testid="translated-actions">{translate("builder.autoTranslate")}</span>
+    );
+    const choiceSchema = {
+      ...schema,
+      defaultLocale: "en",
+      supportedLocales: ["ja"],
+      pages: [{ id: "page-1", title: "Page", questionIds: ["name"] }],
+      fields: [
+        {
+          id: "choice",
+          type: "select" as const,
+          title: "Choice",
+          required: true,
+          options: [{ id: "one", label: "One" }]
+        }
+      ]
+    };
+
+    render(
+      <>
+        <FormBuilder
+          schema={choiceSchema}
+          onChange={() => undefined}
+          translator={translator}
+          slots={{
+            toolbar: Toolbar,
+            optionEditor: OptionEditor,
+            pages: Pages,
+            translationActions: TranslationActions
+          }}
+        />
+        <FormBuilder
+          schema={choiceSchema}
+          onChange={() => undefined}
+          translator={translator}
+          slots={{ fieldEditor: FieldEditor }}
+        />
+        <FormBuilder
+          schema={choiceSchema}
+          onChange={() => undefined}
+          translator={translator}
+          slots={{ localization: Localization }}
+        />
+      </>
+    );
+
+    expect(screen.getByTestId("translated-toolbar")).toHaveTextContent("translated:builder.actions.edit");
+    expect(screen.getByTestId("translated-field")).toHaveTextContent("translated:builder.questionTitle");
+    expect(screen.getByTestId("translated-option")).toHaveTextContent("translated:builder.optionLabel");
+    expect(screen.getByTestId("translated-pages")).toHaveTextContent("translated:builder.pages");
+    expect(screen.getByTestId("translated-localization")).toHaveTextContent("translated:builder.localization");
+    expect(screen.getByTestId("translated-actions")).toHaveTextContent("translated:builder.autoTranslate");
   });
 });

@@ -4,16 +4,16 @@ import type { ComponentType } from "react";
 import type { MuiAdapterOptions } from "../types";
 import { resolveMuiAdapterOptions } from "../types";
 
-const ACTION_LABELS: Readonly<Record<BuilderActionIconType, string>> = {
-  moveUp: "上へ移動",
-  moveDown: "下へ移動",
-  delete: "削除",
-  add: "追加",
-  edit: "編集",
-  settings: "設定",
-  translate: "翻訳",
-  close: "閉じる",
-  dragHandle: "並べ替え"
+const FALLBACK_ACTION_LABELS: Readonly<Record<BuilderActionIconType, string>> = {
+  moveUp: "Move up",
+  moveDown: "Move down",
+  delete: "Delete",
+  add: "Add",
+  edit: "Edit",
+  settings: "Settings",
+  translate: "Translate",
+  close: "Close",
+  dragHandle: "Reorder"
 };
 
 export function createMuiIconButtonAdapter(options?: MuiAdapterOptions): ComponentType<BuilderIconButtonProps> {
@@ -31,7 +31,10 @@ export function createMuiIconButtonAdapter(options?: MuiAdapterOptions): Compone
     actionType,
     title
   }: BuilderIconButtonProps) {
-    const actionLabel = actionType === undefined ? "操作" : ACTION_LABELS[actionType];
+    const actionLabel =
+      actionType === undefined
+        ? "Action"
+        : (resolved.getActionLabel?.(actionType) ?? FALLBACK_ACTION_LABELS[actionType]);
     const tooltip = title ?? actionLabel;
     const color = actionType === "delete" ? "error" : actionType === "add" ? "primary" : "default";
     return (

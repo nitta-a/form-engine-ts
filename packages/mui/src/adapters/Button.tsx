@@ -36,7 +36,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
         data-target-id={targetId}
         onClick={onClick}
         color={variant === "danger" ? "error" : "primary"}
-        variant={resolved.buttonVariant}
+        variant={resolved.buttonVariants?.[variant ?? "primary"] ?? resolved.buttonVariant}
         fullWidth={resolved.fullWidth}
       >
         {children}

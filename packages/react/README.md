@@ -75,8 +75,11 @@ set, locale addition becomes a selector containing only unregistered allowed loc
 Visual Builder has two independent design-system extension layers. `components` replaces normalized primitives such as
 `Button`, `TextInput`, `TextArea`, `Select`, `Checkbox`, `Section`, and `Fieldset`. `slots` replaces complete authoring
 surfaces: `toolbar`, `fieldEditor`, `optionEditor`, `pages`, `localization`, or `translationActions`. Slot props expose
-policy-aware `actions`; a custom `translationActions` slot can therefore call an application-specific AI mutation while
-the standard manual localization editors remain unchanged.
+policy-aware `actions` and the builder's resolved `translate(key, params)` function. Feature-aware slots also receive the
+relevant feature state, while localization slots receive policy and translation-adapter availability. A custom
+`translationActions` slot can therefore call an application-specific AI mutation while the standard manual localization
+editors remain unchanged. A slot collection can set `sectionOrder` to arrange `basicSettings`, `completionMessage`,
+`questions`, `addQuestion`, and `localization` as independent authoring sections.
 
 Input primitives receive design-system-friendly `name`, `label`, `required`, `error`, and `helperText` props in addition
 to their normalized string-value callbacks. The `translationActions` slot also receives `translationError`, the latest

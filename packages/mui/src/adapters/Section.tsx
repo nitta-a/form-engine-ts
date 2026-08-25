@@ -18,25 +18,28 @@ export function createMuiSectionAdapter(options?: MuiAdapterOptions): ComponentT
   }: BuilderSectionProps) {
     return (
       <Paper
+        {...resolved.muiSlotProps?.paper}
         id={id}
         className={className}
         elevation={0}
         aria-label={ariaLabel}
         aria-labelledby={title === undefined ? undefined : headingId}
         onClickCapture={onClickCapture}
-        sx={{
-          p: resolved.dense ? 1.5 : 2,
-          mb: resolved.dense ? 1 : 2,
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          display: "grid",
-          gap: resolved.dense ? 1 : 2,
-          "& > div:not(.MuiStack-root):not(.MuiPaper-root)": {
+        sx={
+          resolved.muiSlotProps?.paper?.sx ?? {
+            p: resolved.dense ? 1.5 : 2,
+            mb: resolved.dense ? 1 : 2,
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 1,
             display: "grid",
-            gap: resolved.dense ? 1 : 2
+            gap: resolved.dense ? 1 : 2,
+            "& > div:not(.MuiStack-root):not(.MuiPaper-root)": {
+              display: "grid",
+              gap: resolved.dense ? 1 : 2
+            }
           }
-        }}
+        }
       >
         {title === undefined ? null : (
           <Typography id={headingId} variant="subtitle1" fontWeight="bold">

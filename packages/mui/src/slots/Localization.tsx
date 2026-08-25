@@ -1,6 +1,7 @@
 import type { BuilderLocalizationSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
-import { Box, Stack, Tab, Tabs, Typography } from "@mui/material";
-import type { ComponentType, SyntheticEvent } from "react";
+import { ExpandMore } from "@mui/icons-material";
+import { Accordion, AccordionDetails, AccordionSummary, Box, Stack, Tab, Tabs, Typography } from "@mui/material";
+import type { ComponentType, ReactNode, SyntheticEvent } from "react";
 import { useState } from "react";
 import type { MuiAdapterOptions } from "../types";
 import { resolveMuiAdapterOptions } from "../types";
@@ -14,27 +15,167 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
     onAutoTranslate,
     isTranslating,
     translationError,
+    policy,
+    translationAdapterAvailable,
     readOnly,
     actions,
-    components
+    components,
+    translate
   }: BuilderLocalizationSlotProps) {
-    const { Button, ErrorMessage, TextArea, TextInput } = components;
+    const { Button, ErrorMessage, Select, TextArea, TextInput } = components;
     const [newLocale, setNewLocale] = useState("");
     const locales = Array.from(
-      new Set([
-        ...(schema.supportedLocales ?? []),
-        ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale])
-      ])
+      new Set((schema.supportedLocales ?? []).filter((locale) => locale !== schema.defaultLocale))
     );
+    const editingLocaleConfigured = locales.includes(currentLocale);
+    const registeredLocales = new Set([
+      ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+      ...(schema.supportedLocales ?? [])
+    ]);
+    const availableAllowedLocales = policy?.allowedLocales?.filter((locale) => !registeredLocales.has(locale));
+    const localeLimitReached = policy?.maxLocales !== undefined && registeredLocales.size >= policy.maxLocales;
+    const normalizedLocale = newLocale.trim();
+    const localeAllowed = policy?.allowedLocales === undefined || policy.allowedLocales.includes(normalizedLocale);
+    const canAddLocale =
+      !readOnly &&
+      normalizedLocale.length > 0 &&
+      localeAllowed &&
+      !registeredLocales.has(normalizedLocale) &&
+      !localeLimitReached;
     const handleTabChange = (_event: SyntheticEvent, value: string) => onCurrentLocaleChange(value);
     const addLocale = () => {
-      const normalized = newLocale.trim();
-      if (normalized.length === 0) return;
-      const result = actions.addLocale(normalized);
+      if (!canAddLocale) return;
+      const result = actions.addLocale(normalizedLocale);
       if (!result.success) return;
-      onCurrentLocaleChange(normalized);
+      onCurrentLocaleChange(normalizedLocale);
       setNewLocale("");
     };
+    const stackProps = resolved.muiSlotProps?.stack;
+    const collapsible = resolved.localizationOptions?.collapsible ?? false;
+    const content = (
+      <Stack {...stackProps} spacing={resolved.dense ? 1 : 2}>
+        {!collapsible ? (
+          <Typography variant="subtitle1" fontWeight="bold">
+            {translate("builder.localization")}
+          </Typography>
+        ) : null}
+        <Stack {...stackProps} direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+          <TextInput
+            id="mui-builder-default-locale"
+            label={translate("builder.defaultLocale")}
+            value={schema.defaultLocale ?? ""}
+            disabled={readOnly}
+            onChange={(value) => {
+              const result = actions.setDefaultLocale(value);
+              if (result.success && value === currentLocale) onCurrentLocaleChange("");
+            }}
+          />
+          {availableAllowedLocales === undefined ? (
+            <TextInput
+              id="mui-builder-new-locale"
+              label={translate("builder.addLocale")}
+              value={newLocale}
+              disabled={readOnly || localeLimitReached}
+              onChange={setNewLocale}
+            />
+          ) : (
+            <Select
+              id="mui-builder-new-locale"
+              label={translate("builder.addLocale")}
+              value={newLocale}
+              options={[
+                { value: "", label: "—" },
+                ...availableAllowedLocales.map((locale) => ({
+                  value: locale,
+                  label: resolved.getLocaleLabel?.(locale) ?? locale
+                }))
+              ]}
+              disabled={readOnly || localeLimitReached || availableAllowedLocales.length === 0}
+              onChange={setNewLocale}
+            />
+          )}
+          <Button variant="primary" action="addLocale" disabled={!canAddLocale} onClick={addLocale}>
+            {translate("builder.addLocale")}
+          </Button>
+        </Stack>
+        {locales.length === 0 ? null : (
+          <Tabs
+            value={editingLocaleConfigured ? currentLocale : false}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            aria-label={translate("builder.translationLocale")}
+          >
+            {locales.map((locale) => (
+              <Tab
+                key={locale}
+                value={locale}
+                label={resolved.getLocaleLabel?.(locale) ?? locale}
+                disabled={readOnly && locale !== currentLocale}
+              />
+            ))}
+          </Tabs>
+        )}
+        {!translationAdapterAvailable ? null : (
+          <Button
+            variant="secondary"
+            disabled={readOnly || !editingLocaleConfigured || isTranslating}
+            onClick={onAutoTranslate}
+          >
+            {isTranslating ? translate("builder.translating") : translate("builder.autoTranslate")}
+          </Button>
+        )}
+        {translationError === undefined ? null : <ErrorMessage message={translationError} />}
+        {!editingLocaleConfigured ? (
+          <Typography variant="body2" color="text.secondary">
+            {translate("builder.selectLocale")}
+          </Typography>
+        ) : (
+          <Stack {...stackProps} spacing={resolved.dense ? 1 : 2}>
+            <TextInput
+              id={`mui-builder-${currentLocale}-form-title`}
+              label={translate("builder.translatedFormTitle")}
+              value={schema.translations?.[currentLocale]?.title ?? ""}
+              disabled={readOnly}
+              onChange={(value) => actions.setLocaleTranslation(currentLocale, { kind: "form" }, "title", value)}
+            />
+            <TextArea
+              id={`mui-builder-${currentLocale}-form-description`}
+              label={translate("builder.translatedFormDescription")}
+              value={schema.translations?.[currentLocale]?.description ?? ""}
+              disabled={readOnly}
+              onChange={(value) => actions.setLocaleTranslation(currentLocale, { kind: "form" }, "description", value)}
+            />
+            <TextInput
+              id={`mui-builder-${currentLocale}-completion-message`}
+              label={translate("builder.translatedCompletionMessage")}
+              value={schema.translations?.[currentLocale]?.completionMessage ?? ""}
+              disabled={readOnly}
+              onChange={(value) =>
+                actions.setLocaleTranslation(currentLocale, { kind: "form" }, "completionMessage", value)
+              }
+            />
+          </Stack>
+        )}
+      </Stack>
+    );
+    const configured = locales.length > 0;
+    const defaultExpanded =
+      resolved.localizationOptions?.defaultExpanded === "when-configured"
+        ? configured
+        : (resolved.localizationOptions?.defaultExpanded ?? false);
+    if (collapsible) {
+      return (
+        <Accordion {...resolved.muiSlotProps?.accordion} data-mui-slot="localization" defaultExpanded={defaultExpanded}>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography variant="subtitle1" fontWeight="bold">
+              {translate("builder.localization")}
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>{content}</AccordionDetails>
+        </Accordion>
+      );
+    }
     return (
       <Box
         data-mui-slot="localization"
@@ -46,91 +187,7 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
           borderRadius: 1
         }}
       >
-        <Stack spacing={resolved.dense ? 1 : 2}>
-          <Typography variant="subtitle1" fontWeight="bold">
-            Localization
-          </Typography>
-          <TextInput
-            id="mui-builder-completion-message"
-            label="Completion message"
-            value={schema.completionMessage ?? ""}
-            disabled={readOnly}
-            onChange={(value) => actions.setSourceText({ kind: "form" }, "completionMessage", value)}
-          />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
-            <TextInput
-              id="mui-builder-default-locale"
-              label="Default locale"
-              value={schema.defaultLocale ?? ""}
-              disabled={readOnly}
-              onChange={(value) => actions.setDefaultLocale(value)}
-            />
-            <TextInput
-              id="mui-builder-new-locale"
-              label="Add locale"
-              value={newLocale}
-              disabled={readOnly}
-              onChange={setNewLocale}
-            />
-            <Button disabled={readOnly || newLocale.trim().length === 0} onClick={addLocale}>
-              Add locale
-            </Button>
-          </Stack>
-          {locales.length === 0 ? null : (
-            <Tabs
-              value={locales.includes(currentLocale) ? currentLocale : false}
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-              aria-label="Translation locale"
-            >
-              {locales.map((locale) => (
-                <Tab key={locale} value={locale} label={locale} disabled={readOnly && locale !== currentLocale} />
-              ))}
-            </Tabs>
-          )}
-          <Button
-            variant="secondary"
-            disabled={readOnly || currentLocale.length === 0 || isTranslating}
-            onClick={onAutoTranslate}
-          >
-            {isTranslating ? "Translating…" : "Translate all text"}
-          </Button>
-          {translationError === undefined ? null : <ErrorMessage message={translationError} />}
-          {currentLocale.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              Select a locale to edit translations.
-            </Typography>
-          ) : (
-            <Stack spacing={resolved.dense ? 1 : 2}>
-              <TextInput
-                id={`mui-builder-${currentLocale}-form-title`}
-                label="Translated form title"
-                value={schema.translations?.[currentLocale]?.title ?? ""}
-                disabled={readOnly}
-                onChange={(value) => actions.setLocaleTranslation(currentLocale, { kind: "form" }, "title", value)}
-              />
-              <TextArea
-                id={`mui-builder-${currentLocale}-form-description`}
-                label="Translated form description"
-                value={schema.translations?.[currentLocale]?.description ?? ""}
-                disabled={readOnly}
-                onChange={(value) =>
-                  actions.setLocaleTranslation(currentLocale, { kind: "form" }, "description", value)
-                }
-              />
-              <TextInput
-                id={`mui-builder-${currentLocale}-completion-message`}
-                label="Translated completion message"
-                value={schema.translations?.[currentLocale]?.completionMessage ?? ""}
-                disabled={readOnly}
-                onChange={(value) =>
-                  actions.setLocaleTranslation(currentLocale, { kind: "form" }, "completionMessage", value)
-                }
-              />
-            </Stack>
-          )}
-        </Stack>
+        {content as ReactNode}
       </Box>
     );
   };

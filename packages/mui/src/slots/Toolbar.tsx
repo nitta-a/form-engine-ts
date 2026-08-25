@@ -15,32 +15,34 @@ export function createMuiToolbarSlot(options?: MuiAdapterOptions): ComponentType
     onMoveDown,
     onRemove,
     readOnly,
-    components
+    components,
+    translate
   }: BuilderToolbarSlotProps) {
     const { IconButton } = components;
     return (
       <Stack
+        {...resolved.muiSlotProps?.stack}
         data-mui-slot="toolbar"
         direction="row"
         spacing={resolved.dense ? 0.5 : 1}
         alignItems="center"
-        sx={{ mb: resolved.dense ? 1 : 2 }}
+        sx={resolved.muiSlotProps?.stack?.sx ?? { mb: resolved.dense ? 1 : 2 }}
       >
         <IconButton
           actionType="moveUp"
-          title={`Move ${title} up`}
+          title={translate("builder.moveUp", { title })}
           disabled={readOnly || index === 0}
           onClick={onMoveUp}
         />
         <IconButton
           actionType="moveDown"
-          title={`Move ${title} down`}
+          title={translate("builder.moveDown", { title })}
           disabled={readOnly || index === total - 1}
           onClick={onMoveDown}
         />
         <IconButton
           actionType="delete"
-          title={`Delete ${title}`}
+          title={translate("builder.delete", { title })}
           disabled={readOnly || (kind !== "page" && total <= 1)}
           onClick={onRemove}
         />
