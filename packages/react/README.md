@@ -152,3 +152,11 @@ preserved. Pass an SSR-safe `createLocalStorageSubmissionAttemptStore()` as `att
 before submission. Renderer injects it as `attemptId` and `submissionId`, retains it after a failed request, promotes it
 to the receipt after success, and then clears the attempt. Custom receipt stores may omit `getBatch`; the hook falls back
 to concurrent `get` calls.
+
+After success, completion rendering receives a snapshot of `answers`, `schema`, the optional response, and
+`submittedItems`. Each summary item includes the field title, raw value, formatted display value, visibility, and field
+metadata. Use `renderSubmittedValues` for a typed summary slot; hidden fields are omitted by default and can be included
+with `showHiddenFieldsInSummary`. Server validation can be returned by throwing `FormSubmissionError` with `fieldErrors`
+and `formError`; field messages are mapped back to the form and the first invalid control is focused. Use
+`submissionConfirmationRenderMode="replace"` or `"dialog"` for alternate confirmation presentations, and
+`fieldsClassName` or `renderFields` to control the fields wrapper.

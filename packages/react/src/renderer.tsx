@@ -15,6 +15,7 @@ import {
   type FormEvent,
   Fragment,
   type ReactNode,
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -29,12 +30,16 @@ import type {
   FormRendererSlots,
   FormSubmitHandler,
   FormSubmitStatus,
+  FormSubmittedAnswerItem,
   FormSuccessRenderMode,
   RenderSubmitButtonProps,
+  SubmissionConfirmationRenderMode,
   SubmissionGuard,
   SubmissionProtectionProps,
+  SubmitResponse,
   SubmitResult
 } from "./types";
+import { FormSubmissionError } from "./types";
 
 export interface FieldComponentProps {
   readonly field: FormField;
@@ -285,6 +290,9 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
    * Defaults to "append" for backwards compatibility.
    */
   readonly successRenderMode?: FormSuccessRenderMode;
+  readonly submissionConfirmationRenderMode?: SubmissionConfirmationRenderMode;
+  readonly showHiddenFieldsInSummary?: boolean;
+  readonly fieldsClassName?: string;
   /** @deprecated Use successRenderMode="replace" instead. */
   readonly hideFormOnSuccess?: boolean;
   readonly successMessageKey?: string;
@@ -327,6 +335,40 @@ function isFormValue(value: unknown): value is FormValue {
   );
 }
 
+function displaySubmittedValue(field: FormField, value: unknown, translate: (key: string) => string): string {
+  if (value === undefined || value === null) return "";
+  if (field.type === "checkbox") return value === true ? translate("form.yes") : translate("form.no");
+  if (field.type === "multi-select" && Array.isArray(value)) {
+    const labels = new Map(field.options.map((option) => [option.id, option.label]));
+    return value.map((item) => labels.get(item) ?? item).join(", ");
+  }
+  if ((field.type === "radio" || field.type === "select") && typeof value === "string") {
+    return field.options.find((option) => option.id === value)?.label ?? value;
+  }
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+}
+
+function buildSubmittedItems(
+  schema: FormSchema,
+  answers: FormValues,
+  visibility: Readonly<Record<string, boolean>>,
+  translate: (key: string) => string,
+  showHiddenFields: boolean
+): readonly FormSubmittedAnswerItem[] {
+  return schema.fields
+    .filter((field) => showHiddenFields || visibility[field.id] === true)
+    .map((field) => ({
+      fieldId: field.id,
+      title: field.title,
+      type: field.type,
+      rawValue: answers[field.id],
+      displayValue: displaySubmittedValue(field, answers[field.id], translate),
+      visible: visibility[field.id] === true,
+      ...(field.metadata === undefined ? {} : { metadata: field.metadata })
+    }));
+}
+
 function parseDraft(serialized: string): StoredDraft | null {
   try {
     const value: unknown = JSON.parse(serialized);
@@ -363,6 +405,9 @@ function ContextFormRenderer({
   beforeSubmit,
   onDraftSave,
   successRenderMode = "append",
+  submissionConfirmationRenderMode = "inline",
+  showHiddenFieldsInSummary = false,
+  fieldsClassName,
   hideFormOnSuccess = false,
   submissionGuards = [],
   receiptStore,
@@ -384,9 +429,15 @@ function ContextFormRenderer({
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
   const [guardsPending, setGuardsPending] = useState(false);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
+  const [completionData, setCompletionData] = useState<{
+    readonly answers: Record<string, unknown>;
+    readonly submittedItems: readonly FormSubmittedAnswerItem[];
+    readonly response?: SubmitResponse;
+  } | null>(null);
   const [receiptLoaded, setReceiptLoaded] = useState(receiptStore === undefined);
   const rendererSubmissionInFlight = useRef(false);
   const completionRef = useRef<HTMLDivElement>(null);
+  const confirmationRef = useRef<HTMLDivElement>(null);
   const pages = form.schema.pages;
   const visiblePageIndexes = useMemo(
     () =>
@@ -400,6 +451,11 @@ function ContextFormRenderer({
   const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
+
+  const focusSubmitButton = useCallback(() => {
+    const button = formRef.current?.querySelector<HTMLElement>(".fe-submit, button[type='submit'], button");
+    button?.focus();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -451,6 +507,22 @@ function ContextFormRenderer({
     if (!isReplaceMode || form.submitStatus !== "success") return;
     completionRef.current?.focus();
   }, [form.submitStatus, isReplaceMode]);
+
+  useEffect(() => {
+    if (confirmation === null) return;
+    const confirmButton = confirmationRef.current?.querySelector<HTMLElement>("[data-fe-confirm], button");
+    confirmButton?.focus();
+    if (submissionConfirmationRenderMode !== "dialog") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setConfirmation(null);
+        globalThis.setTimeout(focusSubmitButton, 0);
+      }
+    };
+    globalThis.addEventListener("keydown", onKeyDown);
+    return () => globalThis.removeEventListener("keydown", onKeyDown);
+  }, [confirmation, focusSubmitButton, submissionConfirmationRenderMode]);
 
   useEffect(() => {
     if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
@@ -590,7 +662,33 @@ function ContextFormRenderer({
         focusFirstIssue(firstInvalidFieldId);
         return result;
       }
+      if (result.status === "error") {
+        if (result.error instanceof FormSubmissionError) {
+          const fieldErrors = result.error.payload.fieldErrors ?? {};
+          form.setServerErrors?.(fieldErrors);
+          const firstServerFieldId = Object.keys(fieldErrors)[0];
+          if (firstServerFieldId !== undefined) {
+            const invalidPageIndex = pages?.findIndex((page) => page.questionIds.includes(firstServerFieldId));
+            if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
+            focusFirstIssue(firstServerFieldId);
+          }
+        }
+        return result;
+      }
       if (result.status !== "success") return result;
+      const submittedAnswers = { ...form.values };
+      const submittedItems = buildSubmittedItems(
+        form.schema,
+        submittedAnswers,
+        form.visibility,
+        (key) => form.translate(key),
+        showHiddenFieldsInSummary
+      );
+      setCompletionData({
+        answers: submittedAnswers,
+        submittedItems,
+        ...(result.response === undefined ? {} : { response: result.response })
+      });
       if (receiptStore !== undefined) {
         const response = result.response;
         const submissionId = response?.submissionId ?? submissionAttempt?.attemptId;
@@ -642,6 +740,7 @@ function ContextFormRenderer({
 
   const cancelSubmission = () => {
     setConfirmation(null);
+    globalThis.setTimeout(focusSubmitButton, 0);
   };
 
   const resetReceipt = async () => {
@@ -673,9 +772,55 @@ function ContextFormRenderer({
   const completionMessage =
     form.schema.completionMessage ??
     (successMessageKey === undefined ? "Submitted." : form.translate(successMessageKey));
+  const activeCompletionData = completionData ?? {
+    answers: { ...form.values },
+    submittedItems: buildSubmittedItems(
+      form.schema,
+      form.values,
+      form.visibility,
+      (key) => form.translate(key),
+      showHiddenFieldsInSummary
+    )
+  };
+  const completionProps = {
+    message: completionMessage,
+    schema: form.schema,
+    answers: activeCompletionData.answers,
+    submittedItems: activeCompletionData.submittedItems,
+    ...(activeCompletionData.response === undefined ? {} : { response: activeCompletionData.response }),
+    onReset: form.reset
+  };
   const completionRegion = (
     <div ref={completionRef} className="fe-completion" role="status" aria-live="polite" tabIndex={-1}>
-      {slots.renderCompletion?.({ message: completionMessage }) ?? <div>{completionMessage}</div>}
+      {slots.renderCompletion?.(completionProps) ?? <div>{completionMessage}</div>}
+      {slots.renderSubmittedValues?.({ items: activeCompletionData.submittedItems, schema: form.schema })}
+    </div>
+  );
+
+  const confirmationContent = (
+    <div
+      ref={confirmationRef}
+      className="fe-submission-confirmation"
+      role={submissionConfirmationRenderMode === "dialog" ? undefined : "dialog"}
+    >
+      {slots.renderSubmissionConfirmation?.({
+        findings: confirmation?.findings ?? [],
+        message: confirmation?.message ?? form.translate("form.confirmSensitiveData"),
+        schema: form.schema,
+        visibleValues,
+        onConfirm: confirmSubmission,
+        onCancel: cancelSubmission
+      }) ?? (
+        <>
+          <p>{confirmation?.message ?? form.translate("form.confirmSensitiveData")}</p>
+          <button type="button" data-fe-confirm="true" onClick={confirmSubmission}>
+            {form.translate("form.confirmSubmission")}
+          </button>
+          <button type="button" onClick={cancelSubmission}>
+            {form.translate("form.cancelSubmission")}
+          </button>
+        </>
+      )}
     </div>
   );
 
@@ -704,170 +849,180 @@ function ContextFormRenderer({
     return <div className={`fe-form ${className}`.trim()}>{completionRegion}</div>;
   }
 
+  if (confirmation !== null && submissionConfirmationRenderMode === "replace") {
+    return <div className={`fe-form ${className}`.trim()}>{confirmationContent}</div>;
+  }
+
   return (
-    <form ref={formRef} className={`fe-form ${className}`.trim()} noValidate onSubmit={handleSubmit}>
-      {slots.renderHeader?.({
-        title: form.schema.title,
-        ...(form.schema.description === undefined ? {} : { description: form.schema.description })
-      }) ?? (
-        <header className="fe-header">
-          <h1>{form.schema.title}</h1>
-          {form.schema.description === undefined ? null : <p>{form.schema.description}</p>}
-          {pages === undefined ? null : (
-            <div className="fe-progress">
-              <div
-                className="form-progress-bar"
-                role="progressbar"
-                aria-valuemin={1}
-                aria-valuemax={visiblePageIndexes.length}
-                aria-valuenow={activeVisibleIndex + 1}
-              >
+    <>
+      <form
+        ref={formRef}
+        className={`fe-form ${className}`.trim()}
+        noValidate
+        onSubmit={handleSubmit}
+        aria-hidden={confirmation !== null && submissionConfirmationRenderMode === "dialog" ? true : undefined}
+      >
+        {slots.renderHeader?.({
+          title: form.schema.title,
+          ...(form.schema.description === undefined ? {} : { description: form.schema.description })
+        }) ?? (
+          <header className="fe-header">
+            <h1>{form.schema.title}</h1>
+            {form.schema.description === undefined ? null : <p>{form.schema.description}</p>}
+            {pages === undefined ? null : (
+              <div className="fe-progress">
                 <div
-                  className="form-progress-fill"
-                  style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
-                />
-              </div>
-              <span>
-                {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
-              </span>
-            </div>
-          )}
-          {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
-        </header>
-      )}
-      {activePage === undefined
-        ? null
-        : (slots.renderPageHeader?.({
-            page: activePage,
-            pageIndex: activeVisibleIndex,
-            totalPages: visiblePageIndexes.length
-          }) ?? (
-            <div className="fe-page-header">
-              {activePage.title === undefined ? null : <h2 className="fe-page-title">{activePage.title}</h2>}
-              {activePage.description === undefined ? null : (
-                <p className="fe-page-description">{activePage.description}</p>
-              )}
-            </div>
-          ))}
-      <div className="fe-fields">
-        {form.schema.fields
-          .filter((field) => form.visibility[field.id] === true && (fieldIds === undefined || fieldIds.has(field.id)))
-          .map((field) => {
-            const error = form.errors[field.id];
-            const props: FieldComponentProps = {
-              field,
-              value: form.values[field.id],
-              error,
-              setValue: (value) => form.setValue(field.id, value),
-              translate: form.translate,
-              inputId: `${prefix}-${field.id}`,
-              errorId: `${prefix}-${field.id}-error`,
-              helpId: `${prefix}-${field.id}-help`,
-              ...(slots.renderCharacterCount === undefined ? {} : { renderCharacterCount: slots.renderCharacterCount })
-            };
-            if (slots.renderField !== undefined) {
-              return (
-                <Fragment key={field.id}>
-                  {slots.renderField({
-                    question: field,
-                    value: form.values[field.id],
-                    onChange: (value) => {
-                      if (isFormValue(value)) form.setValue(field.id, value);
-                    },
-                    ...(error === undefined ? {} : { error })
-                  })}
-                </Fragment>
-              );
-            }
-            const Component = components[field.type];
-            return Component === undefined ? (
-              <DefaultField key={field.id} {...props} />
-            ) : (
-              <Component key={field.id} {...props} />
-            );
-          })}
-      </div>
-      {guardMessage === null ? null : <div role="alert">{guardMessage}</div>}
-      {confirmation === null
-        ? null
-        : (slots.renderSubmissionConfirmation?.({
-            findings: confirmation.findings,
-            message: confirmation.message ?? form.translate("form.confirmSensitiveData"),
-            schema: form.schema,
-            visibleValues,
-            onConfirm: confirmSubmission,
-            onCancel: cancelSubmission
-          }) ?? (
-            <div className="fe-submission-confirmation" role="dialog" aria-modal="true">
-              <p>{confirmation.message ?? form.translate("form.confirmSensitiveData")}</p>
-              <button type="button" onClick={confirmSubmission}>
-                {form.translate("form.confirmSubmission")}
-              </button>
-              <button type="button" onClick={cancelSubmission}>
-                {form.translate("form.cancelSubmission")}
-              </button>
-            </div>
-          ))}
-      {validationIssues.length === 0
-        ? null
-        : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
-            <div className="fe-validation-summary" role="alert">
-              {validationIssues.length} validation error{validationIssues.length === 1 ? "" : "s"}.
-            </div>
-          ))}
-      {pages === undefined ? (
-        <>
-          {slots.renderNavigation?.({
-            currentPage: 0,
-            totalPages: 1,
-            canPrev: false,
-            canNext: false,
-            onPrev: () => undefined,
-            onNext: () => undefined
-          })}
-          {renderSubmitButton()}
-        </>
-      ) : (
-        <div className="form-step-navigation">
-          {slots.renderNavigation?.({
-            currentPage: activeVisibleIndex,
-            totalPages: visiblePageIndexes.length,
-            canPrev,
-            canNext,
-            onPrev: () => {
-              if (!interactionLocked) setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
-            },
-            onNext: handleNext
-          }) ?? (
-            <>
-              {canPrev ? (
-                <button
-                  className="btn-prev"
-                  type="button"
-                  disabled={interactionLocked}
-                  onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
+                  className="form-progress-bar"
+                  role="progressbar"
+                  aria-valuemin={1}
+                  aria-valuemax={visiblePageIndexes.length}
+                  aria-valuenow={activeVisibleIndex + 1}
                 >
-                  {form.translate("form.back")}
-                </button>
-              ) : null}
-              {canNext ? (
-                <button className="btn-next" type="button" disabled={interactionLocked} onClick={handleNext}>
-                  {form.translate("form.next")}
-                </button>
-              ) : null}
-            </>
-          )}
-          {canNext ? null : renderSubmitButton()}
+                  <div
+                    className="form-progress-fill"
+                    style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
+                  />
+                </div>
+                <span>
+                  {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
+                </span>
+              </div>
+            )}
+            {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
+          </header>
+        )}
+        {activePage === undefined
+          ? null
+          : (slots.renderPageHeader?.({
+              page: activePage,
+              pageIndex: activeVisibleIndex,
+              totalPages: visiblePageIndexes.length
+            }) ?? (
+              <div className="fe-page-header">
+                {activePage.title === undefined ? null : <h2 className="fe-page-title">{activePage.title}</h2>}
+                {activePage.description === undefined ? null : (
+                  <p className="fe-page-description">{activePage.description}</p>
+                )}
+              </div>
+            ))}
+        {(() => {
+          const fieldChildren = form.schema.fields
+            .filter((field) => form.visibility[field.id] === true && (fieldIds === undefined || fieldIds.has(field.id)))
+            .map((field) => {
+              const error = form.errors[field.id];
+              const props: FieldComponentProps = {
+                field,
+                value: form.values[field.id],
+                error,
+                setValue: (value) => form.setValue(field.id, value),
+                translate: form.translate,
+                inputId: `${prefix}-${field.id}`,
+                errorId: `${prefix}-${field.id}-error`,
+                helpId: `${prefix}-${field.id}-help`,
+                ...(slots.renderCharacterCount === undefined
+                  ? {}
+                  : { renderCharacterCount: slots.renderCharacterCount })
+              };
+              if (slots.renderField !== undefined) {
+                return (
+                  <Fragment key={field.id}>
+                    {slots.renderField({
+                      question: field,
+                      value: form.values[field.id],
+                      onChange: (value) => {
+                        if (isFormValue(value)) form.setValue(field.id, value);
+                      },
+                      ...(error === undefined ? {} : { error })
+                    })}
+                  </Fragment>
+                );
+              }
+              const Component = components[field.type];
+              return Component === undefined ? (
+                <DefaultField key={field.id} {...props} />
+              ) : (
+                <Component key={field.id} {...props} />
+              );
+            });
+          const fieldClassName = `fe-fields${fieldsClassName === undefined ? "" : ` ${fieldsClassName}`}`;
+          return (
+            slots.renderFields?.({ children: fieldChildren, className: fieldClassName }) ?? (
+              <div className={fieldClassName}>{fieldChildren}</div>
+            )
+          );
+        })()}
+        {guardMessage === null ? null : <div role="alert">{guardMessage}</div>}
+        {confirmation !== null && submissionConfirmationRenderMode === "inline" ? confirmationContent : null}
+        {validationIssues.length === 0
+          ? null
+          : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
+              <div className="fe-validation-summary" role="alert">
+                {validationIssues.length} validation error{validationIssues.length === 1 ? "" : "s"}.
+              </div>
+            ))}
+        {pages === undefined ? (
+          <>
+            {slots.renderNavigation?.({
+              currentPage: 0,
+              totalPages: 1,
+              canPrev: false,
+              canNext: false,
+              onPrev: () => undefined,
+              onNext: () => undefined
+            })}
+            {renderSubmitButton()}
+          </>
+        ) : (
+          <div className="form-step-navigation">
+            {slots.renderNavigation?.({
+              currentPage: activeVisibleIndex,
+              totalPages: visiblePageIndexes.length,
+              canPrev,
+              canNext,
+              onPrev: () => {
+                if (!interactionLocked) setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
+              },
+              onNext: handleNext
+            }) ?? (
+              <>
+                {canPrev ? (
+                  <button
+                    className="btn-prev"
+                    type="button"
+                    disabled={interactionLocked}
+                    onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
+                  >
+                    {form.translate("form.back")}
+                  </button>
+                ) : null}
+                {canNext ? (
+                  <button className="btn-next" type="button" disabled={interactionLocked} onClick={handleNext}>
+                    {form.translate("form.next")}
+                  </button>
+                ) : null}
+              </>
+            )}
+            {canNext ? null : renderSubmitButton()}
+          </div>
+        )}
+        <div className="fe-status" aria-live="polite">
+          {form.submitStatus === "success" ? completionRegion : null}
+          {form.submitStatus === "error" && form.submitError !== null
+            ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??
+              (form.submitError instanceof FormSubmissionError && form.submitError.payload.formError !== undefined ? (
+                <div role="alert">{form.submitError.payload.formError}</div>
+              ) : errorMessageKey === undefined ? null : (
+                <div role="alert">{form.translate(errorMessageKey)}</div>
+              )))
+            : null}
         </div>
-      )}
-      <div className="fe-status" aria-live="polite">
-        {form.submitStatus === "success" ? completionRegion : null}
-        {form.submitStatus === "error" && form.submitError !== null
-          ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??
-            (errorMessageKey === undefined ? null : <div role="alert">{form.translate(errorMessageKey)}</div>))
-          : null}
-      </div>
-    </form>
+      </form>
+      {confirmation !== null && submissionConfirmationRenderMode === "dialog" ? (
+        <div className="fe-confirmation-dialog-backdrop" role="dialog" aria-modal="true">
+          {confirmationContent}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -881,6 +1036,8 @@ const RENDERER_MESSAGES: Readonly<Record<string, string>> = {
   "form.confirmSensitiveData": "Sensitive data may be included. Confirm before submitting.",
   "form.confirmSubmission": "Confirm submission",
   "form.cancelSubmission": "Cancel",
+  "form.yes": "Yes",
+  "form.no": "No",
   "form.alreadySubmitted": "Already submitted.",
   "form.submitAnother": "Submit another response",
   "validation.required": "This field is required."

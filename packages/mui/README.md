@@ -27,6 +27,8 @@ import { MuiFormBuilder } from "@form-engine-ts/mui";
   localizationOptions={{
     collapsible: true,
     defaultExpanded: "when-configured",
+    showSummary: true,
+    emptyStateMessage: "No translation locales have been added yet.",
     defaultLocaleControl: "readOnly"
   }}
   muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
@@ -54,6 +56,9 @@ slots as it does for the standard builder.
 width options. `fieldEditorOptions.description` and `localizationOptions.defaultLocaleControl` independently make those
 controls editable, read-only, or hidden. Set `dense` to reduce section, editor, option, and toolbar spacing.
 `buttonVariants` can override the MUI variant for `primary`, `secondary`, and `danger` actions independently.
+`localizationOptions.showSummary` adds a locale summary badge to the localization heading, and
+`localizationOptions.emptyStateMessage` customizes the guidance shown before a translation locale is added. The
+`defaultExpanded` option also accepts `"always"`.
 `layoutOptions`, `localizationOptions`, and `muiSlotProps` are also accepted in `muiOptions` for low-level factories such
 as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
 

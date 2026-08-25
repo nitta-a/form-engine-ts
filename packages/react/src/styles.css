@@ -281,3 +281,21 @@
 .form-engine-builder__add {
   justify-self: start;
 }
+.fe-confirmation-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 45%);
+}
+
+.fe-confirmation-dialog-backdrop .fe-submission-confirmation {
+  max-width: 32rem;
+  padding: 1.5rem;
+  background: Canvas;
+  color: CanvasText;
+  border-radius: 0.5rem;
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 25%);
+}

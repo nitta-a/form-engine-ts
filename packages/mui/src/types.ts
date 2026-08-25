@@ -11,7 +11,9 @@ export interface MuiLayoutOptions {
 
 export interface MuiLocalizationOptions {
   readonly collapsible?: boolean;
-  readonly defaultExpanded?: boolean | "when-configured";
+  readonly defaultExpanded?: boolean | "when-configured" | "always";
+  readonly showSummary?: boolean;
+  readonly emptyStateMessage?: string;
   readonly defaultLocaleControl?: "editable" | "readOnly" | "hidden";
 }
 
@@ -99,6 +101,10 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
     localizationOptions: {
       collapsible: options.localizationOptions?.collapsible ?? false,
       defaultExpanded: options.localizationOptions?.defaultExpanded ?? false,
+      showSummary: options.localizationOptions?.showSummary ?? false,
+      ...(options.localizationOptions?.emptyStateMessage === undefined
+        ? {}
+        : { emptyStateMessage: options.localizationOptions.emptyStateMessage }),
       defaultLocaleControl: options.localizationOptions?.defaultLocaleControl ?? "editable"
     },
     muiSlotProps: options.muiSlotProps ?? {}

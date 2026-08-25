@@ -25,6 +25,8 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
   }: BuilderSelectProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const labelId = id === undefined || label === undefined ? undefined : `${id}-label`;
+    const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
+    const describedBy = ariaDescribedBy ?? (helperText === undefined || helperText.length === 0 ? undefined : helperId);
     const handleChange = (event: SelectChangeEvent<string>) => onChange(event.target.value);
     return (
       <FormControl
@@ -48,7 +50,7 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
           readOnly={readOnly}
           inputProps={{
             "aria-label": ariaLabel,
-            "aria-describedby": ariaDescribedBy,
+            "aria-describedby": describedBy,
             "aria-labelledby": ariaLabelledBy
           }}
         >
@@ -59,7 +61,7 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
           ))}
         </Select>
         {helperText === undefined || helperText.length === 0 ? null : (
-          <FormHelperText id={ariaDescribedBy}>{helperText}</FormHelperText>
+          <FormHelperText id={helperId}>{helperText}</FormHelperText>
         )}
       </FormControl>
     );

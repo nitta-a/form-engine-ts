@@ -38,6 +38,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
         color={variant === "danger" ? "error" : "primary"}
         variant={resolved.buttonVariants?.[variant ?? "primary"] ?? resolved.buttonVariant}
         fullWidth={resolved.buttonFullWidth ?? false}
+        sx={{ whiteSpace: "nowrap" }}
       >
         {children}
       </Button>

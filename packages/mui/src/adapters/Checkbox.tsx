@@ -22,6 +22,8 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
     label
   }: BuilderCheckboxProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
+    const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
+    const describedBy = ariaDescribedBy ?? (helperText === undefined || helperText.length === 0 ? undefined : helperId);
     return (
       <FormControl className={className} error={Boolean(error)} required={required} disabled={disabled || readOnly}>
         <FormControlLabel
@@ -36,7 +38,7 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
               disabled={disabled || readOnly}
               inputProps={{
                 "aria-label": ariaLabel,
-                "aria-describedby": ariaDescribedBy,
+                "aria-describedby": describedBy,
                 "aria-labelledby": ariaLabelledBy
               }}
               onChange={(event) => onChange(event.target.checked)}
@@ -44,7 +46,7 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
           }
         />
         {helperText === undefined || helperText.length === 0 ? null : (
-          <FormHelperText id={ariaDescribedBy}>{helperText}</FormHelperText>
+          <FormHelperText id={helperId}>{helperText}</FormHelperText>
         )}
       </FormControl>
     );

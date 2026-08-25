@@ -33,6 +33,7 @@ import {
   FormProvider,
   FormRenderer,
   type FormRendererSlots,
+  FormSubmissionError,
   type FormSuccessRenderMode,
   useFormBuilder
 } from "@form-engine-ts/react";
@@ -683,6 +684,7 @@ export default function App() {
   const [useCustomSlots, setUseCustomSlots] = useState(false);
   const [successRenderMode, setSuccessRenderMode] = useState<FormSuccessRenderMode>("append");
   const [cancelNextSubmit, setCancelNextSubmit] = useState(false);
+  const [simulateServerError, setSimulateServerError] = useState(false);
   const [lifecycleStatus, setLifecycleStatus] = useState<string | null>(null);
   const [translationOverwrite, setTranslationOverwrite] = useState<"missing-only" | "all">("missing-only");
   const [translationReport, setTranslationReport] = useState<string | null>(null);
@@ -731,6 +733,16 @@ export default function App() {
 
   const submit = async (values: FormValues) => {
     setResetStatus(null);
+    if (simulateServerError) {
+      setSimulateServerError(false);
+      const firstFieldId = schema.fields[0]?.id;
+      if (firstFieldId !== undefined) {
+        throw new FormSubmissionError("Server validation failed", {
+          fieldErrors: { [firstFieldId]: "This value was rejected by the server." },
+          formError: "The server rejected this response."
+        });
+      }
+    }
     const submission = createSubmission(schema, values, {
       id: globalThis.crypto.randomUUID(),
       locale,
@@ -845,6 +857,15 @@ export default function App() {
           <div className="preview-slot-completion" role="status">
             {message}
           </div>
+        ),
+        renderSubmittedValues: ({ items }) => (
+          <ul className="preview-slot-submitted-values" aria-label="Submitted values">
+            {items.map((item) => (
+              <li key={item.fieldId}>
+                {item.title}: {item.displayValue}
+              </li>
+            ))}
+          </ul>
         ),
         renderSubmitError: ({ error, onRetry }) => (
           <div className="preview-slot-submit-error" role="alert">
@@ -1070,6 +1091,7 @@ export default function App() {
                   localizationOptions={{
                     collapsible: true,
                     defaultExpanded: "when-configured",
+                    showSummary: true,
                     defaultLocaleControl: "readOnly"
                   }}
                   muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
@@ -1111,6 +1133,14 @@ export default function App() {
                   onChange={(event) => setSuccessRenderMode(event.currentTarget.checked ? "replace" : "append")}
                 />
                 Replace form after successful submission
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={simulateServerError}
+                  onChange={(event) => setSimulateServerError(event.currentTarget.checked)}
+                />
+                Simulate server validation error on next submit
               </label>
             </fieldset>
             {lifecycleStatus === null ? null : <p className="lifecycle-status">{lifecycleStatus}</p>}

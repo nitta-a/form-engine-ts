@@ -6,6 +6,9 @@ import { useState } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
 
+const DEFAULT_EMPTY_STATE_MESSAGE =
+  "No translation locales have been added yet. Select a language from the dropdown above to add one.";
+
 export function createMuiLocalizationSlot(options?: MuiAdapterOptions): ComponentType<BuilderLocalizationSlotProps> {
   return function MuiLocalization({
     schema,
@@ -51,65 +54,110 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
       setNewLocale("");
     };
     const stackProps = resolved.muiSlotProps?.stack;
-    const collapsible = resolved.localizationOptions?.collapsible ?? false;
-    const defaultLocaleControl = resolved.localizationOptions?.defaultLocaleControl ?? "editable";
+    const localizationOptions = resolved.localizationOptions ?? {};
+    const collapsible = localizationOptions.collapsible ?? false;
+    const defaultLocaleControl = localizationOptions.defaultLocaleControl ?? "editable";
+    const configuredTranslationLocales = locales.filter((locale) => locale !== schema.defaultLocale);
+    const configuredLocales = [
+      ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
+      ...configuredTranslationLocales
+    ];
+    const summaryLabel =
+      configuredTranslationLocales.length === 0
+        ? "Translations not configured"
+        : `${configuredLocales.length} ${configuredLocales.length === 1 ? "language" : "languages"} configured: ${configuredLocales
+            .map((locale) =>
+              locale === schema.defaultLocale
+                ? `${resolved.getLocaleLabel?.(locale) ?? locale} (default)`
+                : (resolved.getLocaleLabel?.(locale) ?? locale)
+            )
+            .join(", ")}`;
+    const emptyStateMessage =
+      localizationOptions.emptyStateMessage === undefined
+        ? DEFAULT_EMPTY_STATE_MESSAGE
+        : translate(localizationOptions.emptyStateMessage);
+    const title = (
+      <Stack alignItems="center" direction="row" spacing={1}>
+        <Typography variant="subtitle1" fontWeight="bold">
+          {translate("builder.localization")}
+        </Typography>
+        {localizationOptions.showSummary ? (
+          <Chip
+            label={summaryLabel}
+            size="small"
+            color={configuredTranslationLocales.length > 0 ? "primary" : "default"}
+            variant="outlined"
+          />
+        ) : null}
+      </Stack>
+    );
     const content = (
       <Stack {...stackProps} spacing={resolved.dense ? 1 : 2}>
-        {!collapsible ? (
-          <Typography variant="subtitle1" fontWeight="bold">
-            {translate("builder.localization")}
-          </Typography>
-        ) : null}
-        <Stack {...stackProps} direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
-          {defaultLocaleControl === "hidden" ? null : defaultLocaleControl === "readOnly" ? (
-            <Stack spacing={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                {translate("builder.defaultLocale")}
-              </Typography>
-              <Chip
-                label={resolved.getLocaleLabel?.(schema.defaultLocale ?? "") ?? schema.defaultLocale ?? ""}
-                size={resolved.size}
+        {!collapsible ? title : null}
+        <Stack
+          {...stackProps}
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          spacing={resolved.dense ? 1 : 2}
+          sx={{ mt: 1 }}
+        >
+          {defaultLocaleControl === "hidden" ? null : (
+            <Box sx={{ flexGrow: 1, minWidth: 0, width: { xs: "100%", sm: "auto" } }}>
+              {defaultLocaleControl === "readOnly" ? (
+                <Stack spacing={0.5}>
+                  <Typography variant="caption" color="text.secondary">
+                    {translate("builder.defaultLocale")}
+                  </Typography>
+                  <Chip
+                    label={resolved.getLocaleLabel?.(schema.defaultLocale ?? "") ?? schema.defaultLocale ?? ""}
+                    size={resolved.size}
+                  />
+                </Stack>
+              ) : (
+                <TextInput
+                  id="mui-builder-default-locale"
+                  label={translate("builder.defaultLocale")}
+                  value={schema.defaultLocale ?? ""}
+                  disabled={readOnly}
+                  onChange={(value) => {
+                    const result = actions.setDefaultLocale(value);
+                    if (result.success && value === currentLocale) onCurrentLocaleChange("");
+                  }}
+                />
+              )}
+            </Box>
+          )}
+          <Box sx={{ flexGrow: 1, minWidth: 0, width: { xs: "100%", sm: "auto" } }}>
+            {availableAllowedLocales === undefined ? (
+              <TextInput
+                id="mui-builder-new-locale"
+                label={translate("builder.addLocale")}
+                value={newLocale}
+                disabled={readOnly || localeLimitReached}
+                onChange={setNewLocale}
               />
-            </Stack>
-          ) : (
-            <TextInput
-              id="mui-builder-default-locale"
-              label={translate("builder.defaultLocale")}
-              value={schema.defaultLocale ?? ""}
-              disabled={readOnly}
-              onChange={(value) => {
-                const result = actions.setDefaultLocale(value);
-                if (result.success && value === currentLocale) onCurrentLocaleChange("");
-              }}
-            />
-          )}
-          {availableAllowedLocales === undefined ? (
-            <TextInput
-              id="mui-builder-new-locale"
-              label={translate("builder.addLocale")}
-              value={newLocale}
-              disabled={readOnly || localeLimitReached}
-              onChange={setNewLocale}
-            />
-          ) : (
-            <Select
-              id="mui-builder-new-locale"
-              label={translate("builder.addLocale")}
-              value={newLocale}
-              options={[
-                { value: "", label: "—" },
-                ...availableAllowedLocales.map((locale) => ({
-                  value: locale,
-                  label: resolved.getLocaleLabel?.(locale) ?? locale
-                }))
-              ]}
-              disabled={readOnly || localeLimitReached || availableAllowedLocales.length === 0}
-              onChange={setNewLocale}
-            />
-          )}
-          <Button variant="primary" action="addLocale" disabled={!canAddLocale} onClick={addLocale}>
-            {translate("builder.addLocale")}
-          </Button>
+            ) : (
+              <Select
+                id="mui-builder-new-locale"
+                label={translate("builder.addLocale")}
+                value={newLocale}
+                options={[
+                  { value: "", label: "—" },
+                  ...availableAllowedLocales.map((locale) => ({
+                    value: locale,
+                    label: resolved.getLocaleLabel?.(locale) ?? locale
+                  }))
+                ]}
+                disabled={readOnly || localeLimitReached || availableAllowedLocales.length === 0}
+                onChange={setNewLocale}
+              />
+            )}
+          </Box>
+          <Box sx={{ flexShrink: 0, minWidth: "max-content", whiteSpace: "nowrap" }}>
+            <Button variant="primary" action="addLocale" disabled={!canAddLocale} onClick={addLocale}>
+              {translate("builder.addLocale")}
+            </Button>
+          </Box>
         </Stack>
         {locales.length === 0 ? null : (
           <Tabs
@@ -125,23 +173,26 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
                 value={locale}
                 label={resolved.getLocaleLabel?.(locale) ?? locale}
                 disabled={readOnly && locale !== currentLocale}
+                sx={{ whiteSpace: "nowrap" }}
               />
             ))}
           </Tabs>
         )}
         {!translationAdapterAvailable ? null : (
-          <Button
-            variant="secondary"
-            disabled={readOnly || !editingLocaleConfigured || isTranslating}
-            onClick={onAutoTranslate}
-          >
-            {isTranslating ? translate("builder.translating") : translate("builder.autoTranslate")}
-          </Button>
+          <Box sx={{ minWidth: "max-content", whiteSpace: "nowrap" }}>
+            <Button
+              variant="secondary"
+              disabled={readOnly || !editingLocaleConfigured || isTranslating}
+              onClick={onAutoTranslate}
+            >
+              {isTranslating ? translate("builder.translating") : translate("builder.autoTranslate")}
+            </Button>
+          </Box>
         )}
         {translationError === undefined ? null : <ErrorMessage message={translationError} />}
         {!editingLocaleConfigured ? (
           <Typography variant="body2" color="text.secondary">
-            {translate("builder.selectLocale")}
+            {locales.length === 0 ? emptyStateMessage : translate("builder.selectLocale")}
           </Typography>
         ) : (
           <Stack {...stackProps} spacing={resolved.dense ? 1 : 2}>
@@ -174,17 +225,15 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
     );
     const configured = locales.length > 0;
     const defaultExpanded =
-      resolved.localizationOptions?.defaultExpanded === "when-configured"
+      localizationOptions.defaultExpanded === "when-configured"
         ? configured
-        : (resolved.localizationOptions?.defaultExpanded ?? false);
+        : localizationOptions.defaultExpanded === "always"
+          ? true
+          : (localizationOptions.defaultExpanded ?? false);
     if (collapsible) {
       return (
         <Accordion {...resolved.muiSlotProps?.accordion} data-mui-slot="localization" defaultExpanded={defaultExpanded}>
-          <AccordionSummary expandIcon={<ExpandMore />}>
-            <Typography variant="subtitle1" fontWeight="bold">
-              {translate("builder.localization")}
-            </Typography>
-          </AccordionSummary>
+          <AccordionSummary expandIcon={<ExpandMore />}>{title}</AccordionSummary>
           <AccordionDetails>{content}</AccordionDetails>
         </Accordion>
       );

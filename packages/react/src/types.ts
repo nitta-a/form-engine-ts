@@ -6,6 +6,7 @@ import type {
   FormSchema,
   FormValues,
   JsonValue,
+  QuestionType,
   TranslationReport,
   ValidationError
 } from "@form-engine-ts/core";
@@ -285,6 +286,40 @@ export interface SubmitResponse {
   readonly submittedAt?: string;
 }
 
+export interface FormSubmittedAnswerItem {
+  readonly fieldId: string;
+  readonly title: string;
+  readonly type: QuestionType;
+  readonly rawValue: unknown;
+  readonly displayValue: string;
+  readonly visible: boolean;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
+}
+
+export interface FormCompletionSlotProps {
+  readonly message?: string;
+  readonly schema: FormSchema;
+  readonly answers: Record<string, unknown>;
+  readonly submittedItems: readonly FormSubmittedAnswerItem[];
+  readonly response?: SubmitResponse;
+  readonly onReset?: () => void;
+}
+
+export interface FormServerErrorPayload {
+  readonly fieldErrors?: Readonly<Record<string, string>>;
+  readonly formError?: string;
+}
+
+export class FormSubmissionError extends Error {
+  readonly payload: FormServerErrorPayload;
+
+  constructor(message: string, payload?: FormServerErrorPayload) {
+    super(message);
+    this.name = "FormSubmissionError";
+    this.payload = payload ?? { formError: message };
+  }
+}
+
 export type FormSubmitHandler = (
   answers: FormValues
 ) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
@@ -300,6 +335,8 @@ export type SubmissionGuard = (
 ) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
 
 export type FormSuccessRenderMode = "append" | "replace";
+
+export type SubmissionConfirmationRenderMode = "inline" | "replace" | "dialog";
 
 export type FormSubmitStatus = "idle" | "submitting" | "confirming" | "success" | "error";
 
@@ -320,6 +357,11 @@ export interface SubmissionConfirmationSlotProps {
   readonly visibleValues: Record<string, unknown>;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
+}
+
+export interface FormFieldsSlotProps {
+  readonly children: ReactNode;
+  readonly className?: string;
 }
 
 export interface FormRendererSlots {
@@ -345,7 +387,13 @@ export interface FormRendererSlots {
   }) => ReactNode;
   readonly renderSubmitButton?: (props: RenderSubmitButtonProps) => ReactNode;
   readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
+  /** Additional completion data is supplied at runtime; use renderSubmittedValues for typed summary rendering. */
   readonly renderCompletion?: (props: { readonly message: string }) => ReactNode;
+  readonly renderSubmittedValues?: (props: {
+    readonly items: readonly FormSubmittedAnswerItem[];
+    readonly schema: FormSchema;
+  }) => ReactNode;
+  readonly renderFields?: (props: FormFieldsSlotProps) => ReactNode;
   readonly renderSubmitError?: (props: { readonly error: Error; readonly onRetry?: () => void }) => ReactNode;
   readonly renderSubmissionConfirmation?: (props: SubmissionConfirmationSlotProps) => ReactNode;
   readonly renderAlreadySubmitted?: (props: {

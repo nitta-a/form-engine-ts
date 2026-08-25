@@ -87,6 +87,17 @@ function InlineOptionsControlledHarness() {
   );
 }
 
+function LocalizationOptionsHarness() {
+  const [current, setCurrent] = useState<FormSchema>({ ...schema, supportedLocales: ["en"] });
+  return (
+    <MuiFormBuilder
+      schema={current}
+      onChange={setCurrent}
+      localizationOptions={{ showSummary: true, emptyStateMessage: "Add a translation language above." }}
+    />
+  );
+}
+
 describe("MuiFormBuilder", () => {
   it("forces unstyled mode and applies shared size and theme options", () => {
     const theme = createTheme({ palette: { primary: { main: "#123456" } }, shape: { borderRadius: 18 } });
@@ -479,6 +490,46 @@ describe("MuiFormBuilder", () => {
     expect(screen.queryByText("Default locale")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "ja" }));
     expect(screen.getByRole("textbox", { name: "Translated description" })).toHaveAttribute("readonly");
+  });
+
+  it("keeps localization actions and tabs on one line and updates the summary and empty state", async () => {
+    const user = userEvent.setup();
+    render(<LocalizationOptionsHarness />);
+
+    expect(screen.getByText("Translations not configured")).toBeInTheDocument();
+    expect(screen.getByText("Add a translation language above.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add locale" })).toHaveStyle({ whiteSpace: "nowrap" });
+
+    await user.type(screen.getByRole("textbox", { name: "Add locale" }), "fr");
+    await user.click(screen.getByRole("button", { name: "Add locale" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("2 languages configured: en (default), fr")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("tab", { name: "fr" })).toHaveStyle({ whiteSpace: "nowrap" });
+    expect(screen.queryByText("Add a translation language above.")).not.toBeInTheDocument();
+  });
+
+  it("opens localization accordions according to the configured default expansion mode", () => {
+    const emptySchema = { ...schema, supportedLocales: ["en"] };
+    const { unmount } = render(
+      <MuiFormBuilder
+        schema={emptySchema}
+        onChange={() => undefined}
+        localizationOptions={{ collapsible: true, defaultExpanded: true }}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Localization" })).toHaveAttribute("aria-expanded", "true");
+    unmount();
+
+    render(
+      <MuiFormBuilder
+        schema={emptySchema}
+        onChange={() => undefined}
+        localizationOptions={{ collapsible: true, defaultExpanded: "when-configured" }}
+      />
+    );
+    expect(screen.getByRole("button", { name: "Localization" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("preserves controlled input focus and accordion state when inline options change identity", async () => {

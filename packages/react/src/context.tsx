@@ -31,6 +31,7 @@ export interface FormContextValue {
   readonly submitError: Error | null;
   readonly isSubmitting: boolean;
   readonly setValue: (fieldId: string, value: FormValue) => void;
+  readonly setServerErrors?: (fieldErrors: Readonly<Record<string, string>>) => void;
   readonly restoreValues: (values: FormValues) => void;
   readonly validatePage: (pageIndex: number) => AnswerValidationResult;
   readonly reset: () => void;
@@ -107,6 +108,18 @@ export function FormProvider({
     },
     [validSchema, validationPageIndex]
   );
+
+  const setServerErrors = useCallback((fieldErrors: Readonly<Record<string, string>>) => {
+    setErrors(
+      Object.fromEntries(
+        Object.entries(fieldErrors).map(([fieldId, message]) => [
+          fieldId,
+          { fieldId, code: "invalid_type", messageKey: message, params: {} }
+        ])
+      )
+    );
+    setValidationPageIndex(null);
+  }, []);
 
   const restoreValues = useCallback(
     (restoredValues: FormValues) => {
@@ -201,6 +214,7 @@ export function FormProvider({
       submitError,
       isSubmitting: submitStatus === "submitting",
       setValue,
+      setServerErrors,
       restoreValues,
       validatePage,
       reset,
@@ -214,6 +228,7 @@ export function FormProvider({
       reset,
       restoreValues,
       setValue,
+      setServerErrors,
       submit,
       submitError,
       submitStatus,

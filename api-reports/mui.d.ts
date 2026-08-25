@@ -10,7 +10,9 @@ interface MuiLayoutOptions {
 }
 interface MuiLocalizationOptions {
     readonly collapsible?: boolean;
-    readonly defaultExpanded?: boolean | "when-configured";
+    readonly defaultExpanded?: boolean | "when-configured" | "always";
+    readonly showSummary?: boolean;
+    readonly emptyStateMessage?: string;
     readonly defaultLocaleControl?: "editable" | "readOnly" | "hidden";
 }
 interface MuiFieldEditorOptions {
