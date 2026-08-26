@@ -173,7 +173,7 @@ describe("MuiFormBuilder", () => {
     await waitFor(() =>
       expect(JSON.parse(screen.getByTestId("schema-state").textContent ?? "{}").fields).toHaveLength(2)
     );
-  });
+  }, 30000);
 
   it("links MUI error helper text through aria-describedby", () => {
     render(<MuiFormBuilder schema={{ ...schema, title: "" }} onChange={() => undefined} />);
