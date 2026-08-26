@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v3.1.0 — 2026-08-27
+
+- React Select primitives now support rich option metadata, descriptions, disabled states, and custom option/value rendering.
+- The MUI Builder adds rich field-type options with icons and descriptions, granular `fieldTypeSelect` and `fieldEditorHeader` slots, and custom field-type icons.
+- MUI controls accept control-level `muiSlotProps` for text fields, selects, checkboxes, buttons, and icon buttons.
+- Core field-type definitions and canonical builder translation keys are now exported for consistent integrations.
+- Preview coverage, package documentation, and public API reports were updated for the new builder customization surfaces.
+
+See the [GitHub release for v3.1.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.1.0).
+
 ### v2.9.6 — 2026-08-26
 
 - React Renderer now supports server-side validation errors through `FormSubmissionError`, including field-level error mapping and navigation to the affected page.
@@ -85,6 +95,16 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v3.1.0 — 2026-08-27
+
+- React Selectの基本コンポーネントが、説明・無効状態・追加メタデータ・選択肢と選択値のカスタム描画に対応しました。
+- MUI Builderのフィールド型選択肢にアイコンと説明を追加し、`fieldTypeSelect`・`fieldEditorHeader`の個別slotと、フィールド型アイコンの差し替えを公開しました。
+- MUIのテキストフィールド、Select、Checkbox、Button、IconButtonに、コントロール単位の`muiSlotProps`を指定できるようにしました。
+- Coreからフィールド型定義と正規化されたBuilder翻訳キーを公開し、各種インテグレーションで一貫して利用できるようにしました。
+- 新しいBuilderカスタマイズ面に合わせて、Preview、パッケージドキュメント、公開APIレポートを更新しました。
+
+[v3.1.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.1.0)も参照してください。
 
 ### v2.9.6 — 2026-08-26
 

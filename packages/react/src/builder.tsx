@@ -3,6 +3,7 @@ import {
   type AsyncTranslationAdapter,
   type ConditionOperator,
   type ConditionValue,
+  DEFAULT_FIELD_TYPE_DEFINITIONS,
   type DisplayCondition,
   type FieldType,
   type FormField,
@@ -24,6 +25,7 @@ import {
   type BuilderTextTarget,
   useFormBuilder
 } from "./hooks/useFormBuilder";
+import { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS } from "./i18n";
 import type {
   BuilderActionContext,
   BuilderActionIconType,
@@ -33,6 +35,7 @@ import type {
   BuilderFieldsetProps,
   BuilderIconButtonProps,
   BuilderSectionProps,
+  BuilderSelectOption,
   BuilderSelectProps,
   BuilderSlotActions,
   BuilderTextAreaProps,
@@ -112,6 +115,27 @@ function defaultIconFor(actionType: BuilderActionIconType): ReactNode {
       return "⚙";
     case "translate":
       return "文";
+  }
+}
+
+function defaultFieldTypeIcon(type: QuestionType): ReactNode {
+  switch (type) {
+    case "text":
+      return "T";
+    case "textarea":
+      return "≡";
+    case "number":
+      return "#";
+    case "rating":
+      return "★";
+    case "select":
+      return "▾";
+    case "multi-select":
+      return "☑";
+    case "checkbox":
+      return "□";
+    case "radio":
+      return "◉";
   }
 }
 
@@ -229,8 +253,15 @@ function DefaultSelect({
   helperText,
   value,
   onChange,
-  options
+  onKeyDown,
+  options,
+  renderOption,
+  renderValue
 }: BuilderSelectProps) {
+  const normalizedOptions: readonly BuilderSelectOption[] = options.map((option) =>
+    typeof option === "string" ? { value: option, label: option } : option
+  );
+  const selectedOption = normalizedOptions.find((option) => option.value === value);
   const labelElement =
     label === undefined ? null : id === undefined ? <span>{label}</span> : <label htmlFor={id}>{label}</label>;
   return (
@@ -248,13 +279,15 @@ function DefaultSelect({
         aria-invalid={error === true ? true : undefined}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
+        onKeyDown={onKeyDown}
       >
-        {options.map((option) => (
+        {normalizedOptions.map((option) => (
           <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
+            {renderOption === undefined ? option.label : renderOption(option)}
           </option>
         ))}
       </select>
+      {renderValue === undefined ? null : <output>{renderValue(selectedOption)}</output>}
       {helperText === undefined || helperText.length === 0 ? null : <small id={ariaDescribedBy}>{helperText}</small>}
     </>
   );
@@ -347,7 +380,8 @@ const DEFAULT_COMPONENTS: Required<FormBuilderComponents> = {
   Section: DefaultSection,
   Fieldset: DefaultFieldset,
   ErrorMessage: DefaultErrorMessage,
-  renderIcon: defaultIconFor
+  renderIcon: defaultIconFor,
+  renderFieldTypeIcon: defaultFieldTypeIcon
 };
 
 interface BuilderPrimitiveContextValue {
@@ -487,7 +521,7 @@ function BuilderErrorMessage(props: BuilderErrorMessageProps) {
   );
 }
 
-const GUARDED_COMPONENTS: Omit<Required<FormBuilderComponents>, "renderIcon"> = {
+const GUARDED_COMPONENTS: Omit<Required<FormBuilderComponents>, "renderIcon" | "renderFieldTypeIcon"> = {
   Button: BuilderButton,
   IconButton: BuilderIconButton,
   TextInput: BuilderTextInput,
@@ -581,6 +615,16 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.actions.close": "Close",
   "builder.actions.dragHandle": "Reorder",
   "builder.translationUnavailable": "Provide an async translation adapter to enable automatic translation.",
+  "builder.fields.selectType": "Select field type",
+  "builder.fields.typeText": "Text",
+  "builder.fields.typeTextarea": "Textarea",
+  "builder.fields.typeNumber": "Number",
+  "builder.fields.typeRating": "Rating",
+  "builder.fields.typeSelect": "Select",
+  "builder.fields.typeMultiSelect": "Multi-select",
+  "builder.fields.typeCheckbox": "Checkbox",
+  "builder.fields.typeRadio": "Radio",
+  "builder.actions.addField": "Add question",
   "builder.fieldType.text": "Text",
   "builder.fieldType.textarea": "Textarea",
   "builder.fieldType.number": "Number",
@@ -632,7 +676,10 @@ function OrderedBuilderSections({
 }
 
 function fieldTypeKey(type: FieldType): string {
-  return `builder.fieldType.${type}`;
+  return (
+    DEFAULT_FIELD_TYPE_DEFINITIONS.find((definition) => definition.type === type)?.labelKey ??
+    `builder.fieldType.${type}`
+  );
 }
 
 function operatorKey(operator: ConditionOperator): string {
@@ -855,7 +902,8 @@ export function FormBuilder({
   const resolvedComponents: Required<FormBuilderComponents> = { ...DEFAULT_COMPONENTS, ...componentOverrides };
   const components: Required<FormBuilderComponents> = {
     ...GUARDED_COMPONENTS,
-    renderIcon: resolvedComponents.renderIcon
+    renderIcon: resolvedComponents.renderIcon,
+    renderFieldTypeIcon: resolvedComponents.renderFieldTypeIcon
   };
   const defaultStylesDisabled = disableDefaultStyles || unstyled;
   const builderClass = (value: string): string | undefined => (defaultStylesDisabled ? undefined : value);
@@ -886,6 +934,12 @@ export function FormBuilder({
       if (typeof value === "string" || typeof value === "number") translatorParams[name] = value;
     }
     const translated = translator?.translate(key, locale, translatorParams);
+    if (translated !== undefined && translated !== key) return translated;
+    const alias = BUILDER_TRANSLATION_ALIASES[key];
+    if (alias !== undefined) {
+      const aliased = translator?.translate(alias, locale, translatorParams);
+      if (aliased !== undefined && aliased !== alias) return aliased;
+    }
     return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
   };
   const pagesEnabled = features?.pages ?? true;
@@ -1701,6 +1755,7 @@ export function FormBuilder({
                         index={index}
                         currentLocale={editingLocale}
                         translate={translate}
+                        {...(slots === undefined ? {} : { slots })}
                         {...(policy === undefined ? {} : { policy })}
                         {...(features === undefined ? {} : { features })}
                         readOnly={readOnly}
@@ -2086,7 +2141,7 @@ export function FormBuilder({
                 disabled={initialFieldType === null || maxFieldsReached}
                 onClick={addField}
               >
-                {translate("builder.addQuestion")}
+                {translate(BUILDER_TRANSLATION_KEYS.ADD_FIELD)}
               </Button>
             </BuilderSectionGroup>
           </OrderedBuilderSections>

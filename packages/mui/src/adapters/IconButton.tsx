@@ -31,6 +31,7 @@ export function createMuiIconButtonAdapter(options?: MuiAdapterOptions): Compone
     title
   }: BuilderIconButtonProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
+    const iconButtonSlotProps = resolved.muiSlotProps?.iconButton;
     const actionLabel =
       actionType === undefined
         ? "Action"
@@ -41,10 +42,11 @@ export function createMuiIconButtonAdapter(options?: MuiAdapterOptions): Compone
       <Tooltip title={tooltip}>
         <span>
           <IconButton
+            {...iconButtonSlotProps}
             id={id}
             className={className}
             type="button"
-            size={resolved.size}
+            size={iconButtonSlotProps?.size ?? resolved.size}
             color={color}
             disabled={disabled || readOnly}
             aria-label={ariaLabel ?? tooltip}

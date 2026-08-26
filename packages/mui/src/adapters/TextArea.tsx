@@ -25,8 +25,10 @@ export function createMuiTextAreaAdapter(options?: MuiAdapterOptions): Component
     rows
   }: BuilderTextAreaProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
+    const textFieldSlotProps = resolved.muiSlotProps?.textField;
     return (
       <TextField
+        {...textFieldSlotProps}
         id={id}
         className={className}
         name={name}
@@ -52,7 +54,7 @@ export function createMuiTextAreaAdapter(options?: MuiAdapterOptions): Component
         placeholder={placeholder}
         fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
         size={resolved.size}
-        variant={resolved.variant}
+        variant={textFieldSlotProps?.variant ?? resolved.variant}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
     );

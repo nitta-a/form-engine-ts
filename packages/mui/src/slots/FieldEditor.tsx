@@ -1,5 +1,5 @@
-import type { ConditionOperator, FieldType, FormField } from "@form-engine-ts/core";
-import type { BuilderFieldEditorSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
+import { type ConditionOperator, DEFAULT_FIELD_TYPE_DEFINITIONS, type FormField } from "@form-engine-ts/core";
+import type { BuilderFieldEditorSlotProps, FormBuilderSlots, QuestionType } from "@form-engine-ts/react";
 import { Card, Stack, Typography } from "@mui/material";
 import type { ComponentType } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
@@ -7,18 +7,9 @@ import type { MuiAdapterOptions } from "../types";
 import { createMuiOptionEditorSlot } from "./OptionEditor";
 import { createMuiToolbarSlot } from "./Toolbar";
 
-const FIELD_TYPES: readonly FieldType[] = [
-  "text",
-  "textarea",
-  "number",
-  "rating",
-  "select",
-  "multi-select",
-  "checkbox",
-  "radio"
-];
+const FIELD_TYPES: readonly QuestionType[] = DEFAULT_FIELD_TYPE_DEFINITIONS.map((definition) => definition.type);
 
-function isFieldType(value: string): value is FieldType {
+function isFieldType(value: string): value is QuestionType {
   return FIELD_TYPES.some((type) => type === value);
 }
 
@@ -61,7 +52,8 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     readOnly,
     actions,
     components,
-    translate
+    translate,
+    slots
   }: BuilderFieldEditorSlotProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const { Button, Checkbox, Select, TextArea, TextInput } = components;
@@ -72,6 +64,11 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     const conditionSource = conditionSources.find((source) => source.id === condition?.questionId);
     const descriptionMode = resolved.fieldEditorOptions?.description ?? "editable";
     const titleErrorId = field.title.trim().length === 0 ? `mui-field-${field.id}-title-error` : undefined;
+    const FieldTypeSelect = slots?.fieldTypeSelect;
+    const FieldEditorHeader = slots?.fieldEditorHeader;
+    const changeFieldType = (nextType: QuestionType) => {
+      if (allowedTypes.includes(nextType)) actions.changeFieldType(field.id, nextType);
+    };
     return (
       <Card
         {...resolved.muiSlotProps?.card}
@@ -79,25 +76,31 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
         variant="outlined"
         sx={resolved.muiSlotProps?.card?.sx ?? { mb: resolved.dense ? 1 : 2, p: resolved.dense ? 1.5 : 2 }}
       >
-        <Toolbar
-          schema={schema}
-          translate={translate}
-          kind="field"
-          targetId={field.id}
-          index={index}
-          total={schema.fields.length}
-          title={field.title}
-          onMoveUp={() => actions.moveField(field.id, index - 1)}
-          onMoveDown={() => actions.moveField(field.id, index + 1)}
-          onRemove={() => actions.removeField(field.id)}
-          readOnly={readOnly}
-          actions={actions}
-          components={components}
-        />
+        {FieldEditorHeader === undefined ? (
+          <>
+            <Toolbar
+              schema={schema}
+              translate={translate}
+              kind="field"
+              targetId={field.id}
+              index={index}
+              total={schema.fields.length}
+              title={field.title}
+              onMoveUp={() => actions.moveField(field.id, index - 1)}
+              onMoveDown={() => actions.moveField(field.id, index + 1)}
+              onRemove={() => actions.removeField(field.id)}
+              readOnly={readOnly}
+              actions={actions}
+              components={components}
+            />
+            <Typography variant="subtitle1" fontWeight="bold">
+              {field.title}
+            </Typography>
+          </>
+        ) : (
+          <FieldEditorHeader field={field} index={index} totalFields={schema.fields.length} actions={actions} />
+        )}
         <Stack {...resolved.muiSlotProps?.stack} spacing={resolved.dense ? 1 : 2}>
-          <Typography variant="subtitle1" fontWeight="bold">
-            {field.title}
-          </Typography>
           <Stack direction={{ xs: "column", md: "row" }} spacing={resolved.dense ? 1 : 2}>
             <TextInput
               id={`mui-field-${field.id}-title`}
@@ -111,20 +114,36 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               disabled={readOnly}
               onChange={(value) => actions.setSourceText({ kind: "field", id: field.id }, "title", value)}
             />
-            <Select
-              id={`mui-field-${field.id}-type`}
-              name={`fields.${field.id}.type`}
-              label={translate("builder.type")}
-              value={allowedTypes.includes(field.type) ? field.type : ""}
-              options={FIELD_TYPES.filter((type) => allowedTypes.includes(type)).map((type) => ({
-                value: type,
-                label: translate(`builder.fieldType.${type}`)
-              }))}
-              disabled={readOnly}
-              onChange={(value) => {
-                if (isFieldType(value)) actions.changeFieldType(field.id, value);
-              }}
-            />
+            {FieldTypeSelect === undefined ? (
+              <Select
+                id={`mui-field-${field.id}-type`}
+                name={`fields.${field.id}.type`}
+                label={translate("builder.type")}
+                value={allowedTypes.includes(field.type) ? field.type : ""}
+                options={FIELD_TYPES.filter((type) => allowedTypes.includes(type)).map((type) => {
+                  const definition = DEFAULT_FIELD_TYPE_DEFINITIONS.find((candidate) => candidate.type === type);
+                  return {
+                    value: type,
+                    label: translate(definition?.labelKey ?? `builder.fieldType.${type}`),
+                    icon: components.renderFieldTypeIcon(type),
+                    ...(definition?.category === undefined ? {} : { kind: definition.category })
+                  };
+                })}
+                disabled={readOnly}
+                onChange={(value) => {
+                  if (isFieldType(value)) changeFieldType(value);
+                }}
+              />
+            ) : (
+              <FieldTypeSelect
+                currentType={field.type}
+                allowedTypes={allowedTypes}
+                onChangeType={changeFieldType}
+                disabled={readOnly}
+                readOnly={readOnly}
+                renderIcon={components.renderFieldTypeIcon}
+              />
+            )}
           </Stack>
           {descriptionMode === "hidden" ? null : (
             <TextArea

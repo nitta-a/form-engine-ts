@@ -53,10 +53,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v2.9.6** (2026-08-26). All public packages are currently published at version `2.9.6`.
-This release adds server-validation error handling, richer submission completion and confirmation rendering, and
-localization-editor improvements for the MUI Builder. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history
-and the [GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v2.9.6).
+The latest release is **v3.1.0** (2026-08-27). All public packages are currently published at version `3.1.0`.
+This release adds rich Select options, granular MUI Builder field-editor slots, control-level MUI slot props, and
+canonical field-type metadata and translation keys. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history
+and the [GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.1.0).
 
 ### Authoring and respondent experience
 
@@ -364,9 +364,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v2.9.6**（2026-08-26）です。公開パッケージはすべてバージョン `2.9.6` で公開されています。
-本リリースでは、サーバー側バリデーションエラー、送信完了・確認画面の拡張、MUI Builderの言語設定編集を強化しました。
-全更新履歴は [RELEASE_NOTES.md](RELEASE_NOTES.md) と [GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v2.9.6) を参照してください。
+最新版は **v3.1.0**（2026-08-27）です。公開パッケージはすべてバージョン `3.1.0` で公開されています。
+本リリースでは、リッチなSelect選択肢、MUI Builderのフィールド編集slot、コントロール単位のMUI slot props、
+フィールド型メタデータと翻訳キーを追加しました。全更新履歴は [RELEASE_NOTES.md](RELEASE_NOTES.md) と
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.1.0) を参照してください。
 
 ### 編集・回答体験
 

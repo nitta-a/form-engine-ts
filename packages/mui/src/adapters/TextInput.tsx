@@ -30,8 +30,10 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
     step
   }: BuilderTextInputProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
+    const textFieldSlotProps = resolved.muiSlotProps?.textField;
     return (
       <TextField
+        {...textFieldSlotProps}
         id={id}
         className={className}
         name={name}
@@ -60,7 +62,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
         placeholder={placeholder}
         fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
         size={resolved.size}
-        variant={resolved.variant}
+        variant={textFieldSlotProps?.variant ?? resolved.variant}
         onChange={(event) => onChange(event.currentTarget.value)}
         onKeyDown={onKeyDown}
       />

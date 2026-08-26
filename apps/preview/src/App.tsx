@@ -23,7 +23,7 @@ import {
   type SelectField,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { MuiFormBuilder } from "@form-engine-ts/mui";
+import { MuiFormBuilder, muiDefaultFieldTypeIcon } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
@@ -1098,6 +1098,13 @@ export default function App() {
                     ],
                     placement: "beforeQuestions",
                     defaultLocaleControl: "readOnly"
+                  }}
+                  components={{
+                    renderFieldTypeIcon: (type) => (
+                      <span aria-hidden="true" data-testid={`preview-field-type-icon-${type}`}>
+                        {muiDefaultFieldTypeIcon(type)}
+                      </span>
+                    )
                   }}
                   muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
                 />

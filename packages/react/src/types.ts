@@ -6,6 +6,7 @@ import type {
   FormSchema,
   FormValues,
   JsonValue,
+  Question,
   QuestionType,
   TranslationReport,
   ValidationError
@@ -94,11 +95,23 @@ export interface BuilderTextAreaProps extends InputComponentProps {
 export interface BuilderSelectOption {
   readonly label: string;
   readonly value: string;
+  readonly icon?: ReactNode;
+  readonly description?: string;
   readonly disabled?: boolean;
+  readonly kind?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface SelectComponentProps extends InputComponentProps {
+  readonly options: readonly (string | BuilderSelectOption)[];
+  readonly renderOption?: (option: BuilderSelectOption) => ReactNode;
+  readonly renderValue?: (option: BuilderSelectOption | undefined) => ReactNode;
 }
 
 export interface BuilderSelectProps extends InputComponentProps {
   readonly options: readonly BuilderSelectOption[];
+  readonly renderOption?: (option: BuilderSelectOption) => ReactNode;
+  readonly renderValue?: (option: BuilderSelectOption | undefined) => ReactNode;
 }
 
 export interface BuilderCheckboxProps extends ComponentBaseProps {
@@ -144,6 +157,7 @@ export interface FormBuilderComponents {
   readonly Fieldset?: ComponentType<BuilderFieldsetProps>;
   readonly ErrorMessage?: ComponentType<{ readonly message: string }>;
   readonly renderIcon?: (actionType: BuilderActionIconType) => ReactNode;
+  readonly renderFieldTypeIcon?: (type: QuestionType) => ReactNode;
 }
 
 export type FormBuilderActions = Omit<FormBuilderResult, "schema" | "validationIssues">;
@@ -191,6 +205,23 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
     readonly localization?: boolean;
     readonly conditions?: boolean;
   };
+  readonly slots?: Pick<FormBuilderSlots, "fieldTypeSelect" | "fieldEditorHeader">;
+}
+
+export interface FieldTypeSelectSlotProps {
+  readonly currentType: QuestionType;
+  readonly allowedTypes: readonly QuestionType[];
+  readonly onChangeType: (nextType: QuestionType) => void;
+  readonly disabled?: boolean;
+  readonly readOnly?: boolean;
+  readonly renderIcon?: (type: QuestionType) => ReactNode;
+}
+
+export interface FieldEditorHeaderSlotProps {
+  readonly field: Question;
+  readonly index: number;
+  readonly totalFields: number;
+  readonly actions: FormBuilderActions;
 }
 
 export interface BuilderOptionEditorSlotProps extends BuilderSlotBaseProps {
@@ -245,6 +276,8 @@ export type FormBuilderSectionName =
 export interface FormBuilderSlots {
   readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;
   readonly fieldEditor?: ComponentType<BuilderFieldEditorSlotProps>;
+  readonly fieldTypeSelect?: ComponentType<FieldTypeSelectSlotProps>;
+  readonly fieldEditorHeader?: ComponentType<FieldEditorHeaderSlotProps>;
   readonly optionEditor?: ComponentType<BuilderOptionEditorSlotProps>;
   readonly pages?: ComponentType<BuilderPagesSlotProps>;
   readonly localization?: ComponentType<BuilderLocalizationSlotProps>;

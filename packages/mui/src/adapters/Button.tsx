@@ -22,8 +22,10 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
     targetId
   }: BuilderButtonProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
+    const buttonSlotProps = resolved.muiSlotProps?.button;
     return (
       <Button
+        {...buttonSlotProps}
         id={id}
         className={className}
         type="button"
@@ -37,7 +39,7 @@ export function createMuiButtonAdapter(options?: MuiAdapterOptions): ComponentTy
         data-target-id={targetId}
         onClick={onClick}
         color={variant === "danger" ? "error" : "primary"}
-        variant={resolved.buttonVariants?.[variant ?? "primary"] ?? resolved.buttonVariant}
+        variant={buttonSlotProps?.variant ?? resolved.buttonVariants?.[variant ?? "primary"] ?? resolved.buttonVariant}
         fullWidth={resolved.buttonFullWidth ?? false}
         sx={{ whiteSpace: noWrap === false ? "normal" : "nowrap" }}
       >

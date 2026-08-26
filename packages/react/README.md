@@ -95,7 +95,25 @@ translation lifecycle.
 When either is enabled, the builder omits its `form-engine-builder` and `feb-*` classes. Injected `TextInput`, `TextArea`,
 and `Select` components receive the field `label` and accessibility attributes and are responsible for rendering their
 own labels. Builder action icons can be supplied with `renderIcon`, which resolves `actionType` values such as
-`moveUp`, `moveDown`, `delete`, and `add`.
+`moveUp`, `moveDown`, `delete`, and `add`. `renderFieldTypeIcon` supplies icons for field-type selectors. Select
+options may be strings or `BuilderSelectOption` objects with `icon`, `description`, `kind`, and `metadata`; custom
+`renderOption` and `renderValue` functions can control their presentation. `BUILDER_TRANSLATION_KEYS` exposes the
+canonical typed builder translation keys while legacy catalog aliases remain supported.
+
+The `fieldEditor` slot can expose only the type selector or header through `fieldTypeSelect` and `fieldEditorHeader`:
+
+```tsx
+<FormBuilder
+  schema={schema}
+  onChange={setSchema}
+  slots={{
+    fieldTypeSelect: ({ currentType, onChangeType }) => (
+      <button type="button" onClick={() => onChangeType("textarea")}>{currentType}</button>
+    ),
+    fieldEditorHeader: ({ field }) => <h3>{field.title}</h3>
+  }}
+/>
+```
 
 ```tsx
 <FormBuilder

@@ -341,6 +341,18 @@ export interface FormAnalytics {
 export type Question = FormField;
 export type QuestionType = FieldType;
 export type ChoiceOption = FieldOption;
+
+/** Translation keys reserved for the form builder UI. */
+export type BuilderTranslationKey = `builder.${string}`;
+
+export interface FieldTypeDefinition {
+  readonly type: QuestionType;
+  readonly labelKey: BuilderTranslationKey;
+  readonly defaultLabel: string;
+  readonly category: "text" | "choice" | "number" | "advanced";
+  readonly hasOptions: boolean;
+}
+
 export interface FormResponse extends ExtensibleNode {
   readonly responseId: string;
   readonly formId: string;

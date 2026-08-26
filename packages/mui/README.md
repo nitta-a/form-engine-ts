@@ -36,7 +36,13 @@ import { MuiFormBuilder } from "@form-engine-ts/mui";
     emptyStateMessage: "No translation locales have been added yet.",
     defaultLocaleControl: "readOnly"
   }}
-  muiSlotProps={{ card: { sx: { p: 2 } }, accordion: { elevation: 0 } }}
+  muiSlotProps={{
+    card: { sx: { p: 2 } },
+    accordion: { elevation: 0 },
+    textField: { "data-testid": "builder-input" },
+    select: { variant: "filled" },
+    selectMenu: { PaperProps: { elevation: 4 } }
+  }}
 />;
 ```
 
@@ -69,6 +75,12 @@ locale is added. `defaultExpanded` also accepts `"always"`; `autoFocusNewTab` fo
 default.
 `layoutOptions`, `localizationOptions`, and `muiSlotProps` are also accepted in `muiOptions` for low-level factories such
 as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
+
+Select options in the MUI adapter support icons, descriptions, custom metadata, and custom `renderOption`/`renderValue`
+callbacks. Without a custom renderer, icons appear beside labels in the menu and in the selected value. The standard
+MUI field editor supplies icons for every field type and accepts `slots.fieldTypeSelect` and `slots.fieldEditorHeader`
+for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `button`, and
+`iconButton` MUI props in addition to the layout props.
 
 `MuiFormBuilder` supplies options through `MuiFormBuilderContext` to module-stable adapter and slot component types.
 Controlled schema updates therefore preserve input focus and uncontrolled MUI state such as an open localization

@@ -19,7 +19,7 @@ import {
   MuiTextAreaAdapter,
   MuiTextInputAdapter
 } from "./adapters";
-import { muiDefaultIconResolver } from "./icons";
+import { muiDefaultFieldTypeIcon, muiDefaultIconResolver } from "./icons";
 import type { MuiAdapterOptions } from "./types";
 
 function isAdapterOptions(value: MuiAdapterOptions | Partial<FormBuilderComponents>): value is MuiAdapterOptions {
@@ -52,7 +52,8 @@ function buildMuiBuilderComponents(options?: MuiAdapterOptions): FormBuilderComp
     Section: createMuiSectionAdapter(options),
     Fieldset: createMuiFieldsetAdapter(options),
     ErrorMessage: createMuiErrorMessageAdapter(options),
-    renderIcon: muiDefaultIconResolver
+    renderIcon: muiDefaultIconResolver,
+    renderFieldTypeIcon: muiDefaultFieldTypeIcon
   };
 }
 
@@ -66,7 +67,8 @@ export const muiBuilderComponents: FormBuilderComponents = {
   Section: MuiSectionAdapter,
   Fieldset: MuiFieldsetAdapter,
   ErrorMessage: MuiErrorMessageAdapter,
-  renderIcon: muiDefaultIconResolver
+  renderIcon: muiDefaultIconResolver,
+  renderFieldTypeIcon: muiDefaultFieldTypeIcon
 };
 
 export function createMuiBuilderComponents(customOverrides?: Partial<FormBuilderComponents>): FormBuilderComponents;

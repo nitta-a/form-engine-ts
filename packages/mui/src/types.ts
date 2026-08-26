@@ -1,10 +1,25 @@
 import type { BuilderActionIconType, LocalizationSummaryContext } from "@form-engine-ts/react";
-import type { AccordionProps, CardProps, PaperProps, StackProps } from "@mui/material";
+import type {
+  AccordionProps,
+  ButtonProps,
+  CardProps,
+  CheckboxProps,
+  IconButtonProps,
+  MenuProps,
+  PaperProps,
+  SelectProps,
+  StackProps,
+  TextFieldProps
+} from "@mui/material";
 import type { ReactNode } from "react";
 
 export type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization";
 
 export type MuiButtonVariant = "contained" | "outlined" | "text";
+
+type MuiComponentSlotProps<T> = Partial<T> & {
+  readonly [key: `data-${string}`]: string | number | boolean | undefined;
+};
 
 export interface LocaleOptionItem {
   readonly value: string;
@@ -34,11 +49,30 @@ export interface MuiFieldEditorOptions {
   readonly description?: "editable" | "readOnly" | "hidden";
 }
 
+export interface MuiSlotProps {
+  readonly card?: Partial<CardProps>;
+  readonly paper?: Partial<PaperProps>;
+  readonly accordion?: Partial<AccordionProps>;
+  readonly stack?: Partial<StackProps>;
+  readonly textField?: MuiComponentSlotProps<TextFieldProps>;
+  readonly select?: MuiComponentSlotProps<SelectProps>;
+  readonly selectMenu?: Partial<MenuProps>;
+  readonly checkbox?: MuiComponentSlotProps<CheckboxProps>;
+  readonly button?: MuiComponentSlotProps<ButtonProps>;
+  readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
+}
+
 export interface MuiBuilderSlotProps {
   readonly card?: Partial<CardProps>;
   readonly paper?: Partial<PaperProps>;
-  readonly stack?: Partial<StackProps>;
   readonly accordion?: Partial<AccordionProps>;
+  readonly stack?: Partial<StackProps>;
+  readonly textField?: MuiComponentSlotProps<TextFieldProps>;
+  readonly select?: MuiComponentSlotProps<SelectProps>;
+  readonly selectMenu?: Partial<MenuProps>;
+  readonly checkbox?: MuiComponentSlotProps<CheckboxProps>;
+  readonly button?: MuiComponentSlotProps<ButtonProps>;
+  readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
 }
 
 export interface MuiAdapterOptions {

@@ -22,6 +22,7 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
     label
   }: BuilderCheckboxProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
+    const checkboxSlotProps = resolved.muiSlotProps?.checkbox;
     const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
     const describedBy = ariaDescribedBy ?? (helperText === undefined || helperText.length === 0 ? undefined : helperId);
     return (
@@ -30,9 +31,10 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
           label={label}
           control={
             <Checkbox
+              {...checkboxSlotProps}
               id={id}
               name={name}
-              size={resolved.size}
+              size={checkboxSlotProps?.size ?? resolved.size}
               checked={checked}
               required={required}
               disabled={disabled || readOnly}
