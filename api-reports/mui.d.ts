@@ -1,6 +1,6 @@
 import { BuilderActionIconType, LocalizationSummaryContext, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, QuestionType, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps } from '@form-engine-ts/react';
 import * as react from 'react';
-import { ReactNode, ComponentType } from 'react';
+import { ReactNode, ComponentType, ReactElement } from 'react';
 import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, ButtonProps, IconButtonProps } from '@mui/material';
 
 type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization";
@@ -117,8 +117,8 @@ declare const MuiIconButtonAdapter: ComponentType<BuilderIconButtonProps>;
 declare function createMuiSectionAdapter(options?: MuiAdapterOptions): ComponentType<BuilderSectionProps>;
 declare const MuiSectionAdapter: ComponentType<BuilderSectionProps>;
 
-declare function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentType<BuilderSelectProps>;
-declare const MuiSelectAdapter: ComponentType<BuilderSelectProps>;
+declare function createMuiSelectAdapter<T extends string = string>(options?: MuiAdapterOptions): ComponentType<BuilderSelectProps<T>>;
+declare function MuiSelectAdapter<T extends string = string>(props: BuilderSelectProps<T>): ReactElement;
 
 declare function createMuiTextAreaAdapter(options?: MuiAdapterOptions): ComponentType<BuilderTextAreaProps>;
 declare const MuiTextAreaAdapter: ComponentType<BuilderTextAreaProps>;

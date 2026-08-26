@@ -96,11 +96,14 @@ When either is enabled, the builder omits its `form-engine-builder` and `feb-*` 
 and `Select` components receive the field `label` and accessibility attributes and are responsible for rendering their
 own labels. Builder action icons can be supplied with `renderIcon`, which resolves `actionType` values such as
 `moveUp`, `moveDown`, `delete`, and `add`. `renderFieldTypeIcon` supplies icons for field-type selectors. Select
-options may be strings or `BuilderSelectOption` objects with `icon`, `description`, `kind`, and `metadata`; custom
+options may be strings or `BuilderSelectOption` objects with `icon`, `description`, `group`, `groupLabel`, `kind`, and
+`metadata`; custom
 `renderOption` and `renderValue` functions can control their presentation. `BUILDER_TRANSLATION_KEYS` exposes the
 canonical typed builder translation keys while legacy catalog aliases remain supported.
 
 The `fieldEditor` slot can expose only the type selector or header through `fieldTypeSelect` and `fieldEditorHeader`:
+The `fieldTypeSelect` slot receives the resolved `id`, `name`, `label`, `options`, and accessibility attributes in addition
+to `currentType`, `allowedTypes`, and `onChangeType`.
 
 ```tsx
 <FormBuilder

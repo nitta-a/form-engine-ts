@@ -53,10 +53,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v3.2.0** (2026-08-27). All public packages are currently published at version `3.2.0`.
-This release completes the rich Select and granular MUI Builder customization APIs, including generic option values,
-control-level slot props, field-type metadata, and canonical translation keys. See [RELEASE_NOTES.md](RELEASE_NOTES.md)
-for the complete history and the [GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.2.0).
+The latest release is **v4.0.0** (2026-08-27). All public packages are currently published at version `4.0.0`.
+This release hardens translation fallback and alias resolution, adds typed Select values, expands field-type slot props,
+and groups MUI Select options accessibly. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.0.0).
 
 ### Authoring and respondent experience
 
@@ -364,10 +364,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v3.2.0**（2026-08-27）です。公開パッケージはすべてバージョン `3.2.0` で公開されています。
-本リリースでは、リッチなSelectとMUI Builderの細粒度カスタマイズAPIを完成させ、汎用的な選択肢型、
-コントロール単位のslot props、フィールド型メタデータ、正規化された翻訳キーを提供します。全更新履歴は
-[RELEASE_NOTES.md](RELEASE_NOTES.md) と [GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.2.0) を参照してください。
+最新版は **v4.0.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.0.0` で公開されています。
+本リリースでは、翻訳FallbackとAlias解決を堅牢化し、型付きSelect、拡充されたフィールド型slot props、
+アクセシブルなMUI Selectのグループ表示を提供します。全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.0.0) を参照してください。
 
 ### 編集・回答体験
 

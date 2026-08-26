@@ -1,5 +1,10 @@
 import { type ConditionOperator, DEFAULT_FIELD_TYPE_DEFINITIONS, type FormField } from "@form-engine-ts/core";
-import type { BuilderFieldEditorSlotProps, FormBuilderSlots, QuestionType } from "@form-engine-ts/react";
+import type {
+  BuilderFieldEditorSlotProps,
+  BuilderSelectOption,
+  FormBuilderSlots,
+  QuestionType
+} from "@form-engine-ts/react";
 import { Card, Stack, Typography } from "@mui/material";
 import type { ComponentType } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
@@ -66,6 +71,26 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     const titleErrorId = field.title.trim().length === 0 ? `mui-field-${field.id}-title-error` : undefined;
     const FieldTypeSelect = slots?.fieldTypeSelect;
     const FieldEditorHeader = slots?.fieldEditorHeader;
+    const fieldTypeSelectId = `mui-field-${field.id}-type`;
+    const fieldTypeSelectLabel = translate("builder.type");
+    const fieldTypeOptions: readonly BuilderSelectOption<QuestionType>[] = FIELD_TYPES.filter((type) =>
+      allowedTypes.includes(type)
+    ).map((type) => {
+      const definition = DEFAULT_FIELD_TYPE_DEFINITIONS.find((candidate) => candidate.type === type);
+      const group = definition?.category;
+      return {
+        value: type,
+        label: translate(definition?.labelKey ?? `builder.fieldType.${type}`),
+        description: translate(`builder.fieldTypeDescription.${type}`),
+        icon: components.renderFieldTypeIcon(type),
+        ...(group === undefined
+          ? {}
+          : {
+              group,
+              groupLabel: translate(`builder.fieldCategory.${group}`)
+            })
+      };
+    });
     const changeFieldType = (nextType: QuestionType) => {
       if (allowedTypes.includes(nextType)) actions.changeFieldType(field.id, nextType);
     };
@@ -116,19 +141,11 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
             />
             {FieldTypeSelect === undefined ? (
               <Select
-                id={`mui-field-${field.id}-type`}
+                id={fieldTypeSelectId}
                 name={`fields.${field.id}.type`}
-                label={translate("builder.type")}
+                label={fieldTypeSelectLabel}
                 value={allowedTypes.includes(field.type) ? field.type : ""}
-                options={FIELD_TYPES.filter((type) => allowedTypes.includes(type)).map((type) => {
-                  const definition = DEFAULT_FIELD_TYPE_DEFINITIONS.find((candidate) => candidate.type === type);
-                  return {
-                    value: type,
-                    label: translate(definition?.labelKey ?? `builder.fieldType.${type}`),
-                    icon: components.renderFieldTypeIcon(type),
-                    ...(definition?.category === undefined ? {} : { kind: definition.category })
-                  };
-                })}
+                options={fieldTypeOptions}
                 disabled={readOnly}
                 onChange={(value) => {
                   if (isFieldType(value)) changeFieldType(value);
@@ -136,11 +153,16 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               />
             ) : (
               <FieldTypeSelect
+                id={fieldTypeSelectId}
+                name={`fields.${field.id}.type`}
+                label={fieldTypeSelectLabel}
                 currentType={field.type}
                 allowedTypes={allowedTypes}
+                options={fieldTypeOptions}
                 onChangeType={changeFieldType}
                 disabled={readOnly}
                 readOnly={readOnly}
+                aria-labelledby={`${fieldTypeSelectId}-label`}
                 renderIcon={components.renderFieldTypeIcon}
               />
             )}

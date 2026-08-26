@@ -25,7 +25,7 @@ import {
   type BuilderTextTarget,
   useFormBuilder
 } from "./hooks/useFormBuilder";
-import { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS } from "./i18n";
+import { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, resolveTranslation } from "./i18n";
 import type {
   BuilderActionContext,
   BuilderActionIconType,
@@ -624,6 +624,18 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.fields.typeMultiSelect": "Multi-select",
   "builder.fields.typeCheckbox": "Checkbox",
   "builder.fields.typeRadio": "Radio",
+  "builder.fieldCategory.text": "Text",
+  "builder.fieldCategory.choice": "Choice",
+  "builder.fieldCategory.number": "Number",
+  "builder.fieldCategory.advanced": "Advanced",
+  "builder.fieldTypeDescription.text": "A single-line text answer",
+  "builder.fieldTypeDescription.textarea": "A long-form text answer",
+  "builder.fieldTypeDescription.number": "A numeric answer",
+  "builder.fieldTypeDescription.rating": "A rating scale answer",
+  "builder.fieldTypeDescription.radio": "A single-choice answer",
+  "builder.fieldTypeDescription.checkbox": "A yes/no answer",
+  "builder.fieldTypeDescription.select": "A dropdown choice",
+  "builder.fieldTypeDescription.multi-select": "Multiple choices",
   "builder.actions.addField": "Add question",
   "builder.fieldType.text": "Text",
   "builder.fieldType.textarea": "Textarea",
@@ -638,12 +650,6 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.operator.contains": "contains",
   "builder.operator.not_empty": "is not empty"
 };
-
-function interpolate(template: string, params: Readonly<Record<string, unknown>>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (token, name: string) =>
-    Object.hasOwn(params, name) ? String(params[name]) : token
-  );
-}
 
 interface BuilderSectionGroupProps {
   readonly name: FormBuilderSectionName;
@@ -928,20 +934,15 @@ export function FormBuilder({
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [translationReport, setTranslationReport] = useState<TranslationReport>();
-  const translate = (key: string, params: Record<string, unknown> = {}) => {
-    const translatorParams: Record<string, string | number> = {};
-    for (const [name, value] of Object.entries(params)) {
-      if (typeof value === "string" || typeof value === "number") translatorParams[name] = value;
-    }
-    const translated = translator?.translate(key, locale, translatorParams);
-    if (translated !== undefined && translated !== key) return translated;
-    const alias = BUILDER_TRANSLATION_ALIASES[key];
-    if (alias !== undefined) {
-      const aliased = translator?.translate(alias, locale, translatorParams);
-      if (aliased !== undefined && aliased !== alias) return aliased;
-    }
-    return translated === undefined ? interpolate(BUILDER_DEFAULTS[key] ?? key, params) : translated;
-  };
+  const translate = (key: string, params: Record<string, unknown> = {}) =>
+    resolveTranslation(
+      key,
+      BUILDER_TRANSLATION_ALIASES[key] === undefined ? [] : [BUILDER_TRANSLATION_ALIASES[key]],
+      translator,
+      BUILDER_DEFAULTS,
+      params,
+      locale
+    );
   const pagesEnabled = features?.pages ?? true;
   const localizationEnabled = features?.localization ?? true;
   const conditionsEnabled = features?.conditions ?? true;

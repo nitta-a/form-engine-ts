@@ -40,8 +40,26 @@ describe("MUI rich select options and FieldEditor slots", () => {
   });
 
   it("uses the fine-grained FieldEditor slots without replacing the editor", () => {
-    const FieldTypeSelect = ({ currentType, onChangeType }: FieldTypeSelectSlotProps) => (
-      <button type="button" data-testid="custom-type-select" onClick={() => onChangeType("textarea")}>
+    const FieldTypeSelect = ({
+      currentType,
+      onChangeType,
+      id,
+      name,
+      label,
+      options,
+      "aria-labelledby": ariaLabelledBy
+    }: FieldTypeSelectSlotProps) => (
+      <button
+        type="button"
+        data-testid="custom-type-select"
+        data-id={id}
+        data-name={name}
+        data-label={label}
+        data-aria-labelledby={ariaLabelledBy}
+        data-option-label={options.find((option) => option.value === currentType)?.label}
+        data-option-description={options.find((option) => option.value === currentType)?.description}
+        onClick={() => onChangeType("textarea")}
+      >
         {currentType}
       </button>
     );
@@ -63,6 +81,15 @@ describe("MUI rich select options and FieldEditor slots", () => {
 
     expect(screen.getByTestId("custom-field-header")).toHaveTextContent("Choice 1/1");
     expect(screen.getByTestId("custom-type-select")).toHaveTextContent("select");
+    expect(screen.getByTestId("custom-type-select")).toHaveAttribute("data-id", "mui-field-choice-type");
+    expect(screen.getByTestId("custom-type-select")).toHaveAttribute("data-name", "fields.choice.type");
+    expect(screen.getByTestId("custom-type-select")).toHaveAttribute("data-label", "Type");
+    expect(screen.getByTestId("custom-type-select")).toHaveAttribute(
+      "data-aria-labelledby",
+      "mui-field-choice-type-label"
+    );
+    expect(screen.getByTestId("custom-type-select")).toHaveAttribute("data-option-label", "Select");
+    expect(screen.getByTestId("custom-type-select")).toHaveAttribute("data-option-description", "A dropdown choice");
     expect(screen.queryByRole("combobox", { name: "Type" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("custom-type-select"));
     expect(onChange).toHaveBeenCalledWith(

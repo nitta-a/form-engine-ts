@@ -5,6 +5,23 @@ current release and usage information.
 
 ## Latest release
 
+### v4.0.0 — 2026-08-27
+
+- This major release includes the translation fallback, typed Select, expanded field-type slot, and grouped MUI Select APIs introduced in v3.3.0.
+- The public API reports now intentionally record the breaking type changes under the v4.0.0 release.
+- All public packages were aligned to version 4.0.0.
+
+See the [GitHub release for v4.0.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.0.0).
+
+### v3.3.0 — 2026-08-27
+
+- Translation adapters can report unresolved keys with `undefined` or `null`; the React builder now resolves canonical keys, legacy aliases, and default catalog values consistently.
+- React Select props preserve typed string values through `SelectComponentProps<T>` and `BuilderSelectProps<T>`.
+- The MUI field-type slot receives resolved control attributes, options, icons, descriptions, and category groups; grouped Select menus render accessible subheaders.
+- All public packages were aligned to version 3.3.0.
+
+See the [GitHub release for v3.3.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.3.0).
+
 ### v3.2.0 — 2026-08-27
 
 - `BuilderSelectOption<T>` now supports typed string values while retaining rich icons, descriptions, disabled states, categories, and metadata.
@@ -104,6 +121,23 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.0.0 — 2026-08-27
+
+- v3.3.0で導入した翻訳Fallback、型付きSelect、拡充されたフィールド型slot、グループ対応MUI Select APIをメジャーリリースとして提供します。
+- 公開APIレポートに今回の破壊的な型変更をv4.0.0の変更として記録しました。
+- 公開パッケージのバージョンを4.0.0に統一しました。
+
+[v4.0.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.0.0)も参照してください。
+
+### v3.3.0 — 2026-08-27
+
+- 翻訳adapterが未解決キーに`undefined`または`null`を返せるようになり、React Builderが正規キー、旧Alias、デフォルト辞書を一貫して解決するようになりました。
+- React Selectの`SelectComponentProps<T>`と`BuilderSelectProps<T>`が文字列値の型を保持するようになりました。
+- MUIのフィールド型slotに解決済みの属性、選択肢、アイコン、説明、カテゴリが渡され、Selectメニューにアクセシブルなグループ見出しを表示します。
+- 公開パッケージのバージョンを3.3.0に統一しました。
+
+[v3.3.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.3.0)も参照してください。
 
 ### v3.2.0 — 2026-08-27
 

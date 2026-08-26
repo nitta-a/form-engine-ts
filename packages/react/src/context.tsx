@@ -232,7 +232,8 @@ export function FormProvider({
   );
 
   const translate = useCallback(
-    (key: string, params?: Readonly<Record<string, string | number>>) => translator.translate(key, locale, params),
+    (key: string, params?: Readonly<Record<string, string | number>>) =>
+      translator.translate(key, locale, params) ?? key,
     [locale, translator]
   );
 

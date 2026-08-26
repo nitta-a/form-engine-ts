@@ -76,8 +76,9 @@ default.
 `layoutOptions`, `localizationOptions`, and `muiSlotProps` are also accepted in `muiOptions` for low-level factories such
 as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
 
-Select options in the MUI adapter support icons, descriptions, custom metadata, and custom `renderOption`/`renderValue`
-callbacks. Without a custom renderer, icons appear beside labels in the menu and in the selected value. The standard
+Select options in the MUI adapter support icons, descriptions, groups (`group`/`groupLabel` or `kind`), custom metadata,
+and custom `renderOption`/`renderValue` callbacks. Without a custom renderer, icons appear beside labels in the menu and
+in the selected value. The standard
 MUI field editor supplies icons for every field type and accepts `slots.fieldTypeSelect` and `slots.fieldEditorHeader`
 for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `button`, and
 `iconButton` MUI props in addition to the layout props.

@@ -51,6 +51,31 @@ Required locales cover every source text that exists on the form, its fields, op
 `{ policy: { allowedLocales, maxLocales } }` to `populateSchemaTranslations` to reject inadmissible targets before the
 translation adapter runs.
 
+The React builder uses canonical keys with legacy aliases when resolving UI translations:
+
+| Canonical key | Legacy alias |
+| --- | --- |
+| `builder.fields.typeText` | `builder.fieldType.text` |
+| `builder.fields.typeTextarea` | `builder.fieldType.textarea` |
+| `builder.fields.typeNumber` | `builder.fieldType.number` |
+| `builder.fields.typeRating` | `builder.fieldType.rating` |
+| `builder.fields.typeRadio` | `builder.fieldType.radio` |
+| `builder.fields.typeCheckbox` | `builder.fieldType.checkbox` |
+| `builder.fields.typeSelect` | `builder.fieldType.select` |
+| `builder.fields.typeMultiSelect` | `builder.fieldType.multi-select` |
+
+Adapters should return `undefined` or `null` for missing keys so the builder can try aliases and its default catalog. For
+example, an i18next adapter can avoid treating an unresolved key as translated:
+
+```ts
+const i18nextAdapter: TranslationAdapter = {
+  translate: (key, locale, params) => {
+    if (!i18n.exists(key, { lng: locale })) return undefined;
+    return i18n.t(key, { ...params, lng: locale });
+  }
+};
+```
+
 Translation callbacks receive `nodeMetadata` and `existingTranslationMetadata` separately. The deprecated `metadata`
 slot property remains an alias for `nodeMetadata` during migration.
 

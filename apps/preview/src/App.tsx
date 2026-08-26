@@ -362,7 +362,7 @@ function AnalyticsDetails({
   readonly schema: FormSchema;
   readonly locale: string;
 }) {
-  const t = (key: string) => mockTranslator.translate(key, locale);
+  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   if (aggregate.kind === "number" || aggregate.kind === "rating") {
     return (
       <dl className="metric-grid">
@@ -438,7 +438,7 @@ function AnalyticsPanel({
   readonly onExport: () => Promise<void>;
   readonly resetControl: ReactNode;
 }) {
-  const t = (key: string) => mockTranslator.translate(key, locale);
+  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   const textFields = schema.fields.filter((field) => field.type === "text" || field.type === "textarea");
   const singleChoiceFields = schema.fields.filter(
     (field): field is SelectField => field.type === "select" || field.type === "radio"
@@ -616,7 +616,7 @@ function StorageSwitch({
   readonly locale: string;
   readonly onChange: (value: StorageKind) => void;
 }) {
-  const t = (key: string) => mockTranslator.translate(key, locale);
+  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   return (
     <fieldset className="storage-switch">
       <legend>{t("preview.storage")}</legend>
@@ -642,7 +642,7 @@ function ResetResponsesControl({
   readonly onReset: () => Promise<void>;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const t = (key: string) => mockTranslator.translate(key, locale);
+  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   if (!confirming) {
     return (
       <button className="danger-action" type="button" disabled={disabled} onClick={() => setConfirming(true)}>
@@ -701,7 +701,7 @@ export default function App() {
   } | null>(null);
   const storage: FormStorageAdapter = storageKind === "memory" ? memoryStorage : localStorage;
   const analytics = useMemo(() => aggregateResponses(schema, submissions), [schema, submissions]);
-  const t = (key: string) => mockTranslator.translate(key, locale);
+  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
 
   const loadWorkspace = useCallback(async (adapter: FormStorageAdapter) => {
     try {

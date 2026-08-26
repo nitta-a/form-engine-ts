@@ -98,21 +98,22 @@ export interface BuilderSelectOption<T extends string = string> {
   readonly icon?: ReactNode;
   readonly description?: string;
   readonly disabled?: boolean;
+  readonly group?: string;
+  readonly groupLabel?: string;
   readonly kind?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
-export interface SelectComponentProps extends InputComponentProps {
-  readonly options: readonly (string | BuilderSelectOption)[];
-  readonly renderOption?: (option: BuilderSelectOption) => ReactNode;
-  readonly renderValue?: (option: BuilderSelectOption | undefined) => ReactNode;
+export interface SelectComponentProps<T extends string = string>
+  extends Omit<InputComponentProps, "value" | "onChange"> {
+  readonly value: T;
+  readonly onChange: (value: T) => void;
+  readonly options: readonly (T | BuilderSelectOption<T>)[];
+  readonly renderOption?: (option: BuilderSelectOption<T>) => ReactNode;
+  readonly renderValue?: (option: BuilderSelectOption<T> | undefined) => ReactNode;
 }
 
-export interface BuilderSelectProps extends InputComponentProps {
-  readonly options: readonly BuilderSelectOption[];
-  readonly renderOption?: (option: BuilderSelectOption) => ReactNode;
-  readonly renderValue?: (option: BuilderSelectOption | undefined) => ReactNode;
-}
+export type BuilderSelectProps<T extends string = string> = SelectComponentProps<T>;
 
 export interface BuilderCheckboxProps extends ComponentBaseProps {
   readonly name?: string;
@@ -209,11 +210,20 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
 }
 
 export interface FieldTypeSelectSlotProps {
+  readonly id?: string;
+  readonly name?: string;
+  readonly label?: string;
   readonly currentType: QuestionType;
   readonly allowedTypes: readonly QuestionType[];
+  readonly options: readonly BuilderSelectOption<QuestionType>[];
   readonly onChangeType: (nextType: QuestionType) => void;
   readonly disabled?: boolean;
   readonly readOnly?: boolean;
+  readonly required?: boolean;
+  readonly error?: boolean;
+  readonly helperText?: string;
+  readonly "aria-describedby"?: string;
+  readonly "aria-labelledby"?: string;
   readonly renderIcon?: (type: QuestionType) => ReactNode;
 }
 

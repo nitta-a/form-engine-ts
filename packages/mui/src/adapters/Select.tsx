@@ -6,19 +6,68 @@ import {
   InputLabel,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   MenuItem,
   Select
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material/Select";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactElement, ReactNode } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
 
-function normalizeOptions(options: readonly (string | BuilderSelectOption)[]): readonly BuilderSelectOption[] {
+function normalizeOptions<T extends string>(
+  options: readonly (T | BuilderSelectOption<T>)[]
+): readonly BuilderSelectOption<T>[] {
   return options.map((option) => (typeof option === "string" ? { value: option, label: option } : option));
 }
 
-export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentType<BuilderSelectProps> {
+interface SelectOptionGroup<T extends string> {
+  readonly groupKey?: string;
+  readonly groupLabel?: string;
+  readonly items: readonly BuilderSelectOption<T>[];
+}
+
+function SelectGroupHeader({ children }: { readonly children: ReactNode }): ReactElement {
+  return <ListSubheader role="presentation">{children}</ListSubheader>;
+}
+
+function groupSelectOptions<T extends string>(
+  options: readonly BuilderSelectOption<T>[]
+): readonly SelectOptionGroup<T>[] {
+  const groups: SelectOptionGroup<T>[] = [];
+  const groupIndexes = new Map<string, number>();
+  for (const option of options) {
+    const groupKey = option.group ?? option.kind;
+    const groupLabel = option.groupLabel ?? groupKey;
+    if (groupKey === undefined && groupLabel === undefined) {
+      groups.push({ items: [option] });
+      continue;
+    }
+    const key = groupKey ?? groupLabel;
+    if (key === undefined) {
+      groups.push({ items: [option] });
+      continue;
+    }
+    const existingIndex = groupIndexes.get(key);
+    if (existingIndex === undefined) {
+      groupIndexes.set(key, groups.length);
+      groups.push({
+        groupKey: key,
+        ...(groupLabel === undefined ? {} : { groupLabel }),
+        items: [option]
+      });
+      continue;
+    }
+    const existing = groups[existingIndex];
+    if (existing === undefined) continue;
+    groups[existingIndex] = { ...existing, items: [...existing.items, option] };
+  }
+  return groups;
+}
+
+export function createMuiSelectAdapter<T extends string = string>(
+  options?: MuiAdapterOptions
+): ComponentType<BuilderSelectProps<T>> {
   return function MuiSelect({
     id,
     className,
@@ -38,16 +87,17 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
     options: selectOptions,
     renderOption,
     renderValue
-  }: BuilderSelectProps) {
+  }: BuilderSelectProps<T>) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const normalizedOptions = normalizeOptions(selectOptions);
+    const groupedOptions = groupSelectOptions(normalizedOptions);
     const selectSlotProps = resolved.muiSlotProps?.select;
     const menuProps = { ...selectSlotProps?.MenuProps, ...resolved.muiSlotProps?.selectMenu };
     const slotInputProps = selectSlotProps?.inputProps;
     const labelId = id === undefined || label === undefined ? undefined : `${id}-label`;
     const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
     const describedBy = ariaDescribedBy ?? (helperText === undefined || helperText.length === 0 ? undefined : helperId);
-    const handleChange = (event: SelectChangeEvent<unknown>) => onChange(String(event.target.value));
+    const handleChange = (event: SelectChangeEvent<unknown>) => onChange(event.target.value as T);
     return (
       <FormControl
         className={className}
@@ -92,18 +142,27 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
             ...(ariaLabelledBy === undefined ? {} : { "aria-labelledby": ariaLabelledBy })
           }}
         >
-          {normalizedOptions.map((option) => (
-            <MenuItem key={option.value} value={option.value} disabled={option.disabled}>
-              {renderOption === undefined ? (
-                <>
-                  {option.icon === undefined ? null : <ListItemIcon sx={{ minWidth: 32 }}>{option.icon}</ListItemIcon>}
-                  <ListItemText primary={option.label} secondary={option.description} />
-                </>
-              ) : (
-                renderOption(option)
-              )}
-            </MenuItem>
-          ))}
+          {groupedOptions.flatMap((group) => [
+            group.groupLabel === undefined ? null : (
+              <SelectGroupHeader key={`header-${group.groupKey ?? group.groupLabel}`}>
+                {group.groupLabel}
+              </SelectGroupHeader>
+            ),
+            ...group.items.map((option) => (
+              <MenuItem key={option.value} value={option.value} disabled={option.disabled}>
+                {renderOption === undefined ? (
+                  <>
+                    {option.icon === undefined ? null : (
+                      <ListItemIcon sx={{ minWidth: 32 }}>{option.icon}</ListItemIcon>
+                    )}
+                    <ListItemText primary={option.label} secondary={option.description} />
+                  </>
+                ) : (
+                  renderOption(option)
+                )}
+              </MenuItem>
+            ))
+          ])}
         </Select>
         {helperText === undefined || helperText.length === 0 ? null : (
           <FormHelperText id={helperId}>{helperText}</FormHelperText>
@@ -113,4 +172,7 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
   };
 }
 
-export const MuiSelectAdapter: ComponentType<BuilderSelectProps> = createMuiSelectAdapter();
+export function MuiSelectAdapter<T extends string = string>(props: BuilderSelectProps<T>): ReactElement {
+  const Adapter = createMuiSelectAdapter<T>();
+  return <Adapter {...props} />;
+}

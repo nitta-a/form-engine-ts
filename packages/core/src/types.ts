@@ -172,7 +172,8 @@ export interface FormSubmission extends ExtensibleNode {
 }
 
 export interface TranslationAdapter {
-  translate(key: string, locale: string, params?: Readonly<Record<string, string | number>>): string;
+  /** Return null or undefined when the key cannot be resolved by the adapter. */
+  translate(key: string, locale: string, params?: Readonly<Record<string, string | number>>): string | undefined | null;
 }
 
 export interface AsyncTranslationAdapter {
