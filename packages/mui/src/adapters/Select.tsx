@@ -149,7 +149,14 @@ export function createMuiSelectAdapter<T extends string = string>(
               </SelectGroupHeader>
             ),
             ...group.items.map((option) => (
-              <MenuItem key={option.value} value={option.value} disabled={option.disabled}>
+              <MenuItem
+                key={option.value}
+                value={option.value}
+                disabled={option.disabled}
+                {...(option.group === undefined && option.groupLabel === undefined && option.kind === undefined
+                  ? {}
+                  : { "aria-label": option.label })}
+              >
                 {renderOption === undefined ? (
                   <>
                     {option.icon === undefined ? null : (
