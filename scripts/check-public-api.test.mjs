@@ -61,3 +61,9 @@ test("allows widening an interface property with an additive union", () => {
   const current = report("interface Options { readonly value?: string | number; }", "type Options");
   assert.deepEqual(findBreakingApiChanges(previous, current, "fixture"), []);
 });
+
+test("allows a defaulted generic parameter that preserves the previous property type", () => {
+  const previous = report("interface Option { readonly value: string; }", "type Option");
+  const current = report("interface Option<T extends string = string> { readonly value: T; }", "type Option");
+  assert.deepEqual(findBreakingApiChanges(previous, current, "fixture"), []);
+});

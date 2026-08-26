@@ -53,10 +53,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v3.1.0** (2026-08-27). All public packages are currently published at version `3.1.0`.
-This release adds rich Select options, granular MUI Builder field-editor slots, control-level MUI slot props, and
-canonical field-type metadata and translation keys. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history
-and the [GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.1.0).
+The latest release is **v3.2.0** (2026-08-27). All public packages are currently published at version `3.2.0`.
+This release completes the rich Select and granular MUI Builder customization APIs, including generic option values,
+control-level slot props, field-type metadata, and canonical translation keys. See [RELEASE_NOTES.md](RELEASE_NOTES.md)
+for the complete history and the [GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.2.0).
 
 ### Authoring and respondent experience
 
@@ -364,10 +364,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v3.1.0**（2026-08-27）です。公開パッケージはすべてバージョン `3.1.0` で公開されています。
-本リリースでは、リッチなSelect選択肢、MUI Builderのフィールド編集slot、コントロール単位のMUI slot props、
-フィールド型メタデータと翻訳キーを追加しました。全更新履歴は [RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.1.0) を参照してください。
+最新版は **v3.2.0**（2026-08-27）です。公開パッケージはすべてバージョン `3.2.0` で公開されています。
+本リリースでは、リッチなSelectとMUI Builderの細粒度カスタマイズAPIを完成させ、汎用的な選択肢型、
+コントロール単位のslot props、フィールド型メタデータ、正規化された翻訳キーを提供します。全更新履歴は
+[RELEASE_NOTES.md](RELEASE_NOTES.md) と [GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.2.0) を参照してください。
 
 ### 編集・回答体験
 

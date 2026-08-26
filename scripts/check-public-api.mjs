@@ -62,6 +62,21 @@ function isOptional(node) {
   return node.questionToken !== undefined || node.initializer !== undefined;
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function normalizeTypeWithDefaultParameters(node, sourceFile, declaration) {
+  let value = compactText(node, sourceFile);
+  for (const parameter of declaration?.typeParameters ?? []) {
+    if (parameter.default === undefined || !ts.isIdentifier(parameter.name)) continue;
+    const parameterName = escapeRegExp(parameter.name.text);
+    const defaultType = compactText(parameter.default, sourceFile);
+    value = value.replace(new RegExp(`\\b${parameterName}\\b`, "gu"), defaultType);
+  }
+  return value;
+}
+
 function resolveObjectMembers(node, sourceFile, seen = new Set()) {
   if (node === undefined) return undefined;
   if (ts.isTypeLiteralNode(node)) return node.members;
@@ -145,7 +160,7 @@ function isWidenedType(previousType, currentType, previousFile, currentFile) {
   return [...previousParts].every((part) => currentParts.has(part));
 }
 
-function compareMembers(name, previous, current, previousFile, currentFile) {
+function compareMembers(name, previous, current, previousFile, currentFile, currentDeclaration) {
   const changes = [];
   const oldMembers = new Map(previous.members.map((member, index) => [memberKey(member, previousFile, index), member]));
   const newMembers = new Map(current.members.map((member, index) => [memberKey(member, currentFile, index), member]));
@@ -170,7 +185,10 @@ function compareMembers(name, previous, current, previousFile, currentFile) {
         changes.push(...compareSignatures(`${name}.${key}`, oldMember.type, newMember.type, previousFile, currentFile));
       } else {
         const oldType = oldMember.type === undefined ? "unknown" : compactText(oldMember.type, previousFile);
-        const newType = newMember.type === undefined ? "unknown" : compactText(newMember.type, currentFile);
+        const newType =
+          newMember.type === undefined
+            ? "unknown"
+            : normalizeTypeWithDefaultParameters(newMember.type, currentFile, currentDeclaration);
         if (oldType !== newType && !isWidenedType(oldMember.type, newMember.type, previousFile, currentFile)) {
           changes.push(`${name}.${key}: type changed from ${oldType} to ${newType}`);
         }
@@ -203,11 +221,11 @@ function compareDeclaration(name, previous, current, previousFile, currentFile) 
     const newBases = current.heritageClauses?.map((clause) => compactText(clause, currentFile)).join("|") ?? "";
     return [
       ...(oldBases === newBases ? [] : [`${name}: base interfaces changed`]),
-      ...compareMembers(name, previous, current, previousFile, currentFile)
+      ...compareMembers(name, previous, current, previousFile, currentFile, current)
     ];
   }
   if (ts.isClassDeclaration(previous) && ts.isClassDeclaration(current)) {
-    return compareMembers(name, previous, current, previousFile, currentFile);
+    return compareMembers(name, previous, current, previousFile, currentFile, current);
   }
   if (ts.isFunctionDeclaration(previous) && ts.isFunctionDeclaration(current)) {
     return compareSignatures(name, previous, current, previousFile, currentFile);

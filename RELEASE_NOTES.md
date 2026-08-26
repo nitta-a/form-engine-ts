@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v3.2.0 — 2026-08-27
+
+- `BuilderSelectOption<T>` now supports typed string values while retaining rich icons, descriptions, disabled states, categories, and metadata.
+- Select component props accept both string options and rich option objects, with custom option/value renderers preserved across adapters.
+- MUI control-level slot props retain injected accessibility attributes while preserving the existing layout slot API.
+- All public packages were aligned to version 3.2.0.
+
+See the [GitHub release for v3.2.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.2.0).
+
 ### v3.1.0 — 2026-08-27
 
 - React Select primitives now support rich option metadata, descriptions, disabled states, and custom option/value rendering.
@@ -95,6 +104,15 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v3.2.0 — 2026-08-27
+
+- `BuilderSelectOption<T>`が文字列値の型パラメータに対応し、リッチなアイコン、説明、無効状態、種別、メタデータを維持できるようになりました。
+- Selectのpropsが文字列選択肢とリッチな選択肢オブジェクトの両方を受け付け、各adapterでカスタム描画を利用できます。
+- MUIのコントロール単位slot propsでアクセシビリティ属性を保持し、既存のレイアウトslot APIとの互換性を維持しました。
+- 公開パッケージのバージョンを3.2.0に統一しました。
+
+[v3.2.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v3.2.0)も参照してください。
 
 ### v3.1.0 — 2026-08-27
 

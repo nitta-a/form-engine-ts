@@ -181,9 +181,9 @@ interface BuilderTextInputProps extends InputComponentProps {
 interface BuilderTextAreaProps extends InputComponentProps {
     readonly rows?: number;
 }
-interface BuilderSelectOption {
+interface BuilderSelectOption<T extends string = string> {
     readonly label: string;
-    readonly value: string;
+    readonly value: T;
     readonly icon?: ReactNode;
     readonly description?: string;
     readonly disabled?: boolean;

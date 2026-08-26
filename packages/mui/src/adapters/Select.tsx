@@ -43,6 +43,7 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
     const normalizedOptions = normalizeOptions(selectOptions);
     const selectSlotProps = resolved.muiSlotProps?.select;
     const menuProps = { ...selectSlotProps?.MenuProps, ...resolved.muiSlotProps?.selectMenu };
+    const slotInputProps = selectSlotProps?.inputProps;
     const labelId = id === undefined || label === undefined ? undefined : `${id}-label`;
     const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
     const describedBy = ariaDescribedBy ?? (helperText === undefined || helperText.length === 0 ? undefined : helperId);
@@ -85,10 +86,10 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
             );
           }}
           inputProps={{
-            ...selectSlotProps?.inputProps,
-            "aria-label": ariaLabel,
-            "aria-describedby": describedBy,
-            "aria-labelledby": ariaLabelledBy
+            ...slotInputProps,
+            ...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel }),
+            ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+            ...(ariaLabelledBy === undefined ? {} : { "aria-labelledby": ariaLabelledBy })
           }}
         >
           {normalizedOptions.map((option) => (
@@ -112,4 +113,4 @@ export function createMuiSelectAdapter(options?: MuiAdapterOptions): ComponentTy
   };
 }
 
-export const MuiSelectAdapter = createMuiSelectAdapter();
+export const MuiSelectAdapter: ComponentType<BuilderSelectProps> = createMuiSelectAdapter();

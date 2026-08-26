@@ -23,6 +23,7 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
   }: BuilderCheckboxProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const checkboxSlotProps = resolved.muiSlotProps?.checkbox;
+    const checkboxInputProps = checkboxSlotProps?.inputProps;
     const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
     const describedBy = ariaDescribedBy ?? (helperText === undefined || helperText.length === 0 ? undefined : helperId);
     return (
@@ -39,9 +40,10 @@ export function createMuiCheckboxAdapter(options?: MuiAdapterOptions): Component
               required={required}
               disabled={disabled || readOnly}
               inputProps={{
-                "aria-label": ariaLabel,
-                "aria-describedby": describedBy,
-                "aria-labelledby": ariaLabelledBy
+                ...checkboxInputProps,
+                ...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel }),
+                ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+                ...(ariaLabelledBy === undefined ? {} : { "aria-labelledby": ariaLabelledBy })
               }}
               onChange={(event) => onChange(event.target.checked)}
             />
