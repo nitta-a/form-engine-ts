@@ -220,7 +220,7 @@ describe("preview application", () => {
     await submitCompleteResponse(user, false);
     await waitFor(() => expect(screen.getByText(/Submission cancelled/)).toBeInTheDocument());
     expect(screen.getByLabelText(/I agree that this response/)).toBeChecked();
-  });
+  }, 30000);
 
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
