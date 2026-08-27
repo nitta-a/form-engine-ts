@@ -3,7 +3,7 @@ import { createMuiBuilderComponents } from "./components";
 import { createMuiBuilderSlots } from "./slots";
 import type { MuiAdapterOptions } from "./types";
 
-export type { MuiSlotProps } from "./types";
+export type { MuiFieldEditorOptions, MuiSlotProps } from "./types";
 
 export interface MuiBuilderOverrides {
   readonly components?: Partial<FormBuilderComponents>;

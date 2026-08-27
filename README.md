@@ -22,6 +22,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
 | Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
 | Translator adapter | `@form-engine-ts/translator-google-v3` | Google Cloud Translation Advanced v3 with glossaries, labels, chunking, and retry |
+| Translator adapter | `@form-engine-ts/translator-i18next` | Official i18next adapter for synchronous UI translation lookups |
 | Translator utility | `@form-engine-ts/translator-cache` | Storage-neutral TTL cache wrapper for asynchronous translation adapters |
 | Privacy utility | `@form-engine-ts/privacy` | Standard and extensible sensitive-data detection for text answers |
 | Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
@@ -53,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.0.0** (2026-08-27). All public packages are currently published at version `4.0.0`.
-This release hardens translation fallback and alias resolution, adds typed Select values, expands field-type slot props,
-and groups MUI Select options accessibly. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.0.0).
+The latest release is **v4.1.0** (2026-08-27). All public packages are currently published at version `4.1.0`.
+This release adds granular FieldEditor property controls, configurable field-type option transformation and sorting,
+and the official i18next translation adapter. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.1.0).
 
 ### Authoring and respondent experience
 
@@ -333,6 +334,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
 | Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
 | Translator Adapter | `@form-engine-ts/translator-google-v3` | 用語集・label・分割送信・retry対応のGoogle Cloud Translation Advanced v3連携 |
+| Translator Adapter | `@form-engine-ts/translator-i18next` | i18nextを利用する公式同期UI翻訳アダプター |
 | Translator Utility | `@form-engine-ts/translator-cache` | 非同期翻訳adapter向けのstorage非依存TTL cache wrapper |
 | Privacy Utility | `@form-engine-ts/privacy` | テキスト回答向けの標準・拡張可能な機密データ検出 |
 | Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
@@ -364,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.0.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.0.0` で公開されています。
-本リリースでは、翻訳FallbackとAlias解決を堅牢化し、型付きSelect、拡充されたフィールド型slot props、
-アクセシブルなMUI Selectのグループ表示を提供します。全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.0.0) を参照してください。
+最新版は **v4.1.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.1.0` で公開されています。
+本リリースでは、FieldEditorの設問プロパティを細粒度で制御する設定、フィールド種別選択肢の変換・並び替え、
+i18next公式翻訳アダプターを提供します。全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.1.0) を参照してください。
 
 ### 編集・回答体験
 

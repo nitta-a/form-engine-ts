@@ -30,6 +30,7 @@
       "@form-engine-ts/translator-cache": ["./packages/translator-cache/src/index.ts"],
       "@form-engine-ts/translator-deepl": ["./packages/translator-deepl/src/index.ts"],
       "@form-engine-ts/translator-google": ["./packages/translator-google/src/index.ts"],
+      "@form-engine-ts/translator-i18next": ["./packages/translator-i18next/src/index.ts"],
       "@form-engine-ts/translator-mock": ["./packages/translator-mock/src/index.ts"],
       "@form-engine-ts/zod": ["./packages/zod/src/index.ts"]
     },

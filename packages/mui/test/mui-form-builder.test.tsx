@@ -492,6 +492,42 @@ describe("MuiFormBuilder", () => {
     expect(screen.getByRole("textbox", { name: "Translated description" })).toHaveAttribute("readonly");
   });
 
+  it("applies field editor controls and per-type overrides without CSS selectors", () => {
+    render(
+      <MuiFormBuilder
+        schema={{
+          ...schema,
+          fields: [
+            {
+              id: "rating",
+              type: "rating",
+              title: "Rating",
+              required: true,
+              min: 1,
+              max: 5
+            }
+          ]
+        }}
+        onChange={() => undefined}
+        features={{ pages: false, localization: false, conditions: false }}
+        muiOptions={{
+          fieldEditorOptions: {
+            title: "hidden",
+            required: "hidden",
+            ratingBounds: "readOnly",
+            byType: { rating: { typeSelect: "hidden" } }
+          }
+        }}
+      />
+    );
+
+    expect(screen.queryByRole("textbox", { name: "Question title" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Type" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Required" })).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Minimum" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "Maximum" })).toBeDisabled();
+  });
+
   it("keeps localization actions and tabs on one line and updates the summary and empty state", async () => {
     const user = userEvent.setup();
     render(<LocalizationOptionsHarness />);

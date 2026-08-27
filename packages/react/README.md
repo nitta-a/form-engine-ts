@@ -72,6 +72,11 @@ controls `pages`, `localization`, and `conditions` authoring surfaces; each defa
 set, locale addition becomes a selector containing only unregistered allowed locales, and the action is disabled at
 `maxLocales`.
 
+`fieldEditorControls` makes the standard field editor's title, description, required flag, type selector, options,
+display conditions, text limits, rating bounds, and number limits independently `editable`, `readOnly`, or `hidden`.
+`fieldTypeOptions` can provide an explicit order, comparator, or transformation for generated type choices; the default
+choices are copied before they are changed.
+
 Visual Builder has two independent design-system extension layers. `components` replaces normalized primitives such as
 `Button`, `TextInput`, `TextArea`, `Select`, `Checkbox`, `Section`, and `Fieldset`. `slots` replaces complete authoring
 surfaces: `toolbar`, `fieldEditor`, `optionEditor`, `pages`, `localization`, or `translationActions`. Slot props expose

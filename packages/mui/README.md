@@ -17,7 +17,10 @@ import { MuiFormBuilder } from "@form-engine-ts/mui";
     dense: true,
     inputFullWidth: true,
     buttonFullWidth: false,
-    fieldEditorOptions: { description: "hidden" },
+    fieldEditorOptions: {
+      description: "hidden",
+      byType: { rating: { ratingBounds: "readOnly" } }
+    },
     getLocaleLabel: (locale) => localeNames[locale] ?? locale,
     buttonVariants: { primary: "contained", secondary: "outlined", danger: "outlined" }
   }}
@@ -64,8 +67,10 @@ slots as it does for the standard builder.
 
 `MuiAdapterOptions` defaults to `size: "medium"`, `variant: "outlined"`, `buttonVariant: "contained"`,
 `inputFullWidth: true`, and `buttonFullWidth: false`. The legacy `fullWidth` option remains the fallback for both new
-width options. `fieldEditorOptions.description` and `localizationOptions.defaultLocaleControl` independently make those
-controls editable, read-only, or hidden. Set `dense` to reduce section, editor, option, and toolbar spacing.
+width options. `fieldEditorOptions` controls title, description, required, type selection, options, display conditions,
+text limits, rating bounds, and number limits. Each control can be `editable`, `readOnly`, or `hidden`, and `byType`
+can override controls for individual question types. `localizationOptions.defaultLocaleControl` independently controls
+the default locale input. Set `dense` to reduce section, editor, option, and toolbar spacing.
 `buttonVariants` can override the MUI variant for `primary`, `secondary`, and `danger` actions independently.
 `localizationOptions.availableLocales` supplies display-ready locale candidates independently from the policy; when
 both are present, only candidates allowed by `allowedLocales` are shown. `placement` supports `top`,
@@ -82,6 +87,8 @@ in the selected value. The standard
 MUI field editor supplies icons for every field type and accepts `slots.fieldTypeSelect` and `slots.fieldEditorHeader`
 for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `button`, and
 `iconButton` MUI props in addition to the layout props.
+`fieldEditorOptions.fieldTypeOptions` can explicitly order, sort, or transform the generated type choices without
+mutating the defaults.
 
 `MuiFormBuilder` supplies options through `MuiFormBuilderContext` to module-stable adapter and slot component types.
 Controlled schema updates therefore preserve input focus and uncontrolled MUI state such as an open localization

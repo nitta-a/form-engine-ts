@@ -40,6 +40,10 @@ import type {
   BuilderSlotActions,
   BuilderTextAreaProps,
   BuilderTextInputProps,
+  FieldEditorControlsConfig,
+  FieldPropertyControlMode,
+  FieldTypeSelectOptionsConfig,
+  FieldTypeSelectOptionsContext,
   FormBuilderComponents,
   FormBuilderSectionName,
   FormBuilderSlots,
@@ -544,6 +548,43 @@ const FIELD_TYPES: readonly FieldType[] = [
   "radio"
 ];
 
+const DEFAULT_FIELD_EDITOR_CONTROL_MODE: FieldPropertyControlMode = "editable";
+
+export function resolveFieldEditorControls(
+  config: FieldEditorControlsConfig = {}
+): Required<FieldEditorControlsConfig> {
+  return {
+    title: config.title ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    description: config.description ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    required: config.required ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    typeSelect: config.typeSelect ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    options: config.options ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    displayConditions: config.displayConditions ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    textLimits: config.textLimits ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    ratingBounds: config.ratingBounds ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE,
+    numberLimits: config.numberLimits ?? DEFAULT_FIELD_EDITOR_CONTROL_MODE
+  };
+}
+
+export function resolveFieldTypeSelectOptions(
+  options: readonly BuilderSelectOption<QuestionType>[],
+  config: FieldTypeSelectOptionsConfig | undefined,
+  context: FieldTypeSelectOptionsContext
+): readonly BuilderSelectOption<QuestionType>[] {
+  let resolved = [...options];
+  if (config?.transform !== undefined) resolved = [...config.transform(resolved, context)];
+  if (config?.order !== undefined) {
+    const ranks = new Map(config.order.map((type, index) => [type, index]));
+    resolved.sort((left, right) => {
+      const leftRank = ranks.get(left.value) ?? config.order?.length ?? 0;
+      const rightRank = ranks.get(right.value) ?? config.order?.length ?? 0;
+      return leftRank - rightRank;
+    });
+  }
+  if (config?.sort !== undefined) resolved.sort((left, right) => config.sort?.(left, right, context) ?? 0);
+  return resolved;
+}
+
 const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.formBuilder": "Form builder",
   "builder.basicSettings": "Basic settings",
@@ -562,6 +603,10 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.required": "Required",
   "builder.minimum": "Minimum",
   "builder.maximum": "Maximum",
+  "builder.minimumLength": "Minimum length",
+  "builder.maximumLength": "Maximum length",
+  "builder.pattern": "Pattern",
+  "builder.step": "Step",
   "builder.options": "Options",
   "builder.optionLabel": "選択肢 / Option Label {{index}}",
   "builder.optionLabelPlaceholder": "Example: Very satisfied",
@@ -875,6 +920,8 @@ export interface FormBuilderProps {
   ) => Readonly<Record<string, JsonValue>> | undefined;
   readonly readOnly?: boolean;
   readonly features?: FormBuilderFeatures;
+  readonly fieldEditorControls?: FieldEditorControlsConfig;
+  readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
   readonly components?: FormBuilderComponents;
   readonly slots?: FormBuilderSlots;
   readonly sectionOrder?: readonly FormBuilderSectionName[];
@@ -899,6 +946,8 @@ export function FormBuilder({
   createManualTranslationMetadata,
   readOnly = false,
   features,
+  fieldEditorControls,
+  fieldTypeOptions,
   components: componentOverrides,
   slots,
   sectionOrder,
@@ -1741,6 +1790,7 @@ export function FormBuilder({
             <BuilderSectionGroup name="questions">
               <div className={builderClass("form-engine-builder__list")}>
                 {schema.fields.map((field, index) => {
+                  const controls = resolveFieldEditorControls(fieldEditorControls);
                   const condition = field.displayCondition;
                   const source =
                     condition === undefined
@@ -1759,6 +1809,8 @@ export function FormBuilder({
                         {...(slots === undefined ? {} : { slots })}
                         {...(policy === undefined ? {} : { policy })}
                         {...(features === undefined ? {} : { features })}
+                        {...(fieldEditorControls === undefined ? {} : { fieldEditorControls })}
+                        {...(fieldTypeOptions === undefined ? {} : { fieldTypeOptions })}
                         readOnly={readOnly}
                         actions={actions}
                         components={components}
@@ -1813,48 +1865,80 @@ export function FormBuilder({
                         )}
                       </div>
                       <div className={builderClass("form-engine-builder__grid")}>
-                        <div className={builderClass("form-engine-builder__field")}>
-                          <TextInput
-                            id={`builder-field-${field.id}-title`}
-                            name={`fields.${field.id}.title`}
-                            label={translate("builder.questionTitle")}
-                            required={true}
-                            error={field.title.trim().length === 0}
-                            helperText={field.title.trim().length === 0 ? translate("builder.required") : ""}
-                            aria-describedby={
-                              field.title.trim().length === 0 ? `builder-field-${field.id}-title-error` : undefined
+                        {controls.title === "hidden" ? null : (
+                          <div className={builderClass("form-engine-builder__field")}>
+                            <TextInput
+                              id={`builder-field-${field.id}-title`}
+                              name={`fields.${field.id}.title`}
+                              label={translate("builder.questionTitle")}
+                              required={true}
+                              error={field.title.trim().length === 0}
+                              helperText={field.title.trim().length === 0 ? translate("builder.required") : ""}
+                              aria-describedby={
+                                field.title.trim().length === 0 ? `builder-field-${field.id}-title-error` : undefined
+                              }
+                              value={field.title}
+                              placeholder={translate("builder.questionTitlePlaceholder")}
+                              readOnly={controls.title === "readOnly"}
+                              onChange={(value) =>
+                                updateField(field.id, (current) => ({
+                                  ...current,
+                                  title: value.trim().length === 0 ? current.title : value
+                                }))
+                              }
+                            />
+                          </div>
+                        )}
+                        {controls.typeSelect === "hidden" ? null : (
+                          <div className={builderClass("form-engine-builder__field")}>
+                            <Select
+                              id={`builder-field-${field.id}-type`}
+                              label={translate("builder.type")}
+                              value={field.type}
+                              disabled={controls.typeSelect === "readOnly"}
+                              onChange={(value) => changeType(field.id, value as FieldType)}
+                              options={resolveFieldTypeSelectOptions(
+                                FIELD_TYPES.filter(
+                                  (type) =>
+                                    policy?.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
+                                ).map((type) => ({ value: type, label: translate(fieldTypeKey(type)) })),
+                                fieldTypeOptions,
+                                { currentType: field.type, allowedTypes: policy?.allowedFieldTypes ?? FIELD_TYPES }
+                              )}
+                            />
+                          </div>
+                        )}
+                        {controls.required === "hidden" ? null : (
+                          <Checkbox
+                            className={builderClass("form-engine-builder__check")}
+                            checked={field.required === true}
+                            disabled={controls.required === "readOnly"}
+                            onChange={(checked) =>
+                              updateField(field.id, (current) => ({ ...current, required: checked }))
                             }
-                            value={field.title}
-                            placeholder={translate("builder.questionTitlePlaceholder")}
-                            onChange={(value) =>
-                              updateField(field.id, (current) => ({
-                                ...current,
-                                title: value.trim().length === 0 ? current.title : value
-                              }))
-                            }
+                            label={translate("builder.required")}
                           />
-                        </div>
-                        <div className={builderClass("form-engine-builder__field")}>
-                          <Select
-                            id={`builder-field-${field.id}-type`}
-                            label={translate("builder.type")}
-                            value={field.type}
-                            onChange={(value) => changeType(field.id, value as FieldType)}
-                            options={FIELD_TYPES.filter(
-                              (type) =>
-                                policy?.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
-                            ).map((type) => ({ value: type, label: translate(fieldTypeKey(type)) }))}
-                          />
-                        </div>
-                        <Checkbox
-                          className={builderClass("form-engine-builder__check")}
-                          checked={field.required === true}
-                          onChange={(checked) =>
-                            updateField(field.id, (current) => ({ ...current, required: checked }))
-                          }
-                          label={translate("builder.required")}
-                        />
+                        )}
                       </div>
+
+                      {controls.description === "hidden" ? null : (
+                        <div className={builderClass("form-engine-builder__field")}>
+                          <TextArea
+                            id={`builder-field-${field.id}-description`}
+                            name={`fields.${field.id}.description`}
+                            label={translate("builder.description")}
+                            value={field.description ?? ""}
+                            readOnly={controls.description === "readOnly"}
+                            onChange={(value) =>
+                              updateField(field.id, (current) => {
+                                if (value.length > 0) return { ...current, description: value };
+                                const { description: _description, ...remaining } = current;
+                                return remaining;
+                              })
+                            }
+                          />
+                        </div>
+                      )}
 
                       {!pagesEnabled || schema.pages === undefined ? null : (
                         <div className={builderClass("form-engine-builder__field")}>
@@ -1897,29 +1981,32 @@ export function FormBuilder({
                                 }
                               />
                             </div>
-                            <div className={builderClass("form-engine-builder__field")}>
-                              <TextInput
-                                id={`builder-field-${field.id}-${editingLocale}-description`}
-                                label={translate("builder.pageDescription")}
-                                value={field.translations?.[editingLocale]?.description ?? ""}
-                                onChange={(value) =>
-                                  updateManualTranslation({
-                                    locale: editingLocale,
-                                    kind: "field",
-                                    nodeId: field.id,
-                                    property: "description",
-                                    sourceText: field.description ?? "",
-                                    translatedText: value,
-                                    ...(field.translationMetadata?.[editingLocale]?.description === undefined
-                                      ? {}
-                                      : {
-                                          existingTranslationMetadata:
-                                            field.translationMetadata[editingLocale]?.description
-                                        })
-                                  })
-                                }
-                              />
-                            </div>
+                            {controls.description === "hidden" ? null : (
+                              <div className={builderClass("form-engine-builder__field")}>
+                                <TextInput
+                                  id={`builder-field-${field.id}-${editingLocale}-description`}
+                                  label={translate("builder.pageDescription")}
+                                  value={field.translations?.[editingLocale]?.description ?? ""}
+                                  readOnly={controls.description === "readOnly"}
+                                  onChange={(value) =>
+                                    updateManualTranslation({
+                                      locale: editingLocale,
+                                      kind: "field",
+                                      nodeId: field.id,
+                                      property: "description",
+                                      sourceText: field.description ?? "",
+                                      translatedText: value,
+                                      ...(field.translationMetadata?.[editingLocale]?.description === undefined
+                                        ? {}
+                                        : {
+                                            existingTranslationMetadata:
+                                              field.translationMetadata[editingLocale]?.description
+                                          })
+                                    })
+                                  }
+                                />
+                              </div>
+                            )}
                           </div>
                           {"options" in field
                             ? field.options.map((option, optionIndex) => (
@@ -1951,7 +2038,7 @@ export function FormBuilder({
                         </div>
                       )}
 
-                      {field.type === "rating" ? (
+                      {field.type === "rating" && controls.ratingBounds !== "hidden" ? (
                         <div className={builderClass("form-engine-builder__grid")}>
                           <div className={builderClass("form-engine-builder__field")}>
                             <TextInput
@@ -1959,6 +2046,7 @@ export function FormBuilder({
                               label={translate("builder.minimum")}
                               type="number"
                               value={String(field.min ?? 1)}
+                              readOnly={controls.ratingBounds === "readOnly"}
                               onChange={(value) => {
                                 const min = Number(value);
                                 if (!Number.isInteger(min)) return;
@@ -1976,6 +2064,7 @@ export function FormBuilder({
                               label={translate("builder.maximum")}
                               type="number"
                               value={String(field.max ?? 5)}
+                              readOnly={controls.ratingBounds === "readOnly"}
                               onChange={(value) => {
                                 const max = Number(value);
                                 if (!Number.isInteger(max)) return;
@@ -1990,7 +2079,95 @@ export function FormBuilder({
                         </div>
                       ) : null}
 
-                      {"options" in field ? (
+                      {(field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden" ? (
+                        <div className={builderClass("form-engine-builder__grid")}>
+                          <div className={builderClass("form-engine-builder__field")}>
+                            <TextInput
+                              id={`builder-field-${field.id}-min-length`}
+                              label={translate("builder.minimumLength")}
+                              type="number"
+                              value={field.minLength === undefined ? "" : String(field.minLength)}
+                              readOnly={controls.textLimits === "readOnly"}
+                              onChange={(value) =>
+                                updateField(field.id, (current) => {
+                                  if (current.type !== "text" && current.type !== "textarea") return current;
+                                  const parsed = value.trim().length === 0 ? undefined : Number(value);
+                                  return parsed === undefined || !Number.isInteger(parsed) || parsed < 0
+                                    ? current
+                                    : { ...current, minLength: parsed };
+                                })
+                              }
+                            />
+                          </div>
+                          <div className={builderClass("form-engine-builder__field")}>
+                            <TextInput
+                              id={`builder-field-${field.id}-max-length`}
+                              label={translate("builder.maximumLength")}
+                              type="number"
+                              value={field.maxLength === undefined ? "" : String(field.maxLength)}
+                              readOnly={controls.textLimits === "readOnly"}
+                              onChange={(value) =>
+                                updateField(field.id, (current) => {
+                                  if (current.type !== "text" && current.type !== "textarea") return current;
+                                  const parsed = value.trim().length === 0 ? undefined : Number(value);
+                                  return parsed === undefined || !Number.isInteger(parsed) || parsed < 0
+                                    ? current
+                                    : { ...current, maxLength: parsed };
+                                })
+                              }
+                            />
+                          </div>
+                          <div className={builderClass("form-engine-builder__field")}>
+                            <TextInput
+                              id={`builder-field-${field.id}-pattern`}
+                              label={translate("builder.pattern")}
+                              value={field.pattern ?? ""}
+                              readOnly={controls.textLimits === "readOnly"}
+                              onChange={(value) =>
+                                updateField(field.id, (current) => {
+                                  if (current.type !== "text" && current.type !== "textarea") return current;
+                                  return value.length === 0 ? current : { ...current, pattern: value };
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {field.type === "number" && controls.numberLimits !== "hidden" ? (
+                        <div className={builderClass("form-engine-builder__grid")}>
+                          {(["min", "max", "step"] as const).map((property) => (
+                            <div className={builderClass("form-engine-builder__field")} key={property}>
+                              <TextInput
+                                id={`builder-field-${field.id}-${property}`}
+                                label={translate(
+                                  property === "step"
+                                    ? "builder.step"
+                                    : property === "min"
+                                      ? "builder.minimum"
+                                      : "builder.maximum"
+                                )}
+                                type="number"
+                                value={field[property] === undefined ? "" : String(field[property])}
+                                readOnly={controls.numberLimits === "readOnly"}
+                                onChange={(value) =>
+                                  updateField(field.id, (current) => {
+                                    if (current.type !== "number") return current;
+                                    if (value.trim().length === 0) {
+                                      const { [property]: _removed, ...remaining } = current;
+                                      return remaining;
+                                    }
+                                    const parsed = Number(value);
+                                    return Number.isFinite(parsed) ? { ...current, [property]: parsed } : current;
+                                  })
+                                }
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {"options" in field && controls.options !== "hidden" ? (
                         <div className={builderClass("form-engine-builder__options")}>
                           <strong>{translate("builder.options")}</strong>
                           {field.options.map((option, optionIndex) =>
@@ -2001,6 +2178,7 @@ export function FormBuilder({
                                   label={translate("builder.optionLabel", { index: optionIndex + 1 })}
                                   value={option.label}
                                   placeholder={translate("builder.optionLabelPlaceholder")}
+                                  readOnly={controls.options === "readOnly"}
                                   onChange={(value) =>
                                     value.trim().length === 0 ? undefined : updateOption(field.id, option.id, value)
                                   }
@@ -2010,18 +2188,20 @@ export function FormBuilder({
                                     <IconButton
                                       actionType="moveUp"
                                       title={translate("builder.moveUp", { title: option.label })}
-                                      disabled={optionIndex === 0}
+                                      disabled={controls.options === "readOnly" || optionIndex === 0}
                                       onClick={() => moveOption(field.id, option.id, optionIndex - 1)}
                                     />
                                     <IconButton
                                       actionType="moveDown"
                                       title={translate("builder.moveDown", { title: option.label })}
-                                      disabled={optionIndex === field.options.length - 1}
+                                      disabled={
+                                        controls.options === "readOnly" || optionIndex === field.options.length - 1
+                                      }
                                       onClick={() => moveOption(field.id, option.id, optionIndex + 1)}
                                     />
                                     <IconButton
                                       actionType="delete"
-                                      disabled={field.options.length === 1}
+                                      disabled={controls.options === "readOnly" || field.options.length === 1}
                                       onClick={() => removeOption(field.id, option.id)}
                                       title={translate("builder.remove")}
                                     />
@@ -2038,7 +2218,7 @@ export function FormBuilder({
                                     onMoveUp={() => moveOption(field.id, option.id, optionIndex - 1)}
                                     onMoveDown={() => moveOption(field.id, option.id, optionIndex + 1)}
                                     onRemove={() => removeOption(field.id, option.id)}
-                                    readOnly={readOnly}
+                                    readOnly={readOnly || controls.options === "readOnly"}
                                     actions={actions}
                                     components={components}
                                   />
@@ -2053,7 +2233,7 @@ export function FormBuilder({
                                 index={optionIndex}
                                 currentLocale={editingLocale}
                                 translate={translate}
-                                readOnly={readOnly}
+                                readOnly={readOnly || controls.options === "readOnly"}
                                 actions={actions}
                                 components={components}
                               />
@@ -2063,8 +2243,9 @@ export function FormBuilder({
                             action="addOption"
                             targetId={field.id}
                             disabled={
-                              policy?.maxOptionsPerField !== undefined &&
-                              field.options.length >= policy.maxOptionsPerField
+                              controls.options === "readOnly" ||
+                              (policy?.maxOptionsPerField !== undefined &&
+                                field.options.length >= policy.maxOptionsPerField)
                             }
                             onClick={() => addOption(field.id)}
                           >
@@ -2073,7 +2254,7 @@ export function FormBuilder({
                         </div>
                       ) : null}
 
-                      {conditionsEnabled ? (
+                      {conditionsEnabled && controls.displayConditions !== "hidden" ? (
                         <div className={builderClass("form-engine-builder__condition")}>
                           <div className={builderClass("form-engine-builder__field")}>
                             <Select

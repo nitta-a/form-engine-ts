@@ -1,13 +1,11 @@
 {
-  "name": "@form-engine-ts/react",
+  "name": "@form-engine-ts/translator-i18next",
   "version": "4.1.0",
   "publishConfig": {
     "access": "public"
   },
   "type": "module",
-  "sideEffects": [
-    "./dist/styles.css"
-  ],
+  "sideEffects": false,
   "files": [
     "dist",
     "README.md",
@@ -21,14 +19,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./styles.css": "./dist/styles.css"
+    }
   },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nitta-a/form-engine-ts.git",
-    "directory": "packages/react"
+    "directory": "packages/translator-i18next"
   },
   "bugs": {
     "url": "https://github.com/nitta-a/form-engine-ts/issues"
@@ -36,23 +33,21 @@
   "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
   "keywords": [
     "form",
-    "survey",
-    "react",
-    "form-builder",
+    "translation",
+    "i18next",
+    "i18n",
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/styles.css --format esm,cjs --dts --clean --external react --external react/jsx-runtime --external @form-engine-ts/core --external @form-engine-ts/privacy",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core --external i18next",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@form-engine-ts/core": "workspace:*",
-    "@form-engine-ts/privacy": "workspace:*"
+    "@form-engine-ts/core": "workspace:*"
   },
   "peerDependencies": {
-    "react": ">=18.2 <20",
-    "react-dom": ">=18.2 <20"
+    "i18next": ">=22.0.0"
   }
 }

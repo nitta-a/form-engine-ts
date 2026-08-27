@@ -1,4 +1,11 @@
-import type { BuilderActionIconType, LocalizationSummaryContext } from "@form-engine-ts/react";
+import type {
+  BuilderActionIconType,
+  FieldEditorControlsConfig,
+  FieldPropertyControlMode,
+  FieldTypeSelectOptionsConfig,
+  LocalizationSummaryContext,
+  QuestionType
+} from "@form-engine-ts/react";
 import type {
   AccordionProps,
   ButtonProps,
@@ -45,8 +52,23 @@ export interface MuiLocalizationOptions {
   readonly autoFocusNewTab?: boolean;
 }
 
+/**
+ * MUI's field editor controls mirror `FieldEditorControlsConfig` while keeping
+ * the original interface members directly declared for semver/reporting compatibility.
+ */
 export interface MuiFieldEditorOptions {
+  readonly title?: FieldPropertyControlMode;
   readonly description?: "editable" | "readOnly" | "hidden";
+  readonly required?: FieldPropertyControlMode;
+  readonly typeSelect?: FieldPropertyControlMode;
+  readonly options?: FieldPropertyControlMode;
+  readonly displayConditions?: FieldPropertyControlMode;
+  readonly textLimits?: FieldPropertyControlMode;
+  readonly ratingBounds?: FieldPropertyControlMode;
+  readonly numberLimits?: FieldPropertyControlMode;
+  /** Per-question-type overrides take precedence over the base controls. */
+  readonly byType?: Partial<Record<QuestionType, Partial<FieldEditorControlsConfig>>>;
+  readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
 }
 
 export interface MuiSlotProps {
@@ -153,7 +175,19 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
     ...(options.getActionLabel === undefined ? {} : { getActionLabel: options.getActionLabel }),
     layoutOptions: options.layoutOptions ?? {},
     fieldEditorOptions: {
-      description: options.fieldEditorOptions?.description ?? "editable"
+      title: options.fieldEditorOptions?.title ?? "editable",
+      description: options.fieldEditorOptions?.description ?? "editable",
+      required: options.fieldEditorOptions?.required ?? "editable",
+      typeSelect: options.fieldEditorOptions?.typeSelect ?? "editable",
+      options: options.fieldEditorOptions?.options ?? "editable",
+      displayConditions: options.fieldEditorOptions?.displayConditions ?? "editable",
+      textLimits: options.fieldEditorOptions?.textLimits ?? "editable",
+      ratingBounds: options.fieldEditorOptions?.ratingBounds ?? "editable",
+      numberLimits: options.fieldEditorOptions?.numberLimits ?? "editable",
+      ...(options.fieldEditorOptions?.byType === undefined ? {} : { byType: options.fieldEditorOptions.byType }),
+      ...(options.fieldEditorOptions?.fieldTypeOptions === undefined
+        ? {}
+        : { fieldTypeOptions: options.fieldEditorOptions.fieldTypeOptions })
     },
     localizationOptions: {
       collapsible: options.localizationOptions?.collapsible ?? false,

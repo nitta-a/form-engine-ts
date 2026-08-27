@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v4.1.0 — 2026-08-27
+
+- FieldEditor property controls can now independently be editable, read-only, or hidden, including type-specific limits and bounds.
+- Field-type Select options can be transformed and sorted through the public builder API.
+- Added the official i18next translation adapter package.
+- All public packages were aligned to version 4.1.0.
+
+See the [GitHub release for v4.1.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.1.0).
+
 ### v4.0.0 — 2026-08-27
 
 - This major release includes the translation fallback, typed Select, expanded field-type slot, and grouped MUI Select APIs introduced in v3.3.0.
@@ -121,6 +130,15 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.1.0 — 2026-08-27
+
+- FieldEditorの設問プロパティを、タイプ別の制限・境界値を含めて編集可、読み取り専用、非表示から個別に制御できるようになりました。
+- 公開Builder APIでフィールド種別Selectの選択肢を変換・並び替えできるようになりました。
+- i18next公式翻訳アダプターパッケージを追加しました。
+- 公開パッケージのバージョンを4.1.0に統一しました。
+
+[v4.1.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.1.0)も参照してください。
 
 ### v4.0.0 — 2026-08-27
 

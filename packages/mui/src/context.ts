@@ -23,7 +23,15 @@ export function mergeMuiAdapterOptions(
       : { layoutOptions: { ...base.layoutOptions, ...overrides.layoutOptions } }),
     ...(base.fieldEditorOptions === undefined && overrides.fieldEditorOptions === undefined
       ? {}
-      : { fieldEditorOptions: { ...base.fieldEditorOptions, ...overrides.fieldEditorOptions } }),
+      : {
+          fieldEditorOptions: {
+            ...base.fieldEditorOptions,
+            ...overrides.fieldEditorOptions,
+            ...(base.fieldEditorOptions?.byType === undefined && overrides.fieldEditorOptions?.byType === undefined
+              ? {}
+              : { byType: { ...base.fieldEditorOptions?.byType, ...overrides.fieldEditorOptions?.byType } })
+          }
+        }),
     ...(base.localizationOptions === undefined && overrides.localizationOptions === undefined
       ? {}
       : { localizationOptions: { ...base.localizationOptions, ...overrides.localizationOptions } }),

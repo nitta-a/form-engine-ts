@@ -1,4 +1,4 @@
-import { BuilderActionIconType, LocalizationSummaryContext, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, QuestionType, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps } from '@form-engine-ts/react';
+import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
 import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, ButtonProps, IconButtonProps } from '@mui/material';
@@ -28,8 +28,23 @@ interface MuiLocalizationOptions {
     readonly noWrapActions?: boolean;
     readonly autoFocusNewTab?: boolean;
 }
+/**
+ * MUI's field editor controls mirror `FieldEditorControlsConfig` while keeping
+ * the original interface members directly declared for semver/reporting compatibility.
+ */
 interface MuiFieldEditorOptions {
+    readonly title?: FieldPropertyControlMode;
     readonly description?: "editable" | "readOnly" | "hidden";
+    readonly required?: FieldPropertyControlMode;
+    readonly typeSelect?: FieldPropertyControlMode;
+    readonly options?: FieldPropertyControlMode;
+    readonly displayConditions?: FieldPropertyControlMode;
+    readonly textLimits?: FieldPropertyControlMode;
+    readonly ratingBounds?: FieldPropertyControlMode;
+    readonly numberLimits?: FieldPropertyControlMode;
+    /** Per-question-type overrides take precedence over the base controls. */
+    readonly byType?: Partial<Record<QuestionType, Partial<FieldEditorControlsConfig>>>;
+    readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
 }
 interface MuiSlotProps {
     readonly card?: Partial<CardProps>;

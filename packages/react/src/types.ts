@@ -104,6 +104,45 @@ export interface BuilderSelectOption<T extends string = string> {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+export type FieldPropertyControlMode = "editable" | "readOnly" | "hidden";
+
+export interface FieldEditorControlsConfig {
+  readonly title?: FieldPropertyControlMode;
+  readonly description?: FieldPropertyControlMode;
+  readonly required?: FieldPropertyControlMode;
+  readonly typeSelect?: FieldPropertyControlMode;
+  readonly options?: FieldPropertyControlMode;
+  readonly displayConditions?: FieldPropertyControlMode;
+  readonly textLimits?: FieldPropertyControlMode;
+  readonly ratingBounds?: FieldPropertyControlMode;
+  readonly numberLimits?: FieldPropertyControlMode;
+}
+
+export interface FieldTypeSelectOptionsContext {
+  readonly currentType: QuestionType;
+  readonly allowedTypes: readonly QuestionType[];
+}
+
+export type FieldTypeSelectOptionsTransformer = (
+  options: readonly BuilderSelectOption<QuestionType>[],
+  context: FieldTypeSelectOptionsContext
+) => readonly BuilderSelectOption<QuestionType>[];
+
+export type FieldTypeSelectOptionsSorter = (
+  left: BuilderSelectOption<QuestionType>,
+  right: BuilderSelectOption<QuestionType>,
+  context: FieldTypeSelectOptionsContext
+) => number;
+
+export interface FieldTypeSelectOptionsConfig {
+  /** Transform the generated choices. The returned array is used as-is. */
+  readonly transform?: FieldTypeSelectOptionsTransformer;
+  /** Sort generated choices after transform. The source array is never mutated. */
+  readonly sort?: FieldTypeSelectOptionsSorter;
+  /** Optional explicit order applied before `sort`. */
+  readonly order?: readonly QuestionType[];
+}
+
 export interface SelectComponentProps<T extends string = string>
   extends Omit<InputComponentProps, "value" | "onChange"> {
   readonly value: T;
@@ -206,6 +245,8 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
     readonly localization?: boolean;
     readonly conditions?: boolean;
   };
+  readonly fieldEditorControls?: FieldEditorControlsConfig;
+  readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
   readonly slots?: Pick<FormBuilderSlots, "fieldTypeSelect" | "fieldEditorHeader">;
 }
 

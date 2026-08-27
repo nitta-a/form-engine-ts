@@ -5,6 +5,7 @@ import type {
   FormBuilderSlots,
   QuestionType
 } from "@form-engine-ts/react";
+import { resolveFieldEditorControls, resolveFieldTypeSelectOptions } from "@form-engine-ts/react";
 import { Card, Stack, Typography } from "@mui/material";
 import type { ComponentType } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
@@ -44,6 +45,14 @@ function updateBound(field: FormField, property: "min" | "max", value: string): 
   return remaining;
 }
 
+function updateNumberProperty(field: FormField, property: "min" | "max" | "step", value: string): FormField {
+  if (field.type !== "number") return field;
+  const nextValue = numericValue(value);
+  if (nextValue !== undefined) return { ...field, [property]: nextValue };
+  const { [property]: _removed, ...remaining } = field;
+  return remaining;
+}
+
 export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): ComponentType<BuilderFieldEditorSlotProps> {
   const Toolbar = createMuiToolbarSlot(options);
   const OptionEditor = createMuiOptionEditorSlot(options);
@@ -58,7 +67,9 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     actions,
     components,
     translate,
-    slots
+    slots,
+    fieldEditorControls,
+    fieldTypeOptions: fieldTypeOptionsConfig
   }: BuilderFieldEditorSlotProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const { Button, Checkbox, Select, TextArea, TextInput } = components;
@@ -67,13 +78,18 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     const condition = field.displayCondition;
     const conditionSources = schema.fields.slice(0, index);
     const conditionSource = conditionSources.find((source) => source.id === condition?.questionId);
-    const descriptionMode = resolved.fieldEditorOptions?.description ?? "editable";
+    const fieldEditorOptions = resolved.fieldEditorOptions ?? {};
+    const controls = resolveFieldEditorControls({
+      ...(fieldEditorControls ?? {}),
+      ...fieldEditorOptions,
+      ...(fieldEditorOptions.byType?.[field.type] ?? {})
+    });
     const titleErrorId = field.title.trim().length === 0 ? `mui-field-${field.id}-title-error` : undefined;
     const FieldTypeSelect = slots?.fieldTypeSelect;
     const FieldEditorHeader = slots?.fieldEditorHeader;
     const fieldTypeSelectId = `mui-field-${field.id}-type`;
     const fieldTypeSelectLabel = translate("builder.type");
-    const fieldTypeOptions: readonly BuilderSelectOption<QuestionType>[] = FIELD_TYPES.filter((type) =>
+    const generatedFieldTypeOptions: readonly BuilderSelectOption<QuestionType>[] = FIELD_TYPES.filter((type) =>
       allowedTypes.includes(type)
     ).map((type) => {
       const definition = DEFAULT_FIELD_TYPE_DEFINITIONS.find((candidate) => candidate.type === type);
@@ -91,6 +107,14 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
             })
       };
     });
+    const fieldTypeOptions = resolveFieldTypeSelectOptions(
+      generatedFieldTypeOptions,
+      fieldTypeOptionsConfig ?? fieldEditorOptions.fieldTypeOptions,
+      {
+        currentType: field.type,
+        allowedTypes
+      }
+    );
     const changeFieldType = (nextType: QuestionType) => {
       if (allowedTypes.includes(nextType)) actions.changeFieldType(field.id, nextType);
     };
@@ -127,26 +151,28 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
         )}
         <Stack {...resolved.muiSlotProps?.stack} spacing={resolved.dense ? 1 : 2}>
           <Stack direction={{ xs: "column", md: "row" }} spacing={resolved.dense ? 1 : 2}>
-            <TextInput
-              id={`mui-field-${field.id}-title`}
-              name={`fields.${field.id}.title`}
-              label={translate("builder.questionTitle")}
-              value={field.title}
-              required
-              error={field.title.trim().length === 0}
-              helperText={field.title.trim().length === 0 ? translate("builder.required") : ""}
-              aria-describedby={titleErrorId}
-              disabled={readOnly}
-              onChange={(value) => actions.setSourceText({ kind: "field", id: field.id }, "title", value)}
-            />
-            {FieldTypeSelect === undefined ? (
+            {controls.title === "hidden" ? null : (
+              <TextInput
+                id={`mui-field-${field.id}-title`}
+                name={`fields.${field.id}.title`}
+                label={translate("builder.questionTitle")}
+                value={field.title}
+                required
+                error={field.title.trim().length === 0}
+                helperText={field.title.trim().length === 0 ? translate("builder.required") : ""}
+                aria-describedby={titleErrorId}
+                disabled={readOnly || controls.title === "readOnly"}
+                onChange={(value) => actions.setSourceText({ kind: "field", id: field.id }, "title", value)}
+              />
+            )}
+            {controls.typeSelect === "hidden" ? null : FieldTypeSelect === undefined ? (
               <Select
                 id={fieldTypeSelectId}
                 name={`fields.${field.id}.type`}
                 label={fieldTypeSelectLabel}
                 value={allowedTypes.includes(field.type) ? field.type : ""}
                 options={fieldTypeOptions}
-                disabled={readOnly}
+                disabled={readOnly || controls.typeSelect === "readOnly"}
                 onChange={(value) => {
                   if (isFieldType(value)) changeFieldType(value);
                 }}
@@ -160,33 +186,35 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                 allowedTypes={allowedTypes}
                 options={fieldTypeOptions}
                 onChangeType={changeFieldType}
-                disabled={readOnly}
-                readOnly={readOnly}
+                disabled={readOnly || controls.typeSelect === "readOnly"}
+                readOnly={readOnly || controls.typeSelect === "readOnly"}
                 aria-labelledby={`${fieldTypeSelectId}-label`}
                 renderIcon={components.renderFieldTypeIcon}
               />
             )}
           </Stack>
-          {descriptionMode === "hidden" ? null : (
+          {controls.description === "hidden" ? null : (
             <TextArea
               id={`mui-field-${field.id}-description`}
               name={`fields.${field.id}.description`}
               label={translate("builder.description")}
               value={field.description ?? ""}
               rows={resolved.dense ? 2 : 3}
-              disabled={readOnly}
-              readOnly={descriptionMode === "readOnly"}
+              disabled={readOnly || controls.description === "readOnly"}
+              readOnly={readOnly || controls.description === "readOnly"}
               onChange={(value) => actions.setSourceText({ kind: "field", id: field.id }, "description", value)}
             />
           )}
-          <Checkbox
-            id={`mui-field-${field.id}-required`}
-            name={`fields.${field.id}.required`}
-            label={translate("builder.required")}
-            checked={field.required}
-            disabled={readOnly}
-            onChange={(checked) => actions.updateField(field.id, (current) => ({ ...current, required: checked }))}
-          />
+          {controls.required === "hidden" ? null : (
+            <Checkbox
+              id={`mui-field-${field.id}-required`}
+              name={`fields.${field.id}.required`}
+              label={translate("builder.required")}
+              checked={field.required}
+              disabled={readOnly || controls.required === "readOnly"}
+              onChange={(checked) => actions.updateField(field.id, (current) => ({ ...current, required: checked }))}
+            />
+          )}
           {features?.pages === false || schema.pages === undefined ? null : (
             <Select
               id={`mui-field-${field.id}-page`}
@@ -201,26 +229,93 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
             />
           )}
           {field.type === "number" || field.type === "rating" ? (
+            (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "hidden" ? null : (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+                <TextInput
+                  id={`mui-field-${field.id}-minimum`}
+                  label={translate("builder.minimum")}
+                  type="number"
+                  value={field.min === undefined ? "" : String(field.min)}
+                  disabled={
+                    readOnly || (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "readOnly"
+                  }
+                  onChange={(value) => actions.updateField(field.id, (current) => updateBound(current, "min", value))}
+                />
+                <TextInput
+                  id={`mui-field-${field.id}-maximum`}
+                  label={translate("builder.maximum")}
+                  type="number"
+                  value={field.max === undefined ? "" : String(field.max)}
+                  disabled={
+                    readOnly || (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "readOnly"
+                  }
+                  onChange={(value) => actions.updateField(field.id, (current) => updateBound(current, "max", value))}
+                />
+              </Stack>
+            )
+          ) : null}
+          {field.type === "number" && controls.numberLimits !== "hidden" ? (
+            <TextInput
+              id={`mui-field-${field.id}-step`}
+              label={translate("builder.step")}
+              type="number"
+              value={field.step === undefined ? "" : String(field.step)}
+              disabled={readOnly || controls.numberLimits === "readOnly"}
+              onChange={(value) =>
+                actions.updateField(field.id, (current) => updateNumberProperty(current, "step", value))
+              }
+            />
+          ) : null}
+          {(field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden" ? (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
               <TextInput
-                id={`mui-field-${field.id}-minimum`}
-                label={translate("builder.minimum")}
+                id={`mui-field-${field.id}-min-length`}
+                label={translate("builder.minimumLength")}
                 type="number"
-                value={field.min === undefined ? "" : String(field.min)}
-                disabled={readOnly}
-                onChange={(value) => actions.updateField(field.id, (current) => updateBound(current, "min", value))}
+                value={field.minLength === undefined ? "" : String(field.minLength)}
+                disabled={readOnly || controls.textLimits === "readOnly"}
+                onChange={(value) =>
+                  actions.updateField(field.id, (current) => {
+                    if (current.type !== "text" && current.type !== "textarea") return current;
+                    const parsed = numericValue(value);
+                    return parsed === undefined ? current : { ...current, minLength: Math.max(0, Math.floor(parsed)) };
+                  })
+                }
               />
               <TextInput
-                id={`mui-field-${field.id}-maximum`}
-                label={translate("builder.maximum")}
+                id={`mui-field-${field.id}-max-length`}
+                label={translate("builder.maximumLength")}
                 type="number"
-                value={field.max === undefined ? "" : String(field.max)}
-                disabled={readOnly}
-                onChange={(value) => actions.updateField(field.id, (current) => updateBound(current, "max", value))}
+                value={field.maxLength === undefined ? "" : String(field.maxLength)}
+                disabled={readOnly || controls.textLimits === "readOnly"}
+                onChange={(value) =>
+                  actions.updateField(field.id, (current) => {
+                    if (current.type !== "text" && current.type !== "textarea") return current;
+                    const parsed = numericValue(value);
+                    return parsed === undefined ? current : { ...current, maxLength: Math.max(0, Math.floor(parsed)) };
+                  })
+                }
+              />
+              <TextInput
+                id={`mui-field-${field.id}-pattern`}
+                label={translate("builder.pattern")}
+                value={field.pattern ?? ""}
+                disabled={readOnly || controls.textLimits === "readOnly"}
+                onChange={(value) =>
+                  actions.updateField(field.id, (current) =>
+                    current.type === "text" || current.type === "textarea"
+                      ? value.length === 0
+                        ? current
+                        : { ...current, pattern: value }
+                      : current
+                  )
+                }
               />
             </Stack>
           ) : null}
-          {features?.conditions === false || conditionSources.length === 0 ? null : (
+          {features?.conditions === false ||
+          conditionSources.length === 0 ||
+          controls.displayConditions === "hidden" ? null : (
             <Stack direction={{ xs: "column", md: "row" }} spacing={resolved.dense ? 1 : 2}>
               <Select
                 id={`mui-field-${field.id}-condition-source`}
@@ -230,7 +325,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                   { value: "", label: translate("builder.alwaysVisible") },
                   ...conditionSources.map((source) => ({ value: source.id, label: source.title }))
                 ]}
-                disabled={readOnly}
+                disabled={readOnly || controls.displayConditions === "readOnly"}
                 onChange={(value) =>
                   actions.setDisplayCondition(
                     field.id,
@@ -247,7 +342,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                     options={(conditionSource === undefined ? [] : conditionOperators(conditionSource)).map(
                       (operator) => ({ value: operator, label: translate(`builder.operator.${operator}`) })
                     )}
-                    disabled={readOnly}
+                    disabled={readOnly || controls.displayConditions === "readOnly"}
                     onChange={(value) => {
                       if (!isConditionOperator(value)) return;
                       actions.setDisplayCondition(
@@ -263,7 +358,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                       id={`mui-field-${field.id}-condition-value`}
                       label={translate("builder.conditionValue")}
                       value={condition.value === undefined ? "" : String(condition.value)}
-                      disabled={readOnly}
+                      disabled={readOnly || controls.displayConditions === "readOnly"}
                       onChange={(value) => actions.setDisplayCondition(field.id, { ...condition, value })}
                     />
                   )}
@@ -278,22 +373,24 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                   locale: resolved.getLocaleLabel?.(currentLocale) ?? currentLocale
                 })}
               </Typography>
-              <TextInput
-                id={`mui-field-${field.id}-${currentLocale}-title`}
-                label={translate("builder.translatedQuestionTitle")}
-                value={field.translations?.[currentLocale]?.title ?? ""}
-                disabled={readOnly}
-                onChange={(value) =>
-                  actions.setManualTranslation(currentLocale, { kind: "field", id: field.id }, "title", value)
-                }
-              />
-              {descriptionMode === "hidden" ? null : (
+              {controls.title === "hidden" ? null : (
+                <TextInput
+                  id={`mui-field-${field.id}-${currentLocale}-title`}
+                  label={translate("builder.translatedQuestionTitle")}
+                  value={field.translations?.[currentLocale]?.title ?? ""}
+                  disabled={readOnly || controls.title === "readOnly"}
+                  onChange={(value) =>
+                    actions.setManualTranslation(currentLocale, { kind: "field", id: field.id }, "title", value)
+                  }
+                />
+              )}
+              {controls.description === "hidden" ? null : (
                 <TextArea
                   id={`mui-field-${field.id}-${currentLocale}-description`}
                   label={translate("builder.translatedDescription")}
                   value={field.translations?.[currentLocale]?.description ?? ""}
-                  disabled={readOnly}
-                  readOnly={descriptionMode === "readOnly"}
+                  disabled={readOnly || controls.description === "readOnly"}
+                  readOnly={readOnly || controls.description === "readOnly"}
                   onChange={(value) =>
                     actions.setManualTranslation(currentLocale, { kind: "field", id: field.id }, "description", value)
                   }
@@ -301,7 +398,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               )}
             </Stack>
           )}
-          {"options" in field ? (
+          {"options" in field && controls.options !== "hidden" ? (
             <Stack data-mui-slot="options" spacing={resolved.dense ? 1 : 2}>
               <Typography variant="subtitle2">{translate("builder.options")}</Typography>
               {field.options.map((option, optionIndex) => (
@@ -313,7 +410,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                   index={optionIndex}
                   currentLocale={currentLocale}
                   translate={translate}
-                  readOnly={readOnly}
+                  readOnly={readOnly || controls.options === "readOnly"}
                   actions={actions}
                   components={components}
                 />
@@ -323,6 +420,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                 targetId={field.id}
                 disabled={
                   readOnly ||
+                  controls.options === "readOnly" ||
                   (policy?.maxOptionsPerField !== undefined && field.options.length >= policy.maxOptionsPerField)
                 }
                 onClick={() => actions.addOption(field.id)}
