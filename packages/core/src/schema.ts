@@ -29,6 +29,25 @@ function issue(issues: SchemaIssue[], path: string, code: string, message: strin
   issues.push({ path, code, message });
 }
 
+function fieldConstraintIssue(
+  issues: SchemaIssue[],
+  field: FormField,
+  fieldIndex: number,
+  property: string,
+  expected: boolean | number | readonly [number, number],
+  message: string
+): void {
+  issues.push({
+    path: `fields[${fieldIndex}].${property}`,
+    code: "field_constraint_violation",
+    type: "field_constraint_violation",
+    message,
+    fieldId: field.id,
+    property,
+    expected
+  });
+}
+
 function validateJsonValue(value: unknown, path: string, issues: SchemaIssue[], ancestors = new Set<object>()): void {
   if (value === null || typeof value === "string" || typeof value === "boolean") return;
   if (typeof value === "number") {
@@ -429,6 +448,131 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
         `fields[${fieldIndex}].options`,
         "max_options_exceeded",
         `At most ${policy.maxOptionsPerField} options are allowed.`
+      );
+    }
+
+    const constraint = policy.fieldConstraints?.[field.type];
+    if (constraint === undefined) return;
+    if (constraint.fixedRequired !== undefined && field.required !== constraint.fixedRequired) {
+      fieldConstraintIssue(
+        issues,
+        field,
+        fieldIndex,
+        "required",
+        constraint.fixedRequired,
+        `Field required must be ${String(constraint.fixedRequired)} for field type ${field.type}.`
+      );
+    }
+    if (field.type === "rating") {
+      const ratingConstraint =
+        "fixedMin" in constraint ||
+        "fixedMax" in constraint ||
+        "allowedMinRange" in constraint ||
+        "allowedMaxRange" in constraint
+          ? constraint
+          : undefined;
+      if (ratingConstraint?.fixedMin !== undefined && field.min !== ratingConstraint.fixedMin) {
+        fieldConstraintIssue(
+          issues,
+          field,
+          fieldIndex,
+          "min",
+          ratingConstraint.fixedMin,
+          `Rating minimum must be ${ratingConstraint.fixedMin}.`
+        );
+      }
+      if (
+        ratingConstraint !== undefined &&
+        "fixedMax" in ratingConstraint &&
+        ratingConstraint.fixedMax !== undefined &&
+        field.max !== ratingConstraint.fixedMax
+      ) {
+        fieldConstraintIssue(
+          issues,
+          field,
+          fieldIndex,
+          "max",
+          ratingConstraint.fixedMax,
+          `Rating maximum must be ${ratingConstraint.fixedMax}.`
+        );
+      }
+      if (
+        ratingConstraint !== undefined &&
+        "allowedMinRange" in ratingConstraint &&
+        ratingConstraint.allowedMinRange !== undefined &&
+        typeof field.min === "number" &&
+        (field.min < ratingConstraint.allowedMinRange[0] || field.min > ratingConstraint.allowedMinRange[1])
+      ) {
+        fieldConstraintIssue(
+          issues,
+          field,
+          fieldIndex,
+          "min",
+          ratingConstraint.allowedMinRange,
+          `Rating minimum must be between ${ratingConstraint.allowedMinRange[0]} and ${ratingConstraint.allowedMinRange[1]}.`
+        );
+      }
+      if (
+        ratingConstraint !== undefined &&
+        "allowedMaxRange" in ratingConstraint &&
+        ratingConstraint.allowedMaxRange !== undefined &&
+        typeof field.max === "number" &&
+        (field.max < ratingConstraint.allowedMaxRange[0] || field.max > ratingConstraint.allowedMaxRange[1])
+      ) {
+        fieldConstraintIssue(
+          issues,
+          field,
+          fieldIndex,
+          "max",
+          ratingConstraint.allowedMaxRange,
+          `Rating maximum must be between ${ratingConstraint.allowedMaxRange[0]} and ${ratingConstraint.allowedMaxRange[1]}.`
+        );
+      }
+    }
+    if (
+      (field.type === "text" || field.type === "textarea") &&
+      "maxMaxLength" in constraint &&
+      constraint.maxMaxLength !== undefined
+    ) {
+      if (field.maxLength !== undefined && field.maxLength > constraint.maxMaxLength) {
+        fieldConstraintIssue(
+          issues,
+          field,
+          fieldIndex,
+          "maxLength",
+          constraint.maxMaxLength,
+          `Maximum text length must be at most ${constraint.maxMaxLength}.`
+        );
+      }
+    }
+    if (
+      (field.type === "select" || field.type === "radio" || field.type === "multi-select") &&
+      "minOptions" in constraint &&
+      constraint.minOptions !== undefined &&
+      field.options.length < constraint.minOptions
+    ) {
+      fieldConstraintIssue(
+        issues,
+        field,
+        fieldIndex,
+        "options",
+        constraint.minOptions,
+        `At least ${constraint.minOptions} options are required.`
+      );
+    }
+    if (
+      (field.type === "select" || field.type === "radio" || field.type === "multi-select") &&
+      "maxOptions" in constraint &&
+      constraint.maxOptions !== undefined &&
+      field.options.length > constraint.maxOptions
+    ) {
+      fieldConstraintIssue(
+        issues,
+        field,
+        fieldIndex,
+        "options",
+        constraint.maxOptions,
+        `At most ${constraint.maxOptions} options are allowed.`
       );
     }
   });

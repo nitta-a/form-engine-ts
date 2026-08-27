@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.1.0** (2026-08-27). All public packages are currently published at version `4.1.0`.
-This release adds granular FieldEditor property controls, configurable field-type option transformation and sorting,
-and the official i18next translation adapter. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.1.0).
+The latest release is **v4.2.0** (2026-08-27). All public packages are currently published at version `4.2.0`.
+This release adds field value constraint policies, i18next `keyPrefix` support, and configurable MongoDB collection
+names and indexes. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.2.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.1.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.1.0` で公開されています。
-本リリースでは、FieldEditorの設問プロパティを細粒度で制御する設定、フィールド種別選択肢の変換・並び替え、
-i18next公式翻訳アダプターを提供します。全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.1.0) を参照してください。
+最新版は **v4.2.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.2.0` で公開されています。
+本リリースでは、フィールド値制約ポリシー、i18nextの`keyPrefix`対応、MongoDBのコレクション名・Index設定を
+提供します。全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.2.0) を参照してください。
 
 ### 編集・回答体験
 

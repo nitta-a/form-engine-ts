@@ -299,6 +299,24 @@ describe("createMongoDbStorage", () => {
     ]);
   });
 
+  it("creates custom indexes on configured collections", async () => {
+    const { db, indexes } = createDbStub();
+    const adapter = createMongoDbStorage({
+      db,
+      collectionNames: { forms: "forms_custom", formResponses: "responses_custom" },
+      customIndexes: {
+        forms: [{ spec: { tenantId: 1 }, options: { name: "forms_tenant" } }],
+        formResponses: [{ spec: { "metadata.tenantId": 1, submittedAt: -1 } }]
+      }
+    });
+    await adapter.createIndexes();
+
+    expect(indexes.get("forms_custom")).toEqual([{ key: { tenantId: 1 }, name: "forms_tenant" }]);
+    expect(indexes.get("responses_custom")).toContainEqual({
+      key: { "metadata.tenantId": 1, submittedAt: -1 }
+    });
+  });
+
   it("rejects a second published version while allowing multiple archived versions", async () => {
     const { db } = createDbStub();
     const adapter = createMongoDbStorage({ db });

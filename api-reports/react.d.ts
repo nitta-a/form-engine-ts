@@ -61,6 +61,12 @@ type BuilderActionError = {
     readonly type: "max_locales_exceeded";
     readonly max: number;
 } | {
+    readonly type: "field_constraint_immutable";
+} | {
+    readonly type: "field_constraint_violation";
+    readonly property: string;
+    readonly expected: number;
+} | {
     readonly type: "node_not_found";
     readonly kind: BuilderTextTarget["kind"];
     readonly id: string;

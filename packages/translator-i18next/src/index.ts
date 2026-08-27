@@ -5,11 +5,22 @@ export interface I18nextInstance {
   exists?(key: string, options?: Readonly<Record<string, unknown>>): boolean;
 }
 
-export interface I18nextTranslatorOptions {
-  readonly i18n: I18nextInstance;
+export interface I18nextAdapterOptions {
   /** Optional namespace passed to i18next for every lookup. */
   readonly namespace?: string;
-  /** Treat a result equal to the lookup key as unresolved when `exists` is unavailable. */
+  /** Optional key prefix nested inside the namespace. */
+  readonly keyPrefix?: string;
+  /** Locales to try after the requested locale cannot resolve the key. */
+  readonly fallbackLocales?: readonly string[];
+  /** Treat a result equal to the lookup key as unresolved. */
+  readonly checkUnresolvedKey?: boolean;
+}
+
+export interface I18nextTranslatorOptions {
+  readonly i18n: I18nextInstance;
+  readonly namespace?: string;
+  readonly keyPrefix?: string;
+  readonly fallbackLocales?: readonly string[];
   readonly checkUnresolvedKey?: boolean;
 }
 
@@ -21,20 +32,40 @@ function isUnresolvedKey(value: string, key: string): boolean {
   return value === key || value.endsWith(`.${key}`) || value.endsWith(`:${key}`);
 }
 
-function createAdapter({ i18n, namespace, checkUnresolvedKey = true }: I18nextTranslatorOptions): TranslationAdapter {
+function createAdapter({
+  i18n,
+  namespace,
+  keyPrefix,
+  fallbackLocales,
+  checkUnresolvedKey = true
+}: I18nextTranslatorOptions): TranslationAdapter {
   if (i18n === null || typeof i18n !== "object" || typeof i18n.t !== "function") {
     throw new TypeError("i18next adapter requires an i18next instance with a t function.");
   }
   return {
     translate(key, locale, params = {}) {
-      const lookupOptions: Record<string, unknown> = { ...params, lng: locale };
-      if (namespace !== undefined) lookupOptions.ns = namespace;
+      const prefixedKey = keyPrefix === undefined ? key : `${keyPrefix}.${key}`;
+      const lookupKey =
+        keyPrefix === undefined ? key : namespace === undefined ? prefixedKey : `${namespace}:${prefixedKey}`;
+      const locales = [locale, ...(fallbackLocales ?? []).filter((fallback) => fallback !== locale)];
       const exists = i18n.exists;
-      const canCheckExistence = exists !== undefined;
-      if (exists !== undefined && !exists(key, lookupOptions)) return undefined;
-      const result = i18n.t(key, lookupOptions);
-      if (!isNonEmptyString(result)) return undefined;
-      return !canCheckExistence && checkUnresolvedKey && isUnresolvedKey(result, key) ? undefined : result;
+      for (const candidateLocale of locales) {
+        const lookupOptions: Record<string, unknown> = { ...params, lng: candidateLocale };
+        if (keyPrefix === undefined && namespace !== undefined) lookupOptions.ns = namespace;
+        if (keyPrefix !== undefined) lookupOptions.defaultValue = undefined;
+        if (exists !== undefined && !exists(lookupKey, lookupOptions)) continue;
+        const result = i18n.t(lookupKey, lookupOptions);
+        if (!isNonEmptyString(result)) continue;
+        if (checkUnresolvedKey && isUnresolvedKey(result, lookupKey)) continue;
+        if (
+          keyPrefix !== undefined &&
+          (result === lookupKey || result === prefixedKey || result === key || result.endsWith(key))
+        ) {
+          continue;
+        }
+        return result;
+      }
+      return undefined;
     }
   };
 }

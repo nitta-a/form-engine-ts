@@ -2,6 +2,38 @@ import type { FormVersionRecord, FormVersionState, Result, VersionTransitionEven
 
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
 
+export type QuestionType = FieldType;
+
+export interface BaseFieldConstraintRule {
+  readonly defaultRequired?: boolean;
+  readonly fixedRequired?: boolean;
+}
+
+export interface RatingFieldConstraintRule extends BaseFieldConstraintRule {
+  readonly defaultMin?: number;
+  readonly defaultMax?: number;
+  readonly fixedMin?: number;
+  readonly fixedMax?: number;
+  readonly allowedMinRange?: readonly [number, number];
+  readonly allowedMaxRange?: readonly [number, number];
+}
+
+export interface TextFieldConstraintRule extends BaseFieldConstraintRule {
+  readonly defaultMaxLength?: number;
+  readonly maxMaxLength?: number;
+}
+
+export interface ChoiceFieldConstraintRule extends BaseFieldConstraintRule {
+  readonly minOptions?: number;
+  readonly maxOptions?: number;
+}
+
+export type FieldConstraintRule =
+  | RatingFieldConstraintRule
+  | TextFieldConstraintRule
+  | ChoiceFieldConstraintRule
+  | BaseFieldConstraintRule;
+
 export interface FormPolicy {
   readonly allowedFieldTypes?: readonly FieldType[];
   readonly maxFields?: number;
@@ -11,6 +43,8 @@ export interface FormPolicy {
   readonly maxLocales?: number;
   readonly maxTextLength?: number;
   readonly maxSchemaBytes?: number;
+  /** Per-question-type defaults and immutable or bounded field constraints. */
+  readonly fieldConstraints?: Partial<Record<QuestionType, FieldConstraintRule>>;
 }
 
 export type ConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
@@ -143,6 +177,12 @@ export interface SchemaIssue {
   readonly path: string;
   readonly code: string;
   readonly message: string;
+  /** Compatibility discriminator for structured policy issues. */
+  readonly type?: string;
+  /** Present for policy issues that identify a field property and its expected value. */
+  readonly fieldId?: string;
+  readonly property?: string;
+  readonly expected?: boolean | number | readonly [number, number];
 }
 
 export type SchemaValidationResult =
@@ -340,7 +380,6 @@ export interface FormAnalytics {
 }
 
 export type Question = FormField;
-export type QuestionType = FieldType;
 export type ChoiceOption = FieldOption;
 
 /** Translation keys reserved for the form builder UI. */

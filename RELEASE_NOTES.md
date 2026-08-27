@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v4.2.0 — 2026-08-27
+
+- Added field constraint policies for field defaults, fixed values, and bounded rating, text, and choice properties.
+- Added `keyPrefix` and fallback locale support to the official i18next adapter.
+- Added grouped MongoDB collection names and custom index definitions while retaining the legacy collection options.
+- Added the v3 to v4 migration guides and aligned all public packages to version 4.2.0.
+
+See the [GitHub release for v4.2.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.2.0).
+
 ### v4.1.0 — 2026-08-27
 
 - FieldEditor property controls can now independently be editable, read-only, or hidden, including type-specific limits and bounds.

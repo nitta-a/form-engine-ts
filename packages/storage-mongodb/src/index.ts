@@ -21,7 +21,20 @@ import {
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
 } from "@form-engine-ts/core";
-import type { ClientSession, Db, Document, Filter } from "mongodb";
+import type {
+  ClientSession,
+  CreateIndexesOptions,
+  Db,
+  Document,
+  Filter,
+  IndexDescription,
+  IndexSpecification
+} from "mongodb";
+
+export interface MongoCustomIndexDefinition {
+  readonly spec: IndexSpecification;
+  readonly options?: CreateIndexesOptions;
+}
 
 export interface MongoDbStorageOptions {
   readonly db: Db;
@@ -29,6 +42,17 @@ export interface MongoDbStorageOptions {
   readonly responsesCollectionName?: string;
   readonly versionsCollectionName?: string;
   readonly versionStatesCollectionName?: string;
+  readonly collectionNames?: {
+    readonly forms?: string;
+    readonly formVersions?: string;
+    readonly formVersionStates?: string;
+    readonly formResponses?: string;
+  };
+  readonly customIndexes?: {
+    readonly forms?: readonly MongoCustomIndexDefinition[];
+    readonly formVersions?: readonly MongoCustomIndexDefinition[];
+    readonly formResponses?: readonly MongoCustomIndexDefinition[];
+  };
 }
 
 export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
@@ -268,23 +292,70 @@ function collectionName(value: string | undefined, fallback: string, optionName:
   return value;
 }
 
+function normalizeIndexSpecification(spec: IndexSpecification): IndexDescription["key"] {
+  if (typeof spec === "string") return { [spec]: 1 };
+  if (Array.isArray(spec)) return Object.fromEntries(spec.map((field) => [field, 1]));
+  if (spec instanceof Map) return spec as IndexDescription["key"];
+  if (!isRecord(spec) || Object.keys(spec).length === 0) throw new TypeError("Index specification must not be empty.");
+  return spec as IndexDescription["key"];
+}
+
+function customIndexDescriptions(definitions: readonly MongoCustomIndexDefinition[] | undefined): IndexDescription[] {
+  return (definitions ?? []).map(({ spec, options: indexOptions }) => ({
+    ...(indexOptions ?? {}),
+    key: normalizeIndexSpecification(spec)
+  }));
+}
+
+interface IndexableCollection {
+  createIndexes(specifications: IndexDescription[]): Promise<unknown>;
+  createIndex?(specification: IndexDescription["key"], options?: CreateIndexesOptions): Promise<unknown>;
+}
+
+async function createConfiguredIndexes(
+  collection: IndexableCollection,
+  defaults: IndexDescription[],
+  custom: readonly MongoCustomIndexDefinition[] | undefined
+): Promise<void> {
+  const definitions = custom ?? [];
+  if (definitions.length === 0) {
+    await collection.createIndexes(defaults);
+    return;
+  }
+  if (collection.createIndex === undefined) {
+    await collection.createIndexes([...defaults, ...customIndexDescriptions(definitions)]);
+    return;
+  }
+  await collection.createIndexes(defaults);
+  for (const { spec, options: indexOptions } of definitions) {
+    await collection.createIndex(normalizeIndexSpecification(spec), indexOptions);
+  }
+}
+
 export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter {
   if (options?.db === undefined) throw new TypeError("db is required.");
-  const schemasCollectionName = collectionName(options.schemasCollectionName, "form_schemas", "schemasCollectionName");
+  const collectionNames = options.collectionNames;
+  const schemasCollectionName = collectionName(
+    collectionNames?.forms ?? options.schemasCollectionName,
+    collectionNames === undefined ? "form_schemas" : "forms",
+    collectionNames?.forms === undefined ? "schemasCollectionName" : "collectionNames.forms"
+  );
   const responsesCollectionName = collectionName(
-    options.responsesCollectionName,
+    collectionNames?.formResponses ?? options.responsesCollectionName,
     "form_responses",
-    "responsesCollectionName"
+    collectionNames?.formResponses === undefined ? "responsesCollectionName" : "collectionNames.formResponses"
   );
   const versionsCollectionName = collectionName(
-    options.versionsCollectionName,
+    collectionNames?.formVersions ?? options.versionsCollectionName,
     "form_versions",
-    "versionsCollectionName"
+    collectionNames?.formVersions === undefined ? "versionsCollectionName" : "collectionNames.formVersions"
   );
   const versionStatesCollectionName = collectionName(
-    options.versionStatesCollectionName,
+    collectionNames?.formVersionStates ?? options.versionStatesCollectionName,
     "form_version_states",
-    "versionStatesCollectionName"
+    collectionNames?.formVersionStates === undefined
+      ? "versionStatesCollectionName"
+      : "collectionNames.formVersionStates"
   );
   const versionEventsCollectionName = "form_version_events";
   const schemas = options.db.collection<StoredSchemaDocument>(schemasCollectionName);
@@ -668,28 +739,37 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
     },
     async createIndexes() {
       await Promise.all([
-        submissions.createIndexes([
-          { key: { formId: 1, submittedAt: 1, _id: 1 }, name: "form_responses_form_submitted_at_id" },
-          { key: { "submission.locale": 1 }, name: "form_responses_locale" }
-        ]),
-        versions.createIndexes([
-          { key: { formId: 1, version: 1 }, name: "unique_version_per_form", unique: true },
-          {
-            key: { formId: 1 },
-            name: "unique_draft_per_form",
-            unique: true,
-            partialFilterExpression: { status: "draft" }
-          },
-          {
-            key: { formId: 1 },
-            name: "unique_published_per_form",
-            unique: true,
-            partialFilterExpression: { status: "published" }
-          }
-        ]),
+        createConfiguredIndexes(
+          submissions,
+          [
+            { key: { formId: 1, submittedAt: 1, _id: 1 }, name: "form_responses_form_submitted_at_id" },
+            { key: { "submission.locale": 1 }, name: "form_responses_locale" }
+          ],
+          options.customIndexes?.formResponses
+        ),
+        createConfiguredIndexes(
+          versions,
+          [
+            { key: { formId: 1, version: 1 }, name: "unique_version_per_form", unique: true },
+            {
+              key: { formId: 1 },
+              name: "unique_draft_per_form",
+              unique: true,
+              partialFilterExpression: { status: "draft" }
+            },
+            {
+              key: { formId: 1 },
+              name: "unique_published_per_form",
+              unique: true,
+              partialFilterExpression: { status: "published" }
+            }
+          ],
+          options.customIndexes?.formVersions
+        ),
         versionEvents.createIndexes([
           { key: { formId: 1, fromRevision: 1, eventIndex: 1 }, name: "form_version_events_revision" }
-        ])
+        ]),
+        createConfiguredIndexes(schemas, [], options.customIndexes?.forms)
       ]);
     }
   };

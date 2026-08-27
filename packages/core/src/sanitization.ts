@@ -1,4 +1,8 @@
-import type { ExtensibleNode, FieldOption, FormField, FormPage, FormSchema } from "./types";
+import type { ExtensibleNode, FieldOption, FormField, FormPage, FormPolicy, FormSchema } from "./types";
+
+export interface SanitizeSchemaOptions {
+  readonly policy?: FormPolicy;
+}
 
 export type SchemaStructureIssueType =
   | "dangling_condition_reference"
@@ -60,6 +64,33 @@ function sanitizePageLocales(page: FormPage, registeredLocales: ReadonlySet<stri
   const { translations: _translations, ...base } = localizedNode;
   const translations = registeredEntries(page.translations, registeredLocales);
   return { ...base, ...(translations === undefined ? {} : { translations }) };
+}
+
+function sanitizeFieldConstraints(field: FormField, policy: FormPolicy | undefined): FormField {
+  const constraint = policy?.fieldConstraints?.[field.type];
+  if (constraint === undefined) return field;
+  const required = constraint.fixedRequired ?? field.required;
+  if (field.type === "rating") {
+    const ratingConstraint = "fixedMin" in constraint || "fixedMax" in constraint ? constraint : undefined;
+    const min =
+      ratingConstraint !== undefined && "fixedMin" in ratingConstraint ? ratingConstraint.fixedMin : field.min;
+    const max =
+      ratingConstraint !== undefined && "fixedMax" in ratingConstraint ? ratingConstraint.fixedMax : field.max;
+    return {
+      ...field,
+      required,
+      ...(min === undefined ? {} : { min }),
+      ...(max === undefined ? {} : { max })
+    };
+  }
+  if ((field.type === "text" || field.type === "textarea") && "maxMaxLength" in constraint) {
+    const maxLength =
+      field.maxLength === undefined || constraint.maxMaxLength === undefined
+        ? field.maxLength
+        : Math.min(field.maxLength, constraint.maxMaxLength);
+    return { ...field, required, ...(maxLength === undefined ? {} : { maxLength }) };
+  }
+  return { ...field, required };
 }
 
 function cyclicQuestionIds(fields: readonly FormField[]): ReadonlySet<string> {
@@ -152,7 +183,7 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
   return issues;
 }
 
-export function sanitizeSchema(schema: FormSchema): FormSchema {
+export function sanitizeSchema(schema: FormSchema, options: SanitizeSchemaOptions = {}): FormSchema {
   const existingQuestionIds = new Set(schema.fields.map((field) => field.id));
   const registeredLocales = new Set([
     ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
@@ -160,7 +191,7 @@ export function sanitizeSchema(schema: FormSchema): FormSchema {
   ]);
   const cyclic = cyclicQuestionIds(schema.fields);
   const sanitizedFields = schema.fields.map((sourceField) => {
-    const field = sanitizeFieldLocales(sourceField, registeredLocales);
+    const field = sanitizeFieldConstraints(sanitizeFieldLocales(sourceField, registeredLocales), options.policy);
     const sourceId = field.displayCondition?.questionId;
     if (
       sourceId === undefined ||

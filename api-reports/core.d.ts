@@ -114,6 +114,28 @@ declare function createDeleteDraftTransitionPlan(state: FormVersionState, draftR
 declare function assertVersionMutable(status: FormVersionStatus): void;
 
 type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
+type QuestionType = FieldType;
+interface BaseFieldConstraintRule {
+    readonly defaultRequired?: boolean;
+    readonly fixedRequired?: boolean;
+}
+interface RatingFieldConstraintRule extends BaseFieldConstraintRule {
+    readonly defaultMin?: number;
+    readonly defaultMax?: number;
+    readonly fixedMin?: number;
+    readonly fixedMax?: number;
+    readonly allowedMinRange?: readonly [number, number];
+    readonly allowedMaxRange?: readonly [number, number];
+}
+interface TextFieldConstraintRule extends BaseFieldConstraintRule {
+    readonly defaultMaxLength?: number;
+    readonly maxMaxLength?: number;
+}
+interface ChoiceFieldConstraintRule extends BaseFieldConstraintRule {
+    readonly minOptions?: number;
+    readonly maxOptions?: number;
+}
+type FieldConstraintRule = RatingFieldConstraintRule | TextFieldConstraintRule | ChoiceFieldConstraintRule | BaseFieldConstraintRule;
 interface FormPolicy {
     readonly allowedFieldTypes?: readonly FieldType[];
     readonly maxFields?: number;
@@ -123,6 +145,8 @@ interface FormPolicy {
     readonly maxLocales?: number;
     readonly maxTextLength?: number;
     readonly maxSchemaBytes?: number;
+    /** Per-question-type defaults and immutable or bounded field constraints. */
+    readonly fieldConstraints?: Partial<Record<QuestionType, FieldConstraintRule>>;
 }
 type ConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
 type ConditionValue = string | number | boolean;
@@ -223,6 +247,12 @@ interface SchemaIssue {
     readonly path: string;
     readonly code: string;
     readonly message: string;
+    /** Compatibility discriminator for structured policy issues. */
+    readonly type?: string;
+    /** Present for policy issues that identify a field property and its expected value. */
+    readonly fieldId?: string;
+    readonly property?: string;
+    readonly expected?: boolean | number | readonly [number, number];
 }
 type SchemaValidationResult = {
     readonly valid: true;
@@ -417,7 +447,6 @@ interface FormAnalytics {
     readonly questions: readonly QuestionAggregate[];
 }
 type Question = FormField;
-type QuestionType = FieldType;
 type ChoiceOption = FieldOption;
 /** Translation keys reserved for the form builder UI. */
 type BuilderTranslationKey = `builder.${string}`;
@@ -577,6 +606,9 @@ interface CollectedLocales {
 /** Collects locale registrations and every locale key used by translations or translation metadata. */
 declare function collectSchemaLocales(schema: FormSchema): CollectedLocales;
 
+interface SanitizeSchemaOptions {
+    readonly policy?: FormPolicy;
+}
 type SchemaStructureIssueType = "dangling_condition_reference" | "duplicate_question_id" | "duplicate_choice_id" | "self_condition_reference" | "cyclic_condition_reference";
 interface SchemaStructureIssue {
     readonly type: SchemaStructureIssueType;
@@ -585,7 +617,7 @@ interface SchemaStructureIssue {
     readonly message: string;
 }
 declare function validateSchemaStructure(schema: FormSchema): SchemaStructureIssue[];
-declare function sanitizeSchema(schema: FormSchema): FormSchema;
+declare function sanitizeSchema(schema: FormSchema, options?: SanitizeSchemaOptions): FormSchema;
 
 interface ValidateFormSchemaOptions {
     readonly policy?: FormPolicy;
@@ -639,4 +671,4 @@ declare function calculatePageVisibility(schema: FormSchema, currentAnswers: Rea
 declare function calculateFieldVisibility(schema: FormSchema, currentAnswers: Readonly<Record<string, unknown>>): Readonly<Record<string, boolean>>;
 declare function selectVisibleAnswers(schema: FormSchema, currentAnswers: FormValues): FormValues;
 
-export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BuilderTranslationKey, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type ConditionOperator, type ConditionValue, type CreateSubmissionOptions, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvExportOptions, DEFAULT_FIELD_TYPE_DEFINITIONS, type DeleteDraftOptions, type DisplayCondition, type ExtensibleNode, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAnalytics, type FormEvent, type FormEventType, type FormField, type FormPage, type FormPolicy, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type JsonValue, type LocalizedText, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginationIteratorOptions, type PopulateTranslationOptions, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type RatingField, type ResponseAccumulator, type ResponseAccumulatorOptions, type Result, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type StorageAdapter, type StorageCommitError, type StreamCsvOptions, type SubmissionCursorValue, type SubmissionFilter, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionQueryOptions, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextQuestionAggregate, type TranslationAdapter, type TranslationReport, type TranslationSlot, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateResponses, assertValidFormSchema, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, cloneVersionToDraft, collectSchemaLocales, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createPublishTransitionPlan, createResponseAccumulator, createSubmission, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, dispatchWebhook, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, exportResponsesToCsv, exportResponsesToCsvStream, isDisplayConditionSatisfied, isQuestionVisible, iterateSubmissionPages, jsonValuesEqual, matchesSubmissionFilter, matchesSubmissionPageFilters, normalizeSubmissionPageSize, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, resolveFormTranslation, resolveLocalizedSchema, sanitizeSchema, selectVisibleAnswers, transformFieldType, validateAnswers, validateFormSchema, validatePageAnswers, validateSchemaStructure };
+export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BaseFieldConstraintRule, type BuilderTranslationKey, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type ConditionOperator, type ConditionValue, type CreateSubmissionOptions, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvExportOptions, DEFAULT_FIELD_TYPE_DEFINITIONS, type DeleteDraftOptions, type DisplayCondition, type ExtensibleNode, type FieldConstraintRule, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAnalytics, type FormEvent, type FormEventType, type FormField, type FormPage, type FormPolicy, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type JsonValue, type LocalizedText, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginationIteratorOptions, type PopulateTranslationOptions, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type RatingField, type RatingFieldConstraintRule, type ResponseAccumulator, type ResponseAccumulatorOptions, type Result, type SanitizeSchemaOptions, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type StorageAdapter, type StorageCommitError, type StreamCsvOptions, type SubmissionCursorValue, type SubmissionFilter, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionQueryOptions, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TranslationAdapter, type TranslationReport, type TranslationSlot, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateResponses, assertValidFormSchema, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, cloneVersionToDraft, collectSchemaLocales, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createPublishTransitionPlan, createResponseAccumulator, createSubmission, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, dispatchWebhook, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, exportResponsesToCsv, exportResponsesToCsvStream, isDisplayConditionSatisfied, isQuestionVisible, iterateSubmissionPages, jsonValuesEqual, matchesSubmissionFilter, matchesSubmissionPageFilters, normalizeSubmissionPageSize, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, resolveFormTranslation, resolveLocalizedSchema, sanitizeSchema, selectVisibleAnswers, transformFieldType, validateAnswers, validateFormSchema, validatePageAnswers, validateSchemaStructure };

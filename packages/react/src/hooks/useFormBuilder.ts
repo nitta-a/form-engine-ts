@@ -45,6 +45,12 @@ export type BuilderActionError =
   | { readonly type: "disallowed_field_type"; readonly fieldType: QuestionType }
   | { readonly type: "disallowed_locale"; readonly locale: string }
   | { readonly type: "max_locales_exceeded"; readonly max: number }
+  | { readonly type: "field_constraint_immutable" }
+  | {
+      readonly type: "field_constraint_violation";
+      readonly property: string;
+      readonly expected: number;
+    }
   | { readonly type: "node_not_found"; readonly kind: BuilderTextTarget["kind"]; readonly id: string }
   | { readonly type: "invalid_operation"; readonly message: string };
 
@@ -110,6 +116,102 @@ function defaultCreateOption(field: FormField, id: string): ChoiceOption {
 
 function defaultCreatePage(id: string, questionIds: string[]): FormPage {
   return { id, title: "New page", questionIds };
+}
+
+function applyFieldConstraintDefaults(field: FormField, policy: FormPolicy | undefined): FormField {
+  const constraint = policy?.fieldConstraints?.[field.type];
+  if (constraint === undefined) return field;
+  const required = constraint.fixedRequired ?? constraint.defaultRequired ?? field.required;
+  if (field.type === "rating") {
+    const ratingConstraint =
+      "defaultMin" in constraint || "defaultMax" in constraint || "fixedMin" in constraint || "fixedMax" in constraint
+        ? constraint
+        : undefined;
+    const min =
+      ratingConstraint !== undefined && "fixedMin" in ratingConstraint
+        ? ratingConstraint.fixedMin
+        : ratingConstraint !== undefined && "defaultMin" in ratingConstraint
+          ? ratingConstraint.defaultMin
+          : field.min;
+    const max =
+      ratingConstraint !== undefined && "fixedMax" in ratingConstraint
+        ? ratingConstraint.fixedMax
+        : ratingConstraint !== undefined && "defaultMax" in ratingConstraint
+          ? ratingConstraint.defaultMax
+          : field.max;
+    return {
+      ...field,
+      required,
+      ...(min === undefined ? {} : { min }),
+      ...(max === undefined ? {} : { max })
+    };
+  }
+  if ((field.type === "text" || field.type === "textarea") && "defaultMaxLength" in constraint) {
+    return {
+      ...field,
+      required,
+      ...(constraint.defaultMaxLength === undefined ? {} : { maxLength: constraint.defaultMaxLength })
+    };
+  }
+  return { ...field, required };
+}
+
+function fieldConstraintError(updated: FormField, policy: FormPolicy | undefined): BuilderActionError | undefined {
+  const constraint = policy?.fieldConstraints?.[updated.type];
+  if (constraint === undefined) return undefined;
+  if (constraint.fixedRequired !== undefined && updated.required !== constraint.fixedRequired) {
+    return { type: "field_constraint_immutable" };
+  }
+  if (updated.type === "rating") {
+    if ("fixedMin" in constraint && constraint.fixedMin !== undefined && updated.min !== constraint.fixedMin) {
+      return { type: "field_constraint_immutable" };
+    }
+    if ("fixedMax" in constraint && constraint.fixedMax !== undefined && updated.max !== constraint.fixedMax) {
+      return { type: "field_constraint_immutable" };
+    }
+    if (
+      "allowedMinRange" in constraint &&
+      constraint.allowedMinRange !== undefined &&
+      typeof updated.min === "number" &&
+      (updated.min < constraint.allowedMinRange[0] || updated.min > constraint.allowedMinRange[1])
+    ) {
+      return { type: "field_constraint_violation", property: "min", expected: constraint.allowedMinRange[0] };
+    }
+    if (
+      "allowedMaxRange" in constraint &&
+      constraint.allowedMaxRange !== undefined &&
+      typeof updated.max === "number" &&
+      (updated.max < constraint.allowedMaxRange[0] || updated.max > constraint.allowedMaxRange[1])
+    ) {
+      return { type: "field_constraint_violation", property: "max", expected: constraint.allowedMaxRange[1] };
+    }
+  }
+  if (
+    (updated.type === "text" || updated.type === "textarea") &&
+    "maxMaxLength" in constraint &&
+    constraint.maxMaxLength !== undefined &&
+    updated.maxLength !== undefined &&
+    updated.maxLength > constraint.maxMaxLength
+  ) {
+    return { type: "field_constraint_violation", property: "maxLength", expected: constraint.maxMaxLength };
+  }
+  if (
+    (updated.type === "select" || updated.type === "radio" || updated.type === "multi-select") &&
+    "minOptions" in constraint &&
+    constraint.minOptions !== undefined &&
+    updated.options.length < constraint.minOptions
+  ) {
+    return { type: "field_constraint_violation", property: "options", expected: constraint.minOptions };
+  }
+  if (
+    (updated.type === "select" || updated.type === "radio" || updated.type === "multi-select") &&
+    "maxOptions" in constraint &&
+    constraint.maxOptions !== undefined &&
+    updated.options.length > constraint.maxOptions
+  ) {
+    return { type: "field_constraint_violation", property: "options", expected: constraint.maxOptions };
+  }
+  return undefined;
 }
 
 function move<T>(items: readonly T[], sourceIndex: number, targetIndex: number): readonly T[] | undefined {
@@ -191,6 +293,8 @@ export function useFormBuilder({
       const updated = updater(current);
       if (updated.id !== fieldId)
         return { success: false, error: { type: "invalid_id", kind: "field", id: updated.id } };
+      const constraintError = fieldConstraintError(updated, policy);
+      if (constraintError !== undefined) return { success: false, error: constraintError };
       if (policy?.allowedFieldTypes !== undefined && !policy.allowedFieldTypes.includes(updated.type))
         return { success: false, error: { type: "disallowed_field_type", fieldType: updated.type } };
       for (const text of [updated.title, updated.description]) {
@@ -202,7 +306,7 @@ export function useFormBuilder({
       onChange({ ...schema, fields: schema.fields.map((field) => (field.id === fieldId ? updated : field)) });
       return { success: true };
     },
-    [onChange, policy?.allowedFieldTypes, schema, textPolicyError]
+    [onChange, policy, schema, textPolicyError]
   );
 
   const updateOption = useCallback(
@@ -280,6 +384,7 @@ export function useFormBuilder({
           return { success: false, error: { type: "invalid_id", kind: "option", id: option.id } };
         field = { ...field, options: [option] } as FormField;
       }
+      field = applyFieldConstraintDefaults(field, policy);
       const pages = schema.pages?.map((page, index) => ({
         ...page,
         questionIds:
@@ -344,6 +449,17 @@ export function useFormBuilder({
         return { success: false, error: { type: "invalid_operation", message: `Field ${fieldId} has no options.` } };
       if (policy?.maxOptionsPerField !== undefined && field.options.length >= policy.maxOptionsPerField)
         return { success: false, error: { type: "max_options_exceeded", max: policy.maxOptionsPerField } };
+      const constraint = policy?.fieldConstraints?.[field.type];
+      if (
+        constraint !== undefined &&
+        "maxOptions" in constraint &&
+        constraint.maxOptions !== undefined &&
+        field.options.length >= constraint.maxOptions
+      )
+        return {
+          success: false,
+          error: { type: "field_constraint_violation", property: "options", expected: constraint.maxOptions }
+        };
       const ids = new Set(
         schema.fields.flatMap((item) => ("options" in item ? item.options.map((option) => option.id) : []))
       );
@@ -362,7 +478,7 @@ export function useFormBuilder({
       });
       return { success: true };
     },
-    [createId, factories.createOption, onChange, policy?.maxOptionsPerField, schema]
+    [createId, factories.createOption, onChange, policy, policy?.maxOptionsPerField, schema]
   );
 
   const removeOption = useCallback(
@@ -373,6 +489,17 @@ export function useFormBuilder({
         return { success: false, error: { type: "node_not_found", kind: "option", id: optionId } };
       if (field.options.length <= 1)
         return { success: false, error: { type: "invalid_operation", message: "A choice field needs one option." } };
+      const constraint = policy?.fieldConstraints?.[field.type];
+      if (
+        constraint !== undefined &&
+        "minOptions" in constraint &&
+        constraint.minOptions !== undefined &&
+        field.options.length <= constraint.minOptions
+      )
+        return {
+          success: false,
+          error: { type: "field_constraint_violation", property: "options", expected: constraint.minOptions }
+        };
       onChange({
         ...schema,
         fields: schema.fields.map((item) =>
@@ -383,7 +510,7 @@ export function useFormBuilder({
       });
       return { success: true };
     },
-    [onChange, schema]
+    [onChange, policy, schema]
   );
 
   const moveOption = useCallback(
@@ -416,7 +543,9 @@ export function useFormBuilder({
       if (field === undefined) return { success: false, error: { type: "node_not_found", kind: "field", id: fieldId } };
       if (policy?.allowedFieldTypes !== undefined && !policy.allowedFieldTypes.includes(type))
         return { success: false, error: { type: "disallowed_field_type", fieldType: type } };
-      let transformed = transformFieldType(field, type);
+      let transformed = applyFieldConstraintDefaults(transformFieldType(field, type), policy);
+      const constraintError = fieldConstraintError(transformed, policy);
+      if (constraintError !== undefined) return { success: false, error: constraintError };
       if (CHOICE_TYPES.includes(type) && !("options" in field) && "options" in transformed) {
         const ids = new Set(
           schema.fields.flatMap((item) => ("options" in item ? item.options.map((option) => option.id) : []))
@@ -431,7 +560,7 @@ export function useFormBuilder({
       onChange({ ...schema, fields: schema.fields.map((item) => (item.id === fieldId ? transformed : item)) });
       return { success: true };
     },
-    [createId, factories.createOption, onChange, policy?.allowedFieldTypes, schema]
+    [createId, factories.createOption, onChange, policy, policy?.allowedFieldTypes, schema]
   );
 
   const addPage = useCallback(

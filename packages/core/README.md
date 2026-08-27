@@ -41,13 +41,15 @@ round-trips. `completionMessage` is localized with the rest of the form text.
 
 `transformFieldType` changes a question's type without discarding source text, translations, conditions, or extension
 metadata. `validateFormSchema(schema, { policy })` applies the framework-independent `FormPolicy`, including field,
-option, text, serialized-byte, allowed-type, and locale constraints. `allowedLocales` constrains the default and supported
+option, text, serialized-byte, allowed-type, locale, and per-field `fieldConstraints` rules. Rating bounds can be fixed
+or range-limited, text lengths can have a policy maximum, and required state can be fixed. `allowedLocales` constrains the default and supported
 locales, `maxLocales` limits their unique total, and contradictory required/allowed locale policies are reported.
 Required locales cover every source text that exists on the form, its fields, options, and pages.
 
 `collectSchemaLocales(schema)` scans registrations plus every form/page/field/option `translations` and
 `translationMetadata` key. Validation reports unregistered translation locales and applies `allowedLocales` and
-`maxLocales` to the complete collected set. `sanitizeSchema` purges unregistered locale content. Pass
+`maxLocales` to the complete collected set. `sanitizeSchema(schema, { policy })` also applies fixed field values and
+safe maximum-length corrections while purging unregistered locale content. Pass
 `{ policy: { allowedLocales, maxLocales } }` to `populateSchemaTranslations` to reject inadmissible targets before the
 translation adapter runs.
 
