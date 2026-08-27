@@ -3,6 +3,21 @@
 Official Material UI v6/v7 integration layer for `@form-engine-ts/react`. `MuiFormBuilder` applies MUI controls and
 layout slots together, disables the React builder CSS classes, and propagates common size and variant settings.
 
+`MuiChoiceGroupSlot` is an exported renderer slot for grouped choice questions. It uses MUI `Paper`, `FormControl`,
+`FormLabel`, and `FormHelperText`, so error state and theme colors follow the active MUI theme:
+
+```tsx
+import { FormRenderer } from "@form-engine-ts/react";
+import { MuiChoiceGroupSlot } from "@form-engine-ts/mui";
+
+<FormRenderer
+  appearance={{ choiceField: { radio: "grouped" } }}
+  slots={{ renderChoiceGroup: MuiChoiceGroupSlot }}
+  schema={schema}
+  onSubmit={save}
+/>
+```
+
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";
 

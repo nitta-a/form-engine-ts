@@ -9,11 +9,13 @@ import type {
   Question,
   QuestionType,
   TranslationReport,
-  ValidationError
+  ValidationError,
+  ValidationIssue
 } from "@form-engine-ts/core";
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import type {
   ComponentType,
+  CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   ReactNode
@@ -458,13 +460,25 @@ export type FormSuccessRenderMode = "append" | "replace";
 
 export type ChoiceFieldLayoutMode = "default" | "grouped";
 
+export interface ChoiceFieldTypeLayoutMap {
+  readonly radio?: ChoiceFieldLayoutMode;
+  readonly checkbox?: ChoiceFieldLayoutMode;
+  readonly "multi-select"?: ChoiceFieldLayoutMode;
+  readonly select?: ChoiceFieldLayoutMode;
+}
+
+export type FieldError = ValidationIssue & {
+  readonly message: string;
+};
+
 export interface FormRendererAppearance {
   /**
-   * Layout preset for radio and checkbox questions.
+   * Layout preset for choice questions (radio, checkbox, and multi-select).
    * - "default": keep the flat question layout.
    * - "grouped": render a bordered fieldset and legend.
+   * - An object can configure each choice question type independently.
    */
-  readonly choiceField?: ChoiceFieldLayoutMode;
+  readonly choiceField?: ChoiceFieldLayoutMode | ChoiceFieldTypeLayoutMap;
 }
 
 export type SubmissionConfirmationRenderMode = "inline" | "replace" | "dialog";
@@ -499,6 +513,25 @@ export interface SubmissionConfirmationSlotProps {
 export interface FormFieldsSlotProps {
   readonly children: ReactNode;
   readonly className?: string;
+}
+
+export interface ChoiceGroupSlotProps {
+  readonly field: Question;
+  readonly title: string;
+  readonly description?: string;
+  readonly required?: boolean;
+  readonly error?: FieldError;
+  readonly disabled?: boolean;
+  readonly readOnly?: boolean;
+  readonly children: ReactNode;
+  readonly className?: string;
+}
+
+export interface FormRendererSlotProps {
+  readonly choiceGroup?: {
+    readonly className?: string;
+    readonly style?: CSSProperties;
+  };
 }
 
 export interface FormRendererSlots {
@@ -541,6 +574,7 @@ export interface FormRendererSlots {
     readonly current: number;
     readonly max: number;
   }) => ReactNode;
+  readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
 
 export interface SubmissionProtectionProps {

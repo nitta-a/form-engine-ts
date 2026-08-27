@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.3.2** (2026-08-27). All public packages are currently published at version `4.3.2`.
-This release adds an accessible grouped radio and checkbox layout preset to the React Renderer while preserving the
-flat default. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.2).
+The latest release is **v4.4.0** (2026-08-27). All public packages are currently published at version `4.4.0`.
+This release adds per-type choice-field layouts, customizable grouped-choice slots, CSS variables, and an MUI ChoiceGroup
+adapter. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.4.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.3.2**（2026-08-27）です。公開パッケージはすべてバージョン `4.3.2` で公開されています。
-本リリースでは、既定のフラット表示を維持しながら、React Rendererにアクセシブルなradio・checkboxグループ表示プリセットを追加しました。
+最新版は **v4.4.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.4.0` で公開されています。
+本リリースでは、設問タイプ別の選択肢レイアウト、Grouped UI差し替えスロット、CSS変数、MUI ChoiceGroupアダプターを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.2) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.4.0) を参照してください。
 
 ### 編集・回答体験
 

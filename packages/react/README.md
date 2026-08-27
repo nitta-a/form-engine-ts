@@ -41,12 +41,23 @@ Use any compatible `TranslationAdapter` in place of the mock translator.
 
 ## Choice field layout
 
-Radio and checkbox questions use the flat layout by default. Set `appearance.choiceField` to `"grouped"` to render
-them as bordered, accessible `<fieldset>` groups with `<legend>` titles:
+Radio, checkbox, and multi-select questions use the flat layout by default. Set `appearance.choiceField` to `"grouped"`
+to render them as bordered, accessible `<fieldset>` groups with `<legend>` titles:
 
 ```tsx
 <FormRenderer appearance={{ choiceField: "grouped" }} />
 ```
+
+Use an object to configure each choice type independently. Unspecified types remain flat:
+
+```tsx
+<FormRenderer appearance={{ choiceField: { radio: "grouped", checkbox: "default" } }} />
+```
+
+Grouped wrappers can be replaced with `slots.renderChoiceGroup`; `slotProps.choiceGroup` accepts a class name and
+inline style for the default wrapper. The exported `ChoiceGroupSlotProps` includes the field, translated error, and
+option-list children. Group styling is controlled by the public `--fe-choice-group-*`, `--fe-choice-legend-*`, and
+`--fe-choice-options-gap` CSS custom properties.
 
 `groupedChoiceFields={true}` remains available as a deprecated compatibility alias.
 

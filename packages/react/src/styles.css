@@ -1,3 +1,15 @@
+:root {
+  --fe-choice-group-border: 1px solid var(--fe-border-color, #e2e8f0);
+  --fe-choice-group-radius: var(--fe-radius, 8px);
+  --fe-choice-group-padding: 1rem 1.25rem;
+  --fe-choice-group-margin-bottom: 1.25rem;
+  --fe-choice-group-bg: var(--fe-bg-color, transparent);
+  --fe-choice-legend-font-weight: 600;
+  --fe-choice-legend-font-size: 0.95rem;
+  --fe-choice-legend-color: var(--fe-text-color, inherit);
+  --fe-choice-options-gap: 0.625rem;
+}
+
 .fe-form {
   color: #17202a;
   display: grid;
@@ -123,23 +135,23 @@
   margin-top: 0.22rem;
 }
 .fe-choice-group {
-  background-color: var(--fe-bg-color, #ffffff);
-  border: 1px solid var(--fe-border-color, #e2e8f0);
-  border-radius: var(--fe-radius, 8px);
+  background-color: var(--fe-choice-group-bg);
+  border: var(--fe-choice-group-border);
+  border-radius: var(--fe-choice-group-radius);
   box-sizing: border-box;
-  margin: 0 0 1.25rem;
-  padding: 1rem 1.25rem;
+  margin: 0 0 var(--fe-choice-group-margin-bottom);
+  padding: var(--fe-choice-group-padding);
 }
 .fe-choice-legend {
-  color: var(--fe-text-color, #1a202c);
-  font-size: 0.95rem;
-  font-weight: 600;
+  color: var(--fe-choice-legend-color);
+  font-size: var(--fe-choice-legend-font-size);
+  font-weight: var(--fe-choice-legend-font-weight);
   padding: 0 0.5rem;
 }
 .fe-choice-options {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: var(--fe-choice-options-gap);
   margin-top: 0.5rem;
 }
 .fe-choice-option {

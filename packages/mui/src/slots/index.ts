@@ -7,6 +7,7 @@ import { createMuiToolbarSlot, MuiToolbarSlot } from "./Toolbar";
 
 export * from "./FieldEditor";
 export * from "./Localization";
+export * from "./MuiChoiceGroupSlot";
 export * from "./OptionEditor";
 export * from "./Toolbar";
 

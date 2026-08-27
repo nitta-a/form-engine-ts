@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v4.4.0 — 2026-08-27
+
+- Added per-question-type choice-field layouts for radio, checkbox, multi-select, and select questions.
+- Added customizable grouped-choice rendering slots, CSS custom properties, and the MUI `MuiChoiceGroupSlot` adapter.
+- Added preview demonstrations and regression coverage for grouped layouts and MUI theme integration.
+- Aligned all public packages to version 4.4.0.
+
+See the [GitHub release for v4.4.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.4.0).
+
 ### v4.3.2 — 2026-08-27
 
 - Added the React Renderer `appearance.choiceField` preset for grouped radio and checkbox fieldsets with accessible legends, validation state, and keyboard interaction.
@@ -164,6 +173,15 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.4.0 — 2026-08-27
+
+- radio・checkbox・multi-select・select設問ごとに選択肢レイアウトを設定できるようにしました。
+- Grouped UIの差し替えスロット、CSSカスタムプロパティ、MUI用`MuiChoiceGroupSlot`アダプターを追加しました。
+- GroupedレイアウトとMUIテーマ連携のプレビューおよび回帰テストを追加しました。
+- 公開パッケージのバージョンを4.4.0に統一しました。
+
+[v4.4.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.4.0)も参照してください。
 
 ### v4.3.2 — 2026-08-27
 
