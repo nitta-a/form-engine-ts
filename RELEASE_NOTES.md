@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v4.3.0 — 2026-08-27
+
+- Added a generic pre-submission answer confirmation flow to the React Renderer, independent of submission guards.
+- Added standard inline, replacement, and dialog confirmation presentations with formatted visible answer summaries.
+- Added `SubmissionConfirmationOptions` and `visibleItems` to the public React confirmation API.
+- Aligned all public packages to version 4.3.0.
+
+See the [GitHub release for v4.3.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.0).
+
 ### v4.2.0 — 2026-08-27
 
 - Added field constraint policies for field defaults, fixed values, and bounded rating, text, and choice properties.

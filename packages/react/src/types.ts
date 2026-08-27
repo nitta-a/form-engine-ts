@@ -458,6 +458,11 @@ export type FormSuccessRenderMode = "append" | "replace";
 
 export type SubmissionConfirmationRenderMode = "inline" | "replace" | "dialog";
 
+export interface SubmissionConfirmationOptions {
+  readonly enabled?: boolean;
+  readonly renderMode?: SubmissionConfirmationRenderMode;
+}
+
 export type FormSubmitStatus = "idle" | "submitting" | "confirming" | "success" | "error";
 
 /** @deprecated Use FormSubmitStatus instead. */
@@ -471,10 +476,11 @@ export interface RenderSubmitButtonProps {
 }
 
 export interface SubmissionConfirmationSlotProps {
-  readonly findings: readonly SensitiveDataFinding[];
+  readonly findings?: readonly SensitiveDataFinding[];
   readonly message?: string;
   readonly schema: FormSchema;
   readonly visibleValues: Record<string, unknown>;
+  readonly visibleItems: readonly FormSubmittedAnswerItem[];
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
 }

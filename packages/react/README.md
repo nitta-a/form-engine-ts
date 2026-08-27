@@ -168,8 +168,15 @@ state. Text controls forward schema `minLength`, `maxLength`, and `pattern` cons
 `renderCharacterCount` can replace the default count. Guard evaluation, confirmation, receipt persistence, and provider
 submission share an in-flight lock so rapid clicks cannot submit twice.
 
+Set `submissionConfirmation={{ enabled: true, renderMode: "replace" }}` to show a standard answer review before
+submission even when no submission guard is configured. The default `inline` mode keeps the form visible; `replace` and
+`dialog` provide alternate presentations. The standard review lists visible answers with their resolved labels and
+formatted display values. `renderSubmissionConfirmation` receives these as `visibleItems`; guard confirmations continue
+to receive their findings, while generic confirmations provide an empty findings array.
+
 The Builder basic-settings section edits source `title` and `description` through the same policy-aware action pipeline.
-Submission confirmation slots receive the effective message, localized schema, and visible answers. An `onSubmit` result
+Submission confirmation slots receive the effective message, localized schema, visible answers, and formatted
+`visibleItems`. An `onSubmit` result
 may provide `submissionId` and `submittedAt`, which Renderer copies into its receipt. Receipt stores support `getBatch`,
 and `useSubmissionReceipts` loads multiple form/version receipts for list and dashboard surfaces.
 

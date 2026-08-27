@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import {
   createLocalStorageSubmissionReceiptStore,
   FormRenderer,
+  type SubmissionConfirmationSlotProps,
   type SubmissionGuard,
   type SubmissionReceipt,
   type SubmissionReceiptQuery,
@@ -70,13 +71,7 @@ describe("v2.7 submission protection", () => {
     const guard = vi.fn(guardImplementation);
     const onSubmit = vi.fn(async (_values: FormValues) => undefined);
     const slots = {
-      renderSubmissionConfirmation: ({
-        findings,
-        onConfirm
-      }: {
-        findings: readonly SensitiveDataFinding[];
-        onConfirm: () => void;
-      }) => (
+      renderSubmissionConfirmation: ({ findings = [], onConfirm }: SubmissionConfirmationSlotProps) => (
         <button type="button" onClick={onConfirm}>
           Confirm guarded submission ({findings.length})
         </button>

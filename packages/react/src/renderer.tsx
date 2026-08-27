@@ -34,6 +34,7 @@ import type {
   FormSubmittedAnswerItem,
   FormSuccessRenderMode,
   RenderSubmitButtonProps,
+  SubmissionConfirmationOptions,
   SubmissionConfirmationRenderMode,
   SubmissionGuard,
   SubmissionProtectionProps,
@@ -295,6 +296,8 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
    * Defaults to "append" for backwards compatibility.
    */
   readonly successRenderMode?: FormSuccessRenderMode;
+  readonly submissionConfirmation?: SubmissionConfirmationOptions;
+  /** @deprecated Use submissionConfirmation.renderMode instead. */
   readonly submissionConfirmationRenderMode?: SubmissionConfirmationRenderMode;
   readonly showHiddenFieldsInSummary?: boolean;
   readonly fieldsClassName?: string;
@@ -463,7 +466,8 @@ function ContextFormRenderer({
   beforeSubmit,
   onDraftSave,
   successRenderMode = "append",
-  submissionConfirmationRenderMode = "inline",
+  submissionConfirmation,
+  submissionConfirmationRenderMode,
   showHiddenFieldsInSummary = false,
   fieldsClassName,
   hideFormOnSuccess = false,
@@ -483,6 +487,7 @@ function ContextFormRenderer({
   const [confirmation, setConfirmation] = useState<{
     readonly findings: readonly SensitiveDataFinding[];
     readonly message?: string;
+    readonly generic: boolean;
   } | null>(null);
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
   const [guardsPending, setGuardsPending] = useState(false);
@@ -507,6 +512,13 @@ function ContextFormRenderer({
   const activeVisibleIndex = visiblePageIndexes.indexOf(currentPageIndex);
   const fieldIds = activePage === undefined ? undefined : new Set(activePage.questionIds);
   const visibleValues = useMemo(() => selectVisibleAnswers(form.schema, form.values), [form.schema, form.values]);
+  const visibleItems = useMemo(
+    () => buildSubmittedItems(form.schema, form.values, form.visibility, (key) => form.translate(key), false),
+    [form.schema, form.translate, form.values, form.visibility]
+  );
+  const confirmationRenderMode: SubmissionConfirmationRenderMode =
+    submissionConfirmation?.renderMode ?? submissionConfirmationRenderMode ?? "inline";
+  const confirmationEnabled = submissionConfirmation?.enabled === true;
   const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
@@ -590,7 +602,7 @@ function ContextFormRenderer({
     if (confirmation === null) return;
     const confirmButton = confirmationRef.current?.querySelector<HTMLElement>("[data-fe-confirm], button");
     confirmButton?.focus();
-    if (submissionConfirmationRenderMode !== "dialog") return;
+    if (confirmationRenderMode !== "dialog") return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -617,7 +629,7 @@ function ContextFormRenderer({
     };
     globalThis.addEventListener("keydown", onKeyDown);
     return () => globalThis.removeEventListener("keydown", onKeyDown);
-  }, [confirmation, focusSubmitButton, submissionConfirmationRenderMode]);
+  }, [confirmation, confirmationRenderMode, focusSubmitButton]);
 
   useEffect(() => {
     if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
@@ -710,21 +722,29 @@ function ContextFormRenderer({
     }
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
-    if (validation.valid && !guardsConfirmed && submissionGuards.length > 0) {
+    if (validation.valid && !guardsConfirmed) {
       rendererSubmissionInFlight.current = true;
-      setGuardsPending(true);
+      setGuardsPending(submissionGuards.length > 0);
       try {
-        const guardResult = await runSubmissionGuards(submissionGuards);
-        if (guardResult.status === "block") {
-          setGuardMessage(guardResult.message ?? form.translate("form.submissionBlocked"));
-          return { status: "cancelled" };
+        if (submissionGuards.length > 0) {
+          const guardResult = await runSubmissionGuards(submissionGuards);
+          if (guardResult.status === "block") {
+            setGuardMessage(guardResult.message ?? form.translate("form.submissionBlocked"));
+            return { status: "cancelled" };
+          }
+          if (guardResult.status === "confirm") {
+            setGuardMessage(null);
+            setConfirmation({
+              findings: guardResult.findings,
+              generic: false,
+              ...(guardResult.message === undefined ? {} : { message: guardResult.message })
+            });
+            return { status: "cancelled" };
+          }
         }
-        if (guardResult.status === "confirm") {
+        if (confirmationEnabled) {
           setGuardMessage(null);
-          setConfirmation({
-            findings: guardResult.findings,
-            ...(guardResult.message === undefined ? {} : { message: guardResult.message })
-          });
+          setConfirmation({ findings: [], generic: true });
           return { status: "cancelled" };
         }
       } finally {
@@ -906,23 +926,38 @@ function ContextFormRenderer({
     <div
       ref={confirmationRef}
       className="fe-submission-confirmation"
-      role={submissionConfirmationRenderMode === "dialog" ? undefined : "dialog"}
+      role={confirmationRenderMode === "dialog" ? undefined : "dialog"}
     >
       {slots.renderSubmissionConfirmation?.({
         findings: confirmation?.findings ?? [],
         message:
           confirmation?.message ??
-          resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData")),
+          (confirmation?.generic === true
+            ? form.locale.toLowerCase().startsWith("ja")
+              ? "回答内容をご確認のうえ、送信してください。"
+              : "Please review your answers before submitting."
+            : resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData"))),
         schema: form.schema,
         visibleValues,
+        visibleItems,
         onConfirm: confirmSubmission,
         onCancel: cancelSubmission
       }) ?? (
         <>
-          <h2>{resolveMessage("confirmSensitiveDataTitle")}</h2>
+          <h2>
+            {confirmation?.generic === true
+              ? form.locale.toLowerCase().startsWith("ja")
+                ? "回答内容の確認"
+                : "Review your answers"
+              : resolveMessage("confirmSensitiveDataTitle")}
+          </h2>
           <p>
             {confirmation?.message ??
-              resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData"))}
+              (confirmation?.generic === true
+                ? form.locale.toLowerCase().startsWith("ja")
+                  ? "回答内容をご確認のうえ、送信してください。"
+                  : "Please review your answers before submitting."
+                : resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData")))}
           </p>
           {(confirmation?.findings ?? []).length === 0 ? null : (
             <ul>
@@ -943,6 +978,15 @@ function ContextFormRenderer({
               })}
             </ul>
           )}
+          {confirmation?.generic === true ? (
+            <ul className="fe-submission-summary">
+              {visibleItems.map((item) => (
+                <li key={item.fieldId}>
+                  <span>{item.title}</span>: <span>{item.displayValue}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <button type="button" data-fe-confirm="true" onClick={confirmSubmission}>
             {resolveMessage("confirmButton", form.translate("form.confirmSubmission"))}
           </button>
@@ -980,7 +1024,7 @@ function ContextFormRenderer({
     return <div className={`fe-form ${className}`.trim()}>{completionRegion}</div>;
   }
 
-  if (confirmation !== null && submissionConfirmationRenderMode === "replace") {
+  if (confirmation !== null && confirmationRenderMode === "replace") {
     return <div className={`fe-form ${className}`.trim()}>{confirmationContent}</div>;
   }
 
@@ -991,7 +1035,7 @@ function ContextFormRenderer({
         className={`fe-form ${className}`.trim()}
         noValidate
         onSubmit={handleSubmit}
-        aria-hidden={confirmation !== null && submissionConfirmationRenderMode === "dialog" ? true : undefined}
+        aria-hidden={confirmation !== null && confirmationRenderMode === "dialog" ? true : undefined}
       >
         {slots.renderHeader?.({
           title: form.schema.title,
@@ -1083,7 +1127,7 @@ function ContextFormRenderer({
           );
         })()}
         {guardMessage === null ? null : <div role="alert">{guardMessage}</div>}
-        {confirmation !== null && submissionConfirmationRenderMode === "inline" ? confirmationContent : null}
+        {confirmation !== null && confirmationRenderMode === "inline" ? confirmationContent : null}
         {validationIssues.length === 0
           ? null
           : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
@@ -1160,7 +1204,7 @@ function ContextFormRenderer({
             : null}
         </div>
       </form>
-      {confirmation !== null && submissionConfirmationRenderMode === "dialog" ? (
+      {confirmation !== null && confirmationRenderMode === "dialog" ? (
         <div className="fe-confirmation-dialog-backdrop" role="dialog" aria-modal="true">
           {confirmationContent}
         </div>
