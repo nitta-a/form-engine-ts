@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v4.3.1 — 2026-08-27
+
+- Made the React confirmation summary slot's `visibleItems` field optional for SemVer-compatible adoption.
+- The Renderer continues to provide formatted visible answer items at runtime.
+- Aligned all public packages to version 4.3.1.
+
+See the [GitHub release for v4.3.1](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.1).
+
 ### v4.3.0 — 2026-08-27
 
 - Added a generic pre-submission answer confirmation flow to the React Renderer, independent of submission guards.

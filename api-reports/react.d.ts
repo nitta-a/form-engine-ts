@@ -496,7 +496,7 @@ interface SubmissionConfirmationSlotProps {
     readonly message?: string;
     readonly schema: FormSchema;
     readonly visibleValues: Record<string, unknown>;
-    readonly visibleItems: readonly FormSubmittedAnswerItem[];
+    readonly visibleItems?: readonly FormSubmittedAnswerItem[];
     readonly onConfirm: () => void;
     readonly onCancel: () => void;
 }

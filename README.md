@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.3.0** (2026-08-27). All public packages are currently published at version `4.3.0`.
-This release adds generic pre-submission answer confirmation with standard summary UI and preserves guarded
-confirmation behavior. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.0).
+The latest release is **v4.3.1** (2026-08-27). All public packages are currently published at version `4.3.1`.
+This patch keeps the generic pre-submission answer confirmation API SemVer-compatible while preserving its runtime
+summary behavior. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.1).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.3.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.3.0` で公開されています。
-本リリースでは、Guardに依存しない送信前の回答確認と標準サマリーUIを追加し、既存のGuard確認動作を維持します。
+最新版は **v4.3.1**（2026-08-27）です。公開パッケージはすべてバージョン `4.3.1` で公開されています。
+本パッチでは、送信前の回答確認APIをSemVer互換に整えつつ、実行時のサマリー表示と既存のGuard確認動作を維持します。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.1) を参照してください。
 
 ### 編集・回答体験
 
