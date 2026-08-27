@@ -682,6 +682,7 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [useCustomSlots, setUseCustomSlots] = useState(false);
+  const [groupedChoiceFields, setGroupedChoiceFields] = useState(false);
   const [successRenderMode, setSuccessRenderMode] = useState<FormSuccessRenderMode>("append");
   const [cancelNextSubmit, setCancelNextSubmit] = useState(false);
   const [simulateServerError, setSimulateServerError] = useState(false);
@@ -1154,12 +1155,21 @@ export default function App() {
                 />
                 Simulate server validation error on next submit
               </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={groupedChoiceFields}
+                  onChange={(event) => setGroupedChoiceFields(event.currentTarget.checked)}
+                />
+                Group radio and checkbox fields
+              </label>
             </fieldset>
             {lifecycleStatus === null ? null : <p className="lifecycle-status">{lifecycleStatus}</p>}
             <FormProvider schema={schema} locale={locale} translator={mockTranslator} onSubmit={submit} resetOnSuccess>
               <FormRenderer
                 successMessageKey="preview.success"
                 errorMessageKey="preview.error"
+                appearance={{ choiceField: groupedChoiceFields ? "grouped" : "default" }}
                 successRenderMode={successRenderMode}
                 autoSaveKey={`form-engine-preview-draft:${schema.id}:${schema.version}`}
                 beforeSubmit={() => {

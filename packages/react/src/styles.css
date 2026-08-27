@@ -122,6 +122,41 @@
 .fe-check-label input {
   margin-top: 0.22rem;
 }
+.fe-choice-group {
+  background-color: var(--fe-bg-color, #ffffff);
+  border: 1px solid var(--fe-border-color, #e2e8f0);
+  border-radius: var(--fe-radius, 8px);
+  box-sizing: border-box;
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.25rem;
+}
+.fe-choice-legend {
+  color: var(--fe-text-color, #1a202c);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+.fe-choice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-top: 0.5rem;
+}
+.fe-choice-option {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.5rem;
+}
+.fe-field-description {
+  color: #667085;
+  font-size: 0.875rem;
+}
+.fe-field-error {
+  color: #b42318;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
 .fe-rating-options {
   display: flex;
   flex-wrap: wrap;

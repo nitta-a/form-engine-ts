@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.3.1** (2026-08-27). All public packages are currently published at version `4.3.1`.
-This patch keeps the generic pre-submission answer confirmation API SemVer-compatible while preserving its runtime
-summary behavior. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.1).
+The latest release is **v4.3.2** (2026-08-27). All public packages are currently published at version `4.3.2`.
+This release adds an accessible grouped radio and checkbox layout preset to the React Renderer while preserving the
+flat default. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.2).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.3.1**（2026-08-27）です。公開パッケージはすべてバージョン `4.3.1` で公開されています。
-本パッチでは、送信前の回答確認APIをSemVer互換に整えつつ、実行時のサマリー表示と既存のGuard確認動作を維持します。
+最新版は **v4.3.2**（2026-08-27）です。公開パッケージはすべてバージョン `4.3.2` で公開されています。
+本リリースでは、既定のフラット表示を維持しながら、React Rendererにアクセシブルなradio・checkboxグループ表示プリセットを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.1) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.2) を参照してください。
 
 ### 編集・回答体験
 

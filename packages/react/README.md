@@ -39,6 +39,17 @@ export function ContactForm() {
 
 Use any compatible `TranslationAdapter` in place of the mock translator.
 
+## Choice field layout
+
+Radio and checkbox questions use the flat layout by default. Set `appearance.choiceField` to `"grouped"` to render
+them as bordered, accessible `<fieldset>` groups with `<legend>` titles:
+
+```tsx
+<FormRenderer appearance={{ choiceField: "grouped" }} />
+```
+
+`groupedChoiceFields={true}` remains available as a deprecated compatibility alias.
+
 Define `schema.pages` to enable Back/Next navigation, page validation, conditional page skipping, and an accessible
 progress indicator. Pass `autoSaveKey` to persist a versioned draft in `localStorage` after a 500ms debounce and restore it
 on the next mount:

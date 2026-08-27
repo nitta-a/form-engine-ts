@@ -456,6 +456,17 @@ export type SubmissionGuard = (
 
 export type FormSuccessRenderMode = "append" | "replace";
 
+export type ChoiceFieldLayoutMode = "default" | "grouped";
+
+export interface FormRendererAppearance {
+  /**
+   * Layout preset for radio and checkbox questions.
+   * - "default": keep the flat question layout.
+   * - "grouped": render a bordered fieldset and legend.
+   */
+  readonly choiceField?: ChoiceFieldLayoutMode;
+}
+
 export type SubmissionConfirmationRenderMode = "inline" | "replace" | "dialog";
 
 export interface SubmissionConfirmationOptions {

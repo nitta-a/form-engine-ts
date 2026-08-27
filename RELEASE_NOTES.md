@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v4.3.2 — 2026-08-27
+
+- Added the React Renderer `appearance.choiceField` preset for grouped radio and checkbox fieldsets with accessible legends, validation state, and keyboard interaction.
+- Retained flat choice rendering by default and added the deprecated `groupedChoiceFields` compatibility alias.
+- Aligned all public packages to version 4.3.2.
+
+See the [GitHub release for v4.3.2](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.2).
+
 ### v4.3.1 — 2026-08-27
 
 - Made the React confirmation summary slot's `visibleItems` field optional for SemVer-compatible adoption.
@@ -156,6 +164,14 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.3.2 — 2026-08-27
+
+- React Rendererに、アクセシブルなlegend、検証状態、キーボード操作に対応したradio・checkboxのグループ表示プリセットを追加しました。
+- 既定では従来のフラット表示を維持し、非推奨の`groupedChoiceFields`互換aliasも提供します。
+- 公開パッケージのバージョンを4.3.2に統一しました。
+
+[v4.3.2のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.3.2)も参照してください。
 
 ### v4.1.0 — 2026-08-27
 

@@ -27,6 +27,7 @@ import { FormProvider, useForm } from "./context";
 import type { SubmissionReceipt } from "./receipt";
 import type {
   BeforeSubmit,
+  FormRendererAppearance,
   FormRendererMessages,
   FormRendererSlots,
   FormSubmitHandler,
@@ -69,9 +70,15 @@ function describedBy(
   return ids.length === 0 ? undefined : ids.join(" ");
 }
 
-function RequiredMark({ required }: { readonly required: boolean | undefined }) {
+function RequiredMark({
+  required,
+  className = "fe-required"
+}: {
+  readonly required: boolean | undefined;
+  readonly className?: string;
+}) {
   return required ? (
-    <span className="fe-required" aria-hidden="true">
+    <span className={className} aria-hidden="true">
       {" "}
       *
     </span>
@@ -95,7 +102,26 @@ function FieldMessage({ props }: { readonly props: FieldComponentProps }) {
   );
 }
 
-function DefaultField(props: FieldComponentProps) {
+function GroupedChoiceDescription({ props }: { readonly props: FieldComponentProps }) {
+  return props.field.description === undefined ? null : (
+    <div id={props.helpId} className="fe-field-description">
+      {props.field.description}
+    </div>
+  );
+}
+
+function GroupedChoiceError({ props }: { readonly props: FieldComponentProps }) {
+  return props.error === undefined ? null : (
+    <div id={props.errorId} className="fe-field-error" role="alert">
+      {props.translate(props.error.messageKey, props.error.params)}
+    </div>
+  );
+}
+
+function DefaultField({
+  groupedChoiceFields,
+  ...props
+}: FieldComponentProps & { readonly groupedChoiceFields: boolean }) {
   const { field, value, setValue, inputId, error, translate } = props;
   const ariaProps = {
     "aria-describedby": describedBy(field, error, props.helpId, props.errorId),
@@ -103,6 +129,38 @@ function DefaultField(props: FieldComponentProps) {
   } as const;
 
   if (field.type === "checkbox") {
+    if (groupedChoiceFields) {
+      return (
+        // biome-ignore lint/a11y/useAriaPropsSupportedByRole: The grouped fieldset exposes the required state for the complete choice question.
+        <fieldset
+          className="fe-choice-group fe-field--checkbox"
+          data-field-id={field.id}
+          aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+          aria-invalid={Boolean(error)}
+          aria-required={field.required}
+        >
+          <legend className="fe-choice-legend">
+            {field.title}
+            <RequiredMark required={field.required} className="fe-required-badge" />
+          </legend>
+          <GroupedChoiceDescription props={props} />
+          <div className="fe-choice-options">
+            <label className="fe-choice-option" htmlFor={inputId}>
+              <input
+                id={inputId}
+                name={field.id}
+                type="checkbox"
+                checked={value === true}
+                aria-label={field.title}
+                onChange={(event) => setValue(event.currentTarget.checked)}
+              />
+              <span>{field.title}</span>
+            </label>
+          </div>
+          <GroupedChoiceError props={props} />
+        </fieldset>
+      );
+    }
     return (
       <div className="fe-field fe-field--checkbox" data-field-id={field.id}>
         <label className="fe-check-label" htmlFor={inputId}>
@@ -126,6 +184,88 @@ function DefaultField(props: FieldComponentProps) {
 
   if (field.type === "radio" || field.type === "multi-select") {
     const selected = Array.isArray(value) ? value : [];
+    if (field.type === "radio" && groupedChoiceFields) {
+      return (
+        // biome-ignore lint/a11y/useAriaPropsSupportedByRole: The grouped fieldset exposes the required state for the complete choice question.
+        <fieldset
+          className="fe-choice-group fe-field--radio"
+          data-field-id={field.id}
+          aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+          aria-invalid={Boolean(error)}
+          aria-required={field.required}
+        >
+          <legend className="fe-choice-legend">
+            {field.title}
+            <RequiredMark required={field.required} className="fe-required-badge" />
+          </legend>
+          <GroupedChoiceDescription props={props} />
+          <div className="fe-choice-options">
+            {field.options.map((option, index) => {
+              const optionId = `${inputId}-${index}`;
+              const checked = value === option.id;
+              return (
+                <label className="fe-choice-option" htmlFor={optionId} key={option.id}>
+                  <input
+                    id={optionId}
+                    name={field.id}
+                    type="radio"
+                    value={option.id}
+                    checked={checked}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key !== "ArrowDown" &&
+                        event.key !== "ArrowRight" &&
+                        event.key !== "ArrowUp" &&
+                        event.key !== "ArrowLeft"
+                      )
+                        return;
+                      event.preventDefault();
+                      const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+                      const nextIndex = (index + offset + field.options.length) % field.options.length;
+                      const nextOption = field.options[nextIndex];
+                      if (nextOption === undefined) return;
+                      setValue(nextOption.id);
+                      document.getElementById(`${inputId}-${nextIndex}`)?.focus();
+                    }}
+                    onChange={() => setValue(option.id)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <GroupedChoiceError props={props} />
+        </fieldset>
+      );
+    }
+    if (field.type === "radio") {
+      return (
+        <div className="fe-field fe-field--radio" data-field-id={field.id}>
+          <div className="fe-label">
+            {field.title}
+            <RequiredMark required={field.required} />
+          </div>
+          {field.options.map((option, index) => {
+            const optionId = `${inputId}-${index}`;
+            return (
+              <label className="fe-check-label" htmlFor={optionId} key={option.id}>
+                <input
+                  {...ariaProps}
+                  id={optionId}
+                  name={field.id}
+                  type="radio"
+                  value={option.id}
+                  checked={value === option.id}
+                  onChange={() => setValue(option.id)}
+                />
+                <span>{option.label}</span>
+              </label>
+            );
+          })}
+          <FieldMessage props={props} />
+        </div>
+      );
+    }
     return (
       <fieldset className={`fe-field fe-field--${field.type}`} data-field-id={field.id} {...ariaProps}>
         <legend className="fe-label">
@@ -291,6 +431,9 @@ function DefaultField(props: FieldComponentProps) {
 export interface FormRendererPresentationProps extends SubmissionProtectionProps {
   readonly components?: FieldComponents;
   readonly className?: string;
+  readonly appearance?: FormRendererAppearance;
+  /** @deprecated Use appearance.choiceField="grouped" instead. */
+  readonly groupedChoiceFields?: boolean;
   /**
    * Controls where the completion message is rendered after a successful submission.
    * Defaults to "append" for backwards compatibility.
@@ -466,6 +609,8 @@ function ContextFormRenderer({
   beforeSubmit,
   onDraftSave,
   successRenderMode = "append",
+  appearance,
+  groupedChoiceFields = false,
   submissionConfirmation,
   submissionConfirmationRenderMode,
   showHiddenFieldsInSummary = false,
@@ -478,6 +623,7 @@ function ContextFormRenderer({
   slots = {}
 }: FormRendererPresentationProps) {
   const form = useForm();
+  const isGroupedMode = appearance?.choiceField === "grouped" || groupedChoiceFields;
   const prefix = useId().replace(/:/g, "");
   const formRef = useRef<HTMLFormElement>(null);
   const loadedDraftKey = useRef<string | null>(null);
@@ -1114,7 +1260,7 @@ function ContextFormRenderer({
               }
               const Component = components[field.type];
               return Component === undefined ? (
-                <DefaultField key={field.id} {...props} />
+                <DefaultField key={field.id} {...props} groupedChoiceFields={isGroupedMode} />
               ) : (
                 <Component key={field.id} {...props} />
               );
