@@ -1,3 +1,4 @@
+import { normalizeLocale } from "./locale";
 import { collectSchemaLocales } from "./policy";
 import { assertValidFormSchema } from "./schema";
 import type {
@@ -11,6 +12,8 @@ import type {
   SchemaTranslations,
   TranslationAdapter
 } from "./types";
+
+export { normalizeLocale } from "./locale";
 
 export interface TranslationSlot {
   readonly kind: "form" | "page" | "field" | "option";
@@ -213,6 +216,14 @@ interface TranslationSlotOptions {
   readonly normalizeMetadata?: PopulateTranslationOptions["normalizeMetadata"];
 }
 
+function localeRecordEntry<T>(record: Readonly<Record<string, T>> | undefined, locale: string): T | undefined {
+  const normalizedLocale = normalizeLocale(locale) ?? locale;
+  for (const [candidate, value] of Object.entries(record ?? {})) {
+    if ((normalizeLocale(candidate) ?? candidate) === normalizedLocale) return value;
+  }
+  return undefined;
+}
+
 function createSlot(
   kind: TranslationSlot["kind"],
   nodeId: string,
@@ -222,9 +233,15 @@ function createSlot(
   existingText: string | undefined,
   nodeMetadata: Readonly<Record<string, JsonValue>> | undefined,
   existingTranslationMetadata: Readonly<Record<string, JsonValue>> | undefined,
-  options: TranslationSlotOptions = {}
+  options: TranslationSlotOptions = {},
+  parentId?: string
 ): TranslationSlot {
-  const path = `${kind}.${nodeId}.${property}`;
+  const path =
+    kind === "form"
+      ? `form.${property}`
+      : kind === "option"
+        ? `fields.${parentId ?? ""}.options.${nodeId}.${property}`
+        : `${kind}s.${nodeId}.${property}`;
   const manual =
     options.isManualTranslation?.(existingTranslationMetadata, { path, locale }) ??
     isManualTranslationMetadata(existingTranslationMetadata);
@@ -256,7 +273,10 @@ function translationSlots(
   locale: string,
   options: TranslationSlotOptions = {}
 ): readonly SlotDescriptor[] {
+  locale = normalizeLocale(locale) ?? locale;
   const descriptors: SlotDescriptor[] = [];
+  const schemaTranslation = localeRecordEntry(schema.translations, locale);
+  const schemaTranslationMetadata = localeRecordEntry(schema.translationMetadata, locale);
   const addFormSlot = (property: LocalizedProperty, sourceText: string) => {
     const slot = createSlot(
       "form",
@@ -264,18 +284,18 @@ function translationSlots(
       property,
       locale,
       sourceText,
-      schema.translations?.[locale]?.[property],
+      schemaTranslation?.[property],
       schema.metadata,
-      schema.translationMetadata?.[locale]?.[property],
+      schemaTranslationMetadata?.[property],
       options
     );
     descriptors.push({
       slot,
       manual:
-        options.isManualTranslation?.(schema.translationMetadata?.[locale]?.[property], {
+        options.isManualTranslation?.(schemaTranslationMetadata?.[property], {
           path: slot.path ?? "",
           locale
-        }) ?? isManualTranslationMetadata(schema.translationMetadata?.[locale]?.[property]),
+        }) ?? isManualTranslationMetadata(schemaTranslationMetadata?.[property]),
       apply: (current, value, metadata) =>
         withTranslationMetadata(
           { ...current, translations: mergeLocalizedText(current.translations, locale, property, value) },
@@ -290,6 +310,8 @@ function translationSlots(
   if (schema.completionMessage !== undefined) addFormSlot("completionMessage", schema.completionMessage);
 
   schema.fields.forEach((field, fieldIndex) => {
+    const fieldTranslation = localeRecordEntry(field.translations, locale);
+    const fieldTranslationMetadata = localeRecordEntry(field.translationMetadata, locale);
     const addFieldSlot = (property: "title" | "description", sourceText: string) => {
       const slot = createSlot(
         "field",
@@ -297,18 +319,18 @@ function translationSlots(
         property,
         locale,
         sourceText,
-        field.translations?.[locale]?.[property],
+        fieldTranslation?.[property],
         field.metadata,
-        field.translationMetadata?.[locale]?.[property],
+        fieldTranslationMetadata?.[property],
         options
       );
       descriptors.push({
         slot,
         manual:
-          options.isManualTranslation?.(field.translationMetadata?.[locale]?.[property], {
+          options.isManualTranslation?.(fieldTranslationMetadata?.[property], {
             path: slot.path ?? "",
             locale
-          }) ?? isManualTranslationMetadata(field.translationMetadata?.[locale]?.[property]),
+          }) ?? isManualTranslationMetadata(fieldTranslationMetadata?.[property]),
         apply: (current, value, metadata) => ({
           ...current,
           fields: current.fields.map((candidate, index) =>
@@ -332,24 +354,27 @@ function translationSlots(
 
     if ("options" in field) {
       field.options.forEach((option, optionIndex) => {
+        const optionTranslation = localeRecordEntry(option.translations, locale);
+        const optionTranslationMetadata = localeRecordEntry(option.translationMetadata, locale);
         const slot = createSlot(
           "option",
           option.id,
           "label",
           locale,
           option.label,
-          option.translations?.[locale],
+          optionTranslation,
           option.metadata,
-          option.translationMetadata?.[locale]?.label,
-          options
+          optionTranslationMetadata?.label,
+          options,
+          field.id
         );
         descriptors.push({
           slot,
           manual:
-            options.isManualTranslation?.(option.translationMetadata?.[locale]?.label, {
+            options.isManualTranslation?.(optionTranslationMetadata?.label, {
               path: slot.path ?? "",
               locale
-            }) ?? isManualTranslationMetadata(option.translationMetadata?.[locale]?.label),
+            }) ?? isManualTranslationMetadata(optionTranslationMetadata?.label),
           apply: (current, value, metadata) => ({
             ...current,
             fields: current.fields.map((candidate, candidateIndex) => {
@@ -378,6 +403,8 @@ function translationSlots(
   });
 
   schema.pages?.forEach((page, pageIndex) => {
+    const pageTranslation = localeRecordEntry(page.translations, locale);
+    const pageTranslationMetadata = localeRecordEntry(page.translationMetadata, locale);
     const addPageSlot = (property: "title" | "description", sourceText: string) => {
       const slot = createSlot(
         "page",
@@ -385,18 +412,18 @@ function translationSlots(
         property,
         locale,
         sourceText,
-        page.translations?.[locale]?.[property],
+        pageTranslation?.[property],
         page.metadata,
-        page.translationMetadata?.[locale]?.[property],
+        pageTranslationMetadata?.[property],
         options
       );
       descriptors.push({
         slot,
         manual:
-          options.isManualTranslation?.(page.translationMetadata?.[locale]?.[property], {
+          options.isManualTranslation?.(pageTranslationMetadata?.[property], {
             path: slot.path ?? "",
             locale
-          }) ?? isManualTranslationMetadata(page.translationMetadata?.[locale]?.[property]),
+          }) ?? isManualTranslationMetadata(pageTranslationMetadata?.[property]),
         apply: (current, value, metadata) => ({
           ...current,
           ...(current.pages === undefined
@@ -529,7 +556,7 @@ export const migrateSchemaTranslationMetadata = (
     (locale, property) => ({
       locale,
       defaultLocale,
-      path: property,
+      path: `form.${property}`,
       property,
       nodeKind: "form"
     }),
@@ -632,8 +659,11 @@ export function collectTranslationSlots(schema: FormSchema, locale: string): rea
 }
 
 export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string): FormSchema {
-  if (targetLocale === undefined || targetLocale.length === 0 || targetLocale === schema.defaultLocale) return schema;
-  const formTranslation = schema.translations?.[targetLocale];
+  if (targetLocale === undefined || targetLocale.length === 0) return schema;
+  const normalizedTargetLocale = normalizeLocale(targetLocale) ?? targetLocale;
+  const defaultLocale = schema.defaultLocale === undefined ? undefined : normalizeLocale(schema.defaultLocale);
+  if (normalizedTargetLocale === defaultLocale || targetLocale === schema.defaultLocale) return schema;
+  const formTranslation = localeRecordEntry(schema.translations, normalizedTargetLocale);
   const completionMessage = formTranslation?.completionMessage ?? schema.completionMessage;
   return {
     ...schema,
@@ -643,7 +673,7 @@ export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string
       : { description: formTranslation?.description ?? schema.description }),
     ...(completionMessage === undefined ? {} : { completionMessage }),
     fields: schema.fields.map((field): FormField => {
-      const translation = field.translations?.[targetLocale];
+      const translation = localeRecordEntry(field.translations, normalizedTargetLocale);
       const localized = {
         ...field,
         title: translation?.title ?? field.title,
@@ -656,7 +686,7 @@ export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string
         ...localized,
         options: field.options.map((option) => ({
           ...option,
-          label: option.translations?.[targetLocale] ?? option.label
+          label: localeRecordEntry(option.translations, normalizedTargetLocale) ?? option.label
         }))
       } as FormField;
     }),
@@ -664,7 +694,7 @@ export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string
       ? {}
       : {
           pages: schema.pages.map((page): FormPage => {
-            const translation = page.translations?.[targetLocale];
+            const translation = localeRecordEntry(page.translations, normalizedTargetLocale);
             const title = translation?.title ?? page.title;
             const description = translation?.description ?? page.description;
             return {
@@ -696,8 +726,16 @@ export async function populateSchemaTranslations(
   options: PopulateTranslationOptions = {}
 ): Promise<{ readonly schema: FormSchema; readonly report: TranslationReport }> {
   assertValidFormSchema(schema);
-  const locales = [...new Set(targetLocales.filter((locale) => locale.length > 0 && locale !== schema.defaultLocale))];
-  const allowedLocales = options.policy?.allowedLocales;
+  const defaultLocale =
+    schema.defaultLocale === undefined ? undefined : (normalizeLocale(schema.defaultLocale) ?? schema.defaultLocale);
+  const locales = [
+    ...new Set(
+      targetLocales
+        .map((locale) => normalizeLocale(locale) ?? locale.trim())
+        .filter((locale) => locale.length > 0 && locale !== defaultLocale)
+    )
+  ];
+  const allowedLocales = options.policy?.allowedLocales?.map((locale) => normalizeLocale(locale) ?? locale);
   const collectedLocales = collectSchemaLocales(schema);
   const disallowedLocale = [...collectedLocales.allUniqueLocales, ...locales].find(
     (locale) => allowedLocales !== undefined && !allowedLocales.includes(locale)
@@ -751,7 +789,7 @@ export async function populateSchemaTranslations(
       adapter,
       selected.map((descriptor) => descriptor.slot.sourceText),
       locale,
-      schema.defaultLocale
+      defaultLocale
     );
     if (translated.length !== selected.length) {
       throw new Error(`Translation adapter returned ${translated.length} texts for ${selected.length} inputs.`);
@@ -762,7 +800,7 @@ export async function populateSchemaTranslations(
       const metadata =
         options.createMetadata?.(descriptor.slot, translatedText) ??
         ({
-          sourceLocale: schema.defaultLocale ?? "",
+          sourceLocale: defaultLocale ?? "",
           sourceTextHash: computeSourceTextHash(descriptor.slot.sourceText),
           translationSource: "automatic",
           translatedAt: new Date().toISOString()
@@ -774,8 +812,8 @@ export async function populateSchemaTranslations(
 
   const supportedLocales = [
     ...new Set([
-      ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-      ...(schema.supportedLocales ?? []),
+      ...(defaultLocale === undefined ? [] : [defaultLocale]),
+      ...(schema.supportedLocales ?? []).map((locale) => normalizeLocale(locale) ?? locale),
       ...locales
     ])
   ];

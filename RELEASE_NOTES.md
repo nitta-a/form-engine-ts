@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v4.8.0 — 2026-08-29
+
+- Added `normalizeLocale` for canonical BCP 47 locale normalization, including underscore-separated compatibility input and invalid-tag rejection.
+- Applied locale normalization consistently to schema validation, policies, sanitization, translation slot lookup, and React translation workspace updates.
+- Canonicalized locale-keyed content during sanitization and prevented equivalent locale spellings from bypassing duplicate, allowed-locale, or required-locale checks.
+- Aligned all public packages to version 4.8.0.
+
+See the [GitHub release for v4.8.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.8.0).
+
 ### v4.7.0 — 2026-08-29
 
 - Added `TranslationMigrationContext` to custom translation metadata migrators, including locale, JSON path, property, node kind, and node identifiers.
@@ -202,6 +211,15 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.8.0 — 2026-08-29
+
+- アンダースコア区切りの互換入力にも対応し、不正なタグを拒否するBCP 47正規化関数`normalizeLocale`を追加しました。
+- スキーマ検証、ポリシー、サニタイズ、翻訳スロット検索、React翻訳ワークスペースの更新でロケール正規化を統一しました。
+- 同じロケールの異なる表記が、重複・許可ロケール・必須ロケールの検証を回避できないようにし、サニタイズ時にロケールキー付きコンテンツを正規化しました。
+- 公開パッケージのバージョンを4.8.0に統一しました。
+
+[v4.8.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.8.0)も参照してください。
 
 ### v4.7.0 — 2026-08-29
 

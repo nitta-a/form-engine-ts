@@ -1,3 +1,4 @@
+import { canonicalLocaleOrRaw, normalizeLocale } from "./locale";
 import { collectSchemaLocales } from "./policy";
 import { validateSchemaStructure } from "./sanitization";
 import type {
@@ -35,6 +36,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function localeRecordEntry<T>(record: Readonly<Record<string, T>> | undefined, locale: string): T | undefined {
+  for (const [candidate, value] of Object.entries(record ?? {})) {
+    if (canonicalLocaleOrRaw(candidate) === locale) return value;
+  }
+  return undefined;
 }
 
 function issue(issues: SchemaIssue[], path: string, code: string, message: string): void {
@@ -462,51 +470,55 @@ function collectSchemaText(schema: FormSchema): readonly TextEntry[] {
 }
 
 function addRequiredTranslationIssues(schema: FormSchema, locale: string, issues: SchemaIssue[]): void {
-  if (!(schema.supportedLocales ?? []).includes(locale)) {
+  if (!(schema.supportedLocales ?? []).some((candidate) => canonicalLocaleOrRaw(candidate) === locale)) {
     issue(issues, "supportedLocales", "required_locale_missing", `Required locale ${locale} is missing.`);
   }
-  if (locale === schema.defaultLocale) return;
+  if (schema.defaultLocale !== undefined && canonicalLocaleOrRaw(schema.defaultLocale) === locale) return;
+  const formTranslation = localeRecordEntry(schema.translations, locale);
   const required: Array<{ readonly path: string; readonly value: string | undefined }> = [
-    { path: `translations.${locale}.title`, value: schema.translations?.[locale]?.title }
+    { path: `translations.${locale}.title`, value: formTranslation?.title }
   ];
   if (schema.description !== undefined)
-    required.push({ path: `translations.${locale}.description`, value: schema.translations?.[locale]?.description });
+    required.push({ path: `translations.${locale}.description`, value: formTranslation?.description });
   if (schema.completionMessage !== undefined) {
     required.push({
       path: `translations.${locale}.completionMessage`,
-      value: schema.translations?.[locale]?.completionMessage
+      value: formTranslation?.completionMessage
     });
   }
   schema.fields.forEach((field, fieldIndex) => {
+    const fieldTranslation = localeRecordEntry(field.translations, locale);
     required.push({
       path: `fields[${fieldIndex}].translations.${locale}.title`,
-      value: field.translations?.[locale]?.title
+      value: fieldTranslation?.title
     });
     if (field.description !== undefined) {
       required.push({
         path: `fields[${fieldIndex}].translations.${locale}.description`,
-        value: field.translations?.[locale]?.description
+        value: fieldTranslation?.description
       });
     }
     if (!("options" in field)) return;
     field.options.forEach((option, optionIndex) => {
+      const optionTranslation = localeRecordEntry(option.translations, locale);
       required.push({
         path: `fields[${fieldIndex}].options[${optionIndex}].translations.${locale}`,
-        value: option.translations?.[locale]
+        value: optionTranslation
       });
     });
   });
   schema.pages?.forEach((page, pageIndex) => {
+    const pageTranslation = localeRecordEntry(page.translations, locale);
     if (page.title !== undefined) {
       required.push({
         path: `pages[${pageIndex}].translations.${locale}.title`,
-        value: page.translations?.[locale]?.title
+        value: pageTranslation?.title
       });
     }
     if (page.description !== undefined) {
       required.push({
         path: `pages[${pageIndex}].translations.${locale}.description`,
-        value: page.translations?.[locale]?.description
+        value: pageTranslation?.description
       });
     }
   });
@@ -682,8 +694,8 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
   }
   const collectedLocales = collectSchemaLocales(schema);
   const registeredLocales = new Set([
-    ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-    ...(schema.supportedLocales ?? [])
+    ...(collectedLocales.defaultLocale === undefined ? [] : [collectedLocales.defaultLocale]),
+    ...collectedLocales.supportedLocales
   ]);
   for (const locale of collectedLocales.translationLocales) {
     if (registeredLocales.has(locale)) continue;
@@ -697,23 +709,27 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
     }
   }
   if (policy.allowedLocales !== undefined) {
+    const allowedLocales = new Set(policy.allowedLocales.map(canonicalLocaleOrRaw));
     const pathsByLocale = new Map<string, string[]>();
-    if (schema.defaultLocale !== undefined) pathsByLocale.set(schema.defaultLocale, ["defaultLocale"]);
+    if (collectedLocales.defaultLocale !== undefined)
+      pathsByLocale.set(collectedLocales.defaultLocale, ["defaultLocale"]);
     schema.supportedLocales?.forEach((locale, index) => {
-      pathsByLocale.set(locale, [...(pathsByLocale.get(locale) ?? []), `supportedLocales[${index}]`]);
+      const canonical = canonicalLocaleOrRaw(locale);
+      pathsByLocale.set(canonical, [...(pathsByLocale.get(canonical) ?? []), `supportedLocales[${index}]`]);
     });
     for (const [locale, paths] of collectedLocales.translationLocalePaths) {
       pathsByLocale.set(locale, [...(pathsByLocale.get(locale) ?? []), ...paths]);
     }
     for (const [locale, paths] of pathsByLocale) {
-      if (!policy.allowedLocales.includes(locale)) {
+      if (!allowedLocales.has(locale)) {
         for (const path of paths) {
           issue(issues, path, "disallowed_locale", `Locale ${locale} is not allowed by the form policy.`);
         }
       }
     }
-    for (const locale of policy.requiredLocales ?? []) {
-      if (!policy.allowedLocales.includes(locale)) {
+    for (const rawLocale of policy.requiredLocales ?? []) {
+      const locale = canonicalLocaleOrRaw(rawLocale);
+      if (!allowedLocales.has(locale)) {
         issue(
           issues,
           "policy.requiredLocales",
@@ -726,7 +742,8 @@ function validatePolicy(schema: FormSchema, policy: FormPolicy, issues: SchemaIs
   if (policy.maxLocales !== undefined && collectedLocales.allUniqueLocales.size > policy.maxLocales) {
     issue(issues, "supportedLocales", "max_locales_exceeded", `At most ${policy.maxLocales} locales are allowed.`);
   }
-  for (const locale of policy.requiredLocales ?? []) addRequiredTranslationIssues(schema, locale, issues);
+  for (const locale of policy.requiredLocales ?? [])
+    addRequiredTranslationIssues(schema, canonicalLocaleOrRaw(locale), issues);
   if (policy.maxSchemaBytes !== undefined) {
     try {
       const byteLength = new TextEncoder().encode(JSON.stringify(schema)).byteLength;
@@ -763,8 +780,12 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
       );
     }
   }
-  if (input.defaultLocale !== undefined && !isNonEmptyString(input.defaultLocale)) {
-    issue(issues, "defaultLocale", "invalid_locale", "Expected a non-empty default locale.");
+  if (input.defaultLocale !== undefined) {
+    if (!isNonEmptyString(input.defaultLocale)) {
+      issue(issues, "defaultLocale", "invalid_locale", "Expected a non-empty default locale.");
+    } else if (normalizeLocale(input.defaultLocale) === null) {
+      issue(issues, "defaultLocale", "invalid_locale", "Expected a valid BCP 47 locale.");
+    }
   }
   if (input.supportedLocales !== undefined) {
     if (!Array.isArray(input.supportedLocales) || input.supportedLocales.length === 0) {
@@ -774,10 +795,15 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
       input.supportedLocales.forEach((locale, index) => {
         if (!isNonEmptyString(locale)) {
           issue(issues, `supportedLocales[${index}]`, "invalid_locale", "Expected a non-empty locale.");
-        } else if (locales.has(locale)) {
-          issue(issues, `supportedLocales[${index}]`, "duplicate_locale", "Locales must be unique.");
         } else {
-          locales.add(locale);
+          const normalized = normalizeLocale(locale);
+          if (normalized === null) {
+            issue(issues, `supportedLocales[${index}]`, "invalid_locale", "Expected a valid BCP 47 locale.");
+          } else if (locales.has(normalized)) {
+            issue(issues, `supportedLocales[${index}]`, "duplicate_locale", "Locales must be unique.");
+          } else {
+            locales.add(normalized);
+          }
         }
       });
     }

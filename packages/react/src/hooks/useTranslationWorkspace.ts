@@ -7,6 +7,7 @@ import {
   type FormPolicy,
   type FormSchema,
   type JsonValue,
+  normalizeLocale,
   type PopulateTranslationOptions,
   populateSchemaTranslations,
   removeLocaleFromSchema,
@@ -108,17 +109,6 @@ function asAsyncAdapter(adapter: TranslationAdapter | AsyncTranslationAdapter): 
   };
 }
 
-function isValidBcp47Locale(locale: string): boolean {
-  const language = locale.split("-")[0];
-  if (language === undefined || !/^[a-z]{2,3}$/iu.test(language)) return false;
-  try {
-    Intl.getCanonicalLocales(locale);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export const validateLocalePipeline = (
   locale: string,
   schema: FormSchema,
@@ -127,10 +117,9 @@ export const validateLocalePipeline = (
     | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
     | CustomLocaleValidator
 ): LocaleValidationResult => {
-  const currentLocales = schema.supportedLocales ?? [];
-  const defaultLocale = schema.defaultLocale ?? "";
+  const canonicalLocale = normalizeLocale(locale);
 
-  if (!isValidBcp47Locale(locale)) {
+  if (canonicalLocale === null) {
     return {
       valid: false,
       error: {
@@ -140,22 +129,29 @@ export const validateLocalePipeline = (
     };
   }
 
-  if (locale === defaultLocale || currentLocales.includes(locale)) {
+  const currentLocales = (schema.supportedLocales ?? []).map((candidate) => normalizeLocale(candidate) ?? candidate);
+  const defaultLocale =
+    schema.defaultLocale === undefined ? "" : (normalizeLocale(schema.defaultLocale) ?? schema.defaultLocale);
+
+  if (canonicalLocale === defaultLocale || currentLocales.includes(canonicalLocale)) {
     return {
       valid: false,
       error: {
         type: "locale_already_exists",
-        message: `Locale "${locale}" is already registered.`
+        message: `Locale "${canonicalLocale}" is already registered.`
       }
     };
   }
 
-  if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(locale)) {
+  if (
+    policy?.allowedLocales !== undefined &&
+    !policy.allowedLocales.some((candidate) => normalizeLocale(candidate) === canonicalLocale)
+  ) {
     return {
       valid: false,
       error: {
         type: "locale_not_allowed",
-        message: `Locale "${locale}" is not allowed by policy.`
+        message: `Locale "${canonicalLocale}" is not allowed by policy.`
       }
     };
   }
@@ -172,11 +168,13 @@ export const validateLocalePipeline = (
   }
 
   if (customValidator !== undefined) {
-    const customContext =
-      policy === undefined
-        ? Object.assign([...currentLocales], { locale, defaultLocale, currentLocales })
-        : Object.assign([...currentLocales], { locale, defaultLocale, currentLocales, policy });
-    const customResult = customValidator(locale, customContext);
+    const context: LocaleValidationContext = {
+      locale: canonicalLocale,
+      defaultLocale,
+      currentLocales: Object.freeze([...currentLocales]),
+      ...(policy === undefined ? {} : { policy })
+    };
+    const customResult = Reflect.apply(customValidator, undefined, [canonicalLocale, context]);
     if (customResult === false) {
       return {
         valid: false,
@@ -355,7 +353,13 @@ export function useTranslationWorkspace({
   const addLocale = useCallback(
     (locale: string): { readonly success: boolean; readonly error?: string } => {
       if (readOnly) return { success: false, error: "Workspace is read-only." };
-      const normalized = locale.trim();
+      const normalized = normalizeLocale(locale);
+      if (normalized === null) {
+        return {
+          success: false,
+          error: workspaceLocaleValidationMessage(validateLocalePipeline(locale, currentSchema, policy, validateLocale))
+        };
+      }
       const validation = validateLocalePipeline(normalized, currentSchema, policy, validateLocale);
       if (!validation.valid) return { success: false, error: workspaceLocaleValidationMessage(validation) };
       commit({
@@ -370,7 +374,8 @@ export function useTranslationWorkspace({
   const isAddLocaleAllowed = useCallback(
     (locale: string): boolean => {
       if (readOnly) return false;
-      const normalized = locale.trim();
+      const normalized = normalizeLocale(locale);
+      if (normalized === null) return false;
       return validateLocalePipeline(normalized, currentSchema, policy, validateLocale).valid;
     },
     [currentSchema, policy, readOnly, validateLocale]

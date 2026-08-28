@@ -71,21 +71,21 @@ describe("translation metadata migration context", () => {
         expect.objectContaining({
           locale: "ja",
           defaultLocale: "en",
-          path: "title",
+          path: "form.title",
           property: "title",
           nodeKind: "form"
         }),
         expect.objectContaining({
           locale: "ja",
           defaultLocale: "en",
-          path: "description",
+          path: "form.description",
           property: "description",
           nodeKind: "form"
         }),
         expect.objectContaining({
           locale: "ja",
           defaultLocale: "en",
-          path: "completionMessage",
+          path: "form.completionMessage",
           property: "completionMessage",
           nodeKind: "form"
         }),

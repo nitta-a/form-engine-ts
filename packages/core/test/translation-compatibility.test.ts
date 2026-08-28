@@ -47,7 +47,7 @@ describe("translation compatibility", () => {
     });
 
     expect(result.schema.fields[0]?.translations?.ja?.title).toBe("手動の名前");
-    expect(result.report.skippedReasons?.["field.name.title"]).toBe("manual");
+    expect(result.report.skippedReasons?.["fields.name.title"]).toBe("manual");
     expect(result.report.skippedSlots).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId: "name" })]));
   });
 

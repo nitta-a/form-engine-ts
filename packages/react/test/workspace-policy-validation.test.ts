@@ -16,9 +16,7 @@ describe("useTranslationWorkspace locale validation pipeline", () => {
     const customValidator = vi.fn(() => ({ valid: true }));
     const policy = { allowedLocales: ["ja", "en"], maxLocales: 2 } as const;
 
-    expect(validateLocalePipeline("invalid-locale-format", schema, policy, customValidator).error?.type).toBe(
-      "invalid_locale_format"
-    );
+    expect(validateLocalePipeline("en-u", schema, policy, customValidator).error?.type).toBe("invalid_locale_format");
     expect(validateLocalePipeline("fr", schema, policy, customValidator).error?.type).toBe("locale_not_allowed");
     expect(validateLocalePipeline("en", schema, policy, customValidator).error?.type).toBe("locale_already_exists");
     expect(customValidator).not.toHaveBeenCalled();

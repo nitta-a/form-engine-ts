@@ -60,6 +60,9 @@ describe("useTranslationWorkspace locale policy", () => {
     const { result } = renderHook(() => useTranslationWorkspace({ schema, validateLocale }));
     expect(result.current.addLocale("fr")).toEqual({ success: false, error: "Custom rejection" });
     expect(result.current.addLocale("ja")).toEqual({ success: true });
-    expect(validateLocale).toHaveBeenCalledWith("fr", expect.arrayContaining(["en"]));
+    expect(validateLocale).toHaveBeenCalledWith(
+      "fr",
+      expect.objectContaining({ locale: "fr", defaultLocale: "en", currentLocales: ["en"] })
+    );
   });
 });

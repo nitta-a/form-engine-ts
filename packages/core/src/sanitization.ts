@@ -1,3 +1,4 @@
+import { normalizeLocale } from "./locale";
 import type {
   DisplayConditionGroup,
   ExtensibleNode,
@@ -46,7 +47,12 @@ function registeredEntries<T>(
   registeredLocales: ReadonlySet<string>
 ): Readonly<Record<string, T>> | undefined {
   if (value === undefined) return undefined;
-  const entries = Object.entries(value).filter(([locale]) => registeredLocales.has(locale));
+  const entries: Array<readonly [string, T]> = [];
+  for (const [rawLocale, entry] of Object.entries(value)) {
+    const locale = normalizeLocale(rawLocale);
+    if (locale === null || !registeredLocales.has(locale)) continue;
+    entries.push([locale, entry]);
+  }
   return entries.length === 0 ? undefined : Object.fromEntries(entries);
 }
 
@@ -87,6 +93,17 @@ function sanitizePageLocales(page: FormPage, registeredLocales: ReadonlySet<stri
   const { translations: _translations, ...base } = localizedNode;
   const translations = registeredEntries(page.translations, registeredLocales);
   return { ...base, ...(translations === undefined ? {} : { translations }) };
+}
+
+function normalizedLocaleList(locales: readonly string[]): string[] {
+  return [
+    ...new Set(
+      locales.flatMap((locale) => {
+        const normalized = normalizeLocale(locale);
+        return normalized === null ? [] : [normalized];
+      })
+    )
+  ];
 }
 
 function sanitizeFieldConstraints(field: FormField, policy: FormPolicy | undefined): FormField {
@@ -216,10 +233,10 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
 
 export function sanitizeSchema(schema: FormSchema, options: SanitizeSchemaOptions = {}): FormSchema {
   const existingQuestionIds = new Set(schema.fields.map((field) => field.id));
-  const registeredLocales = new Set([
-    ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-    ...(schema.supportedLocales ?? [])
-  ]);
+  const defaultLocale = schema.defaultLocale === undefined ? null : normalizeLocale(schema.defaultLocale);
+  const supportedLocales =
+    schema.supportedLocales === undefined ? undefined : normalizedLocaleList(schema.supportedLocales);
+  const registeredLocales = new Set([...(defaultLocale === null ? [] : [defaultLocale]), ...(supportedLocales ?? [])]);
   const cyclic = cyclicQuestionIds(schema.fields);
   const sanitizedFields = schema.fields.map((sourceField) => {
     const field = sanitizeFieldConstraints(sanitizeFieldLocales(sourceField, registeredLocales), options.policy);
@@ -244,10 +261,17 @@ export function sanitizeSchema(schema: FormSchema, options: SanitizeSchemaOption
     return sanitized;
   });
   const localizedSchema = sanitizeNodeLocales(schema, registeredLocales);
-  const { translations: _translations, ...schemaWithoutLocaleContent } = localizedSchema;
+  const {
+    defaultLocale: _defaultLocale,
+    supportedLocales: _supportedLocales,
+    translations: _translations,
+    ...schemaWithoutLocaleContent
+  } = localizedSchema;
   const translations = registeredEntries(schema.translations, registeredLocales);
   const base: FormSchema = {
     ...schemaWithoutLocaleContent,
+    ...(defaultLocale === null ? {} : { defaultLocale }),
+    ...(supportedLocales === undefined ? {} : { supportedLocales }),
     ...(translations === undefined ? {} : { translations }),
     fields: sanitizedFields
   };

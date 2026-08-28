@@ -81,7 +81,10 @@ schema-driven pre-submit confirmation controls in the builder.
 
 `useTranslationWorkspace` validates added locales against `policy.allowedLocales` and `policy.maxLocales` and returns
 a structured `{ success, error }` result from `addLocale`. Built-in BCP 47, duplicate, and policy checks always run
-before the optional `validateLocale` callback, which receives the locale, default locale, current locales, and policy.
+before the optional `validateLocale` callback, which receives the canonical locale and a plain context object containing
+the canonical default locale, current locales, and policy.
+Locale input is normalized to its canonical BCP 47 form before duplicate, policy, custom-validation, and schema updates;
+underscore-separated values such as `EN_us` are accepted as compatibility input.
 Use `isAddLocaleAllowed` to disable locale controls before submission. Removing a locale also clears its
 localized values and metadata; the default locale remains protected.
 

@@ -1,0 +1,64 @@
+import type { FormSchema } from "@form-engine-ts/core";
+import { act, renderHook } from "@testing-library/react";
+import { type CustomLocaleValidator, useTranslationWorkspace } from "../src";
+
+const schema: FormSchema = {
+  id: "workspace-context",
+  version: 1,
+  title: "Survey",
+  defaultLocale: "JA",
+  supportedLocales: ["en"],
+  fields: [{ id: "name", type: "text", title: "Name", required: false }]
+};
+
+describe("useTranslationWorkspace locale context", () => {
+  it("passes a plain object context with canonical locale values", () => {
+    const customValidator: CustomLocaleValidator = (locale, context) => {
+      expect(locale).toBe("en-US");
+      expect(Array.isArray(context)).toBe(false);
+      expect(Object.getPrototypeOf(context)).toBe(Object.prototype);
+      expect(Object.keys(context)).toEqual(["locale", "defaultLocale", "currentLocales", "policy"]);
+      expect(context).toEqual({
+        locale: "en-US",
+        defaultLocale: "ja",
+        currentLocales: ["en"],
+        policy: { allowedLocales: ["en-US", "ja-JP"] }
+      });
+      expect(Object.isFrozen(context.currentLocales)).toBe(true);
+      return true;
+    };
+    const onChange = vi.fn();
+    const { result } = renderHook(() =>
+      useTranslationWorkspace({
+        schema,
+        onChange,
+        policy: { allowedLocales: ["en-US", "ja-JP"] },
+        validateLocale: customValidator
+      })
+    );
+
+    let addResult: { readonly success: boolean; readonly error?: string } | undefined;
+    act(() => {
+      addResult = result.current.addLocale("EN_us");
+    });
+
+    expect(addResult).toEqual({ success: true });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ supportedLocales: ["en", "en-US"] }));
+  });
+
+  it("normalizes allowed-locale comparisons and duplicate detection", () => {
+    const allowed = renderHook(() =>
+      useTranslationWorkspace({
+        schema: { ...schema, supportedLocales: [] },
+        policy: { allowedLocales: ["en-US", "ja"] }
+      })
+    );
+    expect(allowed.result.current.addLocale("en-us")).toEqual({ success: true });
+
+    const duplicate = renderHook(() => useTranslationWorkspace({ schema: { ...schema, supportedLocales: ["en-US"] } }));
+    expect(duplicate.result.current.addLocale("EN-US")).toEqual({
+      success: false,
+      error: 'Locale "en-US" is already registered.'
+    });
+  });
+});

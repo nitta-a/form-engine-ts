@@ -1,3 +1,4 @@
+import { canonicalLocaleOrRaw } from "./locale";
 import type { FormSchema } from "./types";
 
 export interface CollectedLocales {
@@ -14,9 +15,10 @@ function collectRecordKeys(
   path: string,
   pathsByLocale: Map<string, string[]>
 ): void {
-  for (const locale of Object.keys(value ?? {})) {
+  for (const rawLocale of Object.keys(value ?? {})) {
+    const locale = canonicalLocaleOrRaw(rawLocale);
     const paths = pathsByLocale.get(locale) ?? [];
-    paths.push(`${path}.${locale}`);
+    paths.push(`${path}.${rawLocale}`);
     pathsByLocale.set(locale, paths);
   }
 }
@@ -52,13 +54,15 @@ export function collectSchemaLocales(schema: FormSchema): CollectedLocales {
 
   const translationLocales = new Set(pathsByLocale.keys());
   const allUniqueLocales = new Set([
-    ...(schema.defaultLocale === undefined ? [] : [schema.defaultLocale]),
-    ...(schema.supportedLocales ?? []),
+    ...(schema.defaultLocale === undefined ? [] : [canonicalLocaleOrRaw(schema.defaultLocale)]),
+    ...(schema.supportedLocales ?? []).map(canonicalLocaleOrRaw),
     ...translationLocales
   ]);
+  const defaultLocale = schema.defaultLocale === undefined ? undefined : canonicalLocaleOrRaw(schema.defaultLocale);
+  const supportedLocales = (schema.supportedLocales ?? []).map(canonicalLocaleOrRaw);
   return {
-    ...(schema.defaultLocale === undefined ? {} : { defaultLocale: schema.defaultLocale }),
-    supportedLocales: schema.supportedLocales ?? [],
+    ...(defaultLocale === undefined ? {} : { defaultLocale }),
+    supportedLocales,
     translationLocales,
     allUniqueLocales,
     translationLocalePaths: pathsByLocale

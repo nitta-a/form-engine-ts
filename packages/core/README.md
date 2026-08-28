@@ -52,6 +52,9 @@ Required locales cover every source text that exists on the form, its fields, op
 safe maximum-length corrections while purging unregistered locale content. Pass
 `{ policy: { allowedLocales, maxLocales } }` to `populateSchemaTranslations` to reject inadmissible targets before the
 translation adapter runs.
+`normalizeLocale(locale)` returns the canonical BCP 47 tag, accepts underscore-separated compatibility input such as
+`ja_JP`, and returns `null` for invalid tags. Schema validation, sanitization, locale policy checks, and translation
+slot lookup use this same normalization so equivalent locale spellings cannot bypass constraints.
 
 Fields can use a `displayRule` with nested `all`/`any` condition groups and `show` or `hide` actions. Supported
 operators include equality, containment, emptiness, and numeric comparisons; the legacy `displayCondition` and
