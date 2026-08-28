@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v4.6.0 — 2026-08-29
+
+- Added legacy translation metadata detection, migration to canonical metadata, and customizable metadata normalization.
+- Added `removeLocaleFromSchema` to remove a locale registration together with all localized values and metadata.
+- Added translation workspace locale validation through `FormPolicy` or a custom validator, with structured add-locale results.
+- Added the `PopulateTranslationsOptions` compatibility alias and safeguards for custom manual-translation policies.
+- Aligned all public packages to version 4.6.0.
+
+See the [GitHub release for v4.6.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.6.0).
+
 ### v4.5.0 — 2026-08-28
 
 - Added nested `all`/`any` display rules with show/hide actions, expanded condition operators, and cycle details in schema issues.
@@ -183,6 +193,16 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.6.0 — 2026-08-29
+
+- 旧形式の翻訳メタデータを判定し、標準形式へ移行できる機能と、メタデータ正規化のカスタマイズを追加しました。
+- ロケール登録と、そのローカライズ済み値・メタデータをまとめて削除する`removeLocaleFromSchema`を追加しました。
+- `FormPolicy`またはカスタム検証関数による翻訳ワークスペースのロケール検証と、構造化された追加結果を追加しました。
+- `PopulateTranslationsOptions`互換aliasと、カスタム手動翻訳判定を保護する仕組みを追加しました。
+- 公開パッケージのバージョンを4.6.0に統一しました。
+
+[v4.6.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.6.0)も参照してください。
 
 ### v4.5.0 — 2026-08-28
 

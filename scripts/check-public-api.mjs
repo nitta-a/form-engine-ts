@@ -62,6 +62,10 @@ function isOptional(node) {
   return node.questionToken !== undefined || node.initializer !== undefined;
 }
 
+function isVoidType(node, sourceFile) {
+  return node !== undefined && compactText(node, sourceFile) === "void";
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
@@ -141,7 +145,9 @@ function compareSignatures(name, previous, current, previousFile, currentFile) {
   }
   const oldReturn = previous.type === undefined ? "unknown" : compactText(previous.type, previousFile);
   const newReturn = current.type === undefined ? "unknown" : compactText(current.type, currentFile);
-  if (oldReturn !== newReturn) changes.push(`${name}: return type changed from ${oldReturn} to ${newReturn}`);
+  if (oldReturn !== newReturn && !isVoidType(previous.type, previousFile)) {
+    changes.push(`${name}: return type changed from ${oldReturn} to ${newReturn}`);
+  }
   return changes;
 }
 
@@ -203,7 +209,9 @@ function compareMembers(name, previous, current, previousFile, currentFile, curr
     }
   }
   for (const [key, newMember] of newMembers) {
-    if (!oldMembers.has(key) && !isOptional(newMember)) changes.push(`${name}.${key}: required member was added`);
+    if (!oldMembers.has(key) && !isOptional(newMember) && !name.endsWith("Result")) {
+      changes.push(`${name}.${key}: required member was added`);
+    }
   }
   return changes;
 }

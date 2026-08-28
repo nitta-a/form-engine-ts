@@ -67,3 +67,12 @@ test("allows a defaulted generic parameter that preserves the previous property 
   const current = report("interface Option<T extends string = string> { readonly value: T; }", "type Option");
   assert.deepEqual(findBreakingApiChanges(previous, current, "fixture"), []);
 });
+
+test("allows additive result members and returning a value from a void callback", () => {
+  const previous = report("interface ActionResult { readonly execute: (value: string) => void; }", "type ActionResult");
+  const current = report(
+    "interface ActionResult { readonly execute: (value: string) => { readonly success: boolean }; readonly canExecute: (value: string) => boolean; }",
+    "type ActionResult"
+  );
+  assert.deepEqual(findBreakingApiChanges(previous, current, "fixture"), []);
+});

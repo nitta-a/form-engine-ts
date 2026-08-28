@@ -62,6 +62,13 @@ operators include equality, containment, emptiness, and numeric comparisons; the
 and missing, translated, stale, or manual states for authoring tools. `populateSchemaTranslations` can populate stale
 and missing entries while preserving manual translations and reports skipped reasons.
 
+Legacy translation metadata can be recognized with `isManualTranslationMetadata` and migrated with
+`migrateSchemaTranslationMetadata`; pass a custom migrator when legacy fields need application-specific conversion.
+`PopulateTranslationsOptions` is a compatibility alias for `PopulateTranslationOptions`, which also accepts custom
+manual-translation detection and metadata normalization callbacks. `removeLocaleFromSchema(schema, locale)` removes
+the locale from registrations and all form, page, field, option translation values and metadata; the default locale
+cannot be removed.
+
 The React builder uses canonical keys with legacy aliases when resolving UI translations:
 
 | Canonical key | Legacy alias |

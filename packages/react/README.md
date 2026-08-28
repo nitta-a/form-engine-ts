@@ -79,6 +79,11 @@ single-slot or batch translation with stale/manual status handling. The MUI pack
 `setActiveFieldId` to keep one field editor open at a time. Set `submissionSettingsOptions={{ enabled: true }}` to expose
 schema-driven pre-submit confirmation controls in the builder.
 
+`useTranslationWorkspace` validates added locales against `policy.allowedLocales` and `policy.maxLocales` and returns
+a structured `{ success, error }` result from `addLocale`. Use `validateLocale` for application-specific BCP 47 or
+tenant rules, and `isAddLocaleAllowed` to disable locale controls before submission. Removing a locale also clears its
+localized values and metadata; the default locale remains protected.
+
 ## Headless builder and renderer lifecycle
 
 `useFormBuilder({ schema, onChange, policy, idFactory, factories })` exposes controlled field, option, page, condition,

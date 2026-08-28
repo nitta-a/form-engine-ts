@@ -44,15 +44,47 @@ export interface CanonicalTranslationMetadata {
   readonly editedAt?: string;
 }
 
+export interface LegacyTranslationMetadata {
+  readonly isManuallyEdited?: boolean;
+  readonly translationSource?: "MANUAL" | "AUTOMATIC" | "manual" | "automatic" | string;
+  readonly sourceTextHash?: string;
+  readonly sourceText?: string;
+  readonly sourceLocale?: string;
+  readonly translatedAt?: string;
+  readonly editedAt?: string;
+  readonly isManual?: boolean;
+  readonly [key: string]: unknown;
+}
+
+export const isManualTranslationMetadata = (
+  metadata?: LegacyTranslationMetadata | CanonicalTranslationMetadata
+): boolean => {
+  if (metadata === undefined) return false;
+  if (
+    ("isManuallyEdited" in metadata && metadata.isManuallyEdited === true) ||
+    ("isManual" in metadata && metadata.isManual === true)
+  )
+    return true;
+  return typeof metadata.translationSource === "string" && metadata.translationSource.toLowerCase() === "manual";
+};
+
 export interface PopulateTranslationOptions {
   readonly overwrite?: "all" | "missing-only" | "stale-and-missing";
   readonly preserveManualTranslations?: boolean;
   readonly markStaleTranslations?: boolean;
   readonly shouldOverwrite?: (slot: TranslationSlot) => boolean;
   readonly createMetadata?: (slot: TranslationSlot, translatedText: string) => Readonly<Record<string, JsonValue>>;
+  readonly isManualTranslation?: (
+    metadata: unknown,
+    context: { readonly path: string; readonly locale: string }
+  ) => boolean;
+  readonly normalizeMetadata?: (metadata: unknown, sourceText: string) => CanonicalTranslationMetadata;
   /** Applies locale admission and count limits before the adapter is called. */
   readonly policy?: Pick<FormPolicy, "allowedLocales" | "maxLocales">;
 }
+
+/** Compatibility alias for clients that used the pluralized options name. */
+export type PopulateTranslationsOptions = PopulateTranslationOptions;
 
 export interface TranslationReport {
   readonly updatedSlots: readonly TranslationSlot[];
@@ -76,17 +108,27 @@ export function getTranslationStatus(
   translatedText: string | undefined,
   metadata: CanonicalTranslationMetadata | Readonly<Record<string, JsonValue>> | undefined
 ): TranslationStatus {
+  return getTranslationStatusWithManualOverride(sourceText, translatedText, metadata, undefined);
+}
+
+function getTranslationStatusWithManualOverride(
+  sourceText: string,
+  translatedText: string | undefined,
+  metadata: CanonicalTranslationMetadata | LegacyTranslationMetadata | Readonly<Record<string, JsonValue>> | undefined,
+  manualOverride: boolean | undefined
+): TranslationStatus {
   if (translatedText === undefined || translatedText.trim() === "") return "missing";
   if (metadata === undefined) return "translated";
   const currentHash = computeSourceTextHash(sourceText);
   const sourceHash = typeof metadata.sourceTextHash === "string" ? metadata.sourceTextHash : undefined;
-  const isManual = metadata.translationSource === "manual" || ("isManual" in metadata && metadata.isManual === true);
+  const isManual = manualOverride ?? isManualTranslationMetadata(metadata);
   if (isManual) return sourceHash === undefined || sourceHash === currentHash ? "manual" : "manual-stale";
   return sourceHash === undefined || sourceHash === currentHash ? "translated" : "stale";
 }
 
 interface SlotDescriptor {
   readonly slot: TranslationSlot;
+  readonly manual: boolean;
   readonly apply: (
     schema: FormSchema,
     translatedText: string,
@@ -138,6 +180,11 @@ function withTranslationMetadata<T extends ExtensibleNode>(
   };
 }
 
+interface TranslationSlotOptions {
+  readonly isManualTranslation?: PopulateTranslationOptions["isManualTranslation"];
+  readonly normalizeMetadata?: PopulateTranslationOptions["normalizeMetadata"];
+}
+
 function createSlot(
   kind: TranslationSlot["kind"],
   nodeId: string,
@@ -146,9 +193,20 @@ function createSlot(
   sourceText: string,
   existingText: string | undefined,
   nodeMetadata: Readonly<Record<string, JsonValue>> | undefined,
-  existingTranslationMetadata: Readonly<Record<string, JsonValue>> | undefined
+  existingTranslationMetadata: Readonly<Record<string, JsonValue>> | undefined,
+  options: TranslationSlotOptions = {}
 ): TranslationSlot {
-  const status = getTranslationStatus(sourceText, existingText, existingTranslationMetadata);
+  const path = `${kind}.${nodeId}.${property}`;
+  const manual =
+    options.isManualTranslation?.(existingTranslationMetadata, { path, locale }) ??
+    isManualTranslationMetadata(existingTranslationMetadata);
+  const normalizedMetadata: Readonly<Record<string, JsonValue>> | undefined =
+    existingTranslationMetadata === undefined
+      ? undefined
+      : options.normalizeMetadata === undefined
+        ? existingTranslationMetadata
+        : { ...options.normalizeMetadata(existingTranslationMetadata, sourceText) };
+  const status = getTranslationStatusWithManualOverride(sourceText, existingText, normalizedMetadata, manual);
   return {
     kind,
     nodeId,
@@ -156,16 +214,20 @@ function createSlot(
     locale,
     sourceText,
     target: { kind, ...(nodeId.length === 0 ? {} : { id: nodeId }), property },
-    path: `${kind}.${nodeId}.${property}`,
+    path,
     sourceTextHash: computeSourceTextHash(sourceText),
     status,
     ...(existingText === undefined ? {} : { existingText }),
     ...(nodeMetadata === undefined ? {} : { nodeMetadata, metadata: nodeMetadata }),
-    ...(existingTranslationMetadata === undefined ? {} : { existingTranslationMetadata })
+    ...(normalizedMetadata === undefined ? {} : { existingTranslationMetadata: normalizedMetadata })
   };
 }
 
-function translationSlots(schema: FormSchema, locale: string): readonly SlotDescriptor[] {
+function translationSlots(
+  schema: FormSchema,
+  locale: string,
+  options: TranslationSlotOptions = {}
+): readonly SlotDescriptor[] {
   const descriptors: SlotDescriptor[] = [];
   const addFormSlot = (property: LocalizedProperty, sourceText: string) => {
     const slot = createSlot(
@@ -176,10 +238,16 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
       sourceText,
       schema.translations?.[locale]?.[property],
       schema.metadata,
-      schema.translationMetadata?.[locale]?.[property]
+      schema.translationMetadata?.[locale]?.[property],
+      options
     );
     descriptors.push({
       slot,
+      manual:
+        options.isManualTranslation?.(schema.translationMetadata?.[locale]?.[property], {
+          path: slot.path ?? "",
+          locale
+        }) ?? isManualTranslationMetadata(schema.translationMetadata?.[locale]?.[property]),
       apply: (current, value, metadata) =>
         withTranslationMetadata(
           { ...current, translations: mergeLocalizedText(current.translations, locale, property, value) },
@@ -203,10 +271,16 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
         sourceText,
         field.translations?.[locale]?.[property],
         field.metadata,
-        field.translationMetadata?.[locale]?.[property]
+        field.translationMetadata?.[locale]?.[property],
+        options
       );
       descriptors.push({
         slot,
+        manual:
+          options.isManualTranslation?.(field.translationMetadata?.[locale]?.[property], {
+            path: slot.path ?? "",
+            locale
+          }) ?? isManualTranslationMetadata(field.translationMetadata?.[locale]?.[property]),
         apply: (current, value, metadata) => ({
           ...current,
           fields: current.fields.map((candidate, index) =>
@@ -238,10 +312,16 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
           option.label,
           option.translations?.[locale],
           option.metadata,
-          option.translationMetadata?.[locale]?.label
+          option.translationMetadata?.[locale]?.label,
+          options
         );
         descriptors.push({
           slot,
+          manual:
+            options.isManualTranslation?.(option.translationMetadata?.[locale]?.label, {
+              path: slot.path ?? "",
+              locale
+            }) ?? isManualTranslationMetadata(option.translationMetadata?.[locale]?.label),
           apply: (current, value, metadata) => ({
             ...current,
             fields: current.fields.map((candidate, candidateIndex) => {
@@ -279,10 +359,16 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
         sourceText,
         page.translations?.[locale]?.[property],
         page.metadata,
-        page.translationMetadata?.[locale]?.[property]
+        page.translationMetadata?.[locale]?.[property],
+        options
       );
       descriptors.push({
         slot,
+        manual:
+          options.isManualTranslation?.(page.translationMetadata?.[locale]?.[property], {
+            path: slot.path ?? "",
+            locale
+          }) ?? isManualTranslationMetadata(page.translationMetadata?.[locale]?.[property]),
         apply: (current, value, metadata) => ({
           ...current,
           ...(current.pages === undefined
@@ -310,6 +396,149 @@ function translationSlots(schema: FormSchema, locale: string): readonly SlotDesc
   });
   return descriptors;
 }
+
+function removeLocaleRecord<T>(
+  record: Readonly<Record<string, T>> | undefined,
+  locale: string
+): Readonly<Record<string, T>> | undefined {
+  if (record === undefined) return undefined;
+  const remaining = Object.entries(record).filter(([candidate]) => candidate !== locale);
+  return remaining.length === 0 ? undefined : Object.fromEntries(remaining);
+}
+
+function removeLocalizedNodeLocale<T extends ExtensibleNode & { readonly translations?: SchemaTranslations }>(
+  node: T,
+  locale: string
+): T {
+  const translations = removeLocaleRecord(node.translations, locale);
+  const translationMetadata = removeLocaleRecord(node.translationMetadata, locale);
+  const { translations: _translations, translationMetadata: _translationMetadata, ...base } = node;
+  return {
+    ...base,
+    ...(translations === undefined ? {} : { translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
+  } as T;
+}
+
+function migrateMetadata(
+  metadata: unknown,
+  sourceText: string,
+  defaultLocale: string | undefined,
+  customMigrator: ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata) | undefined
+): CanonicalTranslationMetadata {
+  if (customMigrator !== undefined) return customMigrator(metadata, sourceText);
+  const record =
+    metadata !== null && typeof metadata === "object" ? (metadata as Readonly<Record<string, unknown>>) : undefined;
+  const sourceLocale = typeof record?.sourceLocale === "string" ? record.sourceLocale : (defaultLocale ?? "");
+  const translationSource = isManualTranslationMetadata(record) ? "manual" : "automatic";
+  return {
+    sourceLocale,
+    sourceTextHash: computeSourceTextHash(sourceText),
+    translationSource,
+    ...(typeof record?.translatedAt === "string" ? { translatedAt: record.translatedAt } : {}),
+    ...(typeof record?.editedAt === "string" ? { editedAt: record.editedAt } : {})
+  };
+}
+
+function migrateNodeMetadata<T extends ExtensibleNode>(
+  node: T,
+  sourceTexts: Readonly<Record<string, string>>,
+  defaultLocale: string | undefined,
+  customMigrator: ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata) | undefined
+): T {
+  if (node.translationMetadata === undefined) return node;
+  const translationMetadata = Object.fromEntries(
+    Object.entries(node.translationMetadata).map(([locale, properties]) => [
+      locale,
+      Object.fromEntries(
+        Object.entries(properties).map(([property, metadata]) => [
+          property,
+          migrateMetadata(metadata, sourceTexts[property] ?? "", defaultLocale, customMigrator)
+        ])
+      )
+    ])
+  );
+  return { ...node, translationMetadata } as T;
+}
+
+export const migrateSchemaTranslationMetadata = (
+  schema: FormSchema,
+  customMigrator?: (oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata
+): FormSchema => {
+  const migratedSchema = migrateNodeMetadata(
+    schema,
+    {
+      title: schema.title,
+      ...(schema.description === undefined ? {} : { description: schema.description }),
+      ...(schema.completionMessage === undefined ? {} : { completionMessage: schema.completionMessage })
+    },
+    schema.defaultLocale,
+    customMigrator
+  );
+  const fields = schema.fields.map((field) => {
+    const migratedField = migrateNodeMetadata(
+      field,
+      { title: field.title, ...(field.description === undefined ? {} : { description: field.description }) },
+      schema.defaultLocale,
+      customMigrator
+    );
+    if (!("options" in migratedField)) return migratedField;
+    return {
+      ...migratedField,
+      options: migratedField.options.map((option) =>
+        migrateNodeMetadata(option, { label: option.label }, schema.defaultLocale, customMigrator)
+      )
+    } as FormField;
+  });
+  const pages = schema.pages?.map((page) =>
+    migrateNodeMetadata(
+      page,
+      {
+        ...(page.title === undefined ? {} : { title: page.title }),
+        ...(page.description === undefined ? {} : { description: page.description })
+      },
+      schema.defaultLocale,
+      customMigrator
+    )
+  );
+  return {
+    ...migratedSchema,
+    fields,
+    ...(pages === undefined ? {} : { pages })
+  };
+};
+
+/** Removes a locale registration and every localized value and metadata entry for it. */
+export const removeLocaleFromSchema = (schema: FormSchema, localeToRemove: string): FormSchema => {
+  if (localeToRemove === schema.defaultLocale) {
+    throw new Error(`Cannot remove defaultLocale: ${localeToRemove}`);
+  }
+  const form = removeLocalizedNodeLocale(schema, localeToRemove);
+  const fields = schema.fields.map((field) => {
+    const localizedField = removeLocalizedNodeLocale(field, localeToRemove);
+    if (!("options" in localizedField)) return localizedField;
+    return {
+      ...localizedField,
+      options: localizedField.options.map((option) => {
+        const translations = removeLocaleRecord(option.translations, localeToRemove);
+        const translationMetadata = removeLocaleRecord(option.translationMetadata, localeToRemove);
+        const { translations: _translations, translationMetadata: _translationMetadata, ...base } = option;
+        return {
+          ...base,
+          ...(translations === undefined ? {} : { translations }),
+          ...(translationMetadata === undefined ? {} : { translationMetadata })
+        };
+      })
+    } as FormField;
+  });
+  const pages = schema.pages?.map((page) => removeLocalizedNodeLocale(page, localeToRemove));
+  return {
+    ...form,
+    supportedLocales: (schema.supportedLocales ?? []).filter((locale) => locale !== localeToRemove),
+    fields,
+    ...(pages === undefined ? {} : { pages })
+  };
+};
 
 export function collectTranslationSlots(schema: FormSchema, locale: string): readonly TranslationSlot[] {
   return translationSlots(schema, locale).map((descriptor) => descriptor.slot);
@@ -400,7 +629,7 @@ export async function populateSchemaTranslations(
   let result = schema;
 
   for (const locale of locales) {
-    const descriptors = translationSlots(schema, locale);
+    const descriptors = translationSlots(schema, locale, options);
     if (options.markStaleTranslations ?? true) {
       for (const descriptor of descriptors) {
         if (descriptor.slot.status === "stale" || descriptor.slot.status === "manual-stale")
@@ -410,16 +639,18 @@ export async function populateSchemaTranslations(
     const selected: SlotDescriptor[] = [];
     for (const descriptor of descriptors) {
       const status = descriptor.slot.status ?? "missing";
-      const manual = status === "manual" || status === "manual-stale";
+      const manual = descriptor.manual || status === "manual" || status === "manual-stale";
+      const requestedOverwrite = options.shouldOverwrite?.(descriptor.slot);
       const shouldTranslate =
-        options.shouldOverwrite?.(descriptor.slot) ??
-        ((!(options.preserveManualTranslations ?? true) || !manual) &&
-          (options.overwrite === "all" ||
-            (options.overwrite === "stale-and-missing" || options.overwrite === undefined
-              ? status === "missing" ||
-                status === "stale" ||
-                (!(options.preserveManualTranslations ?? true) && status === "manual-stale")
-              : status === "missing")));
+        (options.preserveManualTranslations ?? true) && manual
+          ? false
+          : (requestedOverwrite ??
+            (options.overwrite === "all" ||
+              (options.overwrite === "stale-and-missing" || options.overwrite === undefined
+                ? status === "missing" ||
+                  status === "stale" ||
+                  (!(options.preserveManualTranslations ?? true) && status === "manual-stale")
+                : status === "missing")));
       if (shouldTranslate) selected.push(descriptor);
       else {
         skippedSlots.push(descriptor.slot);

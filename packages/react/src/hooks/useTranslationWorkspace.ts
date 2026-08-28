@@ -4,10 +4,12 @@ import {
   collectTranslationSlots,
   computeSourceTextHash,
   type FormField,
+  type FormPolicy,
   type FormSchema,
   type JsonValue,
   type PopulateTranslationOptions,
   populateSchemaTranslations,
+  removeLocaleFromSchema,
   type TranslationAdapter,
   type TranslationReport,
   type TranslationSlot,
@@ -22,6 +24,16 @@ export interface UseTranslationWorkspaceOptions {
   readonly targetLocale?: string;
   readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
   readonly readOnly?: boolean;
+  readonly policy?: FormPolicy;
+  readonly validateLocale?: (locale: string, currentLocales: readonly string[]) => LocaleValidationResult;
+}
+
+export interface LocaleValidationResult {
+  readonly valid: boolean;
+  readonly error?: {
+    readonly type: "locale_not_allowed" | "max_locales_exceeded" | "invalid_locale_format";
+    readonly message: string;
+  };
 }
 
 export interface TranslationSummary {
@@ -40,7 +52,8 @@ export interface UseTranslationWorkspaceResult {
   readonly setTargetLocale: (locale: string) => void;
   readonly slots: readonly TranslationSlot[];
   readonly summary: TranslationSummary;
-  readonly addLocale: (locale: string) => void;
+  readonly addLocale: (locale: string) => { readonly success: boolean; readonly error?: string };
+  readonly isAddLocaleAllowed: (locale: string) => boolean;
   readonly removeLocale: (locale: string) => void;
   readonly setTranslation: (slot: TranslationSlot, text: string) => void;
   readonly translateAll: (options?: PopulateTranslationOptions) => Promise<TranslationReport>;
@@ -73,6 +86,47 @@ function asAsyncAdapter(adapter: TranslationAdapter | AsyncTranslationAdapter): 
         (text) => adapter.translate(text, locale, sourceLocale === undefined ? undefined : { sourceLocale }) ?? text
       )
   };
+}
+
+function validateLocaleByPolicy(
+  locale: string,
+  currentLocales: readonly string[],
+  policy: FormPolicy | undefined
+): LocaleValidationResult {
+  if (locale.length === 0) {
+    return {
+      valid: false,
+      error: { type: "invalid_locale_format", message: "Locale must not be empty." }
+    };
+  }
+  try {
+    Intl.getCanonicalLocales(locale);
+  } catch {
+    return {
+      valid: false,
+      error: { type: "invalid_locale_format", message: `Locale "${locale}" is not a valid BCP 47 locale.` }
+    };
+  }
+  if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(locale)) {
+    return {
+      valid: false,
+      error: { type: "locale_not_allowed", message: `Locale "${locale}" is not allowed by the form policy.` }
+    };
+  }
+  if (
+    policy?.maxLocales !== undefined &&
+    !currentLocales.includes(locale) &&
+    currentLocales.length >= policy.maxLocales
+  ) {
+    return {
+      valid: false,
+      error: {
+        type: "max_locales_exceeded",
+        message: `At most ${policy.maxLocales} locales are allowed by the form policy.`
+      }
+    };
+  }
+  return { valid: true };
 }
 
 function manualMetadata(sourceText: string, sourceLocale: string): Readonly<Record<string, JsonValue>> {
@@ -163,7 +217,9 @@ export function useTranslationWorkspace({
   sourceLocale = schema.defaultLocale ?? "en",
   targetLocale,
   translationAdapter,
-  readOnly = false
+  readOnly = false,
+  policy,
+  validateLocale
 }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult {
   const [draftSchema, setDraftSchema] = useState(schema);
   const [selectedLocale, setSelectedLocale] = useState(targetLocale ?? "");
@@ -215,24 +271,57 @@ export function useTranslationWorkspace({
     [commit, currentSchema, readOnly, sourceLocale]
   );
   const addLocale = useCallback(
-    (locale: string): void => {
-      if (readOnly || locale.trim().length === 0) return;
+    (locale: string): { readonly success: boolean; readonly error?: string } => {
+      if (readOnly) return { success: false, error: "Workspace is read-only." };
       const normalized = locale.trim();
+      const currentLocales = [
+        ...new Set([
+          ...(currentSchema.defaultLocale === undefined ? [] : [currentSchema.defaultLocale]),
+          sourceLocale,
+          ...collectSchemaLocales(currentSchema).allUniqueLocales
+        ])
+      ];
+      const validation =
+        validateLocale?.(normalized, currentLocales) ?? validateLocaleByPolicy(normalized, currentLocales, policy);
+      if (!validation.valid) return { success: false, error: validation.error?.message ?? "Locale is not valid." };
+      const alreadyRegistered =
+        normalized === sourceLocale ||
+        normalized === currentSchema.defaultLocale ||
+        (currentSchema.supportedLocales ?? []).includes(normalized);
+      if (alreadyRegistered) {
+        setSelectedLocale(normalized);
+        return { success: true };
+      }
       commit({
         ...currentSchema,
         supportedLocales: [...new Set([...(currentSchema.supportedLocales ?? []), normalized])]
       });
       setSelectedLocale(normalized);
+      return { success: true };
     },
-    [commit, currentSchema, readOnly]
+    [commit, currentSchema, policy, readOnly, sourceLocale, validateLocale]
+  );
+  const isAddLocaleAllowed = useCallback(
+    (locale: string): boolean => {
+      if (readOnly) return false;
+      const normalized = locale.trim();
+      const currentLocales = [
+        ...new Set([
+          ...(currentSchema.defaultLocale === undefined ? [] : [currentSchema.defaultLocale]),
+          sourceLocale,
+          ...collectSchemaLocales(currentSchema).allUniqueLocales
+        ])
+      ];
+      return (
+        validateLocale?.(normalized, currentLocales) ?? validateLocaleByPolicy(normalized, currentLocales, policy)
+      ).valid;
+    },
+    [currentSchema, policy, readOnly, sourceLocale, validateLocale]
   );
   const removeLocale = useCallback(
     (locale: string): void => {
-      if (readOnly || locale === sourceLocale) return;
-      commit({
-        ...currentSchema,
-        supportedLocales: (currentSchema.supportedLocales ?? []).filter((candidate) => candidate !== locale)
-      });
+      if (readOnly || locale === sourceLocale || locale === currentSchema.defaultLocale) return;
+      commit(removeLocaleFromSchema(currentSchema, locale));
       if (activeLocale === locale) setSelectedLocale("");
     },
     [activeLocale, commit, currentSchema, readOnly, sourceLocale]
@@ -293,6 +382,7 @@ export function useTranslationWorkspace({
     slots,
     summary,
     addLocale,
+    isAddLocaleAllowed,
     removeLocale,
     setTranslation,
     translateAll,
