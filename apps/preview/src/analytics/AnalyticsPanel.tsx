@@ -2,15 +2,15 @@ import {
   calculateCrossTabulation,
   calculateFieldVisibility,
   dispatchWebhook,
-  type FormAnalytics,
   type FormEvent,
   type FormSchema,
-  type FormSubmission,
   type QuestionAggregate,
   type SelectField
 } from "@form-engine-ts/core";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { ResetResponsesControl } from "../respondent/ResetResponsesControl";
+import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 
 function formatNumber(value: number | null): string {
   return value === null ? "—" : Number.isInteger(value) ? String(value) : value.toFixed(1);
@@ -110,23 +110,9 @@ function AnalyticsDetails({
   return null;
 }
 
-export interface AnalyticsPanelProps {
-  readonly analytics: FormAnalytics;
-  readonly schema: FormSchema;
-  readonly submissions: readonly FormSubmission[];
-  readonly locale: string;
-  readonly onExport: () => Promise<void>;
-  readonly resetControl: ReactNode;
-}
-
-export function AnalyticsPanel({
-  analytics,
-  schema,
-  submissions,
-  locale,
-  onExport,
-  resetControl
-}: AnalyticsPanelProps) {
+export function AnalyticsPanel() {
+  const { analytics, schema, submissions, locale, downloadCsv, storage, isClearing, resetResponses } =
+    usePreviewWorkspace();
   const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   const textFields = schema.fields.filter((field) => field.type === "text" || field.type === "textarea");
   const singleChoiceFields = schema.fields.filter(
@@ -174,10 +160,14 @@ export function AnalyticsPanel({
         </div>
       </div>
       <div className="dashboard-actions">
-        <button className="primary-action" type="button" onClick={() => void onExport()}>
+        <button className="primary-action" type="button" onClick={() => void downloadCsv()}>
           {t("preview.export")}
         </button>
-        {resetControl}
+        <ResetResponsesControl
+          locale={locale}
+          disabled={isClearing || storage.clearResponses === undefined}
+          onReset={resetResponses}
+        />
       </div>
       <section className="analytics-tool" aria-labelledby="cross-tab-heading">
         <h3 id="cross-tab-heading">{t("preview.crossTab")}</h3>

@@ -1,126 +1,44 @@
-import type { FormSchema, FormStorageAdapter } from "@form-engine-ts/core";
 import { MuiChoiceGroupSlot } from "@form-engine-ts/mui";
-import { FormRenderer, type FormRendererSlots, type FormSuccessRenderMode } from "@form-engine-ts/react";
+import { FormRenderer, type FormRendererSlots, useForm } from "@form-engine-ts/react";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
-import { useState } from "react";
+import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
+import { ResetResponsesControl } from "./ResetResponsesControl";
+import { useRespondentPreview } from "./RespondentPreviewContext";
+import { StorageSwitch } from "./StorageSwitch";
 
-export type StorageKind = "memory" | "local";
-export type ChoiceFieldLayout = "default" | "radio-grouped" | "all-grouped";
+export type { ChoiceFieldLayout } from "./RespondentPreviewContext";
 
 const previewMuiTheme = createTheme();
 
-function StorageSwitch({
-  value,
-  locale,
-  onChange
-}: {
-  readonly value: StorageKind;
-  readonly locale: string;
-  readonly onChange: (value: StorageKind) => void;
-}) {
-  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
-  return (
-    <fieldset className="storage-switch">
-      <legend>{t("preview.storage")}</legend>
-      <label>
-        <input type="radio" name="storage" checked={value === "memory"} onChange={() => onChange("memory")} />
-        {t("preview.memory")}
-      </label>
-      <label>
-        <input type="radio" name="storage" checked={value === "local"} onChange={() => onChange("local")} />
-        {t("preview.localStorage")}
-      </label>
-    </fieldset>
-  );
-}
+export type { ResetResponsesControlProps } from "./ResetResponsesControl";
+export { ResetResponsesControl } from "./ResetResponsesControl";
 
-export function ResetResponsesControl({
-  locale,
-  disabled,
-  onReset
-}: {
-  readonly locale: string;
-  readonly disabled: boolean;
-  readonly onReset: () => Promise<void>;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
-  if (!confirming) {
-    return (
-      <button className="danger-action" type="button" disabled={disabled} onClick={() => setConfirming(true)}>
-        {t("preview.resetResponses")}
-      </button>
-    );
-  }
-  return (
-    <fieldset className="reset-confirmation">
-      <legend>{t("preview.resetConfirmation")}</legend>
-      <button
-        className="danger-action"
-        type="button"
-        disabled={disabled}
-        onClick={async () => {
-          await onReset();
-          setConfirming(false);
-        }}
-      >
-        {t("preview.confirmReset")}
-      </button>
-      <button type="button" disabled={disabled} onClick={() => setConfirming(false)}>
-        {t("preview.cancel")}
-      </button>
-    </fieldset>
-  );
-}
-
-export interface RespondentPanelProps {
-  readonly schema: FormSchema;
-  readonly locale: string;
-  readonly storageKind: StorageKind;
-  readonly storage: FormStorageAdapter;
-  readonly isClearing: boolean;
-  readonly useCustomSlots: boolean;
-  readonly cancelNextSubmit: boolean;
-  readonly successRenderMode: FormSuccessRenderMode;
-  readonly simulateServerError: boolean;
-  readonly choiceFieldLayout: ChoiceFieldLayout;
-  readonly useMuiChoiceGroup: boolean;
-  readonly lifecycleStatus: string | null;
-  readonly onStorageKindChange: (value: StorageKind) => void;
-  readonly onResetResponses: () => Promise<void>;
-  readonly onUseCustomSlotsChange: (value: boolean) => void;
-  readonly onCancelNextSubmitChange: (value: boolean) => void;
-  readonly onSuccessRenderModeChange: (value: FormSuccessRenderMode) => void;
-  readonly onSimulateServerErrorChange: (value: boolean) => void;
-  readonly onChoiceFieldLayoutChange: (value: ChoiceFieldLayout) => void;
-  readonly onUseMuiChoiceGroupChange: (value: boolean) => void;
-  readonly onLifecycleStatusChange: (value: string) => void;
-}
-
-export function RespondentPanel({
-  schema,
-  locale,
-  storageKind,
-  storage,
-  isClearing,
-  useCustomSlots,
-  cancelNextSubmit,
-  successRenderMode,
-  simulateServerError,
-  choiceFieldLayout,
-  useMuiChoiceGroup,
-  lifecycleStatus,
-  onStorageKindChange,
-  onResetResponses,
-  onUseCustomSlotsChange,
-  onCancelNextSubmitChange,
-  onSuccessRenderModeChange,
-  onSimulateServerErrorChange,
-  onChoiceFieldLayoutChange,
-  onUseMuiChoiceGroupChange,
-  onLifecycleStatusChange
-}: RespondentPanelProps) {
+export function RespondentPanel() {
+  const { schema, locale } = useForm();
+  const {
+    storageKind,
+    storage,
+    isClearing,
+    simulateServerError,
+    setStorageKind,
+    resetResponses,
+    setSimulateServerError
+  } = usePreviewWorkspace();
+  const {
+    useCustomSlots,
+    cancelNextSubmit,
+    successRenderMode,
+    choiceFieldLayout,
+    useMuiChoiceGroup,
+    lifecycleStatus,
+    setUseCustomSlots,
+    setCancelNextSubmit,
+    setSuccessRenderMode,
+    setChoiceFieldLayout,
+    setUseMuiChoiceGroup,
+    setLifecycleStatus
+  } = useRespondentPreview();
   const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   const rendererSlots: FormRendererSlots | undefined = useCustomSlots
     ? {
@@ -206,8 +124,8 @@ export function RespondentPanel({
       autoSaveKey={`form-engine-preview-draft:${schema.id}:${schema.version}`}
       beforeSubmit={() => {
         if (!cancelNextSubmit) return "continue";
-        onCancelNextSubmitChange(false);
-        onLifecycleStatusChange("Submission cancelled; values and draft were preserved.");
+        setCancelNextSubmit(false);
+        setLifecycleStatus("Submission cancelled; values and draft were preserved.");
         return "cancel";
       }}
       {...(rendererSlots === undefined ? {} : { slots: rendererSlots })}
@@ -216,11 +134,11 @@ export function RespondentPanel({
 
   return (
     <section className="workspace-card respondent-card">
-      <StorageSwitch value={storageKind} locale={locale} onChange={onStorageKindChange} />
+      <StorageSwitch value={storageKind} locale={locale} onChange={setStorageKind} />
       <ResetResponsesControl
         locale={locale}
         disabled={isClearing || storage.clearResponses === undefined}
-        onReset={onResetResponses}
+        onReset={resetResponses}
       />
       <fieldset className="renderer-demo-controls">
         <legend>v2 Renderer lifecycle &amp; slots</legend>
@@ -228,7 +146,7 @@ export function RespondentPanel({
           <input
             type="checkbox"
             checked={useCustomSlots}
-            onChange={(event) => onUseCustomSlotsChange(event.currentTarget.checked)}
+            onChange={(event) => setUseCustomSlots(event.currentTarget.checked)}
           />
           Use custom UI slots
         </label>
@@ -236,7 +154,7 @@ export function RespondentPanel({
           <input
             type="checkbox"
             checked={cancelNextSubmit}
-            onChange={(event) => onCancelNextSubmitChange(event.currentTarget.checked)}
+            onChange={(event) => setCancelNextSubmit(event.currentTarget.checked)}
           />
           Cancel next submission in beforeSubmit
         </label>
@@ -244,7 +162,7 @@ export function RespondentPanel({
           <input
             type="checkbox"
             checked={successRenderMode === "replace"}
-            onChange={(event) => onSuccessRenderModeChange(event.currentTarget.checked ? "replace" : "append")}
+            onChange={(event) => setSuccessRenderMode(event.currentTarget.checked ? "replace" : "append")}
           />
           Replace form after successful submission
         </label>
@@ -252,7 +170,7 @@ export function RespondentPanel({
           <input
             type="checkbox"
             checked={simulateServerError}
-            onChange={(event) => onSimulateServerErrorChange(event.currentTarget.checked)}
+            onChange={(event) => setSimulateServerError(event.currentTarget.checked)}
           />
           Simulate server validation error on next submit
         </label>
@@ -264,7 +182,7 @@ export function RespondentPanel({
               name="choice-field-layout"
               value="default"
               checked={choiceFieldLayout === "default"}
-              onChange={() => onChoiceFieldLayoutChange("default")}
+              onChange={() => setChoiceFieldLayout("default")}
             />
             Flat choices
           </label>
@@ -274,7 +192,7 @@ export function RespondentPanel({
               name="choice-field-layout"
               value="radio-grouped"
               checked={choiceFieldLayout === "radio-grouped"}
-              onChange={() => onChoiceFieldLayoutChange("radio-grouped")}
+              onChange={() => setChoiceFieldLayout("radio-grouped")}
             />
             Radio only: Grouped
           </label>
@@ -284,7 +202,7 @@ export function RespondentPanel({
               name="choice-field-layout"
               value="all-grouped"
               checked={choiceFieldLayout === "all-grouped"}
-              onChange={() => onChoiceFieldLayoutChange("all-grouped")}
+              onChange={() => setChoiceFieldLayout("all-grouped")}
             />
             Radio, checkbox, and multi-select: Grouped
           </label>
@@ -292,7 +210,7 @@ export function RespondentPanel({
             <input
               type="checkbox"
               checked={useMuiChoiceGroup}
-              onChange={(event) => onUseMuiChoiceGroupChange(event.currentTarget.checked)}
+              onChange={(event) => setUseMuiChoiceGroup(event.currentTarget.checked)}
             />
             Use MUI Theme-linked ChoiceGroup
           </label>

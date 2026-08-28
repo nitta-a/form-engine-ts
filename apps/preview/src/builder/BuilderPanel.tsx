@@ -18,6 +18,8 @@ import {
 } from "@form-engine-ts/react";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
+import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
+import { useBuilderPreview } from "./BuilderPreviewContext";
 import { previewPolicy } from "./previewPolicy";
 
 function PreviewMuiButton({
@@ -287,53 +289,27 @@ function DomainApiDemo({ schema }: { readonly schema: FormSchema }) {
   );
 }
 
-export interface BuilderPanelProps {
-  readonly schema: FormSchema;
-  readonly locale: string;
-  readonly workspaceReady: boolean;
-  readonly translationOverwrite: "missing-only" | "all";
-  readonly translationReport: string | null;
-  readonly builderActionStatus: string | null;
-  readonly builderReadOnly: boolean;
-  readonly pagesEnabled: boolean;
-  readonly localizationEnabled: boolean;
-  readonly conditionsEnabled: boolean;
-  readonly useCustomBuilderUi: boolean;
-  readonly onChangeSchema: (schema: FormSchema) => void;
-  readonly onRunTranslationPolicy: () => Promise<void>;
-  readonly onTranslationOverwriteChange: (value: "missing-only" | "all") => void;
-  readonly onBuilderReadOnlyChange: (value: boolean) => void;
-  readonly onPagesEnabledChange: (value: boolean) => void;
-  readonly onLocalizationEnabledChange: (value: boolean) => void;
-  readonly onConditionsEnabledChange: (value: boolean) => void;
-  readonly onUseCustomBuilderUiChange: (value: boolean) => void;
-  readonly onTranslationReport: (message: string) => void;
-  readonly onBuilderActionStatus: (message: string) => void;
-}
-
-export function BuilderPanel({
-  schema,
-  locale,
-  workspaceReady,
-  translationOverwrite,
-  translationReport,
-  builderActionStatus,
-  builderReadOnly,
-  pagesEnabled,
-  localizationEnabled,
-  conditionsEnabled,
-  useCustomBuilderUi,
-  onChangeSchema,
-  onRunTranslationPolicy,
-  onTranslationOverwriteChange,
-  onBuilderReadOnlyChange,
-  onPagesEnabledChange,
-  onLocalizationEnabledChange,
-  onConditionsEnabledChange,
-  onUseCustomBuilderUiChange,
-  onTranslationReport,
-  onBuilderActionStatus
-}: BuilderPanelProps) {
+export function BuilderPanel() {
+  const { schema, locale, workspaceReady, changeSchema } = usePreviewWorkspace();
+  const {
+    translationOverwrite,
+    translationReport,
+    builderActionStatus,
+    builderReadOnly,
+    pagesEnabled,
+    localizationEnabled,
+    conditionsEnabled,
+    useCustomBuilderUi,
+    setTranslationOverwrite,
+    setBuilderReadOnly,
+    setPagesEnabled,
+    setLocalizationEnabled,
+    setConditionsEnabled,
+    setUseCustomBuilderUi,
+    setTranslationReport,
+    setBuilderActionStatus,
+    runTranslationPolicy
+  } = useBuilderPreview();
   return (
     <div className="builder-grid">
       <section className="workspace-card">
@@ -344,19 +320,19 @@ export function BuilderPanel({
             <select
               value={translationOverwrite}
               onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                onTranslationOverwriteChange(event.currentTarget.value as "missing-only" | "all")
+                setTranslationOverwrite(event.currentTarget.value as "missing-only" | "all")
               }
             >
               <option value="missing-only">missing-only</option>
               <option value="all">all</option>
             </select>
           </label>
-          <button type="button" disabled={!workspaceReady} onClick={() => void onRunTranslationPolicy()}>
+          <button type="button" disabled={!workspaceReady} onClick={() => void runTranslationPolicy()}>
             Run translation policy
           </button>
           {translationReport === null ? null : <output>{translationReport}</output>}
         </fieldset>
-        <HeadlessBuilderDemo schema={schema} onChange={onChangeSchema} />
+        <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
         <DomainApiDemo schema={schema} />
         <fieldset className="renderer-demo-controls">
           <legend>v2.4 MUI-compatible Builder components</legend>
@@ -364,7 +340,7 @@ export function BuilderPanel({
             <input
               type="checkbox"
               checked={builderReadOnly}
-              onChange={(event) => onBuilderReadOnlyChange(event.currentTarget.checked)}
+              onChange={(event) => setBuilderReadOnly(event.currentTarget.checked)}
             />
             Read-only builder
           </label>
@@ -372,7 +348,7 @@ export function BuilderPanel({
             <input
               type="checkbox"
               checked={pagesEnabled}
-              onChange={(event) => onPagesEnabledChange(event.currentTarget.checked)}
+              onChange={(event) => setPagesEnabled(event.currentTarget.checked)}
             />
             Pages feature
           </label>
@@ -380,7 +356,7 @@ export function BuilderPanel({
             <input
               type="checkbox"
               checked={localizationEnabled}
-              onChange={(event) => onLocalizationEnabledChange(event.currentTarget.checked)}
+              onChange={(event) => setLocalizationEnabled(event.currentTarget.checked)}
             />
             Localization feature
           </label>
@@ -388,7 +364,7 @@ export function BuilderPanel({
             <input
               type="checkbox"
               checked={conditionsEnabled}
-              onChange={(event) => onConditionsEnabledChange(event.currentTarget.checked)}
+              onChange={(event) => setConditionsEnabled(event.currentTarget.checked)}
             />
             Conditions feature
           </label>
@@ -396,7 +372,7 @@ export function BuilderPanel({
             <input
               type="checkbox"
               checked={useCustomBuilderUi}
-              onChange={(event) => onUseCustomBuilderUiChange(event.currentTarget.checked)}
+              onChange={(event) => setUseCustomBuilderUi(event.currentTarget.checked)}
             />
             Use custom Builder UI
           </label>
@@ -411,7 +387,7 @@ export function BuilderPanel({
           locale={locale}
           translator={mockTranslator}
           translationAdapter={mockAsyncTranslator}
-          onChange={onChangeSchema}
+          onChange={changeSchema}
           policy={previewPolicy}
           defaultFieldType="textarea"
           readOnly={builderReadOnly}
@@ -424,11 +400,11 @@ export function BuilderPanel({
             createMetadata: (slot) => ({ source: "visual-builder", property: slot.property })
           }}
           onTranslationReport={(report) =>
-            onTranslationReport(
+            setTranslationReport(
               `${report.updatedSlots.length} updated / ${report.skippedSlots.length} skipped (${translationOverwrite})`
             )
           }
-          onActionError={(error, context) => onBuilderActionStatus(`${context.action}: ${error.type}`)}
+          onActionError={(error, context) => setBuilderActionStatus(`${context.action}: ${error.type}`)}
           createManualTranslationMetadata={(context) => ({
             source: "preview-manual",
             isManual: true,

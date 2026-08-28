@@ -1,30 +1,15 @@
-import type { FormSchema } from "@form-engine-ts/core";
 import { MuiFormBuilder, muiDefaultFieldTypeIcon } from "@form-engine-ts/mui";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
+import { useBuilderPreview } from "./BuilderPreviewContext";
 import { previewPolicy } from "./previewPolicy";
 
 const muiPreviewTheme = createTheme();
 
-export interface MuiPanelProps {
-  readonly schema: FormSchema;
-  readonly locale: string;
-  readonly builderReadOnly: boolean;
-  readonly pagesEnabled: boolean;
-  readonly localizationEnabled: boolean;
-  readonly conditionsEnabled: boolean;
-  readonly onChangeSchema: (schema: FormSchema) => void;
-}
-
-export function MuiPanel({
-  schema,
-  locale,
-  builderReadOnly,
-  pagesEnabled,
-  localizationEnabled,
-  conditionsEnabled,
-  onChangeSchema
-}: MuiPanelProps) {
+export function MuiPanel() {
+  const { schema, locale, changeSchema } = usePreviewWorkspace();
+  const { builderReadOnly, pagesEnabled, localizationEnabled, conditionsEnabled } = useBuilderPreview();
   return (
     <section className="workspace-card">
       <h2>MUI Mode</h2>
@@ -34,7 +19,7 @@ export function MuiPanel({
           locale={locale}
           translator={mockTranslator}
           translationAdapter={mockAsyncTranslator}
-          onChange={onChangeSchema}
+          onChange={changeSchema}
           policy={previewPolicy}
           defaultFieldType="textarea"
           readOnly={builderReadOnly}
