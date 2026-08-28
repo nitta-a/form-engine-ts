@@ -80,8 +80,9 @@ single-slot or batch translation with stale/manual status handling. The MUI pack
 schema-driven pre-submit confirmation controls in the builder.
 
 `useTranslationWorkspace` validates added locales against `policy.allowedLocales` and `policy.maxLocales` and returns
-a structured `{ success, error }` result from `addLocale`. Use `validateLocale` for application-specific BCP 47 or
-tenant rules, and `isAddLocaleAllowed` to disable locale controls before submission. Removing a locale also clears its
+a structured `{ success, error }` result from `addLocale`. Built-in BCP 47, duplicate, and policy checks always run
+before the optional `validateLocale` callback, which receives the locale, default locale, current locales, and policy.
+Use `isAddLocaleAllowed` to disable locale controls before submission. Removing a locale also clears its
 localized values and metadata; the default locale remains protected.
 
 ## Headless builder and renderer lifecycle

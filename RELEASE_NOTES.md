@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v4.7.0 — 2026-08-29
+
+- Added `TranslationMigrationContext` to custom translation metadata migrators, including locale, JSON path, property, node kind, and node identifiers.
+- Added an extensible locale-validation pipeline with BCP 47 and duplicate checks before custom validation callbacks.
+- Expanded custom locale validators to receive the default locale, current locales, and active `FormPolicy`, with boolean, message, and structured results supported.
+- Aligned all public packages to version 4.7.0.
+
+See the [GitHub release for v4.7.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.7.0).
+
 ### v4.6.0 — 2026-08-29
 
 - Added legacy translation metadata detection, migration to canonical metadata, and customizable metadata normalization.
@@ -193,6 +202,15 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.7.0 — 2026-08-29
+
+- カスタム翻訳メタデータ移行関数に、ロケール、JSONパス、プロパティ、ノード種別、ノード識別子を含む`TranslationMigrationContext`を追加しました。
+- BCP 47形式と重複をカスタム検証関数より先に確認する、拡張可能なロケール検証パイプラインを追加しました。
+- カスタムロケール検証関数がデフォルトロケール、現在のロケール一覧、適用中の`FormPolicy`を受け取り、真偽値・メッセージ・構造化結果を返せるようにしました。
+- 公開パッケージのバージョンを4.7.0に統一しました。
+
+[v4.7.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.7.0)も参照してください。
 
 ### v4.6.0 — 2026-08-29
 

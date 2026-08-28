@@ -56,6 +56,34 @@ export interface LegacyTranslationMetadata {
   readonly [key: string]: unknown;
 }
 
+export interface TranslationMigrationContext {
+  /** Target locale code, for example "en" or "zh-Hans". */
+  readonly locale: string;
+  /** The schema's default locale. */
+  readonly defaultLocale: string;
+  /** JSON path of the translated property. */
+  readonly path: string;
+  /** Translated property name. */
+  readonly property: "title" | "description" | "label" | "completionMessage";
+  /** Kind of node that owns the translated property. */
+  readonly nodeKind: "form" | "page" | "field" | "option";
+  /** Identifier of the owning node. */
+  readonly nodeId?: string;
+  /** Identifier of the parent node, used for options. */
+  readonly parentId?: string;
+}
+
+export type TranslationMetadataMigrator = (
+  oldMeta: unknown,
+  sourceText: string,
+  context: TranslationMigrationContext
+) => CanonicalTranslationMetadata;
+
+export interface MigrateSchemaTranslationMetadataOptions {
+  /** Custom migration function used instead of the built-in legacy normalizer. */
+  readonly migrator?: TranslationMetadataMigrator;
+}
+
 export const isManualTranslationMetadata = (
   metadata?: LegacyTranslationMetadata | CanonicalTranslationMetadata
 ): boolean => {
@@ -420,16 +448,14 @@ function removeLocalizedNodeLocale<T extends ExtensibleNode & { readonly transla
   } as T;
 }
 
-function migrateMetadata(
+function defaultTranslationMetadataMigrator(
   metadata: unknown,
   sourceText: string,
-  defaultLocale: string | undefined,
-  customMigrator: ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata) | undefined
+  defaultLocale: string
 ): CanonicalTranslationMetadata {
-  if (customMigrator !== undefined) return customMigrator(metadata, sourceText);
   const record =
     metadata !== null && typeof metadata === "object" ? (metadata as Readonly<Record<string, unknown>>) : undefined;
-  const sourceLocale = typeof record?.sourceLocale === "string" ? record.sourceLocale : (defaultLocale ?? "");
+  const sourceLocale = typeof record?.sourceLocale === "string" ? record.sourceLocale : defaultLocale;
   const translationSource = isManualTranslationMetadata(record) ? "manual" : "automatic";
   return {
     sourceLocale,
@@ -440,21 +466,39 @@ function migrateMetadata(
   };
 }
 
+function migrateMetadata(
+  metadata: unknown,
+  sourceText: string,
+  context: TranslationMigrationContext,
+  migrator: TranslationMetadataMigrator
+): CanonicalTranslationMetadata {
+  return migrator(metadata, sourceText, context);
+}
+
+type TranslationMetadataProperty = TranslationMigrationContext["property"];
+
+function isTranslationMetadataProperty(property: string): property is TranslationMetadataProperty {
+  return property === "title" || property === "description" || property === "label" || property === "completionMessage";
+}
+
 function migrateNodeMetadata<T extends ExtensibleNode>(
   node: T,
   sourceTexts: Readonly<Record<string, string>>,
-  defaultLocale: string | undefined,
-  customMigrator: ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata) | undefined
+  contextFor: (locale: string, property: TranslationMetadataProperty) => TranslationMigrationContext,
+  migrator: TranslationMetadataMigrator
 ): T {
   if (node.translationMetadata === undefined) return node;
   const translationMetadata = Object.fromEntries(
     Object.entries(node.translationMetadata).map(([locale, properties]) => [
       locale,
       Object.fromEntries(
-        Object.entries(properties).map(([property, metadata]) => [
-          property,
-          migrateMetadata(metadata, sourceTexts[property] ?? "", defaultLocale, customMigrator)
-        ])
+        Object.entries(properties).map(([property, metadata]) => {
+          if (!isTranslationMetadataProperty(property)) return [property, metadata];
+          return [
+            property,
+            migrateMetadata(metadata, sourceTexts[property] ?? "", contextFor(locale, property), migrator)
+          ];
+        })
       )
     ])
   );
@@ -463,8 +507,18 @@ function migrateNodeMetadata<T extends ExtensibleNode>(
 
 export const migrateSchemaTranslationMetadata = (
   schema: FormSchema,
-  customMigrator?: (oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata
+  migratorOrOptions?:
+    | ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata)
+    | TranslationMetadataMigrator
+    | MigrateSchemaTranslationMetadataOptions
 ): FormSchema => {
+  const defaultLocale = schema.defaultLocale ?? "";
+  const migrator: TranslationMetadataMigrator =
+    typeof migratorOrOptions === "function"
+      ? migratorOrOptions
+      : (migratorOrOptions?.migrator ??
+        ((metadata, sourceText, context) =>
+          defaultTranslationMetadataMigrator(metadata, sourceText, context.defaultLocale)));
   const migratedSchema = migrateNodeMetadata(
     schema,
     {
@@ -472,21 +526,47 @@ export const migrateSchemaTranslationMetadata = (
       ...(schema.description === undefined ? {} : { description: schema.description }),
       ...(schema.completionMessage === undefined ? {} : { completionMessage: schema.completionMessage })
     },
-    schema.defaultLocale,
-    customMigrator
+    (locale, property) => ({
+      locale,
+      defaultLocale,
+      path: property,
+      property,
+      nodeKind: "form"
+    }),
+    migrator
   );
   const fields = schema.fields.map((field) => {
     const migratedField = migrateNodeMetadata(
       field,
       { title: field.title, ...(field.description === undefined ? {} : { description: field.description }) },
-      schema.defaultLocale,
-      customMigrator
+      (locale, property) => ({
+        locale,
+        defaultLocale,
+        path: `fields.${field.id}.${property}`,
+        property,
+        nodeKind: "field",
+        nodeId: field.id
+      }),
+      migrator
     );
     if (!("options" in migratedField)) return migratedField;
     return {
       ...migratedField,
       options: migratedField.options.map((option) =>
-        migrateNodeMetadata(option, { label: option.label }, schema.defaultLocale, customMigrator)
+        migrateNodeMetadata(
+          option,
+          { label: option.label },
+          (locale, property) => ({
+            locale,
+            defaultLocale,
+            path: `fields.${field.id}.options.${option.id}.${property}`,
+            property,
+            nodeKind: "option",
+            nodeId: option.id,
+            parentId: field.id
+          }),
+          migrator
+        )
       )
     } as FormField;
   });
@@ -497,8 +577,15 @@ export const migrateSchemaTranslationMetadata = (
         ...(page.title === undefined ? {} : { title: page.title }),
         ...(page.description === undefined ? {} : { description: page.description })
       },
-      schema.defaultLocale,
-      customMigrator
+      (locale, property) => ({
+        locale,
+        defaultLocale,
+        path: `pages.${page.id}.${property}`,
+        property,
+        nodeKind: "page",
+        nodeId: page.id
+      }),
+      migrator
     )
   );
   return {

@@ -63,7 +63,9 @@ and missing, translated, stale, or manual states for authoring tools. `populateS
 and missing entries while preserving manual translations and reports skipped reasons.
 
 Legacy translation metadata can be recognized with `isManualTranslationMetadata` and migrated with
-`migrateSchemaTranslationMetadata`; pass a custom migrator when legacy fields need application-specific conversion.
+`migrateSchemaTranslationMetadata`; pass a custom migrator (directly or as `{ migrator }`) when legacy fields need
+application-specific conversion. The migrator receives `TranslationMigrationContext` with the locale, JSON path,
+property, node kind, and node identifiers.
 `PopulateTranslationsOptions` is a compatibility alias for `PopulateTranslationOptions`, which also accepts custom
 manual-translation detection and metadata normalization callbacks. `removeLocaleFromSchema(schema, locale)` removes
 the locale from registrations and all form, page, field, option translation values and metadata; the default locale

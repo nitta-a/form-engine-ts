@@ -129,7 +129,8 @@ function compareSignatures(name, previous, current, previousFile, currentFile) {
     const newType = newParameter.type === undefined ? "unknown" : compactText(newParameter.type, currentFile);
     if (
       (oldType !== newType &&
-        !isAdditiveObjectParameter(oldParameter.type, newParameter.type, previousFile, currentFile)) ||
+        !isAdditiveObjectParameter(oldParameter.type, newParameter.type, previousFile, currentFile) &&
+        !isWidenedType(oldParameter.type, newParameter.type, previousFile, currentFile)) ||
       (oldParameter.dotDotDotToken !== undefined) !== (newParameter.dotDotDotToken !== undefined)
     ) {
       changes.push(`${name}: parameter ${index + 1} changed from ${oldType} to ${newType}`);
@@ -166,6 +167,30 @@ function isWidenedType(previousType, currentType, previousFile, currentFile) {
   return [...previousParts].every((part) => currentParts.has(part));
 }
 
+function isAdditiveObjectType(previousType, currentType, previousFile, currentFile) {
+  const previousMembers = resolveObjectMembers(previousType, previousFile);
+  const currentMembers = resolveObjectMembers(currentType, currentFile);
+  if (previousMembers === undefined || currentMembers === undefined) return false;
+  const currentByName = new Map(
+    currentMembers
+      .filter((member) => member.name !== undefined)
+      .map((member) => [compactText(member.name, currentFile), member])
+  );
+  return previousMembers.every((member) => {
+    if (member.name === undefined) return false;
+    const currentMember = currentByName.get(compactText(member.name, previousFile));
+    if (currentMember === undefined || (isOptional(member) && !isOptional(currentMember))) return false;
+    if (member.type === undefined || currentMember.type === undefined) {
+      return compactText(member, previousFile) === compactText(currentMember, currentFile);
+    }
+    return (
+      compactText(member.type, previousFile) === compactText(currentMember.type, currentFile) ||
+      isWidenedType(member.type, currentMember.type, previousFile, currentFile) ||
+      isAdditiveObjectType(member.type, currentMember.type, previousFile, currentFile)
+    );
+  });
+}
+
 function compareMembers(name, previous, current, previousFile, currentFile, currentDeclaration) {
   const changes = [];
   const oldMembers = new Map(previous.members.map((member, index) => [memberKey(member, previousFile, index), member]));
@@ -195,7 +220,11 @@ function compareMembers(name, previous, current, previousFile, currentFile, curr
           newMember.type === undefined
             ? "unknown"
             : normalizeTypeWithDefaultParameters(newMember.type, currentFile, currentDeclaration);
-        if (oldType !== newType && !isWidenedType(oldMember.type, newMember.type, previousFile, currentFile)) {
+        if (
+          oldType !== newType &&
+          !isWidenedType(oldMember.type, newMember.type, previousFile, currentFile) &&
+          !isAdditiveObjectType(oldMember.type, newMember.type, previousFile, currentFile)
+        ) {
           changes.push(`${name}.${key}: type changed from ${oldType} to ${newType}`);
         }
       }
@@ -217,13 +246,34 @@ function compareMembers(name, previous, current, previousFile, currentFile, curr
 }
 
 function unionParts(node, sourceFile) {
-  return ts.isUnionTypeNode(node)
-    ? new Set(node.types.map((part) => compactText(part, sourceFile)))
-    : new Set([compactText(node, sourceFile)]);
+  let unwrapped = node;
+  while (ts.isParenthesizedTypeNode(unwrapped)) unwrapped = unwrapped.type;
+  return ts.isUnionTypeNode(unwrapped)
+    ? new Set(
+        unwrapped.types.map((part) => {
+          let normalized = part;
+          while (ts.isParenthesizedTypeNode(normalized)) normalized = normalized.type;
+          return compactText(normalized, sourceFile);
+        })
+      )
+    : new Set([compactText(unwrapped, sourceFile)]);
 }
 
 function compareDeclaration(name, previous, current, previousFile, currentFile) {
   if (previous.kind !== current.kind) return [`${name}: declaration kind changed`];
+  if (ts.isVariableDeclaration(previous) && ts.isVariableDeclaration(current)) {
+    if (
+      previous.type !== undefined &&
+      current.type !== undefined &&
+      ts.isFunctionTypeNode(previous.type) &&
+      ts.isFunctionTypeNode(current.type)
+    ) {
+      return compareSignatures(name, previous.type, current.type, previousFile, currentFile);
+    }
+    return compactText(previous, previousFile) === compactText(current, currentFile)
+      ? []
+      : [`${name}: declaration changed`];
+  }
   if (ts.isInterfaceDeclaration(previous) && ts.isInterfaceDeclaration(current)) {
     const oldBases = previous.heritageClauses?.map((clause) => compactText(clause, previousFile)).join("|") ?? "";
     const newBases = current.heritageClauses?.map((clause) => compactText(clause, currentFile)).join("|") ?? "";

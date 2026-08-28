@@ -25,13 +25,33 @@ export interface UseTranslationWorkspaceOptions {
   readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
   readonly readOnly?: boolean;
   readonly policy?: FormPolicy;
-  readonly validateLocale?: (locale: string, currentLocales: readonly string[]) => LocaleValidationResult;
+  readonly validateLocale?:
+    | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
+    | CustomLocaleValidator;
 }
+
+export interface LocaleValidationContext {
+  readonly locale: string;
+  readonly defaultLocale: string;
+  readonly currentLocales: readonly string[];
+  readonly policy?: FormPolicy;
+}
+
+export type CustomLocaleValidator = (
+  locale: string,
+  context: LocaleValidationContext
+  // biome-ignore lint/suspicious/noConfusingVoidType: Validators may intentionally return void.
+) => LocaleValidationResult | boolean | string | undefined | void;
 
 export interface LocaleValidationResult {
   readonly valid: boolean;
   readonly error?: {
-    readonly type: "locale_not_allowed" | "max_locales_exceeded" | "invalid_locale_format";
+    readonly type:
+      | "locale_not_allowed"
+      | "max_locales_exceeded"
+      | "invalid_locale_format"
+      | "locale_already_exists"
+      | "custom_validation_failed";
     readonly message: string;
   };
 }
@@ -88,45 +108,107 @@ function asAsyncAdapter(adapter: TranslationAdapter | AsyncTranslationAdapter): 
   };
 }
 
-function validateLocaleByPolicy(
-  locale: string,
-  currentLocales: readonly string[],
-  policy: FormPolicy | undefined
-): LocaleValidationResult {
-  if (locale.length === 0) {
-    return {
-      valid: false,
-      error: { type: "invalid_locale_format", message: "Locale must not be empty." }
-    };
-  }
+function isValidBcp47Locale(locale: string): boolean {
+  const language = locale.split("-")[0];
+  if (language === undefined || !/^[a-z]{2,3}$/iu.test(language)) return false;
   try {
     Intl.getCanonicalLocales(locale);
+    return true;
   } catch {
+    return false;
+  }
+}
+
+export const validateLocalePipeline = (
+  locale: string,
+  schema: FormSchema,
+  policy?: FormPolicy,
+  customValidator?:
+    | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
+    | CustomLocaleValidator
+): LocaleValidationResult => {
+  const currentLocales = schema.supportedLocales ?? [];
+  const defaultLocale = schema.defaultLocale ?? "";
+
+  if (!isValidBcp47Locale(locale)) {
     return {
       valid: false,
-      error: { type: "invalid_locale_format", message: `Locale "${locale}" is not a valid BCP 47 locale.` }
+      error: {
+        type: "invalid_locale_format",
+        message: `Invalid BCP 47 locale format: "${locale}"`
+      }
     };
   }
+
+  if (locale === defaultLocale || currentLocales.includes(locale)) {
+    return {
+      valid: false,
+      error: {
+        type: "locale_already_exists",
+        message: `Locale "${locale}" is already registered.`
+      }
+    };
+  }
+
   if (policy?.allowedLocales !== undefined && !policy.allowedLocales.includes(locale)) {
     return {
       valid: false,
-      error: { type: "locale_not_allowed", message: `Locale "${locale}" is not allowed by the form policy.` }
+      error: {
+        type: "locale_not_allowed",
+        message: `Locale "${locale}" is not allowed by policy.`
+      }
     };
   }
-  if (
-    policy?.maxLocales !== undefined &&
-    !currentLocales.includes(locale) &&
-    currentLocales.length >= policy.maxLocales
-  ) {
+
+  const totalLocalesCount = 1 + currentLocales.length;
+  if (policy?.maxLocales !== undefined && totalLocalesCount >= policy.maxLocales) {
     return {
       valid: false,
       error: {
         type: "max_locales_exceeded",
-        message: `At most ${policy.maxLocales} locales are allowed by the form policy.`
+        message: `Cannot add locale: maximum allowed locales limit (${policy.maxLocales}) reached.`
       }
     };
   }
+
+  if (customValidator !== undefined) {
+    const customContext =
+      policy === undefined
+        ? Object.assign([...currentLocales], { locale, defaultLocale, currentLocales })
+        : Object.assign([...currentLocales], { locale, defaultLocale, currentLocales, policy });
+    const customResult = customValidator(locale, customContext);
+    if (customResult === false) {
+      return {
+        valid: false,
+        error: {
+          type: "custom_validation_failed",
+          message: `Custom validation rejected locale "${locale}".`
+        }
+      };
+    }
+    if (typeof customResult === "string") {
+      return {
+        valid: false,
+        error: { type: "custom_validation_failed", message: customResult }
+      };
+    }
+    if (typeof customResult === "object" && customResult !== null && !customResult.valid) return customResult;
+  }
+
   return { valid: true };
+};
+
+function workspaceLocaleValidationMessage(validation: LocaleValidationResult): string {
+  if (validation.error?.type === "locale_not_allowed") {
+    return validation.error.message.replace(" is not allowed by policy.", " is not allowed by the form policy.");
+  }
+  if (validation.error?.type === "max_locales_exceeded") {
+    const maximum = validation.error.message.match(/\((\d+)\)/u)?.[1];
+    return maximum === undefined
+      ? validation.error.message
+      : `At most ${maximum} locales are allowed by the form policy.`;
+  }
+  return validation.error?.message ?? "Locale is not valid.";
 }
 
 function manualMetadata(sourceText: string, sourceLocale: string): Readonly<Record<string, JsonValue>> {
@@ -274,24 +356,8 @@ export function useTranslationWorkspace({
     (locale: string): { readonly success: boolean; readonly error?: string } => {
       if (readOnly) return { success: false, error: "Workspace is read-only." };
       const normalized = locale.trim();
-      const currentLocales = [
-        ...new Set([
-          ...(currentSchema.defaultLocale === undefined ? [] : [currentSchema.defaultLocale]),
-          sourceLocale,
-          ...collectSchemaLocales(currentSchema).allUniqueLocales
-        ])
-      ];
-      const validation =
-        validateLocale?.(normalized, currentLocales) ?? validateLocaleByPolicy(normalized, currentLocales, policy);
-      if (!validation.valid) return { success: false, error: validation.error?.message ?? "Locale is not valid." };
-      const alreadyRegistered =
-        normalized === sourceLocale ||
-        normalized === currentSchema.defaultLocale ||
-        (currentSchema.supportedLocales ?? []).includes(normalized);
-      if (alreadyRegistered) {
-        setSelectedLocale(normalized);
-        return { success: true };
-      }
+      const validation = validateLocalePipeline(normalized, currentSchema, policy, validateLocale);
+      if (!validation.valid) return { success: false, error: workspaceLocaleValidationMessage(validation) };
       commit({
         ...currentSchema,
         supportedLocales: [...new Set([...(currentSchema.supportedLocales ?? []), normalized])]
@@ -299,24 +365,15 @@ export function useTranslationWorkspace({
       setSelectedLocale(normalized);
       return { success: true };
     },
-    [commit, currentSchema, policy, readOnly, sourceLocale, validateLocale]
+    [commit, currentSchema, policy, readOnly, validateLocale]
   );
   const isAddLocaleAllowed = useCallback(
     (locale: string): boolean => {
       if (readOnly) return false;
       const normalized = locale.trim();
-      const currentLocales = [
-        ...new Set([
-          ...(currentSchema.defaultLocale === undefined ? [] : [currentSchema.defaultLocale]),
-          sourceLocale,
-          ...collectSchemaLocales(currentSchema).allUniqueLocales
-        ])
-      ];
-      return (
-        validateLocale?.(normalized, currentLocales) ?? validateLocaleByPolicy(normalized, currentLocales, policy)
-      ).valid;
+      return validateLocalePipeline(normalized, currentSchema, policy, validateLocale).valid;
     },
-    [currentSchema, policy, readOnly, sourceLocale, validateLocale]
+    [currentSchema, policy, readOnly, validateLocale]
   );
   const removeLocale = useCallback(
     (locale: string): void => {
