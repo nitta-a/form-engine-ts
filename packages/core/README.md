@@ -53,6 +53,15 @@ safe maximum-length corrections while purging unregistered locale content. Pass
 `{ policy: { allowedLocales, maxLocales } }` to `populateSchemaTranslations` to reject inadmissible targets before the
 translation adapter runs.
 
+Fields can use a `displayRule` with nested `all`/`any` condition groups and `show` or `hide` actions. Supported
+operators include equality, containment, emptiness, and numeric comparisons; the legacy `displayCondition` and
+`not_empty` forms remain supported. `submissionSettings` can enable pre-submit confirmation and select its
+`dialog`, `inline`, or `replace` presentation.
+
+`collectTranslationSlots`, `computeSourceTextHash`, and `getTranslationStatus` expose canonical translation targets
+and missing, translated, stale, or manual states for authoring tools. `populateSchemaTranslations` can populate stale
+and missing entries while preserving manual translations and reports skipped reasons.
+
 The React builder uses canonical keys with legacy aliases when resolving UI translations:
 
 | Canonical key | Legacy alias |

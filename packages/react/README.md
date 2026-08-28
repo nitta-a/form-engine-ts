@@ -73,6 +73,12 @@ on the next mount:
 membership controls and localization editors; pass an `AsyncTranslationAdapter` as `translationAdapter` to enable its
 batch-translation action.
 
+`useTranslationWorkspace` exposes locale management, translation slots, completion summaries, manual editing, and
+single-slot or batch translation with stale/manual status handling. The MUI package exports a ready-made
+`TranslationWorkspace` surface. For large forms, set `fieldEditorMode="single"` and use `activeFieldId` or the hook's
+`setActiveFieldId` to keep one field editor open at a time. Set `submissionSettingsOptions={{ enabled: true }}` to expose
+schema-driven pre-submit confirmation controls in the builder.
+
 ## Headless builder and renderer lifecycle
 
 `useFormBuilder({ schema, onChange, policy, idFactory, factories })` exposes controlled field, option, page, condition,

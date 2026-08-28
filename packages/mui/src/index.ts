@@ -6,3 +6,4 @@ export * from "./icons";
 export * from "./MuiFormBuilder";
 export * from "./slots";
 export * from "./types";
+export * from "./workspace/TranslationWorkspace";

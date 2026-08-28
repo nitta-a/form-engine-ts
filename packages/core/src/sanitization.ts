@@ -1,4 +1,12 @@
-import type { ExtensibleNode, FieldOption, FormField, FormPage, FormPolicy, FormSchema } from "./types";
+import type {
+  DisplayConditionGroup,
+  ExtensibleNode,
+  FieldOption,
+  FormField,
+  FormPage,
+  FormPolicy,
+  FormSchema
+} from "./types";
 
 export interface SanitizeSchemaOptions {
   readonly policy?: FormPolicy;
@@ -16,6 +24,21 @@ export interface SchemaStructureIssue {
   readonly questionId: string;
   readonly choiceId?: string;
   readonly message: string;
+  readonly cycle?: readonly string[];
+}
+
+function displayRuleSourceIds(field: FormField): readonly string[] {
+  if (field.displayRule === undefined)
+    return field.displayCondition?.questionId === undefined ? [] : [field.displayCondition.questionId];
+  const ids: string[] = [];
+  const visit = (group: DisplayConditionGroup): void => {
+    for (const condition of group.conditions) {
+      if ("logic" in condition) visit(condition);
+      else ids.push(condition.fieldId);
+    }
+  };
+  visit(field.displayRule.condition);
+  return ids;
 }
 
 function registeredEntries<T>(
@@ -99,27 +122,28 @@ function cyclicQuestionIds(fields: readonly FormField[]): ReadonlySet<string> {
     if (!firstById.has(field.id)) firstById.set(field.id, field);
   }
   const cyclic = new Set<string>();
-  const resolved = new Set<string>();
-
-  for (const startId of firstById.keys()) {
-    if (resolved.has(startId)) continue;
-    const path: string[] = [];
-    const pathIndex = new Map<string, number>();
-    let currentId: string | undefined = startId;
-    while (currentId !== undefined && firstById.has(currentId) && !resolved.has(currentId)) {
-      const existingIndex = pathIndex.get(currentId);
-      if (existingIndex !== undefined) {
-        for (const id of path.slice(existingIndex)) cyclic.add(id);
-        break;
-      }
-      pathIndex.set(currentId, path.length);
-      path.push(currentId);
-      const field = firstById.get(currentId);
-      const sourceId = field?.displayCondition?.questionId;
-      currentId = sourceId === currentId ? undefined : sourceId;
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const path: string[] = [];
+  const visit = (id: string): void => {
+    if (visiting.has(id)) {
+      const start = path.indexOf(id);
+      for (const member of path.slice(start < 0 ? 0 : start)) cyclic.add(member);
+      return;
     }
-    for (const id of path) resolved.add(id);
-  }
+    if (visited.has(id)) return;
+    visiting.add(id);
+    path.push(id);
+    const field = firstById.get(id);
+    if (field === undefined) return;
+    for (const sourceId of displayRuleSourceIds(field)) {
+      if (sourceId !== id && firstById.has(sourceId)) visit(sourceId);
+    }
+    path.pop();
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of firstById.keys()) visit(id);
   return cyclic;
 }
 
@@ -154,20 +178,20 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
   }
 
   for (const field of schema.fields) {
-    const sourceId = field.displayCondition?.questionId;
-    if (sourceId === undefined) continue;
-    if (sourceId === field.id) {
-      issues.push({
-        type: "self_condition_reference",
-        questionId: field.id,
-        message: `Question "${field.id}" cannot depend on itself.`
-      });
-    } else if (!questionIds.has(sourceId)) {
-      issues.push({
-        type: "dangling_condition_reference",
-        questionId: field.id,
-        message: `Question "${field.id}" references missing question "${sourceId}".`
-      });
+    for (const sourceId of displayRuleSourceIds(field)) {
+      if (sourceId === field.id) {
+        issues.push({
+          type: "self_condition_reference",
+          questionId: field.id,
+          message: `Question "${field.id}" cannot depend on itself.`
+        });
+      } else if (!questionIds.has(sourceId)) {
+        issues.push({
+          type: "dangling_condition_reference",
+          questionId: field.id,
+          message: `Question "${field.id}" references missing question "${sourceId}".`
+        });
+      }
     }
   }
 
@@ -177,6 +201,13 @@ export function validateSchemaStructure(schema: FormSchema): SchemaStructureIssu
     issues.push({
       type: "cyclic_condition_reference",
       questionId: field.id,
+      cycle: [
+        field.id,
+        ...displayRuleSourceIds(field)
+          .filter((sourceId) => cyclic.has(sourceId))
+          .slice(0, 1),
+        field.id
+      ],
       message: `Question "${field.id}" participates in a display-condition cycle.`
     });
   }
@@ -192,15 +223,25 @@ export function sanitizeSchema(schema: FormSchema, options: SanitizeSchemaOption
   const cyclic = cyclicQuestionIds(schema.fields);
   const sanitizedFields = schema.fields.map((sourceField) => {
     const field = sanitizeFieldConstraints(sanitizeFieldLocales(sourceField, registeredLocales), options.policy);
-    const sourceId = field.displayCondition?.questionId;
+    let sanitized = field;
+    const ruleSources = displayRuleSourceIds(field);
     if (
-      sourceId === undefined ||
-      (existingQuestionIds.has(sourceId) && sourceId !== field.id && !cyclic.has(field.id))
+      field.displayRule !== undefined &&
+      (cyclic.has(field.id) ||
+        ruleSources.some((sourceId) => sourceId === field.id || !existingQuestionIds.has(sourceId)))
     ) {
-      return field;
+      const { displayRule: _displayRule, ...withoutRule } = sanitized;
+      sanitized = withoutRule as FormField;
     }
-    const { displayCondition: _displayCondition, ...sanitized } = field;
-    return sanitized as FormField;
+    const sourceId = sanitized.displayCondition?.questionId;
+    if (
+      sourceId !== undefined &&
+      (!existingQuestionIds.has(sourceId) || sourceId === sanitized.id || cyclic.has(sanitized.id))
+    ) {
+      const { displayCondition: _displayCondition, ...withoutCondition } = sanitized;
+      return withoutCondition as FormField;
+    }
+    return sanitized;
   });
   const localizedSchema = sanitizeNodeLocales(schema, registeredLocales);
   const { translations: _translations, ...schemaWithoutLocaleContent } = localizedSchema;

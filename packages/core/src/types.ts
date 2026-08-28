@@ -47,7 +47,17 @@ export interface FormPolicy {
   readonly fieldConstraints?: Partial<Record<QuestionType, FieldConstraintRule>>;
 }
 
-export type ConditionOperator = "equals" | "not_equals" | "contains" | "not_empty";
+export type ConditionOperator =
+  | "equals"
+  | "not_equals"
+  | "contains"
+  | "not_contains"
+  | "is_empty"
+  | "is_not_empty"
+  | "greater_than"
+  | "less_than"
+  /** @deprecated Use is_not_empty instead. */
+  | "not_empty";
 export type ConditionValue = string | number | boolean;
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
@@ -65,6 +75,22 @@ export interface DisplayCondition {
   readonly questionId: string;
   readonly operator: ConditionOperator;
   readonly value?: ConditionValue;
+}
+
+export interface FieldDisplayCondition {
+  readonly fieldId: string;
+  readonly operator: ConditionOperator;
+  readonly value?: unknown;
+}
+
+export interface DisplayConditionGroup {
+  readonly logic: "all" | "any";
+  readonly conditions: readonly (FieldDisplayCondition | DisplayConditionGroup)[];
+}
+
+export interface DisplayRule {
+  readonly action: "show" | "hide";
+  readonly condition: DisplayConditionGroup;
 }
 
 export interface LocalizedText {
@@ -104,6 +130,7 @@ export interface BaseField extends ExtensibleNode {
   readonly required: boolean;
   readonly messages?: Partial<Record<ValidationCode, string>>;
   readonly displayCondition?: DisplayCondition;
+  readonly displayRule?: DisplayRule;
   readonly translations?: SchemaTranslations;
 }
 
@@ -168,6 +195,14 @@ export interface FormSchema extends ExtensibleNode {
   readonly translations?: SchemaTranslations;
   readonly fields: readonly FormField[];
   readonly pages?: readonly FormPage[];
+  readonly submissionSettings?: FormSubmissionSettings;
+}
+
+export interface FormSubmissionSettings extends ExtensibleNode {
+  readonly showConfirmationBeforeSubmit?: boolean;
+  readonly confirmationRenderMode?: "dialog" | "inline" | "replace";
+  readonly confirmButtonLabel?: string;
+  readonly cancelButtonLabel?: string;
 }
 
 export type FormValue = string | number | boolean | readonly string[] | undefined;
@@ -183,6 +218,7 @@ export interface SchemaIssue {
   readonly fieldId?: string;
   readonly property?: string;
   readonly expected?: boolean | number | readonly [number, number];
+  readonly cycle?: readonly string[];
 }
 
 export type SchemaValidationResult =

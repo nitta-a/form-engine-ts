@@ -1,4 +1,4 @@
-import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, Question, FieldOption, TranslationReport, ValidationIssue, ValidationError, FormValues, TranslationAdapter, AsyncTranslationAdapter, PopulateTranslationOptions, FormValue, AnswerValidationResult, FieldType } from '@form-engine-ts/core';
+import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, Question, FieldOption, TranslationReport, ValidationIssue, ValidationError, FormValues, TranslationAdapter, AsyncTranslationAdapter, PopulateTranslationOptions, FormValue, AnswerValidationResult, TranslationSlot, FieldType } from '@form-engine-ts/core';
 export { QuestionType } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
@@ -37,7 +37,13 @@ interface FormBuilderOptions {
     readonly policy?: FormPolicy;
     readonly idFactory?: (kind: BuilderIdKind, existingIds: ReadonlySet<string>) => string;
     readonly factories?: BuilderFactories;
+    readonly fieldEditorMode?: FieldEditorMode;
+    readonly activeFieldId?: string;
+    readonly defaultActiveFieldId?: string;
+    readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
 }
+type FieldEditorMode = "all" | "single";
+type UseFormBuilderOptions = FormBuilderOptions;
 type BuilderActionError = {
     readonly type: "invalid_id";
     readonly kind: BuilderIdKind;
@@ -104,8 +110,19 @@ interface FormBuilderResult {
     readonly addLocale: (locale: string) => BuilderActionResult;
     readonly setDefaultLocale: (locale: string) => BuilderActionResult;
     readonly validationIssues: readonly SchemaIssue[];
+    readonly activeFieldId?: string;
+    readonly setActiveFieldId?: (fieldId: string | undefined) => void;
+    readonly getFieldEditorProps?: (fieldId: string) => {
+        readonly isActive: boolean;
+        readonly isVisible: boolean;
+        readonly onSelect: () => void;
+    };
 }
-declare function useFormBuilder({ schema, onChange, policy, idFactory, factories }: FormBuilderOptions): FormBuilderResult;
+interface UseFormBuilderResult extends FormBuilderResult {
+    readonly setActiveFieldId: (fieldId: string | undefined) => void;
+    readonly getFieldEditorProps: NonNullable<FormBuilderResult["getFieldEditorProps"]>;
+}
+declare function useFormBuilder({ schema, onChange, policy, idFactory, factories, fieldEditorMode, activeFieldId: controlledActiveFieldId, defaultActiveFieldId, onActiveFieldChange }: FormBuilderOptions): FormBuilderResult;
 
 interface SubmissionReceipt {
     readonly formId: string;
@@ -376,7 +393,11 @@ interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps {
     readonly onClearTranslationError?: () => void;
     readonly translationAdapterAvailable?: boolean;
 }
-type FormBuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization";
+type FormBuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization" | "submissionSettings";
+interface FormBuilderSubmissionSettingsOptions {
+    readonly enabled: boolean;
+    readonly placement?: "beforeQuestions" | "afterQuestions" | "bottom";
+}
 interface FormBuilderSlots {
     readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;
     readonly fieldEditor?: ComponentType<BuilderFieldEditorSlotProps>;
@@ -632,8 +653,13 @@ interface FormBuilderProps {
     readonly sectionOrder?: readonly FormBuilderSectionName[];
     readonly disableDefaultStyles?: boolean;
     readonly unstyled?: boolean;
+    readonly fieldEditorMode?: "all" | "single";
+    readonly activeFieldId?: string;
+    readonly defaultActiveFieldId?: string;
+    readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
+    readonly submissionSettingsOptions?: FormBuilderSubmissionSettingsOptions;
 }
-declare function FormBuilder({ schema, onChange, locale, translator, translationAdapter, translationOptions, onTranslationReport, policy, idFactory, factories, className, defaultFieldType, onActionError, createManualTranslationMetadata, readOnly, features, fieldEditorControls, fieldTypeOptions, components: componentOverrides, slots, sectionOrder, disableDefaultStyles, unstyled }: FormBuilderProps): react.JSX.Element;
+declare function FormBuilder({ schema, onChange, locale, translator, translationAdapter, translationOptions, onTranslationReport, policy, idFactory, factories, className, defaultFieldType, onActionError, createManualTranslationMetadata, readOnly, features, fieldEditorControls, fieldTypeOptions, components: componentOverrides, slots, sectionOrder, disableDefaultStyles, unstyled, fieldEditorMode, activeFieldId, defaultActiveFieldId, onActiveFieldChange, submissionSettingsOptions }: FormBuilderProps): react.JSX.Element;
 
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
 interface FormContextValue {
@@ -673,6 +699,39 @@ interface FieldState {
     readonly setValue: (value: FormValue) => void;
 }
 declare function useField(fieldId: string): FieldState;
+
+interface UseTranslationWorkspaceOptions {
+    readonly schema: FormSchema;
+    readonly onChange?: (schema: FormSchema) => void;
+    readonly sourceLocale?: string;
+    readonly targetLocale?: string;
+    readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+    readonly readOnly?: boolean;
+}
+interface TranslationSummary {
+    readonly totalSlots: number;
+    readonly translatedCount: number;
+    readonly missingCount: number;
+    readonly staleCount: number;
+    readonly manualCount: number;
+    readonly completionPercentage: number;
+}
+interface UseTranslationWorkspaceResult {
+    readonly sourceLocale: string;
+    readonly targetLocale: string;
+    readonly targetLocales: readonly string[];
+    readonly setTargetLocale: (locale: string) => void;
+    readonly slots: readonly TranslationSlot[];
+    readonly summary: TranslationSummary;
+    readonly addLocale: (locale: string) => void;
+    readonly removeLocale: (locale: string) => void;
+    readonly setTranslation: (slot: TranslationSlot, text: string) => void;
+    readonly translateAll: (options?: PopulateTranslationOptions) => Promise<TranslationReport>;
+    readonly translateSlot: (slot: TranslationSlot) => Promise<void>;
+    readonly isTranslating: boolean;
+    readonly error?: string;
+}
+declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, readOnly }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
 
 declare const BUILDER_TRANSLATION_KEYS: {
     readonly ADD_FIELD: "builder.actions.addField";
@@ -746,4 +805,4 @@ interface StandaloneFormRendererProps extends FormRendererPresentationProps {
 type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
 declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
 
-export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormCompletionSlotProps, type FormContextValue, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, FormSubmissionError, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputComponentProps, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type RenderSubmitButtonProps, type SelectComponentProps, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type UseSubmissionReceiptsResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts };
+export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ComponentBaseProps, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, FormSubmissionError, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputComponentProps, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type RenderSubmitButtonProps, type SelectComponentProps, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionGuard, type SubmissionGuardResult, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TranslationSummary, type UseFormBuilderOptions, type UseFormBuilderResult, type UseSubmissionReceiptsResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useSubmissionReceipts, useTranslationWorkspace };

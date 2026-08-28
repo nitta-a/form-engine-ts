@@ -18,6 +18,11 @@ import { MuiChoiceGroupSlot } from "@form-engine-ts/mui";
 />
 ```
 
+`ConditionEditor` edits nested `DisplayRule` conditions in the field editor, including `all`/`any` groups and
+show/hide actions. `TranslationWorkspace` provides MUI tabs, progress, status chips, manual translation editing, and
+single-slot or batch translation through the React translation workspace hook. Enable the builder's submission settings
+section with `submissionSettingsOptions={{ enabled: true }}` and use `layoutOptions.sectionOrder` to place it.
+
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";
 

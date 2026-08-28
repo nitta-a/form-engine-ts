@@ -12,7 +12,7 @@ import {
   transformFieldType,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 /** @deprecated Import FormPolicy from @form-engine-ts/core instead. */
 export type BuilderPolicy = FormPolicy;
@@ -35,7 +35,14 @@ export interface FormBuilderOptions {
   readonly policy?: FormPolicy;
   readonly idFactory?: (kind: BuilderIdKind, existingIds: ReadonlySet<string>) => string;
   readonly factories?: BuilderFactories;
+  readonly fieldEditorMode?: FieldEditorMode;
+  readonly activeFieldId?: string;
+  readonly defaultActiveFieldId?: string;
+  readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
 }
+
+export type FieldEditorMode = "all" | "single";
+export type UseFormBuilderOptions = FormBuilderOptions;
 
 export type BuilderActionError =
   | { readonly type: "invalid_id"; readonly kind: BuilderIdKind; readonly id: string }
@@ -90,6 +97,18 @@ export interface FormBuilderResult {
   readonly addLocale: (locale: string) => BuilderActionResult;
   readonly setDefaultLocale: (locale: string) => BuilderActionResult;
   readonly validationIssues: readonly SchemaIssue[];
+  readonly activeFieldId?: string;
+  readonly setActiveFieldId?: (fieldId: string | undefined) => void;
+  readonly getFieldEditorProps?: (fieldId: string) => {
+    readonly isActive: boolean;
+    readonly isVisible: boolean;
+    readonly onSelect: () => void;
+  };
+}
+
+export interface UseFormBuilderResult extends FormBuilderResult {
+  readonly setActiveFieldId: (fieldId: string | undefined) => void;
+  readonly getFieldEditorProps: NonNullable<FormBuilderResult["getFieldEditorProps"]>;
 }
 
 const DEFAULT_PREFIXES = { field: "q", option: "opt", page: "page" } as const;
@@ -224,8 +243,21 @@ function move<T>(items: readonly T[], sourceIndex: number, targetIndex: number):
   return result;
 }
 
+function displayRuleSourceIds(field: FormField): readonly string[] {
+  if (field.displayRule === undefined) return [];
+  const ids: string[] = [];
+  const visit = (group: NonNullable<FormField["displayRule"]>["condition"]): void => {
+    for (const condition of group.conditions) {
+      if ("logic" in condition) visit(condition);
+      else ids.push(condition.fieldId);
+    }
+  };
+  visit(field.displayRule.condition);
+  return ids;
+}
+
 function withoutDisplayCondition(field: FormField): FormField {
-  const { displayCondition: _displayCondition, ...rest } = field;
+  const { displayCondition: _displayCondition, displayRule: _displayRule, ...rest } = field;
   return rest as FormField;
 }
 
@@ -264,8 +296,23 @@ export function useFormBuilder({
   onChange,
   policy,
   idFactory = defaultIdFactory,
-  factories = {}
+  factories = {},
+  fieldEditorMode = "all",
+  activeFieldId: controlledActiveFieldId,
+  defaultActiveFieldId,
+  onActiveFieldChange
 }: FormBuilderOptions): FormBuilderResult {
+  const [internalActiveFieldId, setInternalActiveFieldId] = useState<string | undefined>(
+    defaultActiveFieldId ?? (fieldEditorMode === "single" ? schema.fields[0]?.id : undefined)
+  );
+  const activeFieldId = controlledActiveFieldId ?? internalActiveFieldId;
+  const setActiveFieldId = useCallback(
+    (fieldId: string | undefined): void => {
+      if (controlledActiveFieldId === undefined) setInternalActiveFieldId(fieldId);
+      onActiveFieldChange?.(fieldId);
+    },
+    [controlledActiveFieldId, onActiveFieldChange]
+  );
   const createId = useCallback(
     (
       kind: BuilderIdKind,
@@ -393,9 +440,10 @@ export function useFormBuilder({
             : page.questionIds
       }));
       onChange({ ...schema, fields: [...schema.fields, field], ...(pages === undefined ? {} : { pages }) });
+      setActiveFieldId(field.id);
       return { success: true };
     },
-    [createId, factories, onChange, policy, schema]
+    [createId, factories, onChange, policy, schema, setActiveFieldId]
   );
 
   const removeField = useCallback(
@@ -404,9 +452,14 @@ export function useFormBuilder({
         return { success: false, error: { type: "node_not_found", kind: "field", id: fieldId } };
       if (schema.fields.length <= 1)
         return { success: false, error: { type: "invalid_operation", message: "A form must contain one field." } };
+      const removedIndex = schema.fields.findIndex((field) => field.id === fieldId);
       const fields = schema.fields
         .filter((field) => field.id !== fieldId)
-        .map((field) => (field.displayCondition?.questionId === fieldId ? withoutDisplayCondition(field) : field));
+        .map((field) =>
+          field.displayCondition?.questionId === fieldId || displayRuleSourceIds(field).includes(fieldId)
+            ? withoutDisplayCondition(field)
+            : field
+        );
       const pages = schema.pages
         ?.map((page) => ({ ...page, questionIds: page.questionIds.filter((id) => id !== fieldId) }))
         .filter((page) => page.questionIds.length > 0);
@@ -414,9 +467,10 @@ export function useFormBuilder({
         const { pages: _pages, ...single } = schema;
         onChange({ ...single, fields });
       } else onChange({ ...schema, fields, ...(pages === undefined ? {} : { pages }) });
+      if (activeFieldId === fieldId) setActiveFieldId(fields[removedIndex]?.id ?? fields.at(-1)?.id);
       return { success: true };
     },
-    [onChange, schema]
+    [activeFieldId, onChange, schema, setActiveFieldId]
   );
 
   const moveField = useCallback(
@@ -430,8 +484,11 @@ export function useFormBuilder({
       onChange({
         ...schema,
         fields: fields.map((field, index) => {
-          const source = field.displayCondition?.questionId;
-          return source === undefined || (indexById.get(source) ?? index) < index
+          const sources =
+            field.displayCondition?.questionId === undefined
+              ? displayRuleSourceIds(field)
+              : [field.displayCondition.questionId];
+          return sources.every((source) => (indexById.get(source) ?? index) < index)
             ? field
             : withoutDisplayCondition(field);
         })
@@ -931,6 +988,15 @@ export function useFormBuilder({
     return result.valid ? [] : result.issues;
   }, [policy, schema]);
 
+  const getFieldEditorProps = useCallback(
+    (fieldId: string) => ({
+      isActive: activeFieldId === fieldId,
+      isVisible: fieldEditorMode === "all" || activeFieldId === fieldId,
+      onSelect: () => setActiveFieldId(fieldId)
+    }),
+    [activeFieldId, fieldEditorMode, setActiveFieldId]
+  );
+
   return {
     schema,
     addField,
@@ -952,6 +1018,9 @@ export function useFormBuilder({
     setLocaleTranslation,
     addLocale,
     setDefaultLocale,
-    validationIssues
+    validationIssues,
+    ...(activeFieldId === undefined ? {} : { activeFieldId }),
+    setActiveFieldId,
+    getFieldEditorProps
   };
 }

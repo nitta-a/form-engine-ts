@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v4.5.0 — 2026-08-28
+
+- Added nested `all`/`any` display rules with show/hide actions, expanded condition operators, and cycle details in schema issues.
+- Added schema-driven submission confirmation settings and builder controls for configuring the confirmation presentation.
+- Added translation slot collection, source-text hashing, stale/manual status tracking, protected batch population, and the React/MUI translation workspace.
+- Added focused single-field editing and selection controls to the React and MUI builders.
+- Aligned all public packages to version 4.5.0.
+
+See the [GitHub release for v4.5.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.5.0).
+
 ### v4.4.0 — 2026-08-27
 
 - Added per-question-type choice-field layouts for radio, checkbox, multi-select, and select questions.
@@ -173,6 +183,16 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.5.0 — 2026-08-28
+
+- `all`／`any`でネストできる表示ルール、show／hideアクション、拡張された条件演算子、循環参照の詳細情報を追加しました。
+- スキーマから送信確認を設定できるようにし、確認表示方法をBuilderから編集できるようにしました。
+- 翻訳スロット収集、原文ハッシュ、stale／手動翻訳ステータス、手動翻訳を保護する一括生成、React／MUI翻訳ワークスペースを追加しました。
+- React／MUI Builderに、設問を選択して1件ずつ編集するモードと選択状態の制御を追加しました。
+- 公開パッケージのバージョンを4.5.0に統一しました。
+
+[v4.5.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.5.0)も参照してください。
 
 ### v4.4.0 — 2026-08-27
 

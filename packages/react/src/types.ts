@@ -324,7 +324,13 @@ export type FormBuilderSectionName =
   | "completionMessage"
   | "questions"
   | "addQuestion"
-  | "localization";
+  | "localization"
+  | "submissionSettings";
+
+export interface FormBuilderSubmissionSettingsOptions {
+  readonly enabled: boolean;
+  readonly placement?: "beforeQuestions" | "afterQuestions" | "bottom";
+}
 
 export interface FormBuilderSlots {
   readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;

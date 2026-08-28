@@ -20,7 +20,13 @@ import type {
 } from "@mui/material";
 import type { ReactNode } from "react";
 
-export type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization";
+export type BuilderSectionName =
+  | "basicSettings"
+  | "completionMessage"
+  | "questions"
+  | "addQuestion"
+  | "localization"
+  | "submissionSettings";
 
 export type MuiButtonVariant = "contained" | "outlined" | "text";
 
@@ -50,6 +56,11 @@ export interface MuiLocalizationOptions {
   readonly defaultLocaleControl?: "editable" | "readOnly" | "hidden";
   readonly noWrapActions?: boolean;
   readonly autoFocusNewTab?: boolean;
+}
+
+export interface MuiSubmissionSettingsOptions {
+  readonly enabled: boolean;
+  readonly placement?: "beforeQuestions" | "afterQuestions" | "bottom";
 }
 
 /**

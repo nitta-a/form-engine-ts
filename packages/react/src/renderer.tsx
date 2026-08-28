@@ -775,8 +775,12 @@ function ContextFormRenderer({
     [form.schema, form.translate, form.values, form.visibility]
   );
   const confirmationRenderMode: SubmissionConfirmationRenderMode =
-    submissionConfirmation?.renderMode ?? submissionConfirmationRenderMode ?? "inline";
-  const confirmationEnabled = submissionConfirmation?.enabled === true;
+    submissionConfirmation?.renderMode ??
+    submissionConfirmationRenderMode ??
+    (form.schema.submissionSettings?.confirmationRenderMode as SubmissionConfirmationRenderMode | undefined) ??
+    "inline";
+  const confirmationEnabled =
+    submissionConfirmation?.enabled ?? form.schema.submissionSettings?.showConfirmationBeforeSubmit ?? false;
   const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;

@@ -47,6 +47,7 @@ import type {
   FormBuilderComponents,
   FormBuilderSectionName,
   FormBuilderSlots,
+  FormBuilderSubmissionSettingsOptions,
   ManualTranslationContext,
   ManualTranslationTarget
 } from "./types";
@@ -693,7 +694,10 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.operator.equals": "equals",
   "builder.operator.not_equals": "does not equal",
   "builder.operator.contains": "contains",
-  "builder.operator.not_empty": "is not empty"
+  "builder.operator.not_empty": "is not empty",
+  "builder.submissionSettings": "Submission settings",
+  "builder.showConfirmationBeforeSubmit": "Show confirmation before submit",
+  "builder.confirmationRenderMode": "Confirmation display mode"
 };
 
 interface BuilderSectionGroupProps {
@@ -927,6 +931,11 @@ export interface FormBuilderProps {
   readonly sectionOrder?: readonly FormBuilderSectionName[];
   readonly disableDefaultStyles?: boolean;
   readonly unstyled?: boolean;
+  readonly fieldEditorMode?: "all" | "single";
+  readonly activeFieldId?: string;
+  readonly defaultActiveFieldId?: string;
+  readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
+  readonly submissionSettingsOptions?: FormBuilderSubmissionSettingsOptions;
 }
 
 export function FormBuilder({
@@ -952,7 +961,12 @@ export function FormBuilder({
   slots,
   sectionOrder,
   disableDefaultStyles = false,
-  unstyled = false
+  unstyled = false,
+  fieldEditorMode = "all",
+  activeFieldId,
+  defaultActiveFieldId,
+  onActiveFieldChange,
+  submissionSettingsOptions
 }: FormBuilderProps) {
   const resolvedComponents: Required<FormBuilderComponents> = { ...DEFAULT_COMPONENTS, ...componentOverrides };
   const components: Required<FormBuilderComponents> = {
@@ -975,7 +989,11 @@ export function FormBuilder({
     onChange,
     ...(policy === undefined ? {} : { policy }),
     ...(idFactory === undefined ? {} : { idFactory }),
-    ...(factories === undefined ? {} : { factories })
+    ...(factories === undefined ? {} : { factories }),
+    fieldEditorMode,
+    ...(activeFieldId === undefined ? {} : { activeFieldId }),
+    ...(defaultActiveFieldId === undefined ? {} : { defaultActiveFieldId }),
+    ...(onActiveFieldChange === undefined ? {} : { onActiveFieldChange })
   });
   const [newPageQuestionId, setNewPageQuestionId] = useState("");
   const [newLocale, setNewLocale] = useState("");
@@ -1378,6 +1396,43 @@ export function FormBuilder({
                   </div>
                 </div>
               </Section>
+            </BuilderSectionGroup>
+            <BuilderSectionGroup name="submissionSettings">
+              {submissionSettingsOptions?.enabled ? (
+                <Section
+                  className={builderClass("form-engine-builder__submission-settings")}
+                  title={translate("builder.submissionSettings")}
+                >
+                  <Checkbox
+                    id="builder-show-confirmation"
+                    label={translate("builder.showConfirmationBeforeSubmit")}
+                    checked={schema.submissionSettings?.showConfirmationBeforeSubmit === true}
+                    onChange={(checked) =>
+                      onChange({
+                        ...schema,
+                        submissionSettings: { ...schema.submissionSettings, showConfirmationBeforeSubmit: checked }
+                      })
+                    }
+                  />
+                  <Select
+                    id="builder-confirmation-render-mode"
+                    label={translate("builder.confirmationRenderMode")}
+                    value={schema.submissionSettings?.confirmationRenderMode ?? "inline"}
+                    options={[
+                      { value: "dialog", label: "Dialog" },
+                      { value: "inline", label: "Inline" },
+                      { value: "replace", label: "Replace" }
+                    ]}
+                    onChange={(value) => {
+                      if (value !== "dialog" && value !== "inline" && value !== "replace") return;
+                      onChange({
+                        ...schema,
+                        submissionSettings: { ...schema.submissionSettings, confirmationRenderMode: value }
+                      });
+                    }}
+                  />
+                </Section>
+              ) : null}
             </BuilderSectionGroup>
             {resolvedSectionOrder === undefined ? null : (
               <BuilderSectionGroup name="completionMessage">
@@ -1791,12 +1846,30 @@ export function FormBuilder({
               <div className={builderClass("form-engine-builder__list")}>
                 {schema.fields.map((field, index) => {
                   const controls = resolveFieldEditorControls(fieldEditorControls);
+                  const editorState = headless.getFieldEditorProps?.(field.id) ?? {
+                    isActive: true,
+                    isVisible: true,
+                    onSelect: () => undefined
+                  };
                   const condition = field.displayCondition;
                   const source =
                     condition === undefined
                       ? undefined
                       : schema.fields.find((item) => item.id === condition.questionId);
                   const availableSources = schema.fields.slice(0, index);
+                  if (!editorState.isVisible) {
+                    return (
+                      <div
+                        key={field.id}
+                        className={builderClass("form-engine-builder__question-preview")}
+                        data-field-id={field.id}
+                      >
+                        <button type="button" onClick={editorState.onSelect}>
+                          {field.title}
+                        </button>
+                      </div>
+                    );
+                  }
                   if (FieldEditorSlot !== undefined) {
                     return (
                       <FieldEditorSlot

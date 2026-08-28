@@ -10,6 +10,7 @@ import { Card, Stack, Typography } from "@mui/material";
 import type { ComponentType } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
+import { ConditionEditor } from "./ConditionEditor";
 import { createMuiOptionEditorSlot } from "./OptionEditor";
 import { createMuiToolbarSlot } from "./Toolbar";
 
@@ -315,7 +316,24 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
           ) : null}
           {features?.conditions === false ||
           conditionSources.length === 0 ||
-          controls.displayConditions === "hidden" ? null : (
+          controls.displayConditions === "hidden" ? null : field.displayRule !== undefined ? (
+            <ConditionEditor
+              schema={schema}
+              fieldId={field.id}
+              value={field.displayRule}
+              readOnly={readOnly || controls.displayConditions === "readOnly"}
+              onChange={(displayRule) =>
+                actions.updateField(field.id, (current) => {
+                  const { displayCondition: _displayCondition, ...withoutLegacyCondition } = current;
+                  if (displayRule === undefined) {
+                    const { displayRule: _displayRule, ...withoutRules } = withoutLegacyCondition;
+                    return withoutRules as FormField;
+                  }
+                  return { ...withoutLegacyCondition, displayRule } as FormField;
+                })
+              }
+            />
+          ) : (
             <Stack direction={{ xs: "column", md: "row" }} spacing={resolved.dense ? 1 : 2}>
               <Select
                 id={`mui-field-${field.id}-condition-source`}

@@ -2,6 +2,8 @@ import { collectSchemaLocales } from "./policy";
 import { validateSchemaStructure } from "./sanitization";
 import type {
   DisplayCondition,
+  DisplayConditionGroup,
+  DisplayRule,
   FieldOption,
   FormField,
   FormPolicy,
@@ -15,7 +17,17 @@ export interface ValidateFormSchemaOptions {
 }
 
 const FIELD_TYPES = new Set(["text", "textarea", "number", "rating", "select", "multi-select", "checkbox", "radio"]);
-const CONDITION_OPERATORS = new Set(["equals", "not_equals", "contains", "not_empty"]);
+const CONDITION_OPERATORS = new Set([
+  "equals",
+  "not_equals",
+  "contains",
+  "not_contains",
+  "is_empty",
+  "is_not_empty",
+  "greater_than",
+  "less_than",
+  "not_empty"
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -200,7 +212,7 @@ function validateDisplayCondition(value: unknown, path: string, issues: SchemaIs
     return false;
   }
   const hasValue = Object.hasOwn(value, "value") && value.value !== undefined;
-  if (value.operator === "not_empty") {
+  if (value.operator === "not_empty" || value.operator === "is_empty" || value.operator === "is_not_empty") {
     if (hasValue) issue(issues, `${path}.value`, "unexpected_condition_value", "not_empty does not accept a value.");
   } else if (!hasValue) {
     issue(issues, `${path}.value`, "missing_condition_value", `${value.operator} requires a value.`);
@@ -210,6 +222,85 @@ function validateDisplayCondition(value: unknown, path: string, issues: SchemaIs
     issue(issues, `${path}.value`, "invalid_condition_value", "Expected a finite number.");
   }
   return true;
+}
+
+function validateDisplayConditionGroup(
+  value: unknown,
+  path: string,
+  issues: SchemaIssue[]
+): value is DisplayConditionGroup {
+  if (!isRecord(value)) {
+    issue(issues, path, "invalid_condition_group", "Expected a display condition group.");
+    return false;
+  }
+  if (value.logic !== "all" && value.logic !== "any") {
+    issue(issues, `${path}.logic`, "invalid_condition_logic", "Expected all or any.");
+  }
+  if (!Array.isArray(value.conditions)) {
+    issue(issues, `${path}.conditions`, "invalid_condition_group", "Expected a conditions array.");
+    return false;
+  }
+  value.conditions.forEach((condition, index) => {
+    const conditionPath = `${path}.conditions[${index}]`;
+    if (isRecord(condition) && Object.hasOwn(condition, "logic")) {
+      validateDisplayConditionGroup(condition, conditionPath, issues);
+      return;
+    }
+    if (!isRecord(condition)) {
+      issue(issues, conditionPath, "invalid_condition", "Expected a field display condition.");
+      return;
+    }
+    if (!isNonEmptyString(condition.fieldId)) {
+      issue(issues, `${conditionPath}.fieldId`, "invalid_condition_source", "Expected a field ID.");
+    }
+    if (typeof condition.operator !== "string" || !CONDITION_OPERATORS.has(condition.operator)) {
+      issue(issues, `${conditionPath}.operator`, "invalid_condition_operator", "Unsupported condition operator.");
+      return;
+    }
+    const needsValue = !["not_empty", "is_empty", "is_not_empty"].includes(condition.operator);
+    const hasValue = Object.hasOwn(condition, "value") && condition.value !== undefined;
+    if (needsValue && !hasValue)
+      issue(issues, `${conditionPath}.value`, "missing_condition_value", "A value is required.");
+  });
+  return true;
+}
+
+function validateDisplayRule(value: unknown, path: string, issues: SchemaIssue[]): value is DisplayRule {
+  if (!isRecord(value)) {
+    issue(issues, path, "invalid_display_rule", "Expected a display rule object.");
+    return false;
+  }
+  if (value.action !== "show" && value.action !== "hide") {
+    issue(issues, `${path}.action`, "invalid_display_action", "Expected show or hide.");
+  }
+  validateDisplayConditionGroup(value.condition, `${path}.condition`, issues);
+  return true;
+}
+
+function validateSubmissionSettings(value: unknown, path: string, issues: SchemaIssue[]): void {
+  if (!isRecord(value)) {
+    issue(issues, path, "invalid_submission_settings", "Expected submission settings to be an object.");
+    return;
+  }
+  validateExtensibleNode(value, path, issues);
+  if (value.showConfirmationBeforeSubmit !== undefined && typeof value.showConfirmationBeforeSubmit !== "boolean") {
+    issue(issues, `${path}.showConfirmationBeforeSubmit`, "invalid_submission_setting", "Expected a boolean.");
+  }
+  if (
+    value.confirmationRenderMode !== undefined &&
+    !["dialog", "inline", "replace"].includes(String(value.confirmationRenderMode))
+  ) {
+    issue(
+      issues,
+      `${path}.confirmationRenderMode`,
+      "invalid_submission_setting",
+      "Unsupported confirmation render mode."
+    );
+  }
+  for (const key of ["confirmButtonLabel", "cancelButtonLabel"] as const) {
+    if (value[key] !== undefined && !isNonEmptyString(value[key]))
+      issue(issues, `${path}.${key}`, "invalid_submission_setting", "Expected non-empty text.");
+  }
 }
 
 function validateField(value: unknown, path: string, issues: SchemaIssue[]): value is FormField {
@@ -235,6 +326,7 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
   if (value.displayCondition !== undefined) {
     validateDisplayCondition(value.displayCondition, `${path}.displayCondition`, issues);
   }
+  if (value.displayRule !== undefined) validateDisplayRule(value.displayRule, `${path}.displayRule`, issues);
   if (value.translations !== undefined) validateLocalizedTextMap(value.translations, `${path}.translations`, issues);
   if (typeof value.type !== "string" || !FIELD_TYPES.has(value.type)) {
     issue(issues, `${path}.type`, "invalid_field_type", "Unsupported field type.");
@@ -691,6 +783,8 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
     }
   }
   if (input.translations !== undefined) validateLocalizedTextMap(input.translations, "translations", issues);
+  if (input.submissionSettings !== undefined)
+    validateSubmissionSettings(input.submissionSettings, "submissionSettings", issues);
   if (!Array.isArray(input.fields) || input.fields.length === 0) {
     issue(issues, "fields", "invalid_fields", "Expected at least one field.");
   } else {
@@ -718,13 +812,26 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
         continue;
       }
       const fieldIndex = inputFields.findIndex((field) => isRecord(field) && field.id === structuralIssue.questionId);
+      const currentField = inputFields[fieldIndex];
+      const usesDisplayRule = isRecord(currentField) && currentField.displayRule !== undefined;
       const code =
         structuralIssue.type === "dangling_condition_reference"
           ? "unknown_condition_source"
           : structuralIssue.type === "self_condition_reference"
             ? "self_condition"
-            : "condition_cycle";
-      issue(issues, `fields[${fieldIndex}].displayCondition`, code, structuralIssue.message);
+            : usesDisplayRule
+              ? "circular_display_condition"
+              : "condition_cycle";
+      const path = usesDisplayRule ? `fields[${fieldIndex}].displayRule` : `fields[${fieldIndex}].displayCondition`;
+      if (usesDisplayRule && structuralIssue.type === "cyclic_condition_reference") {
+        issues.push({
+          path,
+          code,
+          type: code,
+          message: structuralIssue.message,
+          ...(structuralIssue.cycle === undefined ? {} : { cycle: structuralIssue.cycle })
+        });
+      } else issue(issues, path, code, structuralIssue.message);
     }
 
     if (input.pages !== undefined) {

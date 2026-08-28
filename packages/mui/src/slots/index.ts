@@ -5,6 +5,7 @@ import { createMuiLocalizationSlot, MuiLocalizationSlot } from "./Localization";
 import { createMuiOptionEditorSlot, MuiOptionEditorSlot } from "./OptionEditor";
 import { createMuiToolbarSlot, MuiToolbarSlot } from "./Toolbar";
 
+export * from "./ConditionEditor";
 export * from "./FieldEditor";
 export * from "./Localization";
 export * from "./MuiChoiceGroupSlot";

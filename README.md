@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.4.0** (2026-08-27). All public packages are currently published at version `4.4.0`.
-This release adds per-type choice-field layouts, customizable grouped-choice slots, CSS variables, and an MUI ChoiceGroup
-adapter. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.4.0).
+The latest release is **v4.5.0** (2026-08-28). All public packages are currently published at version `4.5.0`.
+This release adds nested display rules, translation status/workspace APIs, focused field editing, and schema-driven
+submission confirmation settings. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.5.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.4.0**（2026-08-27）です。公開パッケージはすべてバージョン `4.4.0` で公開されています。
-本リリースでは、設問タイプ別の選択肢レイアウト、Grouped UI差し替えスロット、CSS変数、MUI ChoiceGroupアダプターを追加しました。
+最新版は **v4.5.0**（2026-08-28）です。公開パッケージはすべてバージョン `4.5.0` で公開されています。
+本リリースでは、ネスト可能な表示ルール、翻訳ステータス／ワークスペースAPI、フォーカスした設問編集、スキーマ駆動の送信確認設定を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.4.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.5.0) を参照してください。
 
 ### 編集・回答体験
 
