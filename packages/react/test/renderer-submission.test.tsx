@@ -1,4 +1,4 @@
-import type { FormSchema } from "@form-engine-ts/core";
+import { FormSubmissionError as CoreFormSubmissionError, type FormSchema } from "@form-engine-ts/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -105,6 +105,29 @@ describe("FormRenderer submission presentation", () => {
     await user.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
     expect(screen.getByRole("status")).toHaveTextContent("Thanks for your response.");
+  });
+
+  it("handles the Core serialized submission error directly", async () => {
+    const user = userEvent.setup();
+    render(
+      <FormRenderer
+        schema={schema}
+        onSubmit={async () => {
+          throw new CoreFormSubmissionError({
+            code: "VALIDATION_FAILED",
+            messageKey: "submission.validation",
+            fieldErrors: { name: "Name was rejected." },
+            formErrors: ["Please correct the highlighted fields."]
+          });
+        }}
+      />
+    );
+
+    await user.type(screen.getByLabelText(/Name/), "Ada");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await waitFor(() => expect(screen.getByLabelText(/Name/)).toHaveFocus());
+    expect(screen.getByText("Name was rejected.")).toBeInTheDocument();
+    expect(screen.getByText("Please correct the highlighted fields.")).toBeInTheDocument();
   });
 
   it("keeps guard confirmation locked and shows completion before receipt state on revisit", async () => {

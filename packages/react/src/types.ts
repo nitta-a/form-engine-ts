@@ -10,11 +10,17 @@ import type {
   LocaleOption,
   Question,
   QuestionType,
+  TranslationAdapter,
   TranslationReport,
   TranslationSlot,
+  TranslationStatus,
   ValidationError,
   ValidationIssue
 } from "@form-engine-ts/core";
+
+export type { FormSubmissionSerializedError } from "@form-engine-ts/core";
+export { FormSubmissionError } from "@form-engine-ts/core";
+
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import type {
   ComponentType,
@@ -227,6 +233,7 @@ interface BuilderSlotBaseProps {
   readonly actions: BuilderSlotActions;
   readonly components: Required<FormBuilderComponents>;
   readonly translate: (key: string, params?: Record<string, unknown>) => string;
+  readonly onChange?: (schema: FormSchema) => void;
 }
 
 export interface BuilderToolbarSlotProps extends BuilderSlotBaseProps {
@@ -328,6 +335,64 @@ export interface TranslationSlotRowProps {
   readonly readOnly: boolean;
   readonly onChange: (text: string) => void;
   readonly onTranslate: () => void;
+}
+
+export interface TranslationComparisonItem {
+  readonly id: string;
+  readonly path: string;
+  readonly targetKind: "form" | "page" | "field" | "option";
+  readonly targetProperty: "title" | "description" | "label" | "completionMessage";
+  readonly nodeTitle?: string;
+  readonly sourceText: string;
+  readonly translatedText: string;
+  readonly status: TranslationStatus;
+  readonly metadata?: CanonicalTranslationMetadata;
+  readonly translatable: boolean;
+}
+
+export interface TranslationComparisonSummary {
+  readonly total: number;
+  readonly translated: number;
+  readonly missing: number;
+  readonly stale: number;
+  readonly manual: number;
+}
+
+export interface TranslationComparisonHeaderProps {
+  readonly sourceLocale: string;
+  readonly targetLocale: string;
+  readonly summary: TranslationComparisonSummary;
+  readonly onTranslateAll: () => void;
+  readonly isTranslating: boolean;
+  readonly readOnly: boolean;
+}
+
+export interface TranslationComparisonItemRowProps {
+  readonly item: TranslationComparisonItem;
+  readonly readOnly: boolean;
+  readonly onChange: (text: string) => void;
+  readonly onTranslate: () => void;
+}
+
+export interface UseTranslationComparisonOptions {
+  readonly schema: FormSchema;
+  readonly sourceLocale?: string;
+  readonly targetLocale: string;
+  readonly translationAdapter?: TranslationAdapter;
+  readonly readOnly?: boolean;
+  readonly onChange?: (nextSchema: FormSchema) => void;
+  readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+}
+
+export interface UseTranslationComparisonResult {
+  readonly sourceLocale: string;
+  readonly targetLocale: string;
+  readonly items: readonly TranslationComparisonItem[];
+  readonly summary: TranslationComparisonSummary;
+  readonly isTranslating: boolean;
+  readonly updateTranslation: (path: string, text: string) => void;
+  readonly translateSingle: (path: string) => Promise<void>;
+  readonly translateAll: () => Promise<TranslationReport>;
 }
 
 export interface LocaleSelectorProps {
@@ -516,16 +581,6 @@ export interface FormCompletionSlotProps {
 export interface FormServerErrorPayload {
   readonly fieldErrors?: Readonly<Record<string, string>>;
   readonly formError?: string;
-}
-
-export class FormSubmissionError extends Error {
-  readonly payload: FormServerErrorPayload;
-
-  constructor(message: string, payload?: FormServerErrorPayload) {
-    super(message);
-    this.name = "FormSubmissionError";
-    this.payload = payload ?? { formError: message };
-  }
 }
 
 export type FormSubmitHandler = (

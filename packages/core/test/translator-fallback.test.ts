@@ -21,4 +21,22 @@ describe("FormEngine translator fallback", () => {
 
     expect(translate("builder.formTitle", { count: 1, total: 2 })).toBe("1/2");
   });
+
+  it("reports fallback and unresolved keys", () => {
+    const events: { key: string; reason: string; resolvedValue: string }[] = [];
+    const translate = createFormEngineTranslator({
+      locale: "ja",
+      fallbackLocale: "en",
+      messages: { "builder.formTitle": "" },
+      onMissingKey: (event) => events.push(event),
+      strict: true
+    });
+
+    expect(translate("builder.formTitle")).toBe("Form title");
+    expect(translate("builder.missingKey")).toBe("");
+    expect(events).toMatchObject([
+      { key: "builder.formTitle", reason: "missing_in_current_locale", resolvedValue: "Form title" },
+      { key: "builder.missingKey", reason: "missing_in_all_catalogs", resolvedValue: "" }
+    ]);
+  });
 });

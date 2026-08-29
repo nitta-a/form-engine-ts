@@ -1838,6 +1838,7 @@ export function FormBuilder({
                 ) : (
                   <LocalizationSlot
                     schema={schema}
+                    onChange={onChange}
                     translate={translate}
                     currentLocale={editingLocale}
                     onCurrentLocaleChange={setEditingLocale}

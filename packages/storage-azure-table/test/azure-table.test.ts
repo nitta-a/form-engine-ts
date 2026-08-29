@@ -6,6 +6,7 @@ import {
   type AzureTableEntityPage,
   type AzureTableSubmissionCodec,
   createAzureTableStorage,
+  createLegacyArrayAzureTableCodec,
   createLegacyAzureTableCodec
 } from "../src";
 
@@ -378,6 +379,27 @@ describe("createAzureTableStorage", () => {
     expect(page.items).toEqual([submission("mapped")]);
     expect(filters.at(-1)).toContain("surveyVersion eq 2");
     expect(filters.at(-1)).toContain("answeredAt ge '2026-08-24T00:00:00.000Z'");
+  });
+});
+
+describe("createLegacyArrayAzureTableCodec", () => {
+  it("round-trips legacy answers arrays", () => {
+    const codec = createLegacyArrayAzureTableCodec<{ readonly tenantId: string }>({
+      metadataExtractor: (entity) => ({ tenantId: String(entity.tenantId) })
+    });
+    const submission = {
+      id: "response-1",
+      formId: "form",
+      formVersion: 2,
+      values: { first: "Ada", score: 5 },
+      locale: "en-US",
+      metadata: { tenantId: "tenant-1" },
+      submittedAt: "2026-08-29T00:00:00.000Z"
+    } as const;
+
+    const entity = codec.encode(submission);
+    expect(entity).toMatchObject({ PartitionKey: "form", RowKey: "response-1", surveyVersion: 2, locale: "en-US" });
+    expect(codec.decode(entity)).toEqual(submission);
   });
 });
 

@@ -189,10 +189,22 @@ export type TranslationWorkspaceDetailedKey =
   | "workspace.empty.noTargetLocales"
   | "workspace.empty.noSlotsToTranslate";
 
+export type TranslationComparisonTranslationKey =
+  | "workspace.comparison.title"
+  | "workspace.comparison.sourceHeader"
+  | "workspace.comparison.targetHeader"
+  | "workspace.comparison.property.title"
+  | "workspace.comparison.property.description"
+  | "workspace.comparison.property.label"
+  | "workspace.comparison.property.completionMessage"
+  | "workspace.comparison.emptySource"
+  | "workspace.comparison.staleWarning";
+
 export type FormEngineTranslationKey =
   | KnownBuilderTranslationKey
   | RendererTranslationKey
   | TranslationWorkspaceTranslationKey
-  | TranslationWorkspaceDetailedKey;
+  | TranslationWorkspaceDetailedKey
+  | TranslationComparisonTranslationKey;
 
 export type FormEngineMessages = Partial<Record<FormEngineTranslationKey, string>>;

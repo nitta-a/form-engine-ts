@@ -182,5 +182,14 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.confirm.removeLocaleTitle": "Remove language?",
   "workspace.confirm.removeLocaleMessage": "This will remove {{locale}} and its translations.",
   "workspace.empty.noTargetLocales": "No target languages are configured.",
-  "workspace.empty.noSlotsToTranslate": "There are no translation slots for this language."
+  "workspace.empty.noSlotsToTranslate": "There are no translation slots for this language.",
+  "workspace.comparison.title": "Translation comparison workspace",
+  "workspace.comparison.sourceHeader": "Source ({{locale}})",
+  "workspace.comparison.targetHeader": "Translation ({{locale}})",
+  "workspace.comparison.property.title": "Title",
+  "workspace.comparison.property.description": "Description",
+  "workspace.comparison.property.label": "Option label",
+  "workspace.comparison.property.completionMessage": "Completion message",
+  "workspace.comparison.emptySource": "(No source text)",
+  "workspace.comparison.staleWarning": "The source text has changed"
 });

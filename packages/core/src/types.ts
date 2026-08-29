@@ -269,6 +269,14 @@ interface FormSubmissionBase extends Pick<ExtensibleNode, "translationMetadata">
 export type FormSubmission<TMeta extends BaseSubmissionMetadata | undefined = undefined> = FormSubmissionBase &
   ([TMeta] extends [undefined] ? { readonly metadata?: BaseSubmissionMetadata } : { readonly metadata: TMeta });
 
+/** A submission whose persisted or transport representation always includes a locale. */
+export interface StrictFormSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends Omit<FormSubmissionBase, "locale" | "values"> {
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly locale: string;
+  readonly metadata: TMeta;
+}
+
 /** Clean network and persistence representation of a form submission. */
 export interface FormSubmissionWire<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
   readonly id: string;
@@ -279,6 +287,12 @@ export interface FormSubmissionWire<TMeta extends BaseSubmissionMetadata = BaseS
   readonly metadata: TMeta;
   readonly submittedAt: string;
   readonly schemaRevision?: number;
+}
+
+/** Strict wire representation used by integrations that require a locale. */
+export interface StrictFormSubmissionWire<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends Omit<FormSubmissionWire<TMeta>, "locale"> {
+  readonly locale: string;
 }
 
 export interface CreateSubmissionInput<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {

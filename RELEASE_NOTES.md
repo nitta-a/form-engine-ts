@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v6.1.0 — 2026-08-29
+
+- Added `useTranslationComparison` and `TranslationComparisonWorkspace` for side-by-side source/translation editing with status summaries, stale-source highlighting, and single-slot or batch translation.
+- Added strict locale-required submission and wire contracts, including `StrictFormSubmission`, `StrictFormSubmissionWire`, and `StrictFormSubmissionWireSchema`.
+- Added missing-translation diagnostics, strict translator behavior, comparison-workspace catalogs, and policy-aware localization workspace options.
+- Improved structured submission errors and Azure Table submission handling for the new strict contracts.
+- Aligned all public packages to version 6.1.0.
+
+See the [GitHub release for v6.1.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.1.0).
+
 ### v6.0.0 — 2026-08-29
 
 - Breaking release: made `values` the canonical submission answer property and removed the legacy `answers` alias from `FormSubmission`.

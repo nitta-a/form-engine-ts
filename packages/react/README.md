@@ -93,6 +93,10 @@ localized values and metadata; the default locale remains protected.
 `onTranslationChange` with typed lifecycle payloads. The MUI workspace accepts a `confirmRemoveLocale` slot for an
 async confirmation UI; its `onConfirm` callback completes the locale removal.
 
+`useTranslationComparison` provides a focused, controlled comparison model for form, page, field, and option text.
+Its items expose source text, target text, status, canonical metadata, and path-based `updateTranslation`,
+`translateSingle`, and `translateAll` actions.
+
 Wrap a builder or renderer in `FormEngineI18nProvider` to supply a UI locale and typed Core translator independently
 from the schema's `defaultLocale` and `supportedLocales`:
 

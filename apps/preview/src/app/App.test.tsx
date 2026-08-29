@@ -50,6 +50,20 @@ describe("preview application", () => {
     expect(within(panel).getByRole("button", { name: "Add question" })).toBeInTheDocument();
   });
 
+  it("opens the source and translation comparison workspace", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("tab", { name: "Translation Comparison" }));
+
+    const panel = screen.getByRole("tabpanel", { name: "Translation Comparison" });
+    expect(panel).toBeVisible();
+    expect(
+      within(panel).getByRole("heading", { name: "Translation comparison workspace", level: 6 })
+    ).toBeInTheDocument();
+    expect(within(panel).getAllByRole("textbox").length).toBeGreaterThan(0);
+  });
+
   it("runs the translation overwrite policy and displays its report", async () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText("Overwrite"), { target: { value: "all" } });

@@ -141,4 +141,24 @@ describe("MUI localization UX", () => {
     fireEvent.keyDown(screen.getByRole("combobox", { name: "Select a locale to add" }), { key: "Enter" });
     await waitFor(() => expect(screen.getByRole("tab", { name: "fr" })).toHaveAttribute("aria-selected", "true"));
   });
+
+  it("renders the translation workspace inline and persists edits", async () => {
+    const user = userEvent.setup();
+    function ControlledInlineBuilder() {
+      const [current, setCurrent] = useState(schema);
+      return (
+        <MuiFormBuilder
+          schema={current}
+          onChange={setCurrent}
+          localization={{ mode: "inline-workspace", workspaceOptions: { availableLocales: ["fr"] } }}
+        />
+      );
+    }
+    render(<ControlledInlineBuilder />);
+
+    expect(screen.getByTestId("translation-workspace")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "翻訳言語" }), "fr");
+    await user.click(screen.getByRole("button", { name: "言語を追加" }));
+    expect(screen.getByRole("tab", { name: "fr" })).toBeInTheDocument();
+  });
 });

@@ -75,9 +75,11 @@ describe("v2.9.6 renderer features", () => {
       <FormRenderer
         schema={schema}
         onSubmit={async () => {
-          throw new FormSubmissionError("Validation failed", {
+          throw new FormSubmissionError({
+            code: "VALIDATION_FAILED",
+            messageKey: "submission.validation",
             fieldErrors: { second: "This value is already used." },
-            formError: "Please correct the highlighted fields."
+            formErrors: ["Please correct the highlighted fields."]
           });
         }}
       />

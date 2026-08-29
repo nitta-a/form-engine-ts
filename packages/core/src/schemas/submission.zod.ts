@@ -15,4 +15,10 @@ export const FormSubmissionWireSchema = z.object({
   schemaRevision: z.number().int().optional()
 });
 
+/** Runtime schema for the locale-required submission wire contract. */
+export const StrictFormSubmissionWireSchema = FormSubmissionWireSchema.extend({
+  locale: z.string().min(1)
+});
+
 export type FormSubmissionWireSchemaType = z.infer<typeof FormSubmissionWireSchema>;
+export type StrictFormSubmissionWireSchemaType = z.infer<typeof StrictFormSubmissionWireSchema>;

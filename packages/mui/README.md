@@ -23,6 +23,10 @@ show/hide actions. `TranslationWorkspace` provides MUI tabs, progress, status ch
 single-slot or batch translation through the React translation workspace hook. Enable the builder's submission settings
 section with `submissionSettingsOptions={{ enabled: true }}` and use `layoutOptions.sectionOrder` to place it.
 
+`TranslationComparisonWorkspace` provides a responsive source/translation view: two columns at the `md` breakpoint
+and a stacked layout on smaller screens. Its source panel is read-only, while the target panel exposes status badges,
+manual editing, stale-source highlighting, and single-slot automatic translation.
+
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";
 

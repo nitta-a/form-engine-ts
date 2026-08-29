@@ -8,7 +8,9 @@ import type {
   FormSubmission,
   FormSubmissionWire,
   FormValues,
-  JsonValue
+  JsonValue,
+  StrictFormSubmission,
+  StrictFormSubmissionWire
 } from "./types";
 import { validateAnswers } from "./validation";
 import { selectVisibleAnswers } from "./visibility";
@@ -49,12 +51,26 @@ function isFormValue(value: unknown): value is FormValues[string] {
   );
 }
 
+export interface ToWireOptions {
+  readonly requireLocale?: boolean;
+}
+
 export function toFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(
   submission: FormSubmission<TMeta>
 ): FormSubmissionWire<TMeta>;
 export function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire;
-export function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire {
+export function toFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(
+  submission: StrictFormSubmission<TMeta>,
+  options: { readonly requireLocale: true }
+): StrictFormSubmissionWire<TMeta>;
+export function toFormSubmissionWire(
+  submission: FormSubmission | StrictFormSubmission,
+  options?: ToWireOptions
+): FormSubmissionWire | StrictFormSubmissionWire {
   const { id, formId, formVersion, values, locale, metadata, submittedAt, schemaRevision } = submission;
+  if (options?.requireLocale === true && (locale === undefined || locale.trim().length === 0)) {
+    throw new Error(`[FormEngine:Submission] Missing required "locale" in submission ID: "${id}"`);
+  }
   return {
     id,
     formId,

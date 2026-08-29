@@ -2,8 +2,10 @@ import {
   type FieldType,
   type FormField,
   type FormSchema,
+  FormSubmissionError,
   type FormValue,
   type FormValues,
+  isFormSubmissionSerializedError,
   selectVisibleAnswers,
   type TranslationAdapter,
   type ValidationIssue,
@@ -48,7 +50,6 @@ import type {
   SubmitResponse,
   SubmitResult
 } from "./types";
-import { FormSubmissionError } from "./types";
 
 const isChoiceFieldType = (type: FieldType): boolean =>
   type === "radio" || type === "checkbox" || type === "multi-select" || type === "select";
@@ -1053,8 +1054,14 @@ function ContextFormRenderer({
         return result;
       }
       if (result.status === "error") {
-        if (result.error instanceof FormSubmissionError) {
-          const fieldErrors = result.error.payload.fieldErrors ?? {};
+        const payload =
+          result.error instanceof FormSubmissionError
+            ? result.error.payload
+            : isFormSubmissionSerializedError(result.error)
+              ? result.error
+              : undefined;
+        if (payload !== undefined) {
+          const fieldErrors = payload.fieldErrors ?? {};
           form.setServerErrors?.(fieldErrors);
           const firstServerFieldId =
             form.schema.fields.find((field) => Object.hasOwn(fieldErrors, field.id))?.id ?? Object.keys(fieldErrors)[0];
@@ -1062,6 +1069,9 @@ function ContextFormRenderer({
             const invalidPageIndex = pages?.findIndex((page) => page.questionIds.includes(firstServerFieldId));
             if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
             focusFirstIssue(firstServerFieldId);
+          }
+          if (payload.piiFindings !== undefined && payload.piiFindings.length > 0) {
+            setConfirmation({ findings: payload.piiFindings, generic: false });
           }
         }
         return result;
@@ -1462,9 +1472,12 @@ function ContextFormRenderer({
           {form.submitStatus === "success" ? completionRegion : null}
           {form.submitStatus === "error" && form.submitError !== null
             ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??
-              (form.submitError instanceof FormSubmissionError && form.submitError.payload.formError !== undefined ? (
+              (form.submitError instanceof FormSubmissionError &&
+              (form.submitError.payload.formErrors?.length ?? 0) > 0 ? (
                 <div role="alert">
-                  {form.submitError.payload.formError}
+                  {form.submitError.payload.formErrors?.map((message) => (
+                    <div key={message}>{message}</div>
+                  ))}
                   <button type="button" onClick={() => void submitValues()}>
                     {resolveMessage("retryButton")}
                   </button>

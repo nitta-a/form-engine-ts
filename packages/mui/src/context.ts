@@ -35,6 +35,23 @@ export function mergeMuiAdapterOptions(
     ...(base.localizationOptions === undefined && overrides.localizationOptions === undefined
       ? {}
       : { localizationOptions: { ...base.localizationOptions, ...overrides.localizationOptions } }),
+    ...(base.localization === undefined && overrides.localization === undefined
+      ? {}
+      : {
+          localization: {
+            ...base.localization,
+            ...overrides.localization,
+            ...(base.localization?.workspaceOptions === undefined &&
+            overrides.localization?.workspaceOptions === undefined
+              ? {}
+              : {
+                  workspaceOptions: {
+                    ...base.localization?.workspaceOptions,
+                    ...overrides.localization?.workspaceOptions
+                  }
+                })
+          }
+        }),
     ...(base.muiSlotProps === undefined && overrides.muiSlotProps === undefined
       ? {}
       : { muiSlotProps: { ...base.muiSlotProps, ...overrides.muiSlotProps } })

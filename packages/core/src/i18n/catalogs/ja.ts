@@ -1,5 +1,17 @@
 import type { FormEngineTranslationKey } from "../keys";
 
+export const JA_COMPARISON_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  "workspace.comparison.title": "翻訳比較ワークスペース",
+  "workspace.comparison.sourceHeader": "原文 ({{locale}})",
+  "workspace.comparison.targetHeader": "訳文 ({{locale}})",
+  "workspace.comparison.property.title": "タイトル",
+  "workspace.comparison.property.description": "説明文",
+  "workspace.comparison.property.label": "選択肢ラベル",
+  "workspace.comparison.property.completionMessage": "送信完了メッセージ",
+  "workspace.comparison.emptySource": "（原文なし）",
+  "workspace.comparison.staleWarning": "原文が変更されています"
+});
+
 export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = Object.freeze({
   "builder.formTitle": "フォームのタイトル",
   "builder.formDescription": "フォームの説明",
@@ -182,5 +194,14 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.confirm.removeLocaleTitle": "言語を削除しますか？",
   "workspace.confirm.removeLocaleMessage": "{{locale}} とその翻訳を削除します。",
   "workspace.empty.noTargetLocales": "翻訳先の言語が設定されていません。",
-  "workspace.empty.noSlotsToTranslate": "この言語には翻訳項目がありません。"
+  "workspace.empty.noSlotsToTranslate": "この言語には翻訳項目がありません。",
+  "workspace.comparison.title": "翻訳比較ワークスペース",
+  "workspace.comparison.sourceHeader": "原文 ({{locale}})",
+  "workspace.comparison.targetHeader": "訳文 ({{locale}})",
+  "workspace.comparison.property.title": "タイトル",
+  "workspace.comparison.property.description": "説明文",
+  "workspace.comparison.property.label": "選択肢ラベル",
+  "workspace.comparison.property.completionMessage": "送信完了メッセージ",
+  "workspace.comparison.emptySource": "（原文なし）",
+  "workspace.comparison.staleWarning": "原文が変更されています"
 });

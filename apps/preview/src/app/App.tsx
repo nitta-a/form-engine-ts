@@ -5,13 +5,14 @@ import { AnalyticsPanel } from "../analytics/AnalyticsPanel";
 import { BuilderPanel } from "../builder/BuilderPanel";
 import { BuilderPreviewProvider } from "../builder/BuilderPreviewContext";
 import { MuiPanel } from "../builder/MuiPanel";
+import { TranslationComparisonPanel } from "../comparison/TranslationComparisonPanel";
 import { RespondentPanel } from "../respondent/RespondentPanel";
 import { RespondentPreviewProvider } from "../respondent/RespondentPreviewContext";
 import { PreviewWorkspaceProvider, usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 
-type TabId = "builder" | "mui" | "respondent" | "analytics";
+type TabId = "builder" | "mui" | "comparison" | "respondent" | "analytics";
 
-const tabs: readonly TabId[] = ["builder", "mui", "respondent", "analytics"];
+const tabs: readonly TabId[] = ["builder", "mui", "comparison", "respondent", "analytics"];
 
 export default function App() {
   return (
@@ -90,6 +91,14 @@ function AppContent() {
           </div>
           <div id="panel-mui" role="tabpanel" aria-labelledby="tab-mui" hidden={activeTab !== "mui"}>
             {activeTab === "mui" ? <MuiPanel /> : null}
+          </div>
+          <div
+            id="panel-comparison"
+            role="tabpanel"
+            aria-labelledby="tab-comparison"
+            hidden={activeTab !== "comparison"}
+          >
+            {activeTab === "comparison" ? <TranslationComparisonPanel /> : null}
           </div>
         </BuilderPreviewProvider>
         <div id="panel-respondent" role="tabpanel" aria-labelledby="tab-respondent" hidden={activeTab !== "respondent"}>

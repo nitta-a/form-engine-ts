@@ -1,5 +1,6 @@
 import type {
   AsyncTranslationAdapter,
+  FormPolicy,
   FormSchema,
   LocaleOption,
   TranslationAdapter,
@@ -14,6 +15,7 @@ import {
   type TranslationWorkspaceError,
   type TranslationWorkspaceHeaderProps,
   type TranslationWorkspaceSlots,
+  type UseTranslationWorkspaceOptions,
   useFormEngineI18n,
   useTranslationWorkspace
 } from "@form-engine-ts/react";
@@ -38,6 +40,7 @@ export interface TranslationWorkspaceProps {
   readonly targetLocale?: string;
   readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
   readonly readOnly?: boolean;
+  readonly policy?: FormPolicy;
   readonly availableLocales?: readonly (string | LocaleOption)[];
   readonly onLocaleAdded?: (locale: string) => void;
   readonly onLocaleRemoved?: (locale: string) => void;
@@ -53,6 +56,7 @@ export interface TranslationWorkspaceProps {
     readonly error: TranslationWorkspaceError;
   }) => void;
   readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+  readonly validateLocale?: UseTranslationWorkspaceOptions["validateLocale"];
   readonly slots?: TranslationWorkspaceSlots;
 }
 
@@ -146,6 +150,7 @@ export function TranslationWorkspace({
   targetLocale,
   translationAdapter,
   readOnly = false,
+  policy,
   availableLocales,
   onLocaleAdded,
   onLocaleRemoved,
@@ -155,6 +160,7 @@ export function TranslationWorkspace({
   onTranslationSuccess,
   onTranslationError,
   onTranslationChange,
+  validateLocale,
   slots: workspaceSlots
 }: TranslationWorkspaceProps) {
   const { translator } = useFormEngineI18n();
@@ -166,6 +172,7 @@ export function TranslationWorkspace({
     ...(targetLocale === undefined ? {} : { targetLocale }),
     ...(translationAdapter === undefined ? {} : { translationAdapter }),
     readOnly,
+    ...(policy === undefined ? {} : { policy }),
     ...(availableLocales === undefined ? {} : { availableLocales }),
     ...(onLocaleAdded === undefined ? {} : { onLocaleAdded }),
     ...(onLocaleRemoved === undefined ? {} : { onLocaleRemoved }),
@@ -177,7 +184,8 @@ export function TranslationWorkspace({
     ...(onTranslationStart === undefined ? {} : { onTranslationStart }),
     ...(onTranslationSuccess === undefined ? {} : { onTranslationSuccess }),
     ...(onTranslationError === undefined ? {} : { onTranslationError }),
-    ...(onTranslationChange === undefined ? {} : { onTranslationChange })
+    ...(onTranslationChange === undefined ? {} : { onTranslationChange }),
+    ...(validateLocale === undefined ? {} : { validateLocale })
   });
   const [newLocale, setNewLocale] = useState("");
   const headerProps: TranslationWorkspaceHeaderProps = {

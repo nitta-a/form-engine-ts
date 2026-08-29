@@ -5,9 +5,10 @@ import {
   type FormSchema,
   type FormStorageAdapter,
   type FormSubmission,
+  FormSubmissionError,
   type FormValues
 } from "@form-engine-ts/core";
-import { FormSubmissionError, type SubmitContext } from "@form-engine-ts/react";
+import type { SubmitContext } from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
@@ -97,9 +98,11 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
         setSimulateServerError(false);
         const firstFieldId = schema.fields[0]?.id;
         if (firstFieldId !== undefined) {
-          throw new FormSubmissionError("Server validation failed", {
+          throw new FormSubmissionError({
+            code: "VALIDATION_FAILED",
+            messageKey: "submission.validation",
             fieldErrors: { [firstFieldId]: "This value was rejected by the server." },
-            formError: "The server rejected this response."
+            formErrors: ["The server rejected this response."]
           });
         }
       }

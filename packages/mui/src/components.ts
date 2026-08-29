@@ -34,6 +34,7 @@ function isAdapterOptions(value: MuiAdapterOptions | Partial<FormBuilderComponen
     "dense" in value ||
     "fieldEditorOptions" in value ||
     "localizationOptions" in value ||
+    "localization" in value ||
     "layoutOptions" in value ||
     "muiSlotProps" in value ||
     "getLocaleLabel" in value ||

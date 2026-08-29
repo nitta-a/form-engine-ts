@@ -5,8 +5,10 @@ import {
   calculatePageVisibility,
   type FormField,
   type FormSchema,
+  FormSubmissionError,
   type FormValue,
   type FormValues,
+  isFormSubmissionSerializedError,
   resolveLocalizedSchema,
   selectVisibleAnswers,
   type TranslationAdapter,
@@ -15,14 +17,7 @@ import {
   validatePageAnswers
 } from "@form-engine-ts/core";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  type BeforeSubmit,
-  type FormServerErrorPayload,
-  FormSubmissionError,
-  type FormSubmitHandler,
-  type SubmitContext,
-  type SubmitResult
-} from "./types";
+import type { BeforeSubmit, FormServerErrorPayload, FormSubmitHandler, SubmitContext, SubmitResult } from "./types";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -213,14 +208,18 @@ export function FormProvider({
         setSubmitStatus("success");
         return response === undefined ? { status: "success" } : { status: "success", response };
       } catch (cause) {
-        const error = isServerErrorPayload(cause)
-          ? new FormSubmissionError(
-              cause.formError ?? (cause instanceof Error ? cause.message : "Form submission failed."),
-              cause
-            )
-          : cause instanceof Error
-            ? cause
-            : new Error(String(cause));
+        const error = isFormSubmissionSerializedError(cause)
+          ? new FormSubmissionError(cause)
+          : isServerErrorPayload(cause)
+            ? new FormSubmissionError({
+                code: "VALIDATION_FAILED",
+                messageKey: cause.formError ?? "Submission failed",
+                fieldErrors: cause.fieldErrors ?? {},
+                formErrors: cause.formError === undefined ? [] : [cause.formError]
+              })
+            : cause instanceof Error
+              ? cause
+              : new Error(String(cause));
         setSubmitError(error);
         setSubmitStatus("error");
         return { status: "error", error };

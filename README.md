@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.0.0** (2026-08-29). All public packages are currently published at version `6.0.0`.
-This breaking release makes `values` the canonical submission property and removes the legacy `answers` alias from `FormSubmission`. It adds explicit legacy submission and Azure Table compatibility helpers, serializable submission errors, and typed translation workspace lifecycle events and confirmation slots. It also includes the v5.1.0 additions: Zod wire validation, expanded CSV exports, locale-catalog-aware translation workspaces, and Azure Table field mapping.
+The latest release is **v6.1.0** (2026-08-29). All public packages are currently published at version `6.1.0`.
+This release adds the side-by-side `useTranslationComparison` and `TranslationComparisonWorkspace`, strict locale-required submission and wire contracts, missing-translation diagnostics, and policy-aware localization workspace options. It builds on v6.0.0's breaking `values` submission property, explicit legacy compatibility helpers, serializable submission errors, and typed translation workspace lifecycle events.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.0.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.1.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.0.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.0.0` で公開されています。
-本破壊的リリースでは、`FormSubmission`のcanonicalプロパティを`values`に統一し、legacyの`answers` aliasを削除しました。明示的なlegacy SubmissionとAzure Table互換ヘルパー、シリアライズ可能なSubmissionエラー、型付き翻訳ワークスペースのライフサイクルイベントと確認slotを追加しています。v5.1.0のZod wire検証、CSVエクスポート拡張、ロケールカタログ対応の翻訳ワークスペース、Azure Tableのフィールドマッピングも含まれます。
+最新版は **v6.1.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.1.0` で公開されています。
+本リリースでは、左右比較型の`useTranslationComparison`と`TranslationComparisonWorkspace`、locale必須のstrict Submission／wire契約、翻訳キー不足の診断、ポリシー対応のローカライゼーションワークスペースオプションを追加しました。v6.0.0の破壊的な`values`統一、legacy互換ヘルパー、シリアライズ可能なSubmissionエラー、型付き翻訳ワークスペースイベントも引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.0.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.1.0) を参照してください。
 
 ### 編集・回答体験
 

@@ -79,6 +79,10 @@ manual-translation detection and metadata normalization callbacks. `removeLocale
 the locale from registrations and all form, page, field, option translation values and metadata; the default locale
 cannot be removed.
 
+The official catalogs include `JA_COMPARISON_MESSAGES` for comparison-workspace labels. The Core translator returns
+an empty string for unresolved keys, including when a fallback resolver returns the key itself, so internal dotted keys
+are not rendered as user-facing labels.
+
 The React builder uses canonical keys with legacy aliases when resolving UI translations:
 
 | Canonical key | Legacy alias |

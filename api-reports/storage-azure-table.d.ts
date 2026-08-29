@@ -1,4 +1,4 @@
-import { FormSubmission, SubmissionPageQueryOptions, PagedSubmissionStorageAdapter, SubmissionFilter } from '@form-engine-ts/core';
+import { FormSubmission, SubmissionPageQueryOptions, BaseSubmissionMetadata, StrictFormSubmission, PagedSubmissionStorageAdapter, SubmissionFilter } from '@form-engine-ts/core';
 
 interface AzureTableListOptions {
     readonly queryOptions?: {
@@ -44,6 +44,22 @@ interface AzureTableLegacyCodec {
     readonly createPartitionKey: (formId: string, submissionId: string) => string;
     readonly createRowKey: (submittedAt: string, submissionId: string) => string;
 }
+interface LegacyAnswerArrayEntity extends Record<string, unknown> {
+    readonly PartitionKey: string;
+    readonly RowKey: string;
+    readonly answers: string;
+    readonly answeredAt: string;
+    readonly surveyVersion: number;
+    readonly locale?: string;
+}
+interface LegacyArrayAzureTableCodec<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+    readonly encode: (submission: StrictFormSubmission<TMeta>) => Record<string, unknown>;
+    readonly decode: (entity: Record<string, unknown>) => StrictFormSubmission<TMeta>;
+}
+declare function createLegacyArrayAzureTableCodec<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(options?: {
+    readonly defaultLocale?: string;
+    readonly metadataExtractor?: (entity: Record<string, unknown>) => TMeta;
+}): LegacyArrayAzureTableCodec<TMeta>;
 declare const createLegacyAzureTableCodec: (options?: {
     readonly partitionKeyGenerator?: (formId: string, submissionId: string) => string;
     readonly rowKeyGenerator?: (submittedAt: string, submissionId: string) => string;
@@ -104,4 +120,4 @@ declare function metadataFiltersToOData(options: SubmissionPageQueryOptions, map
 declare function submissionFilterToOData(filter: SubmissionFilter, mapping?: AzureTableFieldMapping): string | undefined;
 declare function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
 
-export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableLegacyCodec, type AzureTableLegacyEntity, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, createAzureTableStorage, createLegacyAzureTableCodec, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };
+export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableLegacyCodec, type AzureTableLegacyEntity, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, type LegacyAnswerArrayEntity, type LegacyArrayAzureTableCodec, createAzureTableStorage, createLegacyArrayAzureTableCodec, createLegacyAzureTableCodec, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };

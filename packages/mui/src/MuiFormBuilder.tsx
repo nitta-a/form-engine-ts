@@ -18,6 +18,7 @@ import {
   type MuiFormEngineI18nOptions,
   type MuiLayoutOptions,
   type MuiLocalizationOptions,
+  type MuiLocalizationSlotOptions,
   type MuiSubmissionSettingsOptions
 } from "./types";
 
@@ -26,6 +27,7 @@ export interface MuiFormBuilderProps
   readonly muiOptions?: MuiAdapterOptions;
   readonly layoutOptions?: MuiLayoutOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
+  readonly localization?: MuiLocalizationSlotOptions;
   readonly submissionSettingsOptions?: MuiSubmissionSettingsOptions;
   readonly muiSlotProps?: MuiBuilderSlotProps;
   readonly components?: Partial<FormBuilderComponents>;
@@ -37,6 +39,7 @@ export function MuiFormBuilder({
   muiOptions,
   layoutOptions,
   localizationOptions,
+  localization,
   submissionSettingsOptions,
   muiSlotProps,
   components: customComponents,
@@ -50,9 +53,10 @@ export function MuiFormBuilder({
       mergeMuiAdapterOptions(muiOptions, {
         ...(layoutOptions === undefined ? {} : { layoutOptions }),
         ...(localizationOptions === undefined ? {} : { localizationOptions }),
+        ...(localization === undefined ? {} : { localization }),
         ...(muiSlotProps === undefined ? {} : { muiSlotProps })
       }),
-    [layoutOptions, localizationOptions, muiOptions, muiSlotProps]
+    [layoutOptions, localization, localizationOptions, muiOptions, muiSlotProps]
   );
   const resolvedMuiOptions = useMemo(
     () =>
@@ -110,6 +114,8 @@ export function MuiFormBuilder({
       {...(i18n.locale === undefined ? {} : { locale: i18n.locale })}
       {...(i18n.fallbackLocale === undefined ? {} : { fallbackLocale: i18n.fallbackLocale })}
       {...(i18n.messages === undefined ? {} : { messages: i18n.messages })}
+      {...(i18n.onMissingKey === undefined ? {} : { onMissingKey: i18n.onMissingKey })}
+      {...(i18n.strict === undefined ? {} : { strict: i18n.strict })}
       {...(i18n.translator === undefined ? {} : { translator: i18n.translator })}
     >
       {content}

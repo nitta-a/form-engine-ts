@@ -1,11 +1,17 @@
-import type { FormEngineMessages, FormEngineTranslator, LocaleOption } from "@form-engine-ts/core";
+import type {
+  FormEngineMessages,
+  FormEngineTranslator,
+  LocaleOption,
+  TranslationMissingKeyEvent
+} from "@form-engine-ts/core";
 import type {
   BuilderActionIconType,
   FieldEditorControlsConfig,
   FieldPropertyControlMode,
   FieldTypeSelectOptionsConfig,
   LocalizationSummaryContext,
-  QuestionType
+  QuestionType,
+  UseTranslationWorkspaceOptions
 } from "@form-engine-ts/react";
 import type {
   AccordionProps,
@@ -49,6 +55,8 @@ export interface MuiFormEngineI18nOptions {
   readonly locale?: string;
   readonly fallbackLocale?: string;
   readonly messages?: FormEngineMessages;
+  readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
+  readonly strict?: boolean;
   readonly translator?: FormEngineTranslator;
   readonly getLocaleLabel?: (locale: string) => string;
   readonly getActionLabel?: (actionType: string) => string;
@@ -71,6 +79,11 @@ export interface MuiLocalizationOptions {
   readonly defaultLocaleControl?: "editable" | "readOnly" | "hidden";
   readonly noWrapActions?: boolean;
   readonly autoFocusNewTab?: boolean;
+}
+
+export interface MuiLocalizationSlotOptions {
+  readonly mode?: "standard" | "inline-workspace";
+  readonly workspaceOptions?: Partial<UseTranslationWorkspaceOptions>;
 }
 
 export interface MuiSubmissionSettingsOptions {
@@ -141,6 +154,7 @@ export interface MuiAdapterOptions {
   readonly layoutOptions?: MuiLayoutOptions;
   readonly fieldEditorOptions?: MuiFieldEditorOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
+  readonly localization?: MuiLocalizationSlotOptions;
   readonly muiSlotProps?: MuiBuilderSlotProps;
 }
 
@@ -162,6 +176,7 @@ export interface ResolvedMuiAdapterOptions {
   readonly layoutOptions?: MuiLayoutOptions;
   readonly fieldEditorOptions?: MuiFieldEditorOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
+  readonly localization?: MuiLocalizationSlotOptions;
   readonly muiSlotProps?: MuiBuilderSlotProps;
 }
 
@@ -235,6 +250,7 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
       noWrapActions: options.localizationOptions?.noWrapActions ?? true,
       autoFocusNewTab: options.localizationOptions?.autoFocusNewTab ?? true
     },
+    ...(options.localization === undefined ? {} : { localization: options.localization }),
     muiSlotProps: options.muiSlotProps ?? {}
   };
 }
