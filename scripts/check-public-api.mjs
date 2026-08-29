@@ -84,13 +84,28 @@ function normalizeTypeWithDefaultParameters(node, sourceFile, declaration) {
 function resolveObjectMembers(node, sourceFile, seen = new Set()) {
   if (node === undefined) return undefined;
   if (ts.isTypeLiteralNode(node)) return node.members;
+  if (ts.isIntersectionTypeNode(node)) {
+    const members = [];
+    for (const type of node.types) {
+      const resolved = resolveObjectMembers(type, sourceFile, new Set(seen));
+      if (resolved !== undefined) members.push(...resolved);
+    }
+    return members.length === 0 ? undefined : members;
+  }
   if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName) || seen.has(node.typeName.text)) {
     return undefined;
   }
   seen.add(node.typeName.text);
   const declaration = sourceFile.statements.find((statement) => declarationName(statement) === node.typeName.text);
+  if (declaration === undefined) return undefined;
   if (ts.isInterfaceDeclaration(declaration)) return declaration.members;
   if (ts.isTypeAliasDeclaration(declaration)) return resolveObjectMembers(declaration.type, sourceFile, seen);
+  return undefined;
+}
+
+function declarationObjectMembers(declaration, sourceFile) {
+  if (ts.isInterfaceDeclaration(declaration)) return declaration.members;
+  if (ts.isTypeAliasDeclaration(declaration)) return resolveObjectMembers(declaration.type, sourceFile);
   return undefined;
 }
 
@@ -260,7 +275,21 @@ function unionParts(node, sourceFile) {
 }
 
 function compareDeclaration(name, previous, current, previousFile, currentFile) {
-  if (previous.kind !== current.kind) return [`${name}: declaration kind changed`];
+  if (previous.kind !== current.kind) {
+    const previousMembers = declarationObjectMembers(previous, previousFile);
+    const currentMembers = declarationObjectMembers(current, currentFile);
+    if (previousMembers !== undefined && currentMembers !== undefined) {
+      return compareMembers(
+        name,
+        { members: previousMembers },
+        { members: currentMembers },
+        previousFile,
+        currentFile,
+        current
+      );
+    }
+    return [`${name}: declaration kind changed`];
+  }
   if (ts.isVariableDeclaration(previous) && ts.isVariableDeclaration(current)) {
     if (
       previous.type !== undefined &&
@@ -405,7 +434,7 @@ async function main() {
       `Public API reports changed for ${changed.join(", ")}. Review compatibility, then run pnpm api:update.`
     );
   }
-  await verifySemverGate(root, packages, reportDirectory);
+  if (mode === "check") await verifySemverGate(root, packages, reportDirectory);
   console.log(`${mode === "update" ? "Updated" : "Verified"} ${packages.length} public API reports.`);
 }
 

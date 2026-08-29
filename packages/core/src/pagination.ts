@@ -13,6 +13,91 @@ export interface PaginationIteratorOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface SubmissionCursorPayload {
+  readonly kind: "submission";
+  readonly formId: string;
+  readonly submittedAt: string;
+  readonly id: string;
+}
+
+export interface TextAnswerCursorPayload {
+  readonly kind: "text_answer";
+  readonly formId: string;
+  readonly fieldId: string;
+  readonly submittedAt: string;
+  readonly submissionId: string;
+}
+
+export type StorageCursor = string;
+
+export interface StorageFilterCriteria {
+  readonly fieldId?: string;
+  readonly fromDate?: string;
+  readonly toDate?: string;
+  readonly metadataFilters?: Readonly<Record<string, JsonValue>>;
+}
+
+export interface PaginatedResult<T> {
+  readonly items: readonly T[];
+  readonly hasMore: boolean;
+  readonly nextCursor?: StorageCursor;
+  readonly totalScannedCount: number;
+}
+
+export interface CursorPagingOptions {
+  readonly pageSize: number;
+  readonly cursor?: StorageCursor;
+  readonly maxScanPages?: number;
+}
+
+export async function paginateWithFilter<T>(params: {
+  readonly pageSize: number;
+  readonly cursor?: StorageCursor;
+  readonly maxScanPages?: number;
+  readonly fetchPage: (
+    rawCursor: StorageCursor | undefined,
+    limit: number
+  ) => Promise<{ readonly rawItems: readonly T[]; readonly rawNextCursor?: StorageCursor }>;
+  readonly filterPredicate: (item: T) => boolean;
+  readonly encodeCursor: (lastItem: T) => StorageCursor;
+}): Promise<PaginatedResult<T>> {
+  const { pageSize, cursor, maxScanPages = 5, fetchPage, filterPredicate, encodeCursor } = params;
+  normalizeSubmissionPageSize(pageSize);
+  if (!Number.isSafeInteger(maxScanPages) || maxScanPages < 1) {
+    throw new TypeError("maxScanPages must be a positive safe integer.");
+  }
+
+  const collected: T[] = [];
+  let currentRawCursor = cursor;
+  let totalScannedCount = 0;
+  let scanCount = 0;
+
+  while (collected.length < pageSize && scanCount < maxScanPages) {
+    scanCount += 1;
+    const fetchLimit = pageSize - collected.length + 1;
+    const { rawItems, rawNextCursor } = await fetchPage(currentRawCursor, fetchLimit);
+    totalScannedCount += rawItems.length;
+    for (const item of rawItems) {
+      if (!filterPredicate(item)) continue;
+      collected.push(item);
+      if (collected.length === pageSize) {
+        const lastItem = collected.at(-1);
+        if (lastItem === undefined) break;
+        return {
+          items: collected,
+          hasMore: rawNextCursor !== undefined,
+          ...(rawNextCursor === undefined ? {} : { nextCursor: encodeCursor(lastItem) }),
+          totalScannedCount
+        };
+      }
+    }
+    if (rawItems.length === 0 || rawNextCursor === undefined) break;
+    currentRawCursor = rawNextCursor;
+  }
+
+  return { items: collected, hasMore: false, totalScannedCount };
+}
+
 function asFormResponse(submission: FormSubmission): FormResponse {
   return {
     responseId: submission.id,
@@ -74,6 +159,76 @@ export interface SubmissionCursorValue {
   readonly responseId: string;
 }
 
+export function encodeStorageSubmissionCursor(value: SubmissionCursorPayload): StorageCursor {
+  if (
+    value.kind !== "submission" ||
+    value.formId.length === 0 ||
+    value.submittedAt.length === 0 ||
+    value.id.length === 0
+  ) {
+    throw new TypeError("Submission cursor values are invalid.");
+  }
+  return encodeBase64Url(new TextEncoder().encode(JSON.stringify(value)));
+}
+
+export function decodeStorageSubmissionCursor(cursor: StorageCursor): SubmissionCursorPayload {
+  const parsed = decodeCursorPayload(cursor, "submission cursor payload is invalid.");
+  if (
+    parsed.kind !== "submission" ||
+    typeof parsed.formId !== "string" ||
+    parsed.formId.length === 0 ||
+    typeof parsed.submittedAt !== "string" ||
+    parsed.submittedAt.length === 0 ||
+    typeof parsed.id !== "string" ||
+    parsed.id.length === 0
+  ) {
+    throw new TypeError("submission cursor payload is invalid.");
+  }
+  return {
+    kind: "submission",
+    formId: parsed.formId,
+    submittedAt: parsed.submittedAt,
+    id: parsed.id
+  };
+}
+
+export function encodeStorageTextAnswerCursor(value: TextAnswerCursorPayload): StorageCursor {
+  if (
+    value.kind !== "text_answer" ||
+    value.formId.length === 0 ||
+    value.fieldId.length === 0 ||
+    value.submittedAt.length === 0 ||
+    value.submissionId.length === 0
+  ) {
+    throw new TypeError("Text answer cursor values are invalid.");
+  }
+  return encodeBase64Url(new TextEncoder().encode(JSON.stringify(value)));
+}
+
+export function decodeStorageTextAnswerCursor(cursor: StorageCursor): TextAnswerCursorPayload {
+  const parsed = decodeCursorPayload(cursor, "text answer cursor payload is invalid.");
+  if (
+    parsed.kind !== "text_answer" ||
+    typeof parsed.formId !== "string" ||
+    parsed.formId.length === 0 ||
+    typeof parsed.fieldId !== "string" ||
+    parsed.fieldId.length === 0 ||
+    typeof parsed.submittedAt !== "string" ||
+    parsed.submittedAt.length === 0 ||
+    typeof parsed.submissionId !== "string" ||
+    parsed.submissionId.length === 0
+  ) {
+    throw new TypeError("text answer cursor payload is invalid.");
+  }
+  return {
+    kind: "text_answer",
+    formId: parsed.formId,
+    fieldId: parsed.fieldId,
+    submittedAt: parsed.submittedAt,
+    submissionId: parsed.submissionId
+  };
+}
+
 export interface TextAnswerCursorValue {
   readonly responseId: string;
   readonly fieldId: string;
@@ -111,6 +266,25 @@ function decodeBase64(value: string): Uint8Array {
     if (characters[3] !== "=") bytes.push(combined & 255);
   }
   return new Uint8Array(bytes);
+}
+
+function encodeBase64Url(bytes: Uint8Array): string {
+  return encodeBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function decodeCursorPayload(cursor: StorageCursor, invalidMessage: string): Record<string, unknown> {
+  try {
+    const normalized = cursor
+      .replaceAll("-", "+")
+      .replaceAll("_", "/")
+      .padEnd(Math.ceil(cursor.length / 4) * 4, "=");
+    const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(decodeBase64(normalized)));
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new TypeError(invalidMessage);
+    return parsed as Record<string, unknown>;
+  } catch (cause) {
+    if (cause instanceof TypeError && cause.message === invalidMessage) throw cause;
+    throw new TypeError("cursor must be a valid Base64URL JSON token.", { cause });
+  }
 }
 
 export function encodeSubmissionCursor(value: SubmissionCursorValue): string {

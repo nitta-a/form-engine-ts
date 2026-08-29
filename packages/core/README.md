@@ -99,6 +99,11 @@ const i18nextAdapter: TranslationAdapter = {
 };
 ```
 
+Core also exports the fully typed `FormEngineTranslationKey` union, `JA_MESSAGES`, `EN_MESSAGES`, and
+`createFormEngineTranslator`. The built-in translator defaults to Japanese, falls back to English, accepts partial
+custom catalogs, formats `{{placeholder}}` values, and returns an empty string for an unresolved key instead of
+exposing the key itself.
+
 Translation callbacks receive `nodeMetadata` and `existingTranslationMetadata` separately. The deprecated `metadata`
 slot property remains an alias for `nodeMetadata` during migration.
 
@@ -122,6 +127,23 @@ const submissions = await storage.listSubmissions("contact", 1, range);
 ```
 
 Results are ordered by `submittedAt`, then submission ID. Both boundaries are inclusive.
+
+Submission metadata can be strongly typed at the application boundary:
+
+```ts
+import { createSubmission, validateSubmission } from "@form-engine-ts/core";
+
+const submission = createSubmission<{ deckId: string; piiConfirmed: boolean }>({
+  formId: "guide",
+  formVersion: 1,
+  answers: { title: "Welcome" },
+  metadata: { deckId: "deck_123", piiConfirmed: false }
+});
+submission.metadata.deckId;
+const validation = validateSubmission(schema, submission, { privacyEngine });
+```
+
+`validateSubmission` returns one serializable result containing field errors, form errors, and optional PII findings.
 
 ## Versioning, incremental analytics, and paged storage
 
@@ -152,6 +174,13 @@ and `filter` are applied before page sizing. `filter` accepts a composable `eq`/
 may push supported nodes to their native query language while preserving identical client-side semantics. Adapters that
 implement `listTextAnswerPage` expose stable cursor pagination over individual text answers.
 `TextAnswerPageQueryOptions.fieldIds` can select multiple free-text fields for item-level paging.
+
+The `paginateWithFilter` helper in `@form-engine-ts/storage` continues fetching native pages until `pageSize` matching
+items are collected or the source is exhausted. `totalScannedCount` makes post-filter work observable and
+`maxScanPages` bounds low-density scans.
+
+`commitVersionTransition` accepts a typed `domainData` value and carries it through optional before/after hooks and the
+persistence adapter without interpreting or modifying it.
 
 `iterateSubmissionPages(adapter, formId, query, options)` safely traverses every page as an async generator. It supports
 `pageSize`, `maxItems`, and `AbortSignal`, continues through empty pages with a next cursor, and rejects missing or cyclic

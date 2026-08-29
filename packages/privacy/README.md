@@ -15,3 +15,6 @@ import { createStandardPrivacyDetector } from "@form-engine-ts/privacy";
 const detector = createStandardPrivacyDetector();
 const findings = detector.detect(schema, values);
 ```
+
+Use `normalizePiiFindingsToMetadata(findings, userConfirmed)` to persist a compact confirmation flag, distinct finding
+types, and the detected count alongside a submission.

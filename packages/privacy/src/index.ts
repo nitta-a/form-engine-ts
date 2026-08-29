@@ -26,6 +26,18 @@ export interface SensitiveDataDetector {
   detect(schema: FormSchema, values: Record<string, unknown>): readonly SensitiveDataFinding[];
 }
 
+export function normalizePiiFindingsToMetadata(
+  findings: readonly SensitiveDataFinding[],
+  userConfirmed: boolean
+): {
+  readonly piiConfirmed: boolean;
+  readonly piiFindingTypes: readonly string[];
+  readonly piiDetectedCount: number;
+} {
+  const piiFindingTypes = [...new Set(findings.map((finding) => finding.type))];
+  return { piiConfirmed: userConfirmed, piiFindingTypes, piiDetectedCount: findings.length };
+}
+
 const STANDARD_RULES: readonly SensitiveDataDetectorRule[] = [
   { type: "email", pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu },
   { type: "url", pattern: /\b(?:https?:\/\/|www\.)[^\s<>"']*[A-Z0-9/#]/giu },

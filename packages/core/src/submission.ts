@@ -1,12 +1,22 @@
 import { assertValidFormSchema } from "./schema";
-import type { ExtensibleNode, FormSchema, FormSubmission, FormValues } from "./types";
+import type {
+  BaseSubmissionMetadata,
+  CreateSubmissionInput,
+  ExtensibleNode,
+  FormSchema,
+  FormSubmission,
+  FormValues,
+  JsonValue
+} from "./types";
 import { validateAnswers } from "./validation";
 import { selectVisibleAnswers } from "./visibility";
 
-export interface CreateSubmissionOptions extends ExtensibleNode {
+export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends ExtensibleNode {
   readonly id: string;
   readonly locale: string;
   readonly submittedAt: string;
+  readonly metadata?: TMeta & Readonly<Record<string, JsonValue>>;
 }
 
 function cloneValues(values: FormValues): FormValues {
@@ -15,11 +25,73 @@ function cloneValues(values: FormValues): FormValues {
   );
 }
 
+function generatedSubmissionId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function toFormValues(answers: Readonly<Record<string, unknown>>): FormValues {
+  const values: Record<string, FormValues[string]> = {};
+  for (const [key, value] of Object.entries(answers)) {
+    if (isFormValue(value)) values[key] = value;
+  }
+  return values;
+}
+
+function isFormValue(value: unknown): value is FormValues[string] {
+  return (
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    (Array.isArray(value) && value.every((item) => typeof item === "string"))
+  );
+}
+
 export function createSubmission(
   schema: FormSchema,
   values: FormValues,
   options: CreateSubmissionOptions
-): FormSubmission {
+): FormSubmission;
+export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+  schema: FormSchema,
+  values: FormValues,
+  options: CreateSubmissionOptions<TMeta>
+): FormSubmission<TMeta>;
+export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+  input: CreateSubmissionInput<TMeta>
+): FormSubmission<TMeta>;
+export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+  schemaOrInput: FormSchema | CreateSubmissionInput<BaseSubmissionMetadata>,
+  values?: FormValues,
+  options?: CreateSubmissionOptions<TMeta>
+): FormSubmission<TMeta> {
+  if ("answers" in schemaOrInput) {
+    const input = schemaOrInput;
+    const id = input.id ?? generatedSubmissionId();
+    if (input.formId.trim().length === 0) throw new TypeError("formId must not be empty.");
+    if (!Number.isSafeInteger(input.formVersion) || input.formVersion < 1) {
+      throw new TypeError("formVersion must be a positive safe integer.");
+    }
+    const submittedAt = input.submittedAt ?? new Date().toISOString();
+    if (submittedAt.trim().length === 0 || !Number.isFinite(Date.parse(submittedAt))) {
+      throw new TypeError("submittedAt must be a valid date string.");
+    }
+    const answers = Object.freeze({ ...input.answers });
+    return Object.freeze({
+      id,
+      formId: input.formId,
+      formVersion: input.formVersion,
+      locale: "",
+      values: Object.freeze(cloneValues(toFormValues(answers))),
+      answers,
+      metadata: input.metadata,
+      submittedAt,
+      ...(input.schemaRevision === undefined ? {} : { schemaRevision: input.schemaRevision })
+    }) as FormSubmission<TMeta>;
+  }
+
+  const schema = schemaOrInput;
+  if (values === undefined || options === undefined) throw new TypeError("values and options are required.");
   assertValidFormSchema(schema);
   if (options.id.trim().length === 0) throw new TypeError("Submission ID must not be empty.");
   if (options.locale.trim().length === 0) throw new TypeError("Submission locale must not be empty.");
@@ -39,10 +111,11 @@ export function createSubmission(
     formVersion: schema.version,
     locale: options.locale,
     values: Object.freeze(cloneValues(visibleValues)),
+    answers: Object.freeze({ ...visibleValues }),
     submittedAt: options.submittedAt,
     ...(options.metadata === undefined ? {} : { metadata: Object.freeze({ ...options.metadata }) }),
     ...(options.translationMetadata === undefined
       ? {}
       : { translationMetadata: Object.freeze({ ...options.translationMetadata }) })
-  });
+  }) as FormSubmission<TMeta>;
 }

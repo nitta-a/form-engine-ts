@@ -15,6 +15,13 @@ import type {
 
 export { normalizeLocale } from "./locale";
 
+export interface TranslationProviderError {
+  readonly code: "RATE_LIMIT" | "AUTH_FAILED" | "UNSUPPORTED_LANGUAGE" | "NETWORK_ERROR" | "UNKNOWN";
+  readonly message: string;
+  readonly retryable: boolean;
+  readonly rawError?: unknown;
+}
+
 export interface TranslationSlot {
   readonly kind: "form" | "page" | "field" | "option";
   readonly nodeId: string;

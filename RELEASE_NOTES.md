@@ -5,6 +5,20 @@ current release and usage information.
 
 ## Latest release
 
+### v4.9.0 — 2026-08-29
+
+- Added typed submission metadata and the object-input `createSubmission` overload with generated IDs, answer snapshots, and schema revisions.
+- Added `validateSubmission` with injectable privacy detection and serializable field/form error results.
+- Added cursor payload contracts, filter-aware pagination helpers, async page iteration, and the new `@form-engine-ts/storage` package.
+- Added typed version-transition contexts and `commitVersionTransition`, plus PII finding normalization for persisted metadata.
+- Expanded storage adapter contracts with metadata filters, date ranges, and multi-field text-answer paging.
+- Added typed translation keys, official Japanese/English catalogs, safe fallback translation, and the public `FormEngineTranslator` API.
+- Added `FormEngineI18nProvider` for independent UI and schema/content locales across the React and MUI integrations.
+- Translation workspace mutations now return discriminated structured results for validation, read-only, adapter, and translation failures.
+- Aligned all public packages to version 4.9.0.
+
+See the [GitHub release for v4.9.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.9.0).
+
 ### v4.8.0 — 2026-08-29
 
 - Added `normalizeLocale` for canonical BCP 47 locale normalization, including underscore-separated compatibility input and invalid-tag rejection.
@@ -211,6 +225,20 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v4.9.0 — 2026-08-29
+
+- 型付きSubmissionメタデータ、生成ID・回答スナップショット・スキーマリビジョンに対応したオブジェクト入力形式の`createSubmission`オーバーロードを追加しました。
+- 注入可能なプライバシー検出と、シリアライズ可能なフィールド／フォームエラー結果を備えた`validateSubmission`を追加しました。
+- カーソルペイロード契約、フィルター対応ページング、非同期ページ反復、新しい`@form-engine-ts/storage`パッケージを追加しました。
+- 型付きバージョン遷移コンテキストと`commitVersionTransition`、保存用PII検出結果の正規化を追加しました。
+- ストレージアダプターにメタデータフィルター、日付範囲、複数フィールドのテキスト回答ページングを追加しました。
+- 型付き翻訳キー、公式の日本語／英語カタログ、安全なフォールバック翻訳、および公開`FormEngineTranslator` APIを追加しました。
+- React／MUI連携に`FormEngineI18nProvider`を追加し、UIロケールとスキーマ／コンテンツロケールを分離できるようにしました。
+- 翻訳ワークスペースの変更処理が、検証・読み取り専用・アダプター・翻訳エラーを判別可能な構造化結果として返るようになりました。
+- 公開パッケージのバージョンを4.9.0に統一しました。
+
+[v4.9.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.9.0)も参照してください。
 
 ### v4.8.0 — 2026-08-29
 

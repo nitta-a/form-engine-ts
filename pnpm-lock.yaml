@@ -152,6 +152,12 @@ importers:
         specifier: '>=18.2 <20'
         version: 19.2.8(react@19.2.8)
 
+  packages/storage:
+    dependencies:
+      '@form-engine-ts/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/storage-azure-table:
     dependencies:
       '@form-engine-ts/core':

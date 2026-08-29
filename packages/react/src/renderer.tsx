@@ -16,6 +16,7 @@ import {
   Fragment,
   type ReactNode,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -24,6 +25,7 @@ import {
 } from "react";
 import type { SubmissionAttempt } from "./attempt";
 import { FormProvider, useForm } from "./context";
+import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "./i18n/provider";
 import type { SubmissionReceipt } from "./receipt";
 import type {
   BeforeSubmit,
@@ -736,6 +738,8 @@ function ContextFormRenderer({
   slots = {}
 }: FormRendererPresentationProps) {
   const form = useForm();
+  const i18n = useFormEngineI18n();
+  const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const prefix = useId().replace(/:/g, "");
   const formRef = useRef<HTMLFormElement>(null);
   const loadedDraftKey = useRef<string | null>(null);
@@ -787,12 +791,16 @@ function ContextFormRenderer({
 
   const resolveMessage = useCallback(
     (key: keyof FormRendererMessages, fallback?: string): string => {
+      const providerDefault = isProviderValue ? i18n.translator(`renderer.${key}`) : undefined;
       const defaultText =
-        fallback ?? DEFAULT_RENDERER_MESSAGES[form.locale.toLowerCase().startsWith("ja") ? "ja" : "en"][key] ?? key;
+        fallback ??
+        (providerDefault === "" ? undefined : providerDefault) ??
+        DEFAULT_RENDERER_MESSAGES[form.locale.toLowerCase().startsWith("ja") ? "ja" : "en"][key] ??
+        key;
       const configured = messages[key];
       return messageResolver?.(key, configured ?? defaultText) ?? configured ?? defaultText;
     },
-    [form.locale, messageResolver, messages]
+    [form.locale, i18n, isProviderValue, messageResolver, messages]
   );
 
   const fieldTranslate = useCallback(
@@ -1527,16 +1535,26 @@ const defaultRendererTranslator: TranslationAdapter = {
 };
 
 export function FormRenderer(props: FormRendererProps) {
+  const i18n = useFormEngineI18n();
+  const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   if (!("schema" in props)) return <ContextFormRenderer {...props} />;
   const {
     schema,
     locale = schema.defaultLocale ?? "en",
-    translator = defaultRendererTranslator,
+    translator: explicitTranslator,
     initialValues,
     resetOnSuccess,
     onSubmit,
     ...rendererProps
   } = props;
+  const translator =
+    explicitTranslator ??
+    (isProviderValue
+      ? {
+          translate: (key: string, _locale: string, params?: Readonly<Record<string, string | number>>) =>
+            params === undefined ? i18n.translator(key) : i18n.translator(key, { ...params })
+        }
+      : defaultRendererTranslator);
   return (
     <FormProvider
       schema={schema}

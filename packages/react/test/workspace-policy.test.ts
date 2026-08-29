@@ -18,11 +18,11 @@ describe("useTranslationWorkspace locale policy", () => {
       useTranslationWorkspace({ schema, onChange, policy: { allowedLocales: ["ja", "en"], maxLocales: 2 } })
     );
 
-    let addResult: { success: boolean; error?: string } | undefined;
+    let addResult: ReturnType<typeof result.current.addLocale> | undefined;
     act(() => {
       addResult = result.current.addLocale("fr");
     });
-    expect(addResult).toEqual({ success: false, error: 'Locale "fr" is not allowed by the form policy.' });
+    expect(addResult).toEqual({ success: false, error: { type: "locale_not_allowed", locale: "fr" } });
     expect(result.current.isAddLocaleAllowed("fr")).toBe(false);
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -41,7 +41,7 @@ describe("useTranslationWorkspace locale policy", () => {
 
     expect(result.current.addLocale("fr")).toEqual({
       success: false,
-      error: "At most 2 locales are allowed by the form policy."
+      error: { type: "max_locales_exceeded", max: 2, current: 2 }
     });
     expect(result.current.isAddLocaleAllowed("fr")).toBe(false);
     act(() => result.current.removeLocale("ja"));
@@ -58,7 +58,10 @@ describe("useTranslationWorkspace locale policy", () => {
         : { valid: false, error: { type: "locale_not_allowed" as const, message: "Custom rejection" } }
     );
     const { result } = renderHook(() => useTranslationWorkspace({ schema, validateLocale }));
-    expect(result.current.addLocale("fr")).toEqual({ success: false, error: "Custom rejection" });
+    expect(result.current.addLocale("fr")).toEqual({
+      success: false,
+      error: { type: "locale_not_allowed", locale: "fr" }
+    });
     expect(result.current.addLocale("ja")).toEqual({ success: true });
     expect(validateLocale).toHaveBeenCalledWith(
       "fr",

@@ -26,6 +26,7 @@ export interface UseTranslationWorkspaceOptions {
   readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
   readonly readOnly?: boolean;
   readonly policy?: FormPolicy;
+  readonly beforeRemoveLocale?: (locale: string, context: { readonly slotCount: number }) => Promise<boolean> | boolean;
   readonly validateLocale?:
     | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
     | CustomLocaleValidator;
@@ -66,6 +67,17 @@ export interface TranslationSummary {
   readonly completionPercentage: number;
 }
 
+export type TranslationWorkspaceError =
+  | { readonly type: "locale_not_allowed"; readonly locale: string }
+  | { readonly type: "locale_already_exists"; readonly locale: string }
+  | { readonly type: "invalid_locale_format"; readonly locale: string }
+  | { readonly type: "max_locales_exceeded"; readonly max: number; readonly current: number }
+  | { readonly type: "read_only_mode" }
+  | { readonly type: "adapter_not_configured" }
+  | { readonly type: "target_locale_missing" }
+  | { readonly type: "translation_failed"; readonly message: string; readonly cause?: unknown }
+  | { readonly type: "custom_validation_failed"; readonly message: string };
+
 export interface UseTranslationWorkspaceResult {
   readonly sourceLocale: string;
   readonly targetLocale: string;
@@ -73,14 +85,20 @@ export interface UseTranslationWorkspaceResult {
   readonly setTargetLocale: (locale: string) => void;
   readonly slots: readonly TranslationSlot[];
   readonly summary: TranslationSummary;
-  readonly addLocale: (locale: string) => { readonly success: boolean; readonly error?: string };
+  readonly addLocale: (locale: string) => { readonly success: boolean; readonly error?: TranslationWorkspaceError };
   readonly isAddLocaleAllowed: (locale: string) => boolean;
-  readonly removeLocale: (locale: string) => void;
+  readonly removeLocale: (locale: string) => boolean | Promise<boolean>;
   readonly setTranslation: (slot: TranslationSlot, text: string) => void;
-  readonly translateAll: (options?: PopulateTranslationOptions) => Promise<TranslationReport>;
-  readonly translateSlot: (slot: TranslationSlot) => Promise<void>;
+  readonly translateAll: (options?: PopulateTranslationOptions) => Promise<{
+    readonly success: boolean;
+    readonly report?: TranslationReport;
+    readonly error?: TranslationWorkspaceError;
+  }>;
+  readonly translateSlot: (
+    slot: TranslationSlot
+  ) => Promise<{ readonly success: boolean; readonly error?: TranslationWorkspaceError }>;
   readonly isTranslating: boolean;
-  readonly error?: string;
+  readonly error?: TranslationWorkspaceError;
 }
 
 type LocalizedProperty = "title" | "description" | "completionMessage";
@@ -196,17 +214,25 @@ export const validateLocalePipeline = (
   return { valid: true };
 };
 
-function workspaceLocaleValidationMessage(validation: LocaleValidationResult): string {
-  if (validation.error?.type === "locale_not_allowed") {
-    return validation.error.message.replace(" is not allowed by policy.", " is not allowed by the form policy.");
+function workspaceLocaleValidationError(
+  validation: LocaleValidationResult,
+  currentLocales: number,
+  requestedLocale: string
+): TranslationWorkspaceError {
+  const error = validation.error;
+  if (error === undefined) return { type: "invalid_locale_format", locale: requestedLocale };
+  if (error.type === "locale_not_allowed") return { type: "locale_not_allowed", locale: requestedLocale };
+  if (error.type === "locale_already_exists") {
+    return { type: "locale_already_exists", locale: requestedLocale };
   }
-  if (validation.error?.type === "max_locales_exceeded") {
-    const maximum = validation.error.message.match(/\((\d+)\)/u)?.[1];
-    return maximum === undefined
-      ? validation.error.message
-      : `At most ${maximum} locales are allowed by the form policy.`;
+  if (error.type === "invalid_locale_format") {
+    return { type: "invalid_locale_format", locale: requestedLocale };
   }
-  return validation.error?.message ?? "Locale is not valid.";
+  if (error.type === "max_locales_exceeded") {
+    const max = Number(error.message.match(/\((\d+)\)/u)?.[1] ?? 0);
+    return { type: "max_locales_exceeded", max, current: currentLocales };
+  }
+  return { type: "custom_validation_failed", message: error.message };
 }
 
 function manualMetadata(sourceText: string, sourceLocale: string): Readonly<Record<string, JsonValue>> {
@@ -299,12 +325,13 @@ export function useTranslationWorkspace({
   translationAdapter,
   readOnly = false,
   policy,
+  beforeRemoveLocale,
   validateLocale
 }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult {
   const [draftSchema, setDraftSchema] = useState(schema);
   const [selectedLocale, setSelectedLocale] = useState(targetLocale ?? "");
   const [isTranslating, setIsTranslating] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<TranslationWorkspaceError>();
   const currentSchema = onChange === undefined ? draftSchema : schema;
   const targetLocales = useMemo(() => {
     const locales = collectSchemaLocales(currentSchema).allUniqueLocales;
@@ -351,17 +378,33 @@ export function useTranslationWorkspace({
     [commit, currentSchema, readOnly, sourceLocale]
   );
   const addLocale = useCallback(
-    (locale: string): { readonly success: boolean; readonly error?: string } => {
-      if (readOnly) return { success: false, error: "Workspace is read-only." };
+    (locale: string): { readonly success: boolean; readonly error?: TranslationWorkspaceError } => {
+      if (readOnly) {
+        const workspaceError: TranslationWorkspaceError = { type: "read_only_mode" };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
       const normalized = normalizeLocale(locale);
       if (normalized === null) {
-        return {
-          success: false,
-          error: workspaceLocaleValidationMessage(validateLocalePipeline(locale, currentSchema, policy, validateLocale))
-        };
+        const workspaceError = workspaceLocaleValidationError(
+          validateLocalePipeline(locale, currentSchema, policy, validateLocale),
+          collectSchemaLocales(currentSchema).allUniqueLocales.size,
+          locale
+        );
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
       }
       const validation = validateLocalePipeline(normalized, currentSchema, policy, validateLocale);
-      if (!validation.valid) return { success: false, error: workspaceLocaleValidationMessage(validation) };
+      if (!validation.valid) {
+        const workspaceError = workspaceLocaleValidationError(
+          validation,
+          collectSchemaLocales(currentSchema).allUniqueLocales.size,
+          normalized
+        );
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
+      setError(undefined);
       commit({
         ...currentSchema,
         supportedLocales: [...new Set([...(currentSchema.supportedLocales ?? []), normalized])]
@@ -381,17 +424,64 @@ export function useTranslationWorkspace({
     [currentSchema, policy, readOnly, validateLocale]
   );
   const removeLocale = useCallback(
-    (locale: string): void => {
-      if (readOnly || locale === sourceLocale || locale === currentSchema.defaultLocale) return;
-      commit(removeLocaleFromSchema(currentSchema, locale));
-      if (activeLocale === locale) setSelectedLocale("");
+    (locale: string): boolean | Promise<boolean> => {
+      if (readOnly || locale === sourceLocale || locale === currentSchema.defaultLocale) return false;
+      const remove = (): void => {
+        commit(removeLocaleFromSchema(currentSchema, locale));
+        if (activeLocale === locale) setSelectedLocale("");
+      };
+      const slotCount = collectTranslationSlots(currentSchema, locale).length;
+      if (beforeRemoveLocale === undefined) {
+        remove();
+        return true;
+      }
+      try {
+        const decision = beforeRemoveLocale(locale, { slotCount });
+        if (typeof decision === "boolean") {
+          if (!decision) return false;
+          remove();
+          return true;
+        }
+        return decision.then((allowed) => {
+          if (!allowed) return false;
+          remove();
+          return true;
+        });
+      } catch (cause) {
+        const workspaceError: TranslationWorkspaceError = {
+          type: "translation_failed",
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause
+        };
+        setError(workspaceError);
+        return Promise.reject(cause);
+      }
     },
-    [activeLocale, commit, currentSchema, readOnly, sourceLocale]
+    [activeLocale, beforeRemoveLocale, commit, currentSchema, readOnly, sourceLocale]
   );
   const translateAll = useCallback(
-    async (options: PopulateTranslationOptions = {}): Promise<TranslationReport> => {
-      if (translationAdapter === undefined) throw new Error("A translation adapter is required.");
-      if (activeLocale.length === 0) throw new Error("A target locale is required.");
+    async (
+      options: PopulateTranslationOptions = {}
+    ): Promise<{
+      readonly success: boolean;
+      readonly report?: TranslationReport;
+      readonly error?: TranslationWorkspaceError;
+    }> => {
+      if (readOnly) {
+        const workspaceError: TranslationWorkspaceError = { type: "read_only_mode" };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
+      if (translationAdapter === undefined) {
+        const workspaceError: TranslationWorkspaceError = { type: "adapter_not_configured" };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
+      if (activeLocale.length === 0) {
+        const workspaceError: TranslationWorkspaceError = { type: "target_locale_missing" };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
       setIsTranslating(true);
       setError(undefined);
       try {
@@ -406,30 +496,49 @@ export function useTranslationWorkspace({
           }
         );
         commit(populated.schema);
-        return populated.report;
+        return { success: true, report: populated.report };
       } catch (cause) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setError(message);
-        throw cause;
+        const workspaceError: TranslationWorkspaceError = {
+          type: "translation_failed",
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause
+        };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
       } finally {
         setIsTranslating(false);
       }
     },
-    [activeLocale, commit, currentSchema, translationAdapter]
+    [activeLocale, commit, currentSchema, readOnly, translationAdapter]
   );
   const translateSlot = useCallback(
-    async (slot: TranslationSlot): Promise<void> => {
-      if (translationAdapter === undefined) throw new Error("A translation adapter is required.");
-      if (readOnly) return;
+    async (
+      slot: TranslationSlot
+    ): Promise<{ readonly success: boolean; readonly error?: TranslationWorkspaceError }> => {
+      if (translationAdapter === undefined) {
+        const workspaceError: TranslationWorkspaceError = { type: "adapter_not_configured" };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
+      if (readOnly) {
+        const workspaceError: TranslationWorkspaceError = { type: "read_only_mode" };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
+      }
       setIsTranslating(true);
       setError(undefined);
       try {
         const text = await asAsyncAdapter(translationAdapter).translateText(slot.sourceText, slot.locale, sourceLocale);
         commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale));
+        return { success: true };
       } catch (cause) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setError(message);
-        throw cause;
+        const workspaceError: TranslationWorkspaceError = {
+          type: "translation_failed",
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause
+        };
+        setError(workspaceError);
+        return { success: false, error: workspaceError };
       } finally {
         setIsTranslating(false);
       }

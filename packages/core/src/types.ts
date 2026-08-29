@@ -1,3 +1,4 @@
+import type { BuilderTranslationKey } from "./i18n/keys";
 import type { FormVersionRecord, FormVersionState, Result, VersionTransitionEvent } from "./versioning";
 
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
@@ -61,6 +62,10 @@ export type ConditionOperator =
 export type ConditionValue = string | number | boolean;
 
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+
+export interface BaseSubmissionMetadata {
+  readonly [key: string]: JsonValue | undefined;
+}
 
 /** Arbitrary, JSON-serializable data preserved by every form-engine operation. */
 export interface ExtensibleNode {
@@ -238,13 +243,29 @@ export type AnswerValidationResult =
   | { readonly valid: true; readonly issues: readonly [] }
   | { readonly valid: false; readonly issues: readonly ValidationIssue[] };
 
-export interface FormSubmission extends ExtensibleNode {
+interface FormSubmissionBase extends ExtensibleNode {
   readonly id: string;
   readonly formId: string;
   readonly formVersion: number;
   readonly locale: string;
   readonly values: FormValues;
+  /** Alias used by API-facing consumers; values remains the canonical v4 field. */
+  readonly answers?: Readonly<Record<string, unknown>>;
   readonly submittedAt: string;
+  readonly schemaRevision?: number;
+}
+
+export type FormSubmission<TMeta extends BaseSubmissionMetadata | undefined = undefined> = FormSubmissionBase &
+  ([TMeta] extends [undefined] ? { readonly metadata?: BaseSubmissionMetadata } : { readonly metadata: TMeta });
+
+export interface CreateSubmissionInput<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+  readonly id?: string;
+  readonly formId: string;
+  readonly formVersion: number;
+  readonly answers: Record<string, unknown>;
+  readonly metadata: TMeta;
+  readonly submittedAt?: string;
+  readonly schemaRevision?: number;
 }
 
 export interface TranslationAdapter {
@@ -348,6 +369,8 @@ export interface VersionTransitionPlan {
   readonly events: readonly VersionTransitionEvent[];
   /** The complete next state value used by persistent adapters. */
   readonly nextVersion?: number;
+  /** Optional target schema for adapters that do not use a version record. */
+  readonly schema?: FormSchema;
   readonly timestamp: string;
 }
 
@@ -419,7 +442,7 @@ export type Question = FormField;
 export type ChoiceOption = FieldOption;
 
 /** Translation keys reserved for the form builder UI. */
-export type BuilderTranslationKey = `builder.${string}`;
+export type { BuilderTranslationKey } from "./i18n/keys";
 
 export interface FieldTypeDefinition {
   readonly type: QuestionType;

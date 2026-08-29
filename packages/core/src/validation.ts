@@ -1,13 +1,35 @@
 import type {
   AnswerValidationResult,
+  BaseSubmissionMetadata,
   FormField,
   FormSchema,
+  FormSubmission,
   FormValue,
   FormValues,
   ValidationCode,
   ValidationIssue
 } from "./types";
 import { calculateFieldVisibility } from "./visibility";
+
+export interface SensitiveDataFinding {
+  readonly fieldId: string;
+  readonly type: string;
+  readonly start?: number;
+  readonly end?: number;
+  readonly matchedText?: string;
+  readonly maskedText?: string;
+}
+
+export interface PrivacyEngine {
+  detect(schema: FormSchema, values: Record<string, unknown>): readonly SensitiveDataFinding[];
+}
+
+export interface SubmissionValidationResult {
+  readonly valid: boolean;
+  readonly fieldErrors: Readonly<Record<string, string>>;
+  readonly formErrors: readonly string[];
+  readonly piiFindings?: readonly SensitiveDataFinding[];
+}
 
 const DEFAULT_MESSAGES: Record<ValidationCode, string> = {
   required: "validation.required",
@@ -160,4 +182,34 @@ export function validatePageAnswers(schema: FormSchema, pageIndex: number, value
     if (targetIds.has(field.id) && visibility[field.id] === true) validateField(field, values[field.id], issues);
   }
   return issues.length === 0 ? { valid: true, issues: [] } : { valid: false, issues };
+}
+
+export function validateSubmission<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  schema: FormSchema,
+  submission: FormSubmission<TMeta>,
+  options?: { readonly privacyEngine?: PrivacyEngine }
+): SubmissionValidationResult {
+  const values = submission.values;
+  const answerValidation = validateAnswers(schema, values);
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of answerValidation.issues) {
+    const existing = fieldErrors[issue.fieldId];
+    fieldErrors[issue.fieldId] = existing === undefined ? issue.messageKey : `${existing}; ${issue.messageKey}`;
+  }
+
+  const piiFindings = options?.privacyEngine?.detect(schema, { ...values });
+  if (piiFindings !== undefined) {
+    for (const finding of piiFindings) {
+      const existing = fieldErrors[finding.fieldId];
+      fieldErrors[finding.fieldId] =
+        existing === undefined ? "validation.sensitiveData" : `${existing}; validation.sensitiveData`;
+    }
+  }
+
+  return {
+    valid: Object.keys(fieldErrors).length === 0,
+    fieldErrors,
+    formErrors: [],
+    ...(piiFindings === undefined ? {} : { piiFindings })
+  };
 }

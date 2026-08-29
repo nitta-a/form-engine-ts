@@ -46,7 +46,37 @@ export type VersionTransitionError =
   | { readonly type: "invalid_source_version"; readonly requestedVersion: number; readonly publishedVersion?: number }
   | { readonly type: "version_immutable"; readonly status: FormVersionStatus }
   | { readonly type: "max_version_exceeded"; readonly max: number }
-  | { readonly type: "validation_failed"; readonly issues: readonly SchemaIssue[] };
+  | { readonly type: "validation_failed"; readonly issues: readonly SchemaIssue[] }
+  | { readonly type: "transition_failed"; readonly cause: unknown };
+
+export interface VersionTransitionContext<TDomain = unknown> {
+  readonly formId: string;
+  readonly fromVersion: number;
+  readonly toVersion: number;
+  readonly expectedRevision: number;
+  readonly plan: FormVersionTransitionPlan;
+  readonly domainData?: TDomain;
+}
+
+export type FormVersionTransitionPlan = VersionTransitionPlan;
+
+export interface CommitVersionTransitionOptions<TDomain = unknown> {
+  readonly context: VersionTransitionContext<TDomain>;
+  readonly beforeTransition?: (
+    context: VersionTransitionContext<TDomain>
+    // biome-ignore lint/suspicious/noConfusingVoidType: Hooks may intentionally omit a replacement domain value.
+  ) => Promise<TDomain | void> | TDomain | void;
+  readonly afterTransition?: (
+    context: VersionTransitionContext<TDomain> & { readonly nextRevision: number }
+  ) => Promise<void> | void;
+  readonly persistAdapter: (params: {
+    readonly formId: string;
+    readonly targetVersion: number;
+    readonly expectedRevision: number;
+    readonly schema: FormSchema;
+    readonly domainData?: TDomain;
+  }) => Promise<{ readonly nextRevision: number }>;
+}
 
 export interface CloneVersionOptions {
   readonly maxVersions?: number;
@@ -433,5 +463,47 @@ export function assertVersionMutable(status: FormVersionStatus): void {
   if (status !== "draft") {
     const error: VersionTransitionError = { type: "version_immutable", status };
     throw new TypeError(`A ${status} form version is immutable.`, { cause: error });
+  }
+}
+
+export function applyTransitionPlan(plan: FormVersionTransitionPlan): FormSchema {
+  if (plan.schema !== undefined) return plan.schema;
+  if (plan.publishedRecordToSave !== undefined) return plan.publishedRecordToSave.schema;
+  if (plan.draftToCreate !== undefined) return plan.draftToCreate.schema;
+  const archivedSchema = plan.archivedRecordsToSave?.[0]?.schema;
+  if (archivedSchema !== undefined) return archivedSchema;
+  throw new TypeError("A version transition plan must include a target schema.");
+}
+
+export async function commitVersionTransition<TDomain = unknown>(
+  options: CommitVersionTransitionOptions<TDomain>
+): Promise<{ readonly success: boolean; readonly nextRevision: number; readonly error?: VersionTransitionError }> {
+  const { context, beforeTransition, afterTransition, persistAdapter } = options;
+  const { formId, toVersion, expectedRevision, plan } = context;
+  let currentDomainData = context.domainData;
+
+  try {
+    if (beforeTransition !== undefined) {
+      const hookResult = await beforeTransition(context);
+      if (hookResult !== undefined) currentDomainData = hookResult;
+    }
+    const nextSchema = applyTransitionPlan(plan);
+    const { nextRevision } = await persistAdapter({
+      formId,
+      targetVersion: toVersion,
+      expectedRevision,
+      schema: nextSchema,
+      ...(currentDomainData === undefined ? {} : { domainData: currentDomainData })
+    });
+    if (afterTransition !== undefined) {
+      await afterTransition({
+        ...context,
+        ...(currentDomainData === undefined ? {} : { domainData: currentDomainData }),
+        nextRevision
+      });
+    }
+    return { success: true, nextRevision };
+  } catch (cause) {
+    return { success: false, nextRevision: expectedRevision, error: { type: "transition_failed", cause } };
   }
 }

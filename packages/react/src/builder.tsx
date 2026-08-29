@@ -26,6 +26,7 @@ import {
   useFormBuilder
 } from "./hooks/useFormBuilder";
 import { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, resolveTranslation } from "./i18n";
+import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "./i18n/provider";
 import type {
   BuilderActionContext,
   BuilderActionIconType,
@@ -941,7 +942,7 @@ export interface FormBuilderProps {
 export function FormBuilder({
   schema,
   onChange,
-  locale = "en",
+  locale: explicitLocale,
   translator,
   translationAdapter,
   translationOptions,
@@ -968,6 +969,17 @@ export function FormBuilder({
   onActiveFieldChange,
   submissionSettingsOptions
 }: FormBuilderProps) {
+  const i18n = useFormEngineI18n();
+  const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
+  const locale = explicitLocale ?? (isProviderValue ? i18n.uiLocale : "en");
+  const resolvedTranslator =
+    translator ??
+    (isProviderValue
+      ? {
+          translate: (key: string, _locale: string, params?: Readonly<Record<string, string | number>>) =>
+            params === undefined ? i18n.translator(key) : i18n.translator(key, { ...params })
+        }
+      : undefined);
   const resolvedComponents: Required<FormBuilderComponents> = { ...DEFAULT_COMPONENTS, ...componentOverrides };
   const components: Required<FormBuilderComponents> = {
     ...GUARDED_COMPONENTS,
@@ -1005,7 +1017,7 @@ export function FormBuilder({
     resolveTranslation(
       key,
       BUILDER_TRANSLATION_ALIASES[key] === undefined ? [] : [BUILDER_TRANSLATION_ALIASES[key]],
-      translator,
+      resolvedTranslator,
       BUILDER_DEFAULTS,
       params,
       locale

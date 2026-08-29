@@ -36,12 +36,15 @@ describe("useTranslationWorkspace locale validation pipeline", () => {
       })
     );
 
-    let addResult: { readonly success: boolean; readonly error?: string } | undefined;
+    let addResult: ReturnType<typeof result.current.addLocale> | undefined;
     act(() => {
       addResult = result.current.addLocale("en");
     });
 
-    expect(addResult).toEqual({ success: false, error: "Tenant constraint" });
+    expect(addResult).toEqual({
+      success: false,
+      error: { type: "custom_validation_failed", message: "Tenant constraint" }
+    });
     expect(customValidator).toHaveBeenCalledWith(
       "en",
       expect.objectContaining({ locale: "en", defaultLocale: "ja", currentLocales: [] })

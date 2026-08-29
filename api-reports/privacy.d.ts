@@ -22,6 +22,11 @@ interface PrivacyDetectorConfig {
 interface SensitiveDataDetector {
     detect(schema: FormSchema, values: Record<string, unknown>): readonly SensitiveDataFinding[];
 }
+declare function normalizePiiFindingsToMetadata(findings: readonly SensitiveDataFinding[], userConfirmed: boolean): {
+    readonly piiConfirmed: boolean;
+    readonly piiFindingTypes: readonly string[];
+    readonly piiDetectedCount: number;
+};
 declare function createStandardPrivacyDetector(config?: PrivacyDetectorConfig): SensitiveDataDetector;
 
-export { type PrivacyDetectorConfig, type SensitiveDataDetector, type SensitiveDataDetectorRule, type SensitiveDataFinding, createStandardPrivacyDetector };
+export { type PrivacyDetectorConfig, type SensitiveDataDetector, type SensitiveDataDetectorRule, type SensitiveDataFinding, createStandardPrivacyDetector, normalizePiiFindingsToMetadata };

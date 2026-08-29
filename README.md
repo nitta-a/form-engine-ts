@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v4.8.0** (2026-08-29). All public packages are currently published at version `4.8.0`.
-This release adds canonical BCP 47 locale normalization across schema, policy, sanitization, translation, and React workspace APIs.
+The latest release is **v4.9.0** (2026-08-29). All public packages are currently published at version `4.9.0`.
+This release adds typed submissions and validation, cursor pagination, transition commits, PII metadata normalization, and the shared storage package.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.8.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.9.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v4.8.0**（2026-08-29）です。公開パッケージはすべてバージョン `4.8.0` で公開されています。
-本リリースでは、スキーマ、ポリシー、サニタイズ、翻訳、ReactワークスペースAPI全体でBCP 47ロケールを正規化する機能を追加しました。
+最新版は **v4.9.0**（2026-08-29）です。公開パッケージはすべてバージョン `4.9.0` で公開されています。
+本リリースでは、型付きSubmissionと検証、カーソルページング、遷移コミット、PIIメタデータ正規化、共通ストレージパッケージを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.8.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v4.9.0) を参照してください。
 
 ### 編集・回答体験
 

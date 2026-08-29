@@ -5,7 +5,7 @@ import type {
   TranslationSlot,
   TranslationStatus
 } from "@form-engine-ts/core";
-import { useTranslationWorkspace } from "@form-engine-ts/react";
+import { type TranslationWorkspaceError, useTranslationWorkspace } from "@form-engine-ts/react";
 import {
   Button,
   Card,
@@ -85,6 +85,29 @@ function SlotCard({
   );
 }
 
+function workspaceErrorMessage(error: TranslationWorkspaceError): string {
+  switch (error.type) {
+    case "locale_not_allowed":
+      return `Locale "${error.locale}" is not allowed.`;
+    case "locale_already_exists":
+      return `Locale "${error.locale}" is already registered.`;
+    case "invalid_locale_format":
+      return `Invalid locale format: "${error.locale}"`;
+    case "max_locales_exceeded":
+      return `At most ${error.max} locales are allowed.`;
+    case "read_only_mode":
+      return "This workspace is read-only.";
+    case "adapter_not_configured":
+      return "A translation adapter is not configured.";
+    case "target_locale_missing":
+      return "A target locale is required.";
+    case "translation_failed":
+      return error.message;
+    case "custom_validation_failed":
+      return error.message;
+  }
+}
+
 export function TranslationWorkspace({
   schema,
   onChange,
@@ -145,7 +168,9 @@ export function TranslationWorkspace({
           Add
         </Button>
       </Stack>
-      {workspace.error === undefined ? null : <Typography color="error">{workspace.error}</Typography>}
+      {workspace.error === undefined ? null : (
+        <Typography color="error">{workspaceErrorMessage(workspace.error)}</Typography>
+      )}
       <Stack spacing={1.5}>
         {workspace.slots.map((slot) => (
           <SlotCard

@@ -37,7 +37,7 @@ describe("useTranslationWorkspace locale context", () => {
       })
     );
 
-    let addResult: { readonly success: boolean; readonly error?: string } | undefined;
+    let addResult: ReturnType<typeof result.current.addLocale> | undefined;
     act(() => {
       addResult = result.current.addLocale("EN_us");
     });
@@ -58,7 +58,7 @@ describe("useTranslationWorkspace locale context", () => {
     const duplicate = renderHook(() => useTranslationWorkspace({ schema: { ...schema, supportedLocales: ["en-US"] } }));
     expect(duplicate.result.current.addLocale("EN-US")).toEqual({
       success: false,
-      error: 'Locale "en-US" is already registered.'
+      error: { type: "locale_already_exists", locale: "en-US" }
     });
   });
 });
