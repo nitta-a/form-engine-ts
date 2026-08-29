@@ -169,5 +169,18 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.errors.maxLocalesExceeded": "登録可能な最大言語数 ({{max}}) に達しました。",
   "workspace.errors.readOnly": "読み取り専用モードのため変更できません。",
   "workspace.errors.adapterNotConfigured": "翻訳アダプターが設定されていません。",
-  "workspace.errors.translationFailed": "翻訳処理に失敗しました。"
+  "workspace.errors.translationFailed": "翻訳処理に失敗しました。",
+  "workspace.header.title": "多言語翻訳ワークスペース",
+  "workspace.header.sourceLocale": "元言語",
+  "workspace.header.targetLocale": "翻訳言語",
+  "workspace.header.translateAll": "一括自動翻訳",
+  "workspace.header.progress": "{{translated}}/{{total}} 翻訳済み ({{percent}}%)",
+  "workspace.slot.sourceText": "原文",
+  "workspace.slot.translatedText": "翻訳文",
+  "workspace.slot.translateSingle": "この項目を翻訳",
+  "workspace.slot.revertManual": "手動翻訳を元に戻す",
+  "workspace.confirm.removeLocaleTitle": "言語を削除しますか？",
+  "workspace.confirm.removeLocaleMessage": "{{locale}} とその翻訳を削除します。",
+  "workspace.empty.noTargetLocales": "翻訳先の言語が設定されていません。",
+  "workspace.empty.noSlotsToTranslate": "この言語には翻訳項目がありません。"
 });

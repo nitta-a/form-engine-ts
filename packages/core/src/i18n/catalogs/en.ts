@@ -169,5 +169,18 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.errors.maxLocalesExceeded": "The maximum number of locales ({{max}}) has been reached.",
   "workspace.errors.readOnly": "This workspace is read-only.",
   "workspace.errors.adapterNotConfigured": "A translation adapter is not configured.",
-  "workspace.errors.translationFailed": "Translation failed."
+  "workspace.errors.translationFailed": "Translation failed.",
+  "workspace.header.title": "Translation workspace",
+  "workspace.header.sourceLocale": "Source language",
+  "workspace.header.targetLocale": "Target language",
+  "workspace.header.translateAll": "Translate all",
+  "workspace.header.progress": "{{translated}}/{{total}} translated ({{percent}}%)",
+  "workspace.slot.sourceText": "Source",
+  "workspace.slot.translatedText": "Translation",
+  "workspace.slot.translateSingle": "Translate this slot",
+  "workspace.slot.revertManual": "Revert manual translation",
+  "workspace.confirm.removeLocaleTitle": "Remove language?",
+  "workspace.confirm.removeLocaleMessage": "This will remove {{locale}} and its translations.",
+  "workspace.empty.noTargetLocales": "No target languages are configured.",
+  "workspace.empty.noSlotsToTranslate": "There are no translation slots for this language."
 });

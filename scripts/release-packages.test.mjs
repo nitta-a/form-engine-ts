@@ -7,6 +7,7 @@ import {
   discoverReleasePackages,
   formatReleaseNotes,
   generateApiMigrationNotes,
+  publishAndVerifyPackages,
   publishUnpublishedPackages,
   validateReleasePackages,
   waitForPublishedPackages
@@ -173,5 +174,36 @@ test("times out npm polling and formats release package notes", async () => {
       skipped: ["@form-engine-ts/react@2.7.0"]
     }),
     /Package publication \(2\.7\.0\)[\s\S]*Published[\s\S]*core@2\.7\.0[\s\S]*Already available[\s\S]*react@2\.7\.0/
+  );
+});
+
+test("continues after npm verification timeout and reports unverified packages", async () => {
+  let time = 0;
+  const statuses = [];
+  const result = await publishAndVerifyPackages(
+    [{ directory: "/packages/core", manifest: { name: "@form-engine-ts/core", version: "2.7.0" } }],
+    {
+      timeoutMs: 10,
+      now: () => time,
+      sleep: async (milliseconds) => {
+        time += milliseconds;
+      },
+      onStatus: (status) => statuses.push(status),
+      runCommand: async (command) => {
+        if (command === "pnpm") return { code: 0, stdout: "", stderr: "" };
+        return { code: 1, stdout: "", stderr: "npm error code E404" };
+      }
+    }
+  );
+  assert.deepEqual(result, {
+    published: ["@form-engine-ts/core@2.7.0"],
+    skipped: [],
+    verificationStatus: "timed_out",
+    unverified: ["@form-engine-ts/core@2.7.0"]
+  });
+  assert.match(statuses.at(-1), /continuing to GitHub release/);
+  assert.match(
+    formatReleaseNotes("2.7.0", result),
+    /Verification timed out.*GitHub release[\s\S]*Still unverified:.*core@2\.7\.0/
   );
 });

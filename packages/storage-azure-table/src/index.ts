@@ -56,6 +56,22 @@ export interface AzureTableSubmissionCodec<T = FormSubmission> {
   readonly createRowKey: (value: T) => string;
 }
 
+export interface AzureTableFieldMapping {
+  readonly partitionKeyProperty?: string;
+  readonly rowKeyProperty?: string;
+  readonly formId?: string;
+  readonly formVersion?: string;
+  readonly submittedAt?: string;
+  readonly values?: string;
+  readonly metadata?: string;
+  readonly customPropertyMappings?: Readonly<Record<string, string>>;
+}
+
+export interface AzureTableValueCodec {
+  readonly encodeValues?: (values: Record<string, unknown>) => string;
+  readonly decodeValues?: (raw: string) => Record<string, unknown>;
+}
+
 export interface AzureTableStorageOptions<T = FormSubmission> {
   /** @deprecated Use schemasTableClient, submissionsTableClient, or clientResolver. */
   readonly client?: AzureTableClientLike;
@@ -65,13 +81,15 @@ export interface AzureTableStorageOptions<T = FormSubmission> {
     readonly formId: string;
     readonly query?: SubmissionPageQueryOptions;
   }) => AzureTableClientLike | Promise<AzureTableClientLike>;
-  readonly codec?: AzureTableSubmissionCodec<T>;
+  readonly codec?: AzureTableSubmissionCodec<T> | AzureTableValueCodec;
   /** @deprecated Use codec. */
   readonly submissionCodec?: AzureTableEntityCodec<FormSubmission>;
   readonly buildSubmissionFilter?: (formId: string, query: SubmissionPageQueryOptions) => string;
   /** @deprecated Use buildSubmissionFilter. */
   readonly toODataFilter?: (options: SubmissionPageQueryOptions) => string;
   readonly maxScanPages?: number;
+  readonly fieldMapping?: AzureTableFieldMapping;
+  readonly readOnly?: boolean;
 }
 
 interface StoredSchemaEntity extends Record<string, unknown> {
@@ -286,6 +304,91 @@ function parseSubmission(value: unknown, location: string): FormSubmission {
   return cloneJson(parsed) as unknown as FormSubmission;
 }
 
+function propertyName(mapping: AzureTableFieldMapping | undefined, logicalName: string, fallback: string): string {
+  return (
+    mapping?.customPropertyMappings?.[logicalName] ??
+    (logicalName === "formId" ? mapping?.formId : undefined) ??
+    (logicalName === "formVersion" ? mapping?.formVersion : undefined) ??
+    (logicalName === "submittedAt" ? mapping?.submittedAt : undefined) ??
+    (logicalName === "values" ? mapping?.values : undefined) ??
+    (logicalName === "metadata" ? mapping?.metadata : undefined) ??
+    fallback
+  );
+}
+
+function physicalKeyNames(mapping: AzureTableFieldMapping | undefined): {
+  readonly partitionKey: string;
+  readonly rowKey: string;
+} {
+  return {
+    partitionKey: mapping?.partitionKeyProperty ?? "PartitionKey",
+    rowKey: mapping?.rowKeyProperty ?? "RowKey"
+  };
+}
+
+function entityKey(entity: Record<string, unknown>, property: string, compatibilityProperty: string): unknown {
+  return entity[property] ?? entity[compatibilityProperty];
+}
+
+function mappedSubmissionEntity(
+  entity: Record<string, unknown>,
+  submission: FormSubmission,
+  mapping: AzureTableFieldMapping | undefined,
+  valueCodec: AzureTableValueCodec | undefined
+): Record<string, unknown> {
+  if (mapping === undefined && valueCodec === undefined) return entity;
+  const keys = physicalKeyNames(mapping);
+  const values = valueCodec?.encodeValues?.({ ...submission.values }) ?? JSON.stringify(submission.values);
+  const metadata = submission.metadata === undefined ? undefined : JSON.stringify(submission.metadata);
+  return {
+    ...entity,
+    [keys.partitionKey]: submission.formId,
+    [keys.rowKey]: entity.rowKey ?? defaultSubmissionRowKey(submission),
+    [propertyName(mapping, "formId", "formId")]: submission.formId,
+    [propertyName(mapping, "formVersion", "formVersion")]: submission.formVersion,
+    [propertyName(mapping, "submittedAt", "submittedAt")]: submission.submittedAt,
+    [propertyName(mapping, "values", "values")]: values,
+    ...(metadata === undefined ? {} : { [propertyName(mapping, "metadata", "metadata")]: metadata })
+  };
+}
+
+function mappedSubmissionFromEntity(
+  entity: Record<string, unknown>,
+  mapping: AzureTableFieldMapping | undefined,
+  valueCodec: AzureTableValueCodec | undefined
+): FormSubmission | undefined {
+  const id = typeof entity.responseId === "string" ? entity.responseId : entity.id;
+  const formId = entity[propertyName(mapping, "formId", "formId")];
+  const formVersion = entity[propertyName(mapping, "formVersion", "formVersion")];
+  const submittedAt = entity[propertyName(mapping, "submittedAt", "submittedAt")];
+  const rawValues = entity[propertyName(mapping, "values", "values")];
+  if (
+    typeof id !== "string" ||
+    typeof formId !== "string" ||
+    typeof formVersion !== "number" ||
+    typeof submittedAt !== "string" ||
+    typeof rawValues !== "string"
+  )
+    return undefined;
+  const values = valueCodec?.decodeValues?.(rawValues) ?? parseJson(rawValues, "submission values");
+  if (!isRecord(values) || !Object.values(values).every(isFormValue))
+    throw new Error("Azure Table values are invalid.");
+  const rawMetadata = entity[propertyName(mapping, "metadata", "metadata")];
+  const metadata = rawMetadata === undefined ? undefined : parseJson(rawMetadata, "submission metadata");
+  return parseSubmission(
+    {
+      id,
+      formId,
+      formVersion,
+      locale: typeof entity.locale === "string" ? entity.locale : "",
+      values,
+      ...(metadata === undefined || !isRecord(metadata) ? {} : { metadata }),
+      submittedAt
+    },
+    "mapped submission entity"
+  );
+}
+
 function schemaRowKey(version: number): string {
   return `schema_${version}`;
 }
@@ -359,13 +462,19 @@ function parseSchemaEntity(value: Record<string, unknown>): FormSchema {
 
 function parseSubmissionEntity(
   value: Record<string, unknown>,
-  codec: AzureTableSubmissionCodec<FormSubmission>
+  codec: AzureTableSubmissionCodec<FormSubmission>,
+  mapping?: AzureTableFieldMapping,
+  valueCodec?: AzureTableValueCodec
 ): FormSubmission {
-  if (typeof value.partitionKey !== "string" || typeof value.rowKey !== "string" || !codec.matchesEntity(value)) {
+  const keys = physicalKeyNames(mapping);
+  const partitionKey = entityKey(value, keys.partitionKey, "partitionKey");
+  const rowKey = entityKey(value, keys.rowKey, "rowKey");
+  if (typeof partitionKey !== "string" || typeof rowKey !== "string" || !codec.matchesEntity(value)) {
     throw new Error("Azure Table submission entity is invalid.");
   }
-  const submission = parseSubmission(codec.deserialize(value), `submission ${value.partitionKey}/${value.rowKey}`);
-  if (codec.createPartitionKey(submission) !== value.partitionKey || codec.createRowKey(submission) !== value.rowKey) {
+  const submissionValue = mappedSubmissionFromEntity(value, mapping, valueCodec) ?? codec.deserialize(value);
+  const submission = parseSubmission(submissionValue, `submission ${partitionKey}/${rowKey}`);
+  if (codec.createPartitionKey(submission) !== partitionKey || codec.createRowKey(submission) !== rowKey) {
     throw new Error("Azure Table submission entity has inconsistent keys.");
   }
   return submission;
@@ -383,34 +492,44 @@ function valueToOData(value: JsonValue): string {
   throw new TypeError("Azure Table OData filters support only scalar JSON values.");
 }
 
-export function metadataFiltersToOData(options: SubmissionPageQueryOptions): string {
+export function metadataFiltersToOData(options: SubmissionPageQueryOptions, mapping?: AzureTableFieldMapping): string {
   return Object.entries(options.metadataFilters ?? {})
     .map(([key, value]) => {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new TypeError(`Invalid Azure Table property name: ${key}`);
-      return `${key} eq ${valueToOData(value)}`;
+      const property =
+        mapping?.customPropertyMappings?.[`metadata.${key}`] ?? mapping?.customPropertyMappings?.[key] ?? key;
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(property))
+        throw new TypeError(`Invalid Azure Table property name: ${property}`);
+      return `${property} eq ${valueToOData(value)}`;
     })
     .join(" and ");
 }
 
-function odataProperty(path: string): string | undefined {
+function odataProperty(path: string, mapping?: AzureTableFieldMapping): string | undefined {
   if (path === "id" || path === "responseId") return "responseId";
-  if (["formVersion", "locale", "submittedAt"].includes(path)) return path;
+  if (["formVersion", "locale", "submittedAt"].includes(path)) {
+    return propertyName(mapping, path, path);
+  }
   if (path.startsWith("metadata.")) {
     const property = path.slice("metadata.".length);
-    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(property) ? property : undefined;
+    const mapped = mapping?.customPropertyMappings?.[path] ?? mapping?.customPropertyMappings?.[property] ?? property;
+    return /^[A-Za-z_][A-Za-z0-9_]*$/.test(mapped) ? mapped : undefined;
   }
   return undefined;
 }
 
-export function submissionFilterToOData(filter: SubmissionFilter): string | undefined {
+export function submissionFilterToOData(
+  filter: SubmissionFilter,
+  mapping?: AzureTableFieldMapping
+): string | undefined {
   if (filter.op === "and" || filter.op === "or") {
-    const converted = filter.filters.map(submissionFilterToOData);
+    const converted = filter.filters.map((child) => submissionFilterToOData(child, mapping));
     if (filter.op === "or" && converted.some((value) => value === undefined)) return undefined;
     const available = converted.filter((value): value is string => value !== undefined && value.length > 0);
     if (available.length === 0) return undefined;
     return available.map((value) => `(${value})`).join(filter.op === "and" ? " and " : " or ");
   }
-  const property = odataProperty(filter.path);
+  const property = odataProperty(filter.path, mapping);
   if (property === undefined) return undefined;
   if (filter.op === "eq") return `${property} eq ${valueToOData(filter.value)}`;
   if (filter.op === "in") {
@@ -428,19 +547,27 @@ function defaultSubmissionFilter(
   codec: AzureTableSubmissionCodec<FormSubmission>,
   formId: string,
   options: SubmissionPageQueryOptions,
-  legacyExtension: string
+  legacyExtension: string,
+  mapping?: AzureTableFieldMapping
 ): string {
   const partitionKey = codec.createPartitionKeyFromQuery(formId, options);
   const ast =
     options.filter === undefined || typeof options.filter === "function"
       ? undefined
-      : submissionFilterToOData(options.filter);
+      : submissionFilterToOData(options.filter, mapping);
+  const keys = physicalKeyNames(mapping);
   return [
-    ...(partitionKey === undefined ? [] : [`PartitionKey eq '${escapeOData(partitionKey)}'`]),
+    ...(partitionKey === undefined ? [] : [`${keys.partitionKey} eq '${escapeOData(partitionKey)}'`]),
     ...(codec === defaultAzureTableSubmissionCodec ? ["kind eq 'submission'"] : []),
-    ...(options.version === undefined ? [] : [`formVersion eq ${options.version}`]),
-    ...(options.since === undefined ? [] : [`submittedAt ge '${escapeOData(options.since)}'`]),
-    ...(options.until === undefined ? [] : [`submittedAt le '${escapeOData(options.until)}'`]),
+    ...(options.version === undefined
+      ? []
+      : [`${propertyName(mapping, "formVersion", "formVersion")} eq ${options.version}`]),
+    ...(options.since === undefined
+      ? []
+      : [`${propertyName(mapping, "submittedAt", "submittedAt")} ge '${escapeOData(options.since)}'`]),
+    ...(options.until === undefined
+      ? []
+      : [`${propertyName(mapping, "submittedAt", "submittedAt")} le '${escapeOData(options.until)}'`]),
     ...(options.locale === undefined ? [] : [`locale eq '${escapeOData(options.locale)}'`]),
     ...(ast === undefined || ast.length === 0 ? [] : [`(${ast})`]),
     ...(legacyExtension.trim().length === 0 ? [] : [`(${legacyExtension})`])
@@ -476,8 +603,10 @@ function requireClient(client: AzureTableClientLike | undefined, name: string): 
 export function createAzureTableStorage(options: AzureTableStorageOptions = {}): PagedSubmissionStorageAdapter {
   const staticSchemas = options.schemasTableClient ?? options.client;
   const staticSubmissions = options.submissionsTableClient ?? options.client;
+  const configuredCodec = options.codec;
+  const valueCodec = configuredCodec !== undefined && "encodeValues" in configuredCodec ? configuredCodec : undefined;
   const codec =
-    options.codec ??
+    (configuredCodec !== undefined && "createEntity" in configuredCodec ? configuredCodec : undefined) ??
     (options.submissionCodec === undefined ? defaultAzureTableSubmissionCodec : legacyCodec(options.submissionCodec));
   const maxScanPages = options.maxScanPages ?? 5;
   if (!Number.isSafeInteger(maxScanPages) || maxScanPages < 1) {
@@ -502,11 +631,15 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
       codec,
       formId,
       query,
-      options.toODataFilter?.(query) ?? metadataFiltersToOData(query)
+      options.toODataFilter?.(query) ?? metadataFiltersToOData(query, options.fieldMapping),
+      options.fieldMapping
     );
   };
   const deserializeIfMatching = (entity: Record<string, unknown>): FormSubmission | undefined =>
-    codec.matchesEntity(entity) ? parseSubmissionEntity(entity, codec) : undefined;
+    codec.matchesEntity(entity) ? parseSubmissionEntity(entity, codec, options.fieldMapping, valueCodec) : undefined;
+  const ensureWritable = (): void => {
+    if (options.readOnly === true) throw new Error("Azure Table storage is read-only.");
+  };
 
   const listSubmissionCandidates = async (
     formId: string,
@@ -526,6 +659,7 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
 
   return {
     async saveSchema(schema) {
+      ensureWritable();
       assertValidFormSchema(schema);
       const entity: StoredSchemaEntity = {
         partitionKey: schema.id,
@@ -552,14 +686,20 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
       return found.sort((left, right) => left.id.localeCompare(right.id) || left.version - right.version);
     },
     async deleteSchema(formId, formVersion) {
+      ensureWritable();
       await (await schemaClient(formId)).deleteEntity(formId, schemaRowKey(formVersion));
     },
     async saveSubmission(submission) {
+      ensureWritable();
       const stored = parseSubmission(submission, `input ${String(submission?.id)}`);
+      const mappedEntity = mappedSubmissionEntity(codec.createEntity(stored), stored, options.fieldMapping, valueCodec);
+      const keys = physicalKeyNames(options.fieldMapping);
       await (await submissionClient(stored.formId)).createEntity({
-        ...codec.createEntity(stored),
+        ...mappedEntity,
         partitionKey: codec.createPartitionKey(stored),
-        rowKey: codec.createRowKey(stored)
+        rowKey: codec.createRowKey(stored),
+        [keys.partitionKey]: codec.createPartitionKey(stored),
+        [keys.rowKey]: codec.createRowKey(stored)
       });
     },
     async listSubmissions(formId, formVersion, queryOptions: SubmissionQueryOptions = {}) {
@@ -716,6 +856,7 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
       };
     },
     async deleteSubmission(submissionId) {
+      ensureWritable();
       const client = await submissionClient("");
       for await (const raw of client.listEntities()) {
         const submission = deserializeIfMatching(raw);
@@ -728,6 +869,7 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
       }
     },
     async clearResponses(formId) {
+      ensureWritable();
       const query: SubmissionPageQueryOptions = {};
       const client = await submissionClient(formId, query);
       for await (const raw of client.listEntities({ queryOptions: { filter: queryFilter(formId, query) } })) {
@@ -739,6 +881,7 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
       }
     },
     async clear() {
+      ensureWritable();
       const schemas = await schemaClient("");
       for await (const raw of schemas.listEntities()) {
         if (typeof raw.partitionKey === "string" && typeof raw.rowKey === "string") {

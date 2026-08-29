@@ -15,22 +15,28 @@ import {
 import type { ComponentType, KeyboardEvent, ReactNode, SyntheticEvent } from "react";
 import { useEffect, useState } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
-import type { LocaleOptionItem, MuiAdapterOptions } from "../types";
+import type { LocaleOptionItem, MuiAdapterOptions, MuiLocaleOption } from "../types";
 
 const DEFAULT_EMPTY_STATE_MESSAGE =
   "No translation locales have been added yet. Select a language from the dropdown above to add one.";
 
 function normalizeLocaleOptions(
-  options: readonly (LocaleOptionItem | string)[],
+  options: readonly (MuiLocaleOption | string)[],
   getLocaleLabel?: (locale: string) => string
 ): LocaleOptionItem[] {
   const seen = new Set<string>();
   const normalized: LocaleOptionItem[] = [];
   for (const item of options) {
-    const value = typeof item === "string" ? item : item.value;
+    const value = typeof item === "string" ? item : "value" in item ? item.value : item.locale;
     if (value.length === 0 || seen.has(value)) continue;
     seen.add(value);
-    normalized.push({ value, label: typeof item === "string" ? (getLocaleLabel?.(value) ?? value) : item.label });
+    normalized.push({
+      value,
+      label: typeof item === "string" ? (getLocaleLabel?.(value) ?? value) : item.label,
+      ...(typeof item === "string" || item.translatable === undefined ? {} : { translatable: item.translatable }),
+      ...(typeof item === "string" || item.removable === undefined ? {} : { removable: item.removable }),
+      ...(typeof item === "string" || item.metadata === undefined ? {} : { metadata: item.metadata })
+    });
   }
   return normalized;
 }
@@ -64,7 +70,7 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
     ]);
     const localizationOptions = resolved.localizationOptions ?? {};
     const availableLocaleSource = localizationOptions.availableLocales;
-    const availableLocaleOptions =
+    const availableLocaleOptions: LocaleOptionItem[] | undefined =
       availableLocaleSource === undefined
         ? policy?.allowedLocales?.map((value) => ({
             value,
@@ -79,6 +85,8 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
     const hasLocaleSelector = filteredAvailableLocales !== undefined;
     const localeLimitReached = policy?.maxLocales !== undefined && registeredLocales.size >= policy.maxLocales;
     const normalizedLocale = newLocale.trim();
+    const currentLocaleOption = availableLocaleOptions?.find((locale) => locale.value === currentLocale);
+    const currentLocaleTranslatable = currentLocaleOption?.translatable !== false;
     const selectedLocaleAvailable =
       !hasLocaleSelector || filteredAvailableLocales.some((locale) => locale.value === normalizedLocale);
     const localeAllowed = policy?.allowedLocales === undefined || policy.allowedLocales.includes(normalizedLocale);
@@ -286,7 +294,7 @@ export function createMuiLocalizationSlot(options?: MuiAdapterOptions): Componen
             <Button
               variant="secondary"
               noWrap={localizationOptions.noWrapActions ?? true}
-              disabled={readOnly || !editingLocaleConfigured || isTranslating}
+              disabled={readOnly || !editingLocaleConfigured || isTranslating || !currentLocaleTranslatable}
               onClick={onAutoTranslate}
             >
               {isTranslating ? translate("builder.translating") : translate("builder.autoTranslate")}

@@ -631,18 +631,21 @@ export const migrateSchemaTranslationMetadata = (
 
 /** Removes a locale registration and every localized value and metadata entry for it. */
 export const removeLocaleFromSchema = (schema: FormSchema, localeToRemove: string): FormSchema => {
-  if (localeToRemove === schema.defaultLocale) {
+  const normalizedLocaleToRemove = normalizeLocale(localeToRemove) ?? localeToRemove;
+  const normalizedDefaultLocale =
+    schema.defaultLocale === undefined ? undefined : (normalizeLocale(schema.defaultLocale) ?? schema.defaultLocale);
+  if (normalizedLocaleToRemove === normalizedDefaultLocale) {
     throw new Error(`Cannot remove defaultLocale: ${localeToRemove}`);
   }
-  const form = removeLocalizedNodeLocale(schema, localeToRemove);
+  const form = removeLocalizedNodeLocale(schema, normalizedLocaleToRemove);
   const fields = schema.fields.map((field) => {
-    const localizedField = removeLocalizedNodeLocale(field, localeToRemove);
+    const localizedField = removeLocalizedNodeLocale(field, normalizedLocaleToRemove);
     if (!("options" in localizedField)) return localizedField;
     return {
       ...localizedField,
       options: localizedField.options.map((option) => {
-        const translations = removeLocaleRecord(option.translations, localeToRemove);
-        const translationMetadata = removeLocaleRecord(option.translationMetadata, localeToRemove);
+        const translations = removeLocaleRecord(option.translations, normalizedLocaleToRemove);
+        const translationMetadata = removeLocaleRecord(option.translationMetadata, normalizedLocaleToRemove);
         const { translations: _translations, translationMetadata: _translationMetadata, ...base } = option;
         return {
           ...base,
@@ -652,10 +655,12 @@ export const removeLocaleFromSchema = (schema: FormSchema, localeToRemove: strin
       })
     } as FormField;
   });
-  const pages = schema.pages?.map((page) => removeLocalizedNodeLocale(page, localeToRemove));
+  const pages = schema.pages?.map((page) => removeLocalizedNodeLocale(page, normalizedLocaleToRemove));
   return {
     ...form,
-    supportedLocales: (schema.supportedLocales ?? []).filter((locale) => locale !== localeToRemove),
+    supportedLocales: (schema.supportedLocales ?? []).filter(
+      (locale) => (normalizeLocale(locale) ?? locale) !== normalizedLocaleToRemove
+    ),
     fields,
     ...(pages === undefined ? {} : { pages })
   };

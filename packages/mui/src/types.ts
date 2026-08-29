@@ -1,3 +1,4 @@
+import type { FormEngineMessages, FormEngineTranslator, LocaleOption } from "@form-engine-ts/core";
 import type {
   BuilderActionIconType,
   FieldEditorControlsConfig,
@@ -37,6 +38,20 @@ type MuiComponentSlotProps<T> = Partial<T> & {
 export interface LocaleOptionItem {
   readonly value: string;
   readonly label: string;
+  readonly translatable?: boolean;
+  readonly removable?: boolean;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export type MuiLocaleOption = LocaleOption | LocaleOptionItem;
+
+export interface MuiFormEngineI18nOptions {
+  readonly locale?: string;
+  readonly fallbackLocale?: string;
+  readonly messages?: FormEngineMessages;
+  readonly translator?: FormEngineTranslator;
+  readonly getLocaleLabel?: (locale: string) => string;
+  readonly getActionLabel?: (actionType: string) => string;
 }
 
 export type LocalizationSectionPlacement = "top" | "beforeQuestions" | "afterQuestions" | "bottom";

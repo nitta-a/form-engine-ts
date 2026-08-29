@@ -129,9 +129,7 @@ export async function waitForPublishedPackages(packages, options = {}) {
     if (unavailable.length === 0) return;
     const elapsed = now() - startedAt;
     if (elapsed >= timeoutMs) {
-      throw new Error(
-        `npm publication verification timed out for: ${unavailable.map((pkg) => `${pkg.manifest.name}@${pkg.manifest.version}`).join(", ")}`
-      );
+      throw new NpmPublicationVerificationTimeoutError(unavailable);
     }
     const waitMs = Math.min(delayMs, maxDelayMs, timeoutMs - elapsed);
     options.onStatus?.(`waiting ${waitMs}ms for ${unavailable.length} npm package(s)`);
@@ -140,9 +138,34 @@ export async function waitForPublishedPackages(packages, options = {}) {
   }
 }
 
+export class NpmPublicationVerificationTimeoutError extends Error {
+  constructor(packages) {
+    const identifiers = packages.map((pkg) => `${pkg.manifest.name}@${pkg.manifest.version}`);
+    super(`npm publication verification timed out for: ${identifiers.join(", ")}`);
+    this.name = "NpmPublicationVerificationTimeoutError";
+    this.packages = packages;
+  }
+}
+
+export async function publishAndVerifyPackages(packages, options = {}) {
+  const result = await publishUnpublishedPackages(packages, options);
+  try {
+    await waitForPublishedPackages(packages, options);
+    return { ...result, verificationStatus: "verified", unverified: [] };
+  } catch (error) {
+    if (!(error instanceof NpmPublicationVerificationTimeoutError)) throw error;
+    options.onStatus?.(`warning ${error.message}; continuing to GitHub release`);
+    return {
+      ...result,
+      verificationStatus: "timed_out",
+      unverified: error.packages.map((pkg) => `${pkg.manifest.name}@${pkg.manifest.version}`)
+    };
+  }
+}
+
 export function formatReleaseNotes(version, result) {
   const list = (items) => (items.length === 0 ? "- None" : items.map((item) => `- \`${item}\``).join("\n"));
-  return [
+  const notes = [
     `## Package publication (${version})`,
     "",
     "### Published",
@@ -150,7 +173,16 @@ export function formatReleaseNotes(version, result) {
     "",
     "### Already available",
     list(result.skipped)
-  ].join("\n");
+  ];
+  if (result.verificationStatus === "timed_out") {
+    notes.push(
+      "",
+      "### npm availability verification",
+      "- Verification timed out after publishing; the GitHub release was created so the registry can finish propagating.",
+      ...(result.unverified?.length === 0 ? [] : [`- Still unverified: ${list(result.unverified)}`])
+    );
+  }
+  return notes.join("\n");
 }
 
 export async function resolvePreviousReleaseTag(expectedVersion, options = {}) {
@@ -209,7 +241,9 @@ async function writeGitHubOutputs(version, result) {
     `${[
       `version=${version}`,
       `published_json=${JSON.stringify(result.published)}`,
-      `skipped_json=${JSON.stringify(result.skipped)}`
+      `skipped_json=${JSON.stringify(result.skipped)}`,
+      `verification_status=${result.verificationStatus ?? "verified"}`,
+      `unverified_json=${JSON.stringify(result.unverified ?? [])}`
     ].join("\n")}\n`
   );
 }
@@ -225,8 +259,7 @@ async function main() {
   if (command === "publish") {
     const packages =
       expectedVersion.length === 0 ? await discoverReleasePackages() : await validateReleasePackages(expectedVersion);
-    const result = await publishUnpublishedPackages(packages, { onStatus: console.log, env: process.env });
-    await waitForPublishedPackages(packages, { onStatus: console.log });
+    const result = await publishAndVerifyPackages(packages, { onStatus: console.log, env: process.env });
     await writeGitHubOutputs(expectedVersion || String(packages[0]?.manifest.version ?? "unknown"), result);
     console.log(`Published ${result.published.length}; skipped ${result.skipped.length}.`);
     return;

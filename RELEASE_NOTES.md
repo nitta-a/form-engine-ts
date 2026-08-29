@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v5.1.0 — 2026-08-29
+
+- Added a public submission wire contract, Zod runtime schemas, submission serialization, and JSON-serializable submission errors for API and persistence boundaries.
+- Expanded CSV export with custom columns, locale and PII status columns, streaming support, and compatible BOM/formula-injection option aliases.
+- Added locale catalogs, locale lifecycle callbacks, manual-only translation targets, and replaceable React/MUI translation workspace slots with localized messages.
+- Added logical-to-physical field mapping support to the Azure Table storage adapter.
+- Aligned all public packages to version 5.1.0.
+
+See the [GitHub release for v5.1.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.1.0).
+
 ### v5.0.1 — 2026-08-29
 
 - Fixed npm Sigstore provenance validation by including the canonical GitHub repository metadata in every published package, including `@form-engine-ts/storage`.

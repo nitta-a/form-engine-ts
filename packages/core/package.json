@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/core",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "publishConfig": {
     "access": "public"
   },
@@ -38,6 +38,9 @@
     "validation",
     "typescript"
   ],
+  "dependencies": {
+    "zod": "^4.0.0"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "check": "biome check . && tsc --noEmit",

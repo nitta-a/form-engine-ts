@@ -38,6 +38,20 @@ interface AzureTableSubmissionCodec<T = FormSubmission> {
     readonly createPartitionKeyFromQuery: (formId: string, query: SubmissionPageQueryOptions) => string | undefined;
     readonly createRowKey: (value: T) => string;
 }
+interface AzureTableFieldMapping {
+    readonly partitionKeyProperty?: string;
+    readonly rowKeyProperty?: string;
+    readonly formId?: string;
+    readonly formVersion?: string;
+    readonly submittedAt?: string;
+    readonly values?: string;
+    readonly metadata?: string;
+    readonly customPropertyMappings?: Readonly<Record<string, string>>;
+}
+interface AzureTableValueCodec {
+    readonly encodeValues?: (values: Record<string, unknown>) => string;
+    readonly decodeValues?: (raw: string) => Record<string, unknown>;
+}
 interface AzureTableStorageOptions<T = FormSubmission> {
     /** @deprecated Use schemasTableClient, submissionsTableClient, or clientResolver. */
     readonly client?: AzureTableClientLike;
@@ -47,13 +61,15 @@ interface AzureTableStorageOptions<T = FormSubmission> {
         readonly formId: string;
         readonly query?: SubmissionPageQueryOptions;
     }) => AzureTableClientLike | Promise<AzureTableClientLike>;
-    readonly codec?: AzureTableSubmissionCodec<T>;
+    readonly codec?: AzureTableSubmissionCodec<T> | AzureTableValueCodec;
     /** @deprecated Use codec. */
     readonly submissionCodec?: AzureTableEntityCodec<FormSubmission>;
     readonly buildSubmissionFilter?: (formId: string, query: SubmissionPageQueryOptions) => string;
     /** @deprecated Use buildSubmissionFilter. */
     readonly toODataFilter?: (options: SubmissionPageQueryOptions) => string;
     readonly maxScanPages?: number;
+    readonly fieldMapping?: AzureTableFieldMapping;
+    readonly readOnly?: boolean;
 }
 interface AzureTextAnswerCursorPayload {
     readonly formatVersion: 1;
@@ -66,8 +82,8 @@ interface AzureTextAnswerCursorPayload {
     readonly fieldIndex: number;
 }
 declare const defaultAzureTableSubmissionCodec: AzureTableSubmissionCodec<FormSubmission>;
-declare function metadataFiltersToOData(options: SubmissionPageQueryOptions): string;
-declare function submissionFilterToOData(filter: SubmissionFilter): string | undefined;
+declare function metadataFiltersToOData(options: SubmissionPageQueryOptions, mapping?: AzureTableFieldMapping): string;
+declare function submissionFilterToOData(filter: SubmissionFilter, mapping?: AzureTableFieldMapping): string | undefined;
 declare function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
 
-export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTextAnswerCursorPayload, createAzureTableStorage, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };
+export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, createAzureTableStorage, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };

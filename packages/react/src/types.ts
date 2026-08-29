@@ -6,6 +6,7 @@ import type {
   FormSchema,
   FormValues,
   JsonValue,
+  LocaleOption,
   Question,
   QuestionType,
   TranslationReport,
@@ -301,6 +302,57 @@ export interface BuilderLocalizationSlotProps extends BuilderSlotBaseProps {
   readonly translationError?: string;
   readonly policy?: FormPolicy;
   readonly translationAdapterAvailable?: boolean;
+}
+
+export interface TranslationWorkspaceHeaderProps {
+  readonly schema: FormSchema;
+  readonly sourceLocale: string;
+  readonly targetLocale: string;
+  readonly summary: {
+    readonly totalSlots: number;
+    readonly translatedCount: number;
+    readonly missingCount: number;
+    readonly staleCount: number;
+    readonly manualCount: number;
+    readonly completionPercentage: number;
+  };
+  readonly onTranslateAll: () => void;
+  readonly isTranslating: boolean;
+  readonly readOnly: boolean;
+}
+
+export interface TranslationSlotRowProps {
+  readonly slot: import("@form-engine-ts/core").TranslationSlot;
+  readonly readOnly: boolean;
+  readonly onChange: (text: string) => void;
+  readonly onTranslate: () => void;
+}
+
+export interface LocaleSelectorProps {
+  readonly targetLocale: string;
+  readonly targetLocales: readonly string[];
+  readonly localeOptions: readonly LocaleOption[];
+  readonly newLocale: string;
+  readonly readOnly: boolean;
+  readonly onTargetLocaleChange: (locale: string) => void;
+  readonly onNewLocaleChange: (locale: string) => void;
+  readonly onAddLocale: () => void;
+}
+
+export interface TranslationWorkspaceActionsProps {
+  readonly onTranslateAll: () => void;
+  readonly isTranslating: boolean;
+  readonly readOnly: boolean;
+}
+
+export interface TranslationWorkspaceSlots {
+  readonly renderHeader?: (props: TranslationWorkspaceHeaderProps) => ReactNode;
+  readonly renderSlotRow?: (props: TranslationSlotRowProps) => ReactNode;
+  readonly renderLocaleSelector?: (props: LocaleSelectorProps) => ReactNode;
+  readonly renderStatusBadge?: (props: {
+    readonly status: import("@form-engine-ts/core").TranslationStatus;
+  }) => ReactNode;
+  readonly renderActions?: (props: TranslationWorkspaceActionsProps) => ReactNode;
 }
 
 export interface LocalizationSummaryContext {

@@ -3,7 +3,8 @@ import {
   type FormBuilderComponents,
   type FormBuilderProps,
   type FormBuilderSectionName,
-  type FormBuilderSlots
+  type FormBuilderSlots,
+  FormEngineI18nProvider
 } from "@form-engine-ts/react";
 import { useMemo } from "react";
 import { muiBuilderComponents } from "./components";
@@ -14,6 +15,7 @@ import {
   MUI_LOCALIZATION_SECTION_ORDERS,
   type MuiAdapterOptions,
   type MuiBuilderSlotProps,
+  type MuiFormEngineI18nOptions,
   type MuiLayoutOptions,
   type MuiLocalizationOptions,
   type MuiSubmissionSettingsOptions
@@ -28,6 +30,7 @@ export interface MuiFormBuilderProps
   readonly muiSlotProps?: MuiBuilderSlotProps;
   readonly components?: Partial<FormBuilderComponents>;
   readonly slots?: Partial<FormBuilderSlots>;
+  readonly i18n?: MuiFormEngineI18nOptions;
 }
 
 export function MuiFormBuilder({
@@ -38,6 +41,7 @@ export function MuiFormBuilder({
   muiSlotProps,
   components: customComponents,
   slots: customSlots,
+  i18n,
   sectionOrder,
   ...props
 }: MuiFormBuilderProps) {
@@ -50,7 +54,15 @@ export function MuiFormBuilder({
       }),
     [layoutOptions, localizationOptions, muiOptions, muiSlotProps]
   );
-  const contextValue = useMemo(() => ({ options: contextOptions }), [contextOptions]);
+  const resolvedMuiOptions = useMemo(
+    () =>
+      mergeMuiAdapterOptions(contextOptions, {
+        ...(i18n?.getLocaleLabel === undefined ? {} : { getLocaleLabel: i18n.getLocaleLabel }),
+        ...(i18n?.getActionLabel === undefined ? {} : { getActionLabel: i18n.getActionLabel })
+      }),
+    [contextOptions, i18n?.getActionLabel, i18n?.getLocaleLabel]
+  );
+  const contextValue = useMemo(() => ({ options: resolvedMuiOptions }), [resolvedMuiOptions]);
   const components = useMemo(() => ({ ...muiBuilderComponents, ...customComponents }), [customComponents]);
   const slots = useMemo(() => ({ ...muiBuilderSlots, ...customSlots }), [customSlots]);
   const placement = contextOptions.localizationOptions?.placement;
@@ -80,7 +92,7 @@ export function MuiFormBuilder({
     );
     return order;
   })();
-  return (
+  const content = (
     <MuiFormBuilderContext.Provider value={contextValue}>
       <FormBuilder
         {...props}
@@ -91,5 +103,16 @@ export function MuiFormBuilder({
         {...(submissionSettingsOptions === undefined ? {} : { submissionSettingsOptions })}
       />
     </MuiFormBuilderContext.Provider>
+  );
+  if (i18n === undefined) return content;
+  return (
+    <FormEngineI18nProvider
+      {...(i18n.locale === undefined ? {} : { locale: i18n.locale })}
+      {...(i18n.fallbackLocale === undefined ? {} : { fallbackLocale: i18n.fallbackLocale })}
+      {...(i18n.messages === undefined ? {} : { messages: i18n.messages })}
+      {...(i18n.translator === undefined ? {} : { translator: i18n.translator })}
+    >
+      {content}
+    </FormEngineI18nProvider>
   );
 }

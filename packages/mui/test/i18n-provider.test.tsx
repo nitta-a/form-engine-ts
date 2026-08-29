@@ -24,4 +24,17 @@ describe("MUI i18n provider integration", () => {
     expect(schema.defaultLocale).toBe("en");
     expect(schema.supportedLocales).toEqual(["zh-Hans", "ko"]);
   });
+
+  it("constructs the provider from MuiFormBuilder i18n options", () => {
+    render(
+      <MuiFormBuilder
+        schema={schema}
+        onChange={() => undefined}
+        i18n={{ locale: "ja" }}
+        features={{ pages: false, localization: false }}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "質問を追加" })).toBeInTheDocument();
+  });
 });

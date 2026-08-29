@@ -358,4 +358,24 @@ describe("createAzureTableStorage", () => {
     await storage.clear();
     expect(await storage.listSchemas()).toEqual([]);
   });
+
+  it("maps submission fields to physical Azure Table property names", async () => {
+    const { client, filters, entities } = createClientStub();
+    const storage = createAzureTableStorage({
+      client,
+      fieldMapping: { formVersion: "surveyVersion", submittedAt: "answeredAt" }
+    });
+    await storage.saveSubmission(submission("mapped"));
+
+    expect([...entities.values()]).toContainEqual(
+      expect.objectContaining({ surveyVersion: 2, answeredAt: "2026-08-24T00:00:00.000Z" })
+    );
+    const page = await storage.listSubmissionPage("form", {
+      version: 2,
+      since: "2026-08-24T00:00:00.000Z"
+    });
+    expect(page.items).toEqual([submission("mapped")]);
+    expect(filters.at(-1)).toContain("surveyVersion eq 2");
+    expect(filters.at(-1)).toContain("answeredAt ge '2026-08-24T00:00:00.000Z'");
+  });
 });

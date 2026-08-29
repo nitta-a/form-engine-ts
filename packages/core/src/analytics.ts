@@ -1,5 +1,6 @@
 import { assertValidFormSchema } from "./schema";
 import type {
+  BaseSubmissionMetadata,
   ChoiceQuestionAggregate,
   CrossTabulationResult,
   FormAnalytics,
@@ -469,9 +470,25 @@ function serializeValue(value: FormValue): string | number | boolean {
     : JSON.stringify(value);
 }
 
-export interface CsvExportOptions {
+export interface CsvColumnDefinition<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+  readonly key: string;
+  readonly header: string;
+  readonly getValue: (
+    submission: FormSubmission<TMeta>,
+    schema: FormSchema
+  ) => string | number | boolean | null | undefined;
+}
+
+export interface CsvExportOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
   readonly withBom?: boolean;
   readonly neutralizeFormulas?: boolean;
+  /** Alias for withBom used by the public export contract. */
+  readonly useBom?: boolean;
+  /** Alias for neutralizeFormulas used by the public export contract. */
+  readonly preventFormulaInjection?: boolean;
+  readonly customColumns?: readonly CsvColumnDefinition<TMeta>[];
+  readonly includePiiStatus?: boolean;
+  readonly includeLocale?: boolean;
 }
 
 export interface CsvColumnDef {
@@ -512,6 +529,10 @@ function serializeUnknown(value: unknown): string | number | boolean {
   return JSON.stringify(value);
 }
 
+function submissionWithMetadata(submission: FormSubmission): FormSubmission<BaseSubmissionMetadata> {
+  return { ...submission, metadata: submission.metadata ?? {} };
+}
+
 export async function* exportResponsesToCsvStream(
   schema: FormSchema,
   submissions: AsyncIterable<AccumulatorResponse>,
@@ -520,13 +541,23 @@ export async function* exportResponsesToCsvStream(
   assertValidFormSchema(schema);
   const includeDefaultColumns = options.includeDefaultColumns ?? true;
   const customColumns = options.columns ?? [];
+  const contractColumns = options.customColumns ?? [];
+  const includeLocale = options.includeLocale ?? true;
+  const includePiiStatus = options.includePiiStatus ?? false;
   const headers = [
     ...(includeDefaultColumns
-      ? ["submissionId", "submittedAt", "locale", ...schema.fields.map((field) => field.id)]
+      ? [
+          "submissionId",
+          "submittedAt",
+          ...(includeLocale ? ["locale"] : []),
+          ...(includePiiStatus ? ["piiStatus"] : []),
+          ...schema.fields.map((field) => field.id)
+        ]
       : []),
-    ...customColumns.map((column) => column.header)
+    ...customColumns.map((column) => column.header),
+    ...contractColumns.map((column) => column.header)
   ];
-  const neutralizeFormulas = options.neutralizeFormulas ?? true;
+  const neutralizeFormulas = options.preventFormulaInjection ?? options.neutralizeFormulas ?? true;
   const header = headers.map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",");
   yield `${(options.withBom ?? true) ? "\uFEFF" : ""}${header}`;
   for await (const submission of submissions) {
@@ -535,11 +566,13 @@ export async function* exportResponsesToCsvStream(
     const response = asFormResponse(submission);
     const answers = response.answers;
     const visible = selectVisibleAnswers(schema, answers as FormValues);
+    const piiStatus = response.metadata?.piiConfirmed === true ? "confirmed" : "unconfirmed";
     const defaultCells = includeDefaultColumns
       ? [
           response.responseId,
           response.submittedAt,
-          response.sourceLocale ?? "",
+          ...(includeLocale ? [response.sourceLocale ?? ""] : []),
+          ...(includePiiStatus ? [piiStatus] : []),
           ...schema.fields.map((field) => serializeUnknown(visible[field.id]))
         ]
       : [];
@@ -550,7 +583,13 @@ export async function* exportResponsesToCsvStream(
       schema
     };
     const customCells = await Promise.all(customColumns.map((column) => column.getValue(context)));
-    yield `\r\n${[...defaultCells, ...customCells].map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",")}`;
+    const contractCells =
+      "values" in submission
+        ? contractColumns.map((column) => column.getValue(submissionWithMetadata(submission), schema))
+        : contractColumns.map(() => undefined);
+    yield `\r\n${[...defaultCells, ...customCells, ...contractCells]
+      .map((value) => escapeCsvCell(value, neutralizeFormulas))
+      .join(",")}`;
   }
 }
 
@@ -635,19 +674,34 @@ export function exportResponsesToCsv(
       throw new TypeError(`Submission ${response.id} does not match ${schema.id}@${schema.version}.`);
     }
   }
+  const includeLocale = options.includeLocale ?? true;
+  const includePiiStatus = options.includePiiStatus ?? false;
+  const customColumns = options.customColumns ?? [];
+  const headers = [
+    "submissionId",
+    "submittedAt",
+    ...(includeLocale ? ["locale"] : []),
+    ...(includePiiStatus ? ["piiStatus"] : []),
+    ...schema.fields.map((field) => field.id),
+    ...customColumns.map((column) => column.header)
+  ];
   const rows = [
-    ["submissionId", "submittedAt", "locale", ...schema.fields.map((field) => field.id)],
+    headers,
     ...responses.map((response) => {
       const visible = selectVisibleAnswers(schema, response.values);
+      const piiStatus = response.metadata?.piiConfirmed === true ? "confirmed" : "unconfirmed";
+      const submissionForCustomColumns = submissionWithMetadata(response);
       return [
         response.id,
         response.submittedAt,
-        response.locale,
-        ...schema.fields.map((field) => serializeValue(visible[field.id] as FormValue))
+        ...(includeLocale ? [response.locale] : []),
+        ...(includePiiStatus ? [piiStatus] : []),
+        ...schema.fields.map((field) => serializeValue(visible[field.id] as FormValue)),
+        ...customColumns.map((column) => column.getValue(submissionForCustomColumns, schema))
       ];
     })
   ];
-  const neutralizeFormulas = options.neutralizeFormulas ?? true;
+  const neutralizeFormulas = options.preventFormulaInjection ?? options.neutralizeFormulas ?? true;
   const csv = rows.map((row) => row.map((cell) => escapeCsvCell(cell, neutralizeFormulas)).join(",")).join("\r\n");
-  return (options.withBom ?? true) ? `\uFEFF${csv}` : csv;
+  return (options.useBom ?? options.withBom ?? true) ? `\uFEFF${csv}` : csv;
 }

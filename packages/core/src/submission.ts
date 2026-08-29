@@ -5,6 +5,7 @@ import type {
   ExtensibleNode,
   FormSchema,
   FormSubmission,
+  FormSubmissionWire,
   FormValues,
   JsonValue
 } from "./types";
@@ -45,6 +46,24 @@ function isFormValue(value: unknown): value is FormValues[string] {
     typeof value === "boolean" ||
     (Array.isArray(value) && value.every((item) => typeof item === "string"))
   );
+}
+
+export function toFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(
+  submission: FormSubmission<TMeta>
+): FormSubmissionWire<TMeta>;
+export function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire;
+export function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire {
+  const { id, formId, formVersion, values, answers, metadata, submittedAt, schemaRevision } = submission;
+  const targetValues = values ?? answers ?? {};
+  return {
+    id,
+    formId,
+    formVersion,
+    values: { ...targetValues },
+    metadata: { ...(metadata ?? {}) },
+    submittedAt,
+    ...(schemaRevision === undefined ? {} : { schemaRevision })
+  };
 }
 
 export function createSubmission(

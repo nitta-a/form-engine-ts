@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v5.0.1** (2026-08-29). All public packages are currently published at version `5.0.1`.
-This patch release fixes npm Sigstore provenance metadata for published packages. It includes the v5.0.0 major release additions: typed submissions and validation, cursor pagination, transition commits, PII metadata normalization, the shared storage package, and typed i18n providers and workspace results.
+The latest release is **v5.1.0** (2026-08-29). All public packages are currently published at version `5.1.0`.
+This release adds a public submission wire contract with Zod runtime validation, expanded CSV exports, locale-catalog-aware translation workspaces, and Azure Table field mapping. It also includes the v5.0.0 major release additions: typed submissions and validation, cursor pagination, transition commits, PII metadata normalization, the shared storage package, and typed i18n providers and workspace results.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.1).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.1.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v5.0.1**（2026-08-29）です。公開パッケージはすべてバージョン `5.0.1` で公開されています。
-本パッチリリースでは、公開パッケージのnpm Sigstore provenanceメタデータを修正しました。v5.0.0のメジャーリリースで追加した型付きSubmissionと検証、カーソルページング、遷移コミット、PIIメタデータ正規化、共通ストレージパッケージ、型付きi18nプロバイダーとワークスペース結果も含まれます。
+最新版は **v5.1.0**（2026-08-29）です。公開パッケージはすべてバージョン `5.1.0` で公開されています。
+本リリースでは、Submission wire契約とZodランタイム検証、CSVエクスポート拡張、ロケールカタログ対応の翻訳ワークスペース、Azure Tableのフィールドマッピングを追加しました。v5.0.0のメジャーリリースで追加した型付きSubmissionと検証、カーソルページング、遷移コミット、PIIメタデータ正規化、共通ストレージパッケージ、型付きi18nプロバイダーとワークスペース結果も含まれます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.1) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.1.0) を参照してください。
 
 ### 編集・回答体験
 

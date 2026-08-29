@@ -174,9 +174,25 @@ export type TranslationWorkspaceTranslationKey =
   | "workspace.errors.adapterNotConfigured"
   | "workspace.errors.translationFailed";
 
+export type TranslationWorkspaceDetailedKey =
+  | "workspace.header.title"
+  | "workspace.header.sourceLocale"
+  | "workspace.header.targetLocale"
+  | "workspace.header.translateAll"
+  | "workspace.header.progress"
+  | "workspace.slot.sourceText"
+  | "workspace.slot.translatedText"
+  | "workspace.slot.translateSingle"
+  | "workspace.slot.revertManual"
+  | "workspace.confirm.removeLocaleTitle"
+  | "workspace.confirm.removeLocaleMessage"
+  | "workspace.empty.noTargetLocales"
+  | "workspace.empty.noSlotsToTranslate";
+
 export type FormEngineTranslationKey =
   | KnownBuilderTranslationKey
   | RendererTranslationKey
-  | TranslationWorkspaceTranslationKey;
+  | TranslationWorkspaceTranslationKey
+  | TranslationWorkspaceDetailedKey;
 
 export type FormEngineMessages = Partial<Record<FormEngineTranslationKey, string>>;

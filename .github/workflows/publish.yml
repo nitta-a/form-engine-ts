@@ -64,6 +64,8 @@ jobs:
       version: ${{ steps.publish.outputs.version }}
       published_json: ${{ steps.publish.outputs.published_json }}
       skipped_json: ${{ steps.publish.outputs.skipped_json }}
+      verification_status: ${{ steps.publish.outputs.verification_status }}
+      unverified_json: ${{ steps.publish.outputs.unverified_json }}
 
     steps:
       - name: Checkout
@@ -112,6 +114,8 @@ jobs:
           RELEASE_VERSION: ${{ needs.npm.outputs.version }}
           PUBLISHED_JSON: ${{ needs.npm.outputs.published_json }}
           SKIPPED_JSON: ${{ needs.npm.outputs.skipped_json }}
+          VERIFICATION_STATUS: ${{ needs.npm.outputs.verification_status }}
+          UNVERIFIED_JSON: ${{ needs.npm.outputs.unverified_json }}
         run: |
           node scripts/release-packages.mjs migration-notes > migration-notes.md
           {
@@ -122,7 +126,18 @@ jobs:
             echo
             echo "### Already available"
             echo "${SKIPPED_JSON}" | jq -r 'if length == 0 then "- None" else .[] | "- `\(.)`" end'
+            if [[ "${VERIFICATION_STATUS}" == "timed_out" ]]; then
+              echo
+              echo "### npm availability verification"
+              echo "- Verification timed out after publishing; the GitHub release was created so the registry can finish propagating."
+              echo "- Still unverified:"
+              echo "${UNVERIFIED_JSON}" | jq -r 'if length == 0 then "- None" else .[] | "  - `\(.)`" end'
+            fi
             echo
             cat migration-notes.md
           } > release-notes.md
-          gh release create "${{ github.ref_name }}" --verify-tag --generate-notes --notes-file release-notes.md --title "${{ github.ref_name }}"
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release edit "${{ github.ref_name }}" --notes-file release-notes.md --title "${{ github.ref_name }}"
+          else
+            gh release create "${{ github.ref_name }}" --verify-tag --generate-notes --notes-file release-notes.md --title "${{ github.ref_name }}"
+          fi

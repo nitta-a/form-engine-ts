@@ -67,6 +67,19 @@ export interface BaseSubmissionMetadata {
   readonly [key: string]: JsonValue | undefined;
 }
 
+/** A contract or tenant-managed locale and its translation capabilities. */
+export interface LocaleOption {
+  /** Canonical BCP 47 locale tag. */
+  readonly locale: string;
+  /** Human-readable locale name. */
+  readonly label: string;
+  /** Whether automatic translation is allowed for this locale. Defaults to true. */
+  readonly translatable?: boolean;
+  /** Whether the locale may be removed from the form. Defaults to true. */
+  readonly removable?: boolean;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 /** Arbitrary, JSON-serializable data preserved by every form-engine operation. */
 export interface ExtensibleNode {
   readonly metadata?: Readonly<Record<string, JsonValue>>;
@@ -257,6 +270,17 @@ interface FormSubmissionBase extends ExtensibleNode {
 
 export type FormSubmission<TMeta extends BaseSubmissionMetadata | undefined = undefined> = FormSubmissionBase &
   ([TMeta] extends [undefined] ? { readonly metadata?: BaseSubmissionMetadata } : { readonly metadata: TMeta });
+
+/** Clean network and persistence representation of a form submission. */
+export interface FormSubmissionWire<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+  readonly id: string;
+  readonly formId: string;
+  readonly formVersion: number;
+  readonly values: Record<string, unknown>;
+  readonly metadata: TMeta;
+  readonly submittedAt: string;
+  readonly schemaRevision?: number;
+}
 
 export interface CreateSubmissionInput<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
   readonly id?: string;
