@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v5.0.0** (2026-08-29). All public packages are currently published at version `5.0.0`.
-This major release adds typed submissions and validation, cursor pagination, transition commits, PII metadata normalization, the shared storage package, and typed i18n providers and workspace results.
+The latest release is **v5.0.1** (2026-08-29). All public packages are currently published at version `5.0.1`.
+This patch release fixes npm Sigstore provenance metadata for published packages. It includes the v5.0.0 major release additions: typed submissions and validation, cursor pagination, transition commits, PII metadata normalization, the shared storage package, and typed i18n providers and workspace results.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.1).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v5.0.0**（2026-08-29）です。公開パッケージはすべてバージョン `5.0.0` で公開されています。
-本メジャーリリースでは、型付きSubmissionと検証、カーソルページング、遷移コミット、PIIメタデータ正規化、共通ストレージパッケージ、型付きi18nプロバイダーとワークスペース結果を追加しました。
+最新版は **v5.0.1**（2026-08-29）です。公開パッケージはすべてバージョン `5.0.1` で公開されています。
+本パッチリリースでは、公開パッケージのnpm Sigstore provenanceメタデータを修正しました。v5.0.0のメジャーリリースで追加した型付きSubmissionと検証、カーソルページング、遷移コミット、PIIメタデータ正規化、共通ストレージパッケージ、型付きi18nプロバイダーとワークスペース結果も含まれます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.1) を参照してください。
 
 ### 編集・回答体験
 

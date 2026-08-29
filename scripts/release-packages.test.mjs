@@ -23,10 +23,12 @@ async function fixture(packages) {
   return root;
 }
 
+const repository = { type: "git", url: "git+https://github.com/nitta-a/form-engine-ts.git" };
+
 test("discovers every package directory and validates release metadata", async () => {
   const root = await fixture({
-    core: { name: "@form-engine-ts/core", version: "2.7.0" },
-    adapter: { name: "@form-engine-ts/adapter", version: "2.7.0" }
+    core: { name: "@form-engine-ts/core", version: "2.7.0", repository },
+    adapter: { name: "@form-engine-ts/adapter", version: "2.7.0", repository }
   });
   try {
     assert.equal((await discoverReleasePackages(root)).length, 2);
@@ -38,16 +40,27 @@ test("discovers every package directory and validates release metadata", async (
 
 test("rejects mismatched and private packages", async () => {
   const root = await fixture({
-    core: { name: "@form-engine-ts/core", version: "2.2.9" },
-    hidden: { name: "@form-engine-ts/hidden", version: "2.7.0", private: true }
+    core: { name: "@form-engine-ts/core", version: "2.2.9", repository },
+    hidden: { name: "@form-engine-ts/hidden", version: "2.7.0", private: true, repository }
   });
   try {
     await assert.rejects(validateReleasePackages("2.7.0", { rootDirectory: root }), /version is 2\.2\.9/);
     await writeFile(
       join(root, "packages", "core", "package.json"),
-      JSON.stringify({ name: "@form-engine-ts/core", version: "2.7.0" })
+      JSON.stringify({ name: "@form-engine-ts/core", version: "2.7.0", repository })
     );
     await assert.rejects(validateReleasePackages("2.7.0", { rootDirectory: root }), /marked private/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("rejects packages without matching repository metadata", async () => {
+  const root = await fixture({
+    storage: { name: "@form-engine-ts/storage", version: "2.7.0" }
+  });
+  try {
+    await assert.rejects(validateReleasePackages("2.7.0", { rootDirectory: root }), /repository\.url/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

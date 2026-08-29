@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v5.0.1 — 2026-08-29
+
+- Fixed npm Sigstore provenance validation by including the canonical GitHub repository metadata in every published package, including `@form-engine-ts/storage`.
+- Added release validation that rejects packages with missing or mismatched repository metadata before publication.
+- Aligned all public packages to version 5.0.1.
+
+See the [GitHub release for v5.0.1](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.1).
+
 ### v5.0.0 — 2026-08-29
 
 - Major release: typed submission and validation APIs, cursor pagination, transition commits, PII metadata normalization, and the shared `@form-engine-ts/storage` package are now available together.

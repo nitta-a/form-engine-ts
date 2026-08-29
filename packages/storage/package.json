@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/storage",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "publishConfig": {
     "access": "public"
   },
@@ -32,6 +32,10 @@
     }
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitta-a/form-engine-ts.git"
+  },
   "scripts": {
     "build": "tsup src/index.ts src/types.ts src/pagination.ts --format esm,cjs --dts --clean --external @form-engine-ts/core",
     "check": "biome check . && tsc --noEmit",

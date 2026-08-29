@@ -3,6 +3,8 @@ import { appendFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+const repositoryUrl = "git+https://github.com/nitta-a/form-engine-ts.git";
+
 export async function discoverReleasePackages(rootDirectory = process.cwd()) {
   const packagesDirectory = join(rootDirectory, "packages");
   const entries = await readdir(packagesDirectory, { withFileTypes: true });
@@ -34,6 +36,9 @@ export async function validateReleasePackages(expectedVersion, options = {}) {
     if (pkg.manifest.private === true) throw new Error(`${pkg.manifestPath} is marked private`);
     if (typeof pkg.manifest.name !== "string" || pkg.manifest.name.length === 0) {
       throw new Error(`${pkg.manifestPath} has no package name`);
+    }
+    if (pkg.manifest.repository?.url !== repositoryUrl) {
+      throw new Error(`${pkg.manifestPath} repository.url must be ${repositoryUrl}`);
     }
   }
   return packages;
