@@ -1,4 +1,4 @@
-import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonHeaderProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
+import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
 import * as _form_engine_ts_core from '@form-engine-ts/core';
@@ -248,9 +248,13 @@ interface TranslationComparisonWorkspaceProps {
     readonly validateLocale?: UseTranslationComparisonOptions["validateLocale"];
     readonly createTranslationMetadata?: UseTranslationComparisonOptions["createTranslationMetadata"];
     readonly showInternalPath?: boolean;
+    readonly localeSelectorMode?: "tabs" | "select";
+    readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
+    readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
     readonly i18n?: MuiFormEngineI18nOptions;
     readonly slots?: {
         readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
+        readonly renderTargetLocaleSelector?: (props: TranslationComparisonLocaleSelectorProps) => ReactNode;
         readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
         readonly renderStatusBadge?: (props: {
             readonly status: TranslationStatus;
@@ -290,6 +294,7 @@ interface TranslationWorkspaceProps {
     readonly createTranslationMetadata?: UseTranslationWorkspaceOptions["createTranslationMetadata"];
     readonly validateLocale?: UseTranslationWorkspaceOptions["validateLocale"];
     readonly showInternalPath?: boolean;
+    readonly localeSelectorMode?: "tabs" | "select";
     readonly i18n?: MuiFormEngineI18nOptions;
     readonly slots?: TranslationWorkspaceSlots;
 }

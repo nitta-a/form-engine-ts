@@ -32,6 +32,13 @@ cancellation controls. It accepts both `TranslationAdapter` and `AsyncTranslatio
 set `showInternalPath` only for developer-facing diagnostics. Both surfaces preserve keyboard access and expose
 `renderHeader`/`renderItemRow` customization slots.
 
+Pass `localeSelectorMode="select"` to either workspace to replace registered translation-locale tabs with a MUI Select;
+the registered-locale selector is hidden when only one translation locale exists. `TranslationComparisonWorkspace` also
+accepts `slots.renderTargetLocaleSelector` for a custom registered-locale control. Configure `i18n.getLocaleLabel` to
+show display names such as `日本語` and `English` everywhere locale names are rendered. Comparison rows include the
+same default type icon on both sides; replace it with `renderItemIcon` or `getTranslationSlotIcon`. The icon callback
+receives the item, `nodeKind`, `targetProperty`, and field/option position metadata.
+
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";
 

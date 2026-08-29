@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v6.4.0 — 2026-08-30
+
+- Added configurable tabs/select locale controls and a custom locale-selector slot to the MUI translation workspaces.
+- Added localized locale labels throughout translation workspaces, including errors and confirmation dialogs.
+- Added translation comparison item icons with default node/property icons and customization callbacks.
+- Aligned all public packages to version 6.4.0.
+
+See the [GitHub release for v6.4.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.4.0).
+
 ### v6.3.0 — 2026-08-29
 
 - Expanded the translation comparison workspace with locale selection, locale add/remove flows, localized labels, internal-path visibility, and policy-aware controls.

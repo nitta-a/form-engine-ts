@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.3.0** (2026-08-29). All public packages are currently published at version `6.3.0`.
-This release expands the translation comparison workspace with locale selection and management, localized labels, and policy-aware controls, while preserving provider-specific translation metadata during migration. It builds on v6.2.0's asynchronous translation cancellation, progress reporting, partial-failure handling, retry, and cancellation controls.
+The latest release is **v6.4.0** (2026-08-30). All public packages are currently published at version `6.4.0`.
+This release adds configurable tabs/select locale controls, localized workspace labels, and customizable translation comparison item icons. It builds on v6.3.0's locale management, policy-aware controls, and provider-specific translation metadata preservation during migration.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.3.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.4.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.3.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.3.0` で公開されています。
-本リリースでは、翻訳比較ワークスペースに言語の選択・追加・削除、ローカライズされたラベル、ポリシー対応の操作を追加し、翻訳メタデータ移行時にプロバイダー固有のJSON拡張を保持するようにしました。v6.2.0の非同期翻訳キャンセル、進捗報告、部分失敗処理、再試行・キャンセル操作も引き継いでいます。
+最新版は **v6.4.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.4.0` で公開されています。
+本リリースでは、翻訳ワークスペースのタブ／セレクト式ロケール操作、ローカライズされたラベル、翻訳比較項目のアイコンとカスタマイズ用コールバックを追加しました。v6.3.0のロケール管理、ポリシー対応の操作、翻訳メタデータ移行時のプロバイダー固有JSON拡張の保持も引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.3.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.4.0) を参照してください。
 
 ### 編集・回答体験
 

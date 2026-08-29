@@ -357,6 +357,15 @@ export interface TranslationComparisonItem {
   readonly translatable: boolean;
 }
 
+export interface TranslationComparisonItemIconProps {
+  readonly item: TranslationComparisonItem;
+  readonly nodeKind: TranslationComparisonItem["targetKind"];
+  readonly targetProperty: TranslationComparisonItem["targetProperty"];
+  readonly questionIndex?: number;
+  readonly fieldType?: string;
+  readonly optionIndex?: number;
+}
+
 export interface TranslationComparisonSummary {
   readonly total: number;
   readonly translated: number;
@@ -368,6 +377,8 @@ export interface TranslationComparisonSummary {
 export interface TranslationComparisonHeaderProps {
   readonly sourceLocale: string;
   readonly targetLocale: string;
+  readonly sourceLocaleLabel?: string;
+  readonly targetLocaleLabel?: string;
   readonly summary: TranslationComparisonSummary;
   readonly onTranslateAll: () => void;
   readonly isTranslating: boolean;
@@ -375,6 +386,14 @@ export interface TranslationComparisonHeaderProps {
   readonly report?: TranslationReport;
   readonly progress?: TranslationProgress;
   readonly onCancel?: () => void;
+}
+
+export interface TranslationComparisonLocaleSelectorProps {
+  readonly targetLocale: string;
+  readonly targetLocales: readonly string[];
+  readonly localeOptions: readonly LocaleOption[];
+  readonly readOnly: boolean;
+  readonly onTargetLocaleChange: (locale: string) => void;
 }
 
 export interface TranslationComparisonItemRowProps {
@@ -385,6 +404,7 @@ export interface TranslationComparisonItemRowProps {
   readonly optionIndex?: number;
   readonly sourceLocaleLabel?: string;
   readonly targetLocaleLabel?: string;
+  readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
   readonly readOnly: boolean;
   readonly onChange: (text: string) => void;
   readonly onTranslate: () => Promise<void>;

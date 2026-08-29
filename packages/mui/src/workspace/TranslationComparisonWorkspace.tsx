@@ -7,36 +7,29 @@ import type {
   TranslationReport,
   TranslationStatus
 } from "@form-engine-ts/core";
-import { normalizeLocale } from "@form-engine-ts/core";
 import {
   type ConfirmRemoveLocaleSlotProps,
   FormEngineI18nProvider,
   type TranslationComparisonHeaderProps,
-  type TranslationComparisonItem,
+  type TranslationComparisonItemIconProps,
   type TranslationComparisonItemRowProps,
+  type TranslationComparisonLocaleSelectorProps,
   type UseTranslationComparisonOptions,
-  useFormEngineI18n,
-  useTranslationComparison
+  useFormEngineI18n
 } from "@form-engine-ts/react";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
-import {
-  Box,
-  Button,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  LinearProgress,
-  MenuItem,
-  Paper,
-  TextField,
-  Typography
-} from "@mui/material";
+import { Box, Button, Chip, IconButton, LinearProgress, MenuItem, Paper, TextField, Typography } from "@mui/material";
 import type { ReactNode } from "react";
-import { useState } from "react";
 import type { MuiFormEngineI18nOptions } from "../types";
+import {
+  defaultTranslationSlotIcon,
+  translationComparisonContext,
+  translationNodeKindKey,
+  translationPropertyKey,
+  translationStatusColor,
+  translationStatusKey
+} from "./translationWorkspaceUtils";
+import { useTranslationComparisonView } from "./useTranslationComparisonView";
 
 export interface TranslationComparisonWorkspaceProps {
   readonly schema: FormSchema;
@@ -60,218 +53,48 @@ export interface TranslationComparisonWorkspaceProps {
   readonly validateLocale?: UseTranslationComparisonOptions["validateLocale"];
   readonly createTranslationMetadata?: UseTranslationComparisonOptions["createTranslationMetadata"];
   readonly showInternalPath?: boolean;
+  readonly localeSelectorMode?: "tabs" | "select";
+  readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
+  readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
   readonly i18n?: MuiFormEngineI18nOptions;
   readonly slots?: {
     readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
+    readonly renderTargetLocaleSelector?: (props: TranslationComparisonLocaleSelectorProps) => ReactNode;
     readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
     readonly renderStatusBadge?: (props: { readonly status: TranslationStatus }) => ReactNode;
     readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
   };
 }
 
-const statusKey: Record<TranslationStatus, string> = {
-  missing: "workspace.status.missing",
-  translated: "workspace.status.translated",
-  stale: "workspace.status.stale",
-  manual: "workspace.status.manual",
-  "manual-stale": "workspace.status.manualStale"
-};
-
-const propertyKey: Record<TranslationComparisonItem["targetProperty"], string> = {
-  title: "workspace.comparison.property.title",
-  description: "workspace.comparison.property.description",
-  label: "workspace.comparison.property.label",
-  completionMessage: "workspace.comparison.property.completionMessage"
-};
-
-const nodeKindKey: Record<TranslationComparisonItem["targetKind"], string> = {
-  form: "workspace.comparison.nodeKind.form",
-  page: "workspace.comparison.nodeKind.page",
-  field: "workspace.comparison.nodeKind.field",
-  option: "workspace.comparison.nodeKind.option"
-};
-
-function statusColor(status: TranslationStatus): "default" | "success" | "warning" {
-  if (status === "translated" || status === "manual") return "success";
-  if (status === "stale" || status === "manual-stale") return "warning";
-  return "default";
-}
-
-function fieldContext(
-  schema: FormSchema,
-  item: TranslationComparisonItem
-): {
-  readonly questionIndex?: number;
-  readonly fieldType?: string;
-  readonly optionIndex?: number;
-} {
-  if (item.targetKind !== "field" && item.targetKind !== "option") return {};
-  const parentId = /^fields\.([^.]+)\./u.exec(item.path)?.[1];
-  const fieldIndex = schema.fields.findIndex((field) => field.id === parentId);
-  const field = fieldIndex < 0 ? undefined : schema.fields[fieldIndex];
-  if (field === undefined) return {};
-  if (item.targetKind === "field") return { questionIndex: fieldIndex, fieldType: field.type };
-  const optionId = /^fields\.[^.]+\.options\.([^.]+)\./u.exec(item.path)?.[1];
-  const optionIndex = "options" in field ? field.options.findIndex((option) => option.id === optionId) : -1;
-  return {
-    questionIndex: fieldIndex,
-    fieldType: field.type,
-    ...(optionIndex < 0 ? {} : { optionIndex })
-  };
-}
-
-function DefaultLocaleRemovalDialog({
-  localeLabel,
-  translatedSlotsCount,
-  isOpen,
-  onConfirm,
-  onCancel,
-  translate
-}: ConfirmRemoveLocaleSlotProps & {
-  readonly translate: (key: string, params?: Record<string, unknown>) => string;
-}) {
-  return (
-    <Dialog open={isOpen} onClose={onCancel} aria-labelledby="translation-remove-locale-title">
-      <DialogTitle id="translation-remove-locale-title">{translate("workspace.confirm.removeLocaleTitle")}</DialogTitle>
-      <DialogContent>
-        {translate("workspace.confirm.removeLocaleMessage", { locale: localeLabel })}
-        {translatedSlotsCount > 0
-          ? ` ${translate("workspace.confirm.removeLocaleTranslatedCount", { count: translatedSlotsCount })}`
-          : ""}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel}>{translate("workspace.confirm.cancel")}</Button>
-        <Button color="error" onClick={onConfirm} autoFocus>
-          {translate("workspace.confirm.remove")}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function ComparisonContent({
-  schema,
-  sourceLocale,
-  targetLocale,
-  availableLocales,
-  policy,
-  readOnly = false,
-  translationAdapter,
-  onChange,
-  onTranslationChange,
-  onTranslationReport,
-  onTranslationError,
-  signal,
-  slots,
-  onLocaleAdded,
-  onLocaleRemoved,
-  onLocaleChange,
-  beforeRemoveLocale,
-  onTranslationStart,
-  onTranslationSuccess,
-  validateLocale,
-  createTranslationMetadata,
-  showInternalPath = false,
-  i18n
-}: TranslationComparisonWorkspaceProps) {
+function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
+  const {
+    schema,
+    availableLocales,
+    readOnly = false,
+    showInternalPath = false,
+    localeSelectorMode = "tabs",
+    renderItemIcon,
+    getTranslationSlotIcon,
+    slots
+  } = props;
   const { translator } = useFormEngineI18n();
   const translate = (key: string, params: Record<string, unknown> = {}) => translator(key, params);
-  const [newLocale, setNewLocale] = useState("");
-  const defaultConfirmRemoveLocale = (props: ConfirmRemoveLocaleSlotProps) => (
-    <DefaultLocaleRemovalDialog {...props} translate={translate} />
-  );
-  const localizedAvailableLocales = availableLocales?.map((candidate) =>
-    typeof candidate === "string"
-      ? { locale: candidate, label: i18n?.getLocaleLabel?.(candidate) ?? candidate }
-      : candidate
-  );
-  const comparison = useTranslationComparison({
-    schema,
-    targetLocale: targetLocale ?? "",
-    ...(localizedAvailableLocales === undefined ? {} : { availableLocales: localizedAvailableLocales }),
-    ...(policy === undefined ? {} : { policy }),
-    ...(sourceLocale === undefined ? {} : { sourceLocale }),
-    ...(translationAdapter === undefined ? {} : { translationAdapter }),
-    ...(signal === undefined ? {} : { signal }),
-    readOnly,
-    ...(onChange === undefined ? {} : { onChange }),
-    ...(onTranslationChange === undefined ? {} : { onTranslationChange }),
-    ...(onTranslationReport === undefined ? {} : { onTranslationReport }),
-    ...(onTranslationError === undefined ? {} : { onTranslationError }),
-    ...(onLocaleAdded === undefined ? {} : { onLocaleAdded }),
-    ...(onLocaleRemoved === undefined ? {} : { onLocaleRemoved }),
-    ...(onLocaleChange === undefined ? {} : { onLocaleChange }),
-    ...(beforeRemoveLocale === undefined ? {} : { beforeRemoveLocale }),
-    ...(onTranslationStart === undefined ? {} : { onTranslationStart }),
-    ...(onTranslationSuccess === undefined ? {} : { onTranslationSuccess }),
-    ...(validateLocale === undefined ? {} : { validateLocale }),
-    ...(createTranslationMetadata === undefined ? {} : { createTranslationMetadata }),
-    confirmRemoveLocale: slots?.confirmRemoveLocale ?? defaultConfirmRemoveLocale
-  });
-  const headerProps: TranslationComparisonHeaderProps = {
-    sourceLocale: comparison.sourceLocale,
-    targetLocale: comparison.targetLocale,
-    summary: comparison.summary,
-    onTranslateAll: () => void comparison.translateAll(),
-    isTranslating: comparison.isTranslating,
-    readOnly,
-    ...(comparison.report === undefined ? {} : { report: comparison.report }),
-    ...(comparison.progress === undefined ? {} : { progress: comparison.progress }),
-    onCancel: comparison.cancelTranslation
-  };
-  const sourceLocaleLabel =
-    comparison.localeOptions.find(
-      (option) => (normalizeLocale(option.locale) ?? option.locale) === comparison.sourceLocale
-    )?.label ??
-    i18n?.getLocaleLabel?.(comparison.sourceLocale) ??
-    comparison.sourceLocale;
-  const targetLocaleLabel =
-    comparison.localeOptions.find(
-      (option) => (normalizeLocale(option.locale) ?? option.locale) === comparison.targetLocale
-    )?.label ??
-    i18n?.getLocaleLabel?.(comparison.targetLocale) ??
-    comparison.targetLocale;
-  const sourceHeader = translate("workspace.comparison.sourceHeader", { locale: sourceLocaleLabel });
-  const targetHeader = translate("workspace.comparison.targetHeader", { locale: targetLocaleLabel });
-  const targetLocaleSet = new Set(comparison.targetLocales.map((locale) => normalizeLocale(locale) ?? locale));
-  const localeCandidates = comparison.localeOptions.filter((option) => {
-    const locale = normalizeLocale(option.locale) ?? option.locale;
-    return locale !== comparison.sourceLocale && !targetLocaleSet.has(locale);
-  });
-  const selectedLocaleOption = comparison.localeOptions.find(
-    (option) => (normalizeLocale(option.locale) ?? option.locale) === comparison.targetLocale
-  );
-  const canRemoveTargetLocale =
-    !readOnly && comparison.targetLocale.length > 0 && comparison.targetLocale !== comparison.sourceLocale;
-  const handleAddLocale = () => {
-    const result = comparison.addLocale(newLocale);
-    if (result.success) setNewLocale("");
-  };
-  const errorMessage =
-    comparison.error === undefined
-      ? undefined
-      : comparison.error.type === "locale_not_allowed"
-        ? translate("workspace.errors.localeNotAllowed", { locale: comparison.error.locale })
-        : comparison.error.type === "locale_already_exists"
-          ? translate("workspace.errors.localeAlreadyExists", { locale: comparison.error.locale })
-          : comparison.error.type === "source_locale"
-            ? translate("workspace.errors.sourceLocale", { locale: comparison.error.locale })
-            : comparison.error.type === "max_locales_exceeded"
-              ? translate("workspace.errors.maxLocalesExceeded", { max: comparison.error.max })
-              : comparison.error.type === "custom_validation_failed"
-                ? comparison.error.message
-                : comparison.error.type === "adapter_not_configured"
-                  ? translate("workspace.errors.adapterNotConfigured")
-                  : comparison.error.type === "target_locale_missing"
-                    ? translate("workspace.errors.targetLocaleMissing")
-                    : comparison.error.type === "cancelled"
-                      ? translate("workspace.errors.cancelled")
-                      : comparison.error.type === "partial_failure"
-                        ? translate("workspace.errors.partialFailure", {
-                            succeeded: comparison.error.succeeded,
-                            failed: comparison.error.failed
-                          })
-                        : translate("workspace.errors.translationFailed");
+  const {
+    comparison,
+    newLocale,
+    setNewLocale,
+    handleAddLocale,
+    localeLabel,
+    sourceLocaleLabel,
+    sourceHeader,
+    targetHeader,
+    headerProps,
+    localeCandidates,
+    selectedLocaleOption,
+    canRemoveTargetLocale,
+    errorMessage,
+    targetLocaleSelectorProps
+  } = useTranslationComparisonView(props, translate);
 
   return (
     <Box data-testid="translation-comparison-workspace">
@@ -353,25 +176,46 @@ function ComparisonContent({
       )}
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center", mb: 2 }}>
         <Typography variant="body2" component="span">
-          {translate("workspace.header.sourceLocale")}: {comparison.sourceLocale}
+          {translate("workspace.header.sourceLocale")}: {sourceLocaleLabel}
         </Typography>
         <Typography variant="body2" component="span">
           {translate("workspace.header.targetLocale")}:
         </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} role="tablist" aria-label={targetHeader}>
-          {comparison.targetLocales.map((locale) => (
-            <Button
-              key={locale}
-              role="tab"
-              aria-selected={locale === comparison.targetLocale}
-              variant={locale === comparison.targetLocale ? "contained" : "outlined"}
-              onClick={() => comparison.setTargetLocale(locale)}
-              disabled={readOnly && locale !== comparison.targetLocale}
-            >
-              {comparison.localeOptions.find((option) => option.locale === locale)?.label ?? locale}
-            </Button>
+        {slots?.renderTargetLocaleSelector?.(targetLocaleSelectorProps) ??
+          (localeSelectorMode === "select" ? (
+            comparison.targetLocales.length > 1 ? (
+              <TextField
+                select
+                size="small"
+                label={translate("workspace.header.targetLocale")}
+                value={comparison.targetLocale}
+                onChange={(event) => comparison.setTargetLocale(event.target.value)}
+                disabled={readOnly}
+                sx={{ minWidth: 180 }}
+              >
+                {comparison.targetLocales.map((locale) => (
+                  <MenuItem key={locale} value={locale}>
+                    {localeLabel(locale)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null
+          ) : (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }} role="tablist" aria-label={targetHeader}>
+              {comparison.targetLocales.map((locale) => (
+                <Button
+                  key={locale}
+                  role="tab"
+                  aria-selected={locale === comparison.targetLocale}
+                  variant={locale === comparison.targetLocale ? "contained" : "outlined"}
+                  onClick={() => comparison.setTargetLocale(locale)}
+                  disabled={readOnly && locale !== comparison.targetLocale}
+                >
+                  {localeLabel(locale)}
+                </Button>
+              ))}
+            </Box>
           ))}
-        </Box>
         <TextField
           {...(availableLocales !== undefined ? { select: true } : {})}
           size="small"
@@ -385,7 +229,7 @@ function ComparisonContent({
             ? null
             : localeCandidates.map((option) => (
                 <MenuItem key={option.locale} value={option.locale}>
-                  {option.label}
+                  {localeLabel(option.locale)}
                 </MenuItem>
               ))}
         </TextField>
@@ -425,13 +269,24 @@ function ComparisonContent({
       </Box>
       <Box sx={{ display: "grid", gap: 1.5 }}>
         {comparison.items.map((item) => {
-          const context = fieldContext(schema, item);
+          const context = translationComparisonContext(schema, item);
+          const itemIconProps: TranslationComparisonItemIconProps = {
+            item,
+            nodeKind: item.targetKind,
+            targetProperty: item.targetProperty,
+            ...context
+          };
+          const itemIcon =
+            renderItemIcon?.(itemIconProps) ??
+            getTranslationSlotIcon?.(itemIconProps) ??
+            defaultTranslationSlotIcon(itemIconProps);
           const rowProps: TranslationComparisonItemRowProps = {
             item,
             nodeKind: item.targetKind,
             ...context,
             sourceLocaleLabel: sourceHeader,
             targetLocaleLabel: targetHeader,
+            renderItemIcon: () => itemIcon,
             readOnly,
             onChange: (text) => comparison.updateTranslation(item.path, text),
             onTranslate: () => comparison.translateSingle(item.path)
@@ -450,23 +305,63 @@ function ComparisonContent({
               }}
             >
               {slots?.renderItemRow?.(rowProps) ?? (
-                <>
-                  <Box aria-readonly="true">
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridColumn: { xs: "1", md: "1 / -1" },
+                    gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                    gap: 1.5
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75, minWidth: 0 }}>
+                    <Box component="span" aria-hidden="true" data-testid={`translation-item-icon-${item.id}`}>
+                      {itemIcon}
+                    </Box>
                     <Typography variant="caption" color="text.secondary">
-                      {translate(nodeKindKey[item.targetKind])}
+                      {translate(translationNodeKindKey[item.targetKind])}
                       {item.nodeTitle === undefined ? "" : ` · ${item.nodeTitle}`}
                       {" ("}
-                      {translate(propertyKey[item.targetProperty])}
+                      {translate(translationPropertyKey[item.targetProperty])}
                       {")"}
                       {showInternalPath ? ` · ${item.path}` : ""}
                     </Typography>
+                  </Box>
+                  <Box
+                    sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", minWidth: 0 }}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                      <Box component="span" aria-hidden="true" data-testid={`translation-item-icon-${item.id}-target`}>
+                        {itemIcon}
+                      </Box>
+                      {slots?.renderStatusBadge?.({ status: item.status }) ?? (
+                        <Chip
+                          size="small"
+                          color={translationStatusColor(item.status)}
+                          label={translate(translationStatusKey[item.status])}
+                        />
+                      )}
+                    </Box>
+                    {item.translatable ? (
+                      <IconButton
+                        size="small"
+                        aria-label={translate("workspace.slot.translateSingle")}
+                        title={translate("workspace.slot.translateSingle")}
+                        onClick={rowProps.onTranslate}
+                        disabled={readOnly || comparison.isTranslating}
+                      >
+                        <AutoFixHighIcon fontSize="small" />
+                      </IconButton>
+                    ) : null}
+                  </Box>
+                  <Box aria-readonly="true">
                     <Paper
                       variant="outlined"
                       sx={{
                         bgcolor: "action.hover",
                         minHeight: 56,
                         p: 1.5,
-                        mt: 0.5,
                         ...(item.status === "stale" || item.status === "manual-stale"
                           ? { borderColor: "warning.main", borderWidth: 2 }
                           : {})
@@ -478,34 +373,14 @@ function ComparisonContent({
                     </Paper>
                   </Box>
                   <Box>
-                    <Box
-                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {slots?.renderStatusBadge?.({ status: item.status }) ?? (
-                        <Chip size="small" color={statusColor(item.status)} label={translate(statusKey[item.status])} />
-                      )}
-                      {item.translatable ? (
-                        <IconButton
-                          size="small"
-                          aria-label={translate("workspace.slot.translateSingle")}
-                          title={translate("workspace.slot.translateSingle")}
-                          onClick={rowProps.onTranslate}
-                          disabled={readOnly || comparison.isTranslating}
-                        >
-                          <AutoFixHighIcon fontSize="small" />
-                        </IconButton>
-                      ) : null}
-                    </Box>
                     <TextField
                       fullWidth
                       multiline
                       minRows={2}
                       label={`${targetHeader} · ${
                         item.targetKind === "form"
-                          ? translate(propertyKey[item.targetProperty])
-                          : (item.nodeTitle ?? translate(propertyKey[item.targetProperty]))
+                          ? translate(translationPropertyKey[item.targetProperty])
+                          : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
                       }`}
                       value={item.translatedText}
                       onChange={(event) => rowProps.onChange(event.target.value)}
@@ -513,8 +388,8 @@ function ComparisonContent({
                       inputProps={{
                         "aria-label": `${targetHeader} · ${
                           item.targetKind === "form"
-                            ? translate(propertyKey[item.targetProperty])
-                            : (item.nodeTitle ?? translate(propertyKey[item.targetProperty]))
+                            ? translate(translationPropertyKey[item.targetProperty])
+                            : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
                         }`
                       }}
                       placeholder={item.status === "missing" ? targetHeader : undefined}
@@ -530,7 +405,7 @@ function ComparisonContent({
                       </Typography>
                     ) : null}
                   </Box>
-                </>
+                </Box>
               )}
             </Box>
           );

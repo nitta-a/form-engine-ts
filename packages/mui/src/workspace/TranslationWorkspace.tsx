@@ -1,28 +1,20 @@
 import type {
   AsyncTranslationAdapter,
-  CanonicalTranslationMetadata,
   FormPolicy,
   FormSchema,
   LocaleOption,
-  TranslationAdapter,
-  TranslationStatus
+  TranslationAdapter
 } from "@form-engine-ts/core";
 import {
-  type ConfirmRemoveLocaleSlotProps,
   FormEngineI18nProvider,
-  type LocaleSelectorProps,
-  type TranslationComparisonItem,
   type TranslationComparisonItemRowProps,
   type TranslationEventPayload,
   type TranslationSlotChangeEvent,
   type TranslationSlotRowProps,
-  type TranslationWorkspaceActionsProps,
   type TranslationWorkspaceError,
-  type TranslationWorkspaceHeaderProps,
   type TranslationWorkspaceSlots,
   type UseTranslationWorkspaceOptions,
-  useFormEngineI18n,
-  useTranslationWorkspace
+  useFormEngineI18n
 } from "@form-engine-ts/react";
 import {
   Box,
@@ -30,18 +22,20 @@ import {
   Card,
   CardContent,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   LinearProgress,
+  MenuItem,
   Stack,
   Tab,
   Tabs,
   TextField,
   Typography
 } from "@mui/material";
-import { useState } from "react";
+import {
+  comparisonItemFromSlot,
+  translationComparisonContext,
+  translationStatusKey
+} from "./translationWorkspaceUtils";
+import { useTranslationWorkspaceView } from "./useTranslationWorkspaceView";
 
 export interface TranslationWorkspaceProps {
   readonly schema: FormSchema;
@@ -71,17 +65,10 @@ export interface TranslationWorkspaceProps {
   readonly createTranslationMetadata?: UseTranslationWorkspaceOptions["createTranslationMetadata"];
   readonly validateLocale?: UseTranslationWorkspaceOptions["validateLocale"];
   readonly showInternalPath?: boolean;
+  readonly localeSelectorMode?: "tabs" | "select";
   readonly i18n?: import("../types").MuiFormEngineI18nOptions;
   readonly slots?: TranslationWorkspaceSlots;
 }
-
-const statusKey: Record<TranslationStatus, Parameters<ReturnType<typeof useFormEngineI18n>["translator"]>[0]> = {
-  missing: "workspace.status.missing",
-  translated: "workspace.status.translated",
-  stale: "workspace.status.stale",
-  manual: "workspace.status.manual",
-  "manual-stale": "workspace.status.manualStale"
-};
 
 function SlotCard({
   slot,
@@ -110,7 +97,7 @@ function SlotCard({
               {translate(`workspace.comparison.property.${slot.property}`)}
               {showInternalPath ? ` · ${slot.path ?? ""}` : ""}
             </Typography>
-            {renderStatusBadge?.({ status }) ?? <Chip size="small" label={translate(statusKey[status])} />}
+            {renderStatusBadge?.({ status }) ?? <Chip size="small" label={translate(translationStatusKey[status])} />}
           </Stack>
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.5 }}>
             <TextField
@@ -146,206 +133,28 @@ function SlotCard({
   );
 }
 
-function comparisonItemFromSlot(
-  schema: FormSchema,
-  slot: import("@form-engine-ts/core").TranslationSlot,
-  hasAdapter: boolean
-): TranslationComparisonItem {
-  const path = slot.path ?? `${slot.kind}.${slot.nodeId}.${slot.property}`;
-  const fieldId = /^fields\.([^.]+)\./u.exec(path)?.[1];
-  const field = schema.fields.find((candidate) => candidate.id === fieldId);
-  const nodeTitle =
-    slot.kind === "form"
-      ? schema.title
-      : slot.kind === "field" || slot.kind === "option"
-        ? field?.title
-        : slot.kind === "page"
-          ? schema.pages?.find((page) => page.id === slot.nodeId)?.title
-          : undefined;
-  return {
-    id: path,
-    path,
-    nodeId: slot.nodeId,
-    targetKind: slot.kind,
-    targetProperty: slot.property,
-    ...(nodeTitle === undefined ? {} : { nodeTitle }),
-    sourceText: slot.sourceText,
-    translatedText: slot.existingText ?? "",
-    status: slot.status ?? "missing",
-    ...(isCanonicalMetadata(slot.existingTranslationMetadata) ? { metadata: slot.existingTranslationMetadata } : {}),
-    translatable: hasAdapter && slot.sourceText.trim().length > 0
-  };
-}
-
-function isCanonicalMetadata(
-  metadata: Readonly<Record<string, import("@form-engine-ts/core").JsonValue>> | undefined
-): metadata is CanonicalTranslationMetadata & Readonly<Record<string, import("@form-engine-ts/core").JsonValue>> {
-  return (
-    typeof metadata?.sourceLocale === "string" &&
-    typeof metadata.sourceTextHash === "string" &&
-    (metadata.translationSource === "automatic" || metadata.translationSource === "manual")
-  );
-}
-
-function comparisonContext(
-  schema: FormSchema,
-  item: TranslationComparisonItem
-): Pick<TranslationComparisonItemRowProps, "questionIndex" | "fieldType" | "optionIndex"> {
-  const fieldId = /^fields\.([^.]+)\./u.exec(item.path)?.[1];
-  if (fieldId === undefined) return {};
-  const questionIndex = schema.fields.findIndex((field) => field.id === fieldId);
-  const field = schema.fields[questionIndex];
-  if (field === undefined) return {};
-  if (item.targetKind === "field") return { questionIndex, fieldType: field.type };
-  const optionId = /^fields\.[^.]+\.options\.([^.]+)\./u.exec(item.path)?.[1];
-  const optionIndex = "options" in field ? field.options.findIndex((option) => option.id === optionId) : -1;
-  return { questionIndex, fieldType: field.type, ...(optionIndex < 0 ? {} : { optionIndex }) };
-}
-
-function DefaultLocaleRemovalDialog({
-  localeLabel,
-  translatedSlotsCount,
-  isOpen,
-  onConfirm,
-  onCancel,
-  translate
-}: ConfirmRemoveLocaleSlotProps & {
-  readonly translate: (key: string, params?: Record<string, unknown>) => string;
-}) {
-  return (
-    <Dialog open={isOpen} onClose={onCancel} aria-labelledby="translation-remove-locale-title">
-      <DialogTitle id="translation-remove-locale-title">{translate("workspace.confirm.removeLocaleTitle")}</DialogTitle>
-      <DialogContent>
-        {translate("workspace.confirm.removeLocaleMessage", { locale: localeLabel })}
-        {translatedSlotsCount > 0
-          ? ` ${translate("workspace.confirm.removeLocaleTranslatedCount", { count: translatedSlotsCount })}`
-          : ""}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onCancel}>{translate("workspace.confirm.cancel")}</Button>
-        <Button color="error" onClick={onConfirm} autoFocus>
-          {translate("workspace.confirm.remove")}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function workspaceErrorMessage(
-  error: TranslationWorkspaceError,
-  translate: (key: string, params?: Record<string, unknown>) => string
-): string {
-  switch (error.type) {
-    case "locale_not_allowed":
-      return translate("workspace.errors.localeNotAllowed", { locale: error.locale });
-    case "locale_already_exists":
-      return translate("workspace.errors.localeAlreadyExists", { locale: error.locale });
-    case "source_locale":
-      return translate("workspace.errors.sourceLocale", { locale: error.locale });
-    case "invalid_locale_format":
-      return translate("workspace.errors.invalidLocale", { locale: error.locale });
-    case "max_locales_exceeded":
-      return translate("workspace.errors.maxLocalesExceeded", { max: error.max });
-    case "read_only_mode":
-      return translate("workspace.errors.readOnly");
-    case "adapter_not_configured":
-      return translate("workspace.errors.adapterNotConfigured");
-    case "target_locale_missing":
-      return translate("workspace.errors.targetLocaleMissing");
-    case "translation_failed":
-      return translate("workspace.errors.translationFailed");
-    case "partial_failure":
-      return translate("workspace.errors.partialFailure", { succeeded: error.succeeded, failed: error.failed });
-    case "cancelled":
-      return translate("workspace.errors.cancelled");
-    case "custom_validation_failed":
-      return error.message;
-  }
-}
-
-function TranslationWorkspaceContent({
-  schema,
-  onChange,
-  sourceLocale,
-  targetLocale,
-  translationAdapter,
-  signal,
-  readOnly = false,
-  policy,
-  availableLocales,
-  onLocaleAdded,
-  onLocaleRemoved,
-  onLocaleChange,
-  beforeRemoveLocale,
-  onTranslationStart,
-  onTranslationSuccess,
-  onTranslationReport,
-  onTranslationError,
-  onTranslationChange,
-  validateLocale,
-  createTranslationMetadata,
-  slots: workspaceSlots,
-  showInternalPath = false
-}: TranslationWorkspaceProps) {
+function TranslationWorkspaceContent(props: TranslationWorkspaceProps) {
+  const {
+    schema,
+    translationAdapter,
+    readOnly = false,
+    slots: workspaceSlots,
+    showInternalPath = false,
+    localeSelectorMode = "tabs"
+  } = props;
   const { translator } = useFormEngineI18n();
   const translate = (key: string, params: Record<string, unknown> = {}) => translator(key, params);
-  const workspace = useTranslationWorkspace({
-    schema,
-    ...(onChange === undefined ? {} : { onChange }),
-    ...(sourceLocale === undefined ? {} : { sourceLocale }),
-    ...(targetLocale === undefined ? {} : { targetLocale }),
-    ...(translationAdapter === undefined ? {} : { translationAdapter }),
-    ...(signal === undefined ? {} : { signal }),
-    readOnly,
-    ...(policy === undefined ? {} : { policy }),
-    ...(availableLocales === undefined ? {} : { availableLocales }),
-    ...(onLocaleAdded === undefined ? {} : { onLocaleAdded }),
-    ...(onLocaleRemoved === undefined ? {} : { onLocaleRemoved }),
-    ...(onLocaleChange === undefined ? {} : { onLocaleChange }),
-    ...(beforeRemoveLocale === undefined ? {} : { beforeRemoveLocale }),
-    confirmRemoveLocale:
-      workspaceSlots?.confirmRemoveLocale ??
-      ((props) => <DefaultLocaleRemovalDialog {...props} translate={translate} />),
-    ...(onTranslationStart === undefined ? {} : { onTranslationStart }),
-    ...(onTranslationSuccess === undefined ? {} : { onTranslationSuccess }),
-    ...(onTranslationReport === undefined ? {} : { onTranslationReport }),
-    ...(onTranslationError === undefined ? {} : { onTranslationError }),
-    ...(onTranslationChange === undefined ? {} : { onTranslationChange }),
-    ...(createTranslationMetadata === undefined ? {} : { createTranslationMetadata }),
-    ...(validateLocale === undefined ? {} : { validateLocale })
-  });
-  const [newLocale, setNewLocale] = useState("");
-  const localeLabel = (locale: string): string =>
-    workspace.localeOptions.find((option) => option.locale === locale)?.label ?? locale;
-  const headerProps: TranslationWorkspaceHeaderProps = {
-    schema,
-    sourceLocale: workspace.sourceLocale,
-    targetLocale: workspace.targetLocale,
-    summary: workspace.summary,
-    onTranslateAll: () => void workspace.translateAll(),
-    isTranslating: workspace.isTranslating,
-    readOnly,
-    ...(workspace.progress === undefined ? {} : { progress: workspace.progress }),
-    onCancel: workspace.cancelTranslation
-  };
-  const actionsProps: TranslationWorkspaceActionsProps = {
-    onTranslateAll: headerProps.onTranslateAll,
-    isTranslating: workspace.isTranslating,
-    readOnly
-  };
-  const localeSelectorProps: LocaleSelectorProps = {
-    targetLocale: workspace.targetLocale,
-    targetLocales: workspace.targetLocales,
-    localeOptions: workspace.localeOptions,
+  const {
+    workspace,
     newLocale,
-    readOnly,
-    onTargetLocaleChange: workspace.setTargetLocale,
-    onNewLocaleChange: setNewLocale,
-    onAddLocale: () => {
-      const result = workspace.addLocale(newLocale);
-      if (result.success) setNewLocale("");
-    }
-  };
+    setNewLocale,
+    handleAddLocale,
+    localeLabel,
+    headerProps,
+    actionsProps,
+    localeSelectorProps,
+    errorMessage
+  } = useTranslationWorkspaceView(props, translate);
   return (
     <Stack spacing={2} data-testid="translation-workspace">
       {workspaceSlots?.renderHeader?.(headerProps) ?? (
@@ -399,26 +208,41 @@ function TranslationWorkspaceContent({
             {translate("workspace.header.sourceLocale")}: {localeLabel(workspace.sourceLocale)}
           </Typography>
           <Typography variant="body2">{translate("workspace.header.targetLocale")}:</Typography>
-          <Tabs
-            value={workspace.targetLocale}
-            onChange={(_event, value: string) => workspace.setTargetLocale(value)}
-            aria-label={translate("workspace.header.targetLocale")}
-          >
-            {workspace.targetLocales.map((locale) => (
-              <Tab
-                key={locale}
-                value={locale}
-                label={workspace.localeOptions.find((option) => option.locale === locale)?.label ?? locale}
-              />
-            ))}
-          </Tabs>
+          {localeSelectorMode === "select" ? (
+            workspace.targetLocales.length > 1 ? (
+              <TextField
+                select
+                size="small"
+                label={translate("workspace.header.targetLocale")}
+                value={workspace.targetLocale}
+                onChange={(event) => workspace.setTargetLocale(event.target.value)}
+                disabled={readOnly}
+              >
+                {workspace.targetLocales.map((locale) => (
+                  <MenuItem key={locale} value={locale}>
+                    {localeLabel(locale)}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null
+          ) : (
+            <Tabs
+              value={workspace.targetLocale}
+              onChange={(_event, value: string) => workspace.setTargetLocale(value)}
+              aria-label={translate("workspace.header.targetLocale")}
+            >
+              {workspace.targetLocales.map((locale) => (
+                <Tab key={locale} value={locale} label={localeLabel(locale)} />
+              ))}
+            </Tabs>
+          )}
           <TextField
             size="small"
             label={translate("workspace.header.targetLocale")}
             value={newLocale}
             onChange={(event) => setNewLocale(event.target.value)}
           />
-          <Button onClick={localeSelectorProps.onAddLocale} disabled={readOnly}>
+          <Button onClick={handleAddLocale} disabled={readOnly}>
             {translate("builder.addLocale")}
           </Button>
           <Button
@@ -438,7 +262,7 @@ function TranslationWorkspaceContent({
       )}
       {workspace.error === undefined ? null : (
         <Box role="alert" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          <Typography color="error">{workspaceErrorMessage(workspace.error, translate)}</Typography>
+          <Typography color="error">{errorMessage}</Typography>
           {workspace.error.type === "translation_failed" || workspace.error.type === "partial_failure" ? (
             <Button size="small" onClick={headerProps.onTranslateAll} disabled={workspace.isTranslating}>
               {translate("workspace.header.retry")}
@@ -466,7 +290,7 @@ function TranslationWorkspaceContent({
             const comparisonRowProps: TranslationComparisonItemRowProps = {
               item: comparisonItem,
               nodeKind: comparisonItem.targetKind,
-              ...comparisonContext(schema, comparisonItem),
+              ...translationComparisonContext(schema, comparisonItem),
               sourceLocaleLabel: translate("workspace.comparison.sourceHeader", {
                 locale: localeLabel(workspace.sourceLocale)
               }),
@@ -500,14 +324,7 @@ function TranslationWorkspaceContent({
 
 export function TranslationWorkspace(props: TranslationWorkspaceProps) {
   const { i18n } = props;
-  const localizedAvailableLocales = props.availableLocales?.map((candidate) =>
-    typeof candidate === "string"
-      ? { locale: candidate, label: i18n?.getLocaleLabel?.(candidate) ?? candidate }
-      : candidate
-  );
-  const contentProps =
-    localizedAvailableLocales === undefined ? props : { ...props, availableLocales: localizedAvailableLocales };
-  if (i18n === undefined) return <TranslationWorkspaceContent {...contentProps} />;
+  if (i18n === undefined) return <TranslationWorkspaceContent {...props} />;
   return (
     <FormEngineI18nProvider
       {...(i18n.locale === undefined ? {} : { locale: i18n.locale })}
@@ -517,7 +334,7 @@ export function TranslationWorkspace(props: TranslationWorkspaceProps) {
       {...(i18n.strict === undefined ? {} : { strict: i18n.strict })}
       {...(i18n.translator === undefined ? {} : { translator: i18n.translator })}
     >
-      <TranslationWorkspaceContent {...contentProps} />
+      <TranslationWorkspaceContent {...props} />
     </FormEngineI18nProvider>
   );
 }
