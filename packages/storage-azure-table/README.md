@@ -42,3 +42,7 @@ and field indexes, so a page can resume inside a multi-answer entity without gap
 consume the item limit, and scanning remains bounded by `maxScanPages`. Cursor format version 1 also records the form,
 version, sorted fields, and a SHA-256 filter fingerprint. Reusing a cursor with different query context throws
 `invalid_cursor_context`.
+
+`createLegacyAzureTableCodec()` decodes older entities using `PartitionKey`, `RowKey`, `answers`, `answeredAt`, and
+`surveyVersion` into the canonical `FormSubmission` shape. Custom partition- and row-key generators can be supplied
+for migration tooling.

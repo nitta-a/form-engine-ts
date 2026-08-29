@@ -7,14 +7,13 @@ import {
 } from "../src";
 
 describe("v5.1 submission contracts", () => {
-  it("converts legacy-compatible submissions to an alias-free wire payload", () => {
+  it("converts canonical submissions to an alias-free wire payload", () => {
     const submission: FormSubmission = {
       id: "submission-1",
       formId: "form-1",
       formVersion: 2,
       locale: "ja",
       values: { answer: "はい" },
-      answers: { answer: "legacy" },
       metadata: { source: "test" },
       submittedAt: "2026-08-29T00:00:00.000Z"
     };
@@ -25,6 +24,7 @@ describe("v5.1 submission contracts", () => {
       formId: "form-1",
       formVersion: 2,
       values: { answer: "はい" },
+      locale: "ja",
       metadata: { source: "test" },
       submittedAt: "2026-08-29T00:00:00.000Z"
     });

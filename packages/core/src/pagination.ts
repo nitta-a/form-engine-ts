@@ -99,14 +99,20 @@ export async function paginateWithFilter<T>(params: {
 }
 
 function asFormResponse(submission: FormSubmission): FormResponse {
+  const metadata =
+    submission.metadata === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(submission.metadata).filter((entry): entry is [string, JsonValue] => entry[1] !== undefined)
+        );
   return {
     responseId: submission.id,
     formId: submission.formId,
     formVersion: submission.formVersion,
-    sourceLocale: submission.locale,
+    ...(submission.locale === undefined ? {} : { sourceLocale: submission.locale }),
     answers: submission.values,
     submittedAt: submission.submittedAt,
-    ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+    ...(metadata === undefined ? {} : { metadata })
   };
 }
 

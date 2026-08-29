@@ -7,6 +7,8 @@ import type {
 } from "@form-engine-ts/core";
 import {
   type LocaleSelectorProps,
+  type TranslationEventPayload,
+  type TranslationSlotChangeEvent,
   type TranslationSlotRowProps,
   type TranslationWorkspaceActionsProps,
   type TranslationWorkspaceError,
@@ -41,6 +43,16 @@ export interface TranslationWorkspaceProps {
   readonly onLocaleRemoved?: (locale: string) => void;
   readonly onLocaleChange?: (locale: string) => void;
   readonly beforeRemoveLocale?: (locale: string, context: { readonly slotCount: number }) => Promise<boolean> | boolean;
+  readonly onTranslationStart?: (params: {
+    readonly targetLocale: string;
+    readonly mode: "manual" | "automatic";
+  }) => void;
+  readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+  readonly onTranslationError?: (params: {
+    readonly targetLocale: string;
+    readonly error: TranslationWorkspaceError;
+  }) => void;
+  readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
   readonly slots?: TranslationWorkspaceSlots;
 }
 
@@ -139,6 +151,10 @@ export function TranslationWorkspace({
   onLocaleRemoved,
   onLocaleChange,
   beforeRemoveLocale,
+  onTranslationStart,
+  onTranslationSuccess,
+  onTranslationError,
+  onTranslationChange,
   slots: workspaceSlots
 }: TranslationWorkspaceProps) {
   const { translator } = useFormEngineI18n();
@@ -154,7 +170,14 @@ export function TranslationWorkspace({
     ...(onLocaleAdded === undefined ? {} : { onLocaleAdded }),
     ...(onLocaleRemoved === undefined ? {} : { onLocaleRemoved }),
     ...(onLocaleChange === undefined ? {} : { onLocaleChange }),
-    ...(beforeRemoveLocale === undefined ? {} : { beforeRemoveLocale })
+    ...(beforeRemoveLocale === undefined ? {} : { beforeRemoveLocale }),
+    ...(workspaceSlots?.confirmRemoveLocale === undefined
+      ? {}
+      : { confirmRemoveLocale: workspaceSlots.confirmRemoveLocale }),
+    ...(onTranslationStart === undefined ? {} : { onTranslationStart }),
+    ...(onTranslationSuccess === undefined ? {} : { onTranslationSuccess }),
+    ...(onTranslationError === undefined ? {} : { onTranslationError }),
+    ...(onTranslationChange === undefined ? {} : { onTranslationChange })
   });
   const [newLocale, setNewLocale] = useState("");
   const headerProps: TranslationWorkspaceHeaderProps = {
@@ -241,6 +264,7 @@ export function TranslationWorkspace({
       {workspace.error === undefined ? null : (
         <Typography color="error">{workspaceErrorMessage(workspace.error, translate)}</Typography>
       )}
+      {workspace.removeLocaleConfirmation}
       <Stack spacing={1.5}>
         {workspace.slots.length === 0 ? (
           <Typography color="text.secondary">

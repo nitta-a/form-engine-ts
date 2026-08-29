@@ -4,6 +4,7 @@ import type {
   FormValue,
   FormVersionRecord,
   FormVersionState,
+  JsonValue,
   PagedSubmissionStorageAdapter,
   StorageCommitError,
   SubmissionFilter,
@@ -639,9 +640,17 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
                 formVersion: submission.formVersion,
                 fieldId,
                 text,
-                locale: submission.locale,
+                ...(submission.locale === undefined ? {} : { locale: submission.locale }),
                 submittedAt: submission.submittedAt,
-                ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+                ...(submission.metadata === undefined
+                  ? {}
+                  : {
+                      metadata: Object.fromEntries(
+                        Object.entries(submission.metadata).filter(
+                          (entry): entry is [string, JsonValue] => entry[1] !== undefined
+                        )
+                      )
+                    })
               }
             ];
           });

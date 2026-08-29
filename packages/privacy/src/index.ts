@@ -1,4 +1,4 @@
-import type { FormSchema } from "@form-engine-ts/core";
+import { type FormSchema, FormSubmissionError, type FormSubmissionSerializedError } from "@form-engine-ts/core";
 
 export interface SensitiveDataFinding {
   readonly fieldId: string;
@@ -37,6 +37,32 @@ export function normalizePiiFindingsToMetadata(
   const piiFindingTypes = [...new Set(findings.map((finding) => finding.type))];
   return { piiConfirmed: userConfirmed, piiFindingTypes, piiDetectedCount: findings.length };
 }
+
+export const createSubmissionErrorFromPii = (
+  findings: readonly SensitiveDataFinding[],
+  options?: { readonly messageKey?: string; readonly formTitleMap?: Record<string, string> }
+): FormSubmissionError => {
+  const messageKey = options?.messageKey ?? "renderer.confirmSensitiveDataMessage";
+  const formTitleMap = options?.formTitleMap ?? {};
+  const fieldErrors: Record<string, string> = {};
+
+  for (const finding of findings) {
+    const fieldTitle = formTitleMap[finding.fieldId] ?? finding.fieldId;
+    void fieldTitle;
+    fieldErrors[finding.fieldId] = `個人情報（${finding.typeLabel ?? finding.type}）が含まれている可能性があります。`;
+  }
+
+  const payload: FormSubmissionSerializedError = {
+    code: "PII_CONFIRMATION_REQUIRED",
+    messageKey,
+    fieldErrors,
+    formErrors: ["個人情報の確認が必要です。"],
+    piiFindings: findings,
+    piiWarningAcknowledged: false
+  };
+
+  return new FormSubmissionError(payload);
+};
 
 const STANDARD_RULES: readonly SensitiveDataDetectorRule[] = [
   { type: "email", pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu },

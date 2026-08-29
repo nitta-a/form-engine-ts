@@ -1,4 +1,5 @@
 import { assertValidFormSchema } from "./schema";
+import type { FormSubmissionWireSchemaType } from "./schemas/submission.zod";
 import type {
   BaseSubmissionMetadata,
   CreateSubmissionInput,
@@ -53,14 +54,34 @@ export function toFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(
 ): FormSubmissionWire<TMeta>;
 export function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire;
 export function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire {
-  const { id, formId, formVersion, values, answers, metadata, submittedAt, schemaRevision } = submission;
-  const targetValues = values ?? answers ?? {};
+  const { id, formId, formVersion, values, locale, metadata, submittedAt, schemaRevision } = submission;
   return {
     id,
     formId,
     formVersion,
-    values: { ...targetValues },
+    values: { ...values },
+    ...(locale === undefined ? {} : { locale }),
     metadata: { ...(metadata ?? {}) },
+    submittedAt,
+    ...(schemaRevision === undefined ? {} : { schemaRevision })
+  };
+}
+
+export function fromFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(
+  wire: FormSubmissionWire<TMeta>
+): FormSubmission<TMeta>;
+export function fromFormSubmissionWire(wire: FormSubmissionWireSchemaType): FormSubmission;
+export function fromFormSubmissionWire(wire: FormSubmissionWire): FormSubmission;
+export function fromFormSubmissionWire(wire: FormSubmissionWire | FormSubmissionWireSchemaType): FormSubmission {
+  const { id, formId, formVersion, values, locale, metadata, submittedAt, schemaRevision } = wire;
+  const canonicalMetadata = { ...metadata } as BaseSubmissionMetadata;
+  return {
+    id,
+    formId,
+    formVersion,
+    values: { ...values } as FormValues,
+    ...(locale === undefined ? {} : { locale }),
+    metadata: canonicalMetadata,
     submittedAt,
     ...(schemaRevision === undefined ? {} : { schemaRevision })
   };
@@ -102,11 +123,10 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
       formVersion: input.formVersion,
       locale: "",
       values: Object.freeze(cloneValues(toFormValues(answers))),
-      answers,
       metadata: input.metadata,
       submittedAt,
       ...(input.schemaRevision === undefined ? {} : { schemaRevision: input.schemaRevision })
-    }) as FormSubmission<TMeta>;
+    }) as unknown as FormSubmission<TMeta>;
   }
 
   const schema = schemaOrInput;
@@ -130,7 +150,6 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
     formVersion: schema.version,
     locale: options.locale,
     values: Object.freeze(cloneValues(visibleValues)),
-    answers: Object.freeze({ ...visibleValues }),
     submittedAt: options.submittedAt,
     ...(options.metadata === undefined ? {} : { metadata: Object.freeze({ ...options.metadata }) }),
     ...(options.translationMetadata === undefined

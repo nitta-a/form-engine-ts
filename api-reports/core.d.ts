@@ -370,14 +370,12 @@ type AnswerValidationResult = {
     readonly valid: false;
     readonly issues: readonly ValidationIssue[];
 };
-interface FormSubmissionBase extends ExtensibleNode {
+interface FormSubmissionBase extends Pick<ExtensibleNode, "translationMetadata"> {
     readonly id: string;
     readonly formId: string;
     readonly formVersion: number;
-    readonly locale: string;
+    readonly locale?: string;
     readonly values: FormValues;
-    /** Alias used by API-facing consumers; values remains the canonical v4 field. */
-    readonly answers?: Readonly<Record<string, unknown>>;
     readonly submittedAt: string;
     readonly schemaRevision?: number;
 }
@@ -391,7 +389,8 @@ interface FormSubmissionWire<TMeta extends BaseSubmissionMetadata = BaseSubmissi
     readonly id: string;
     readonly formId: string;
     readonly formVersion: number;
-    readonly values: Record<string, unknown>;
+    readonly values: Readonly<Record<string, unknown>>;
+    readonly locale?: string;
     readonly metadata: TMeta;
     readonly submittedAt: string;
     readonly schemaRevision?: number;
@@ -677,6 +676,19 @@ interface NodeWritableStream {
 declare function pipeResponsesToCsvStream(schema: FormSchema, submissions: AsyncIterable<AccumulatorResponse>, writable: WritableStream<Uint8Array> | NodeWritableStream, options?: StreamCsvOptions): Promise<void>;
 declare function exportResponsesToCsv(schema: FormSchema, responses: readonly FormSubmission[], options?: CsvExportOptions): string;
 
+/** Submission shape used by pre-v4 clients and migration-only code. */
+interface LegacyFormSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+    readonly id: string;
+    readonly formId: string;
+    readonly formVersion: number;
+    readonly answers: Readonly<Record<string, unknown>>;
+    readonly locale?: string;
+    readonly metadata: TMeta;
+    readonly submittedAt: string;
+    readonly schemaRevision?: number;
+}
+declare const fromLegacyFormSubmission: <TMeta extends BaseSubmissionMetadata>(legacy: LegacyFormSubmission<TMeta>) => FormSubmission<TMeta>;
+
 interface SensitiveDataFinding {
     readonly fieldId: string;
     readonly type: string;
@@ -715,6 +727,8 @@ declare class FormSubmissionError extends Error {
     constructor(payload: FormSubmissionSerializedError);
     toJSON(): FormSubmissionSerializedError;
 }
+declare const serializeSubmissionError: (error: FormSubmissionError) => FormSubmissionSerializedError;
+declare const deserializeSubmissionError: (json: FormSubmissionSerializedError) => FormSubmissionError;
 
 type FormEventType = "response.submitted" | "schema.updated";
 interface FormEvent<T = unknown> {
@@ -867,6 +881,7 @@ declare const FormSubmissionWireSchema: z.ZodObject<{
     formId: z.ZodString;
     formVersion: z.ZodNumber;
     values: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+    locale: z.ZodOptional<z.ZodString>;
     metadata: z.ZodRecord<z.ZodString, z.ZodUnknown>;
     submittedAt: z.ZodString;
     schemaRevision: z.ZodOptional<z.ZodNumber>;
@@ -881,6 +896,9 @@ interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = BaseSub
 }
 declare function toFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(submission: FormSubmission<TMeta>): FormSubmissionWire<TMeta>;
 declare function toFormSubmissionWire(submission: FormSubmission): FormSubmissionWire;
+declare function fromFormSubmissionWire<TMeta extends BaseSubmissionMetadata>(wire: FormSubmissionWire<TMeta>): FormSubmission<TMeta>;
+declare function fromFormSubmissionWire(wire: FormSubmissionWireSchemaType): FormSubmission;
+declare function fromFormSubmissionWire(wire: FormSubmissionWire): FormSubmission;
 declare function createSubmission(schema: FormSchema, values: FormValues, options: CreateSubmissionOptions): FormSubmission;
 declare function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(schema: FormSchema, values: FormValues, options: CreateSubmissionOptions<TMeta>): FormSubmission<TMeta>;
 declare function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(input: CreateSubmissionInput<TMeta>): FormSubmission<TMeta>;
@@ -1007,4 +1025,4 @@ declare function calculatePageVisibility(schema: FormSchema, currentAnswers: Rea
 declare function calculateFieldVisibility(schema: FormSchema, currentAnswers: Readonly<Record<string, unknown>>): Readonly<Record<string, boolean>>;
 declare function selectVisibleAnswers(schema: FormSchema, currentAnswers: FormValues): FormValues;
 
-export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, DEFAULT_FIELD_TYPE_DEFINITIONS, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAnalytics, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormPage, type FormPolicy, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type Result, type SanitizeSchemaOptions, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StreamCsvOptions, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionQueryOptions, type SubmissionValidationResult, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TranslationAdapter, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateResponses, applyTransitionPlan, assertValidFormSchema, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeSourceTextHash, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createPublishTransitionPlan, createResponseAccumulator, createSubmission, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, dispatchWebhook, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, exportResponsesToCsv, exportResponsesToCsvStream, getTranslationStatus, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isManualTranslationMetadata, isQuestionVisible, iterateSubmissionPages, jsonValuesEqual, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, removeLocaleFromSchema, resolveFormTranslation, resolveLocalizedSchema, sanitizeSchema, selectVisibleAnswers, toFormSubmissionWire, transformFieldType, validateAnswers, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };
+export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, DEFAULT_FIELD_TYPE_DEFINITIONS, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAnalytics, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormPage, type FormPolicy, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyFormSubmission, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type Result, type SanitizeSchemaOptions, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StreamCsvOptions, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionQueryOptions, type SubmissionValidationResult, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TranslationAdapter, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateResponses, applyTransitionPlan, assertValidFormSchema, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeSourceTextHash, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createPublishTransitionPlan, createResponseAccumulator, createSubmission, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, dispatchWebhook, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, fromLegacyFormSubmission, getTranslationStatus, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isManualTranslationMetadata, isQuestionVisible, iterateSubmissionPages, jsonValuesEqual, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, removeLocaleFromSchema, resolveFormTranslation, resolveLocalizedSchema, sanitizeSchema, selectVisibleAnswers, serializeSubmissionError, toFormSubmissionWire, transformFieldType, validateAnswers, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };

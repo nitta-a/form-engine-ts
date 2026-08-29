@@ -5,6 +5,17 @@ current release and usage information.
 
 ## Latest release
 
+### v6.0.0 — 2026-08-29
+
+- Breaking release: made `values` the canonical submission answer property and removed the legacy `answers` alias from `FormSubmission`.
+- Added wire conversion plus explicit legacy `answers` compatibility helpers for migration code.
+- Added submission error serialization/deserialization and PII findings to typed confirmation errors.
+- Added typed translation workspace lifecycle events, translation-change metadata, and replaceable locale-removal confirmation slots.
+- Added a legacy Azure Table codec for migrating entities that use the older partition, row-key, answer, and version fields.
+- Aligned all public packages to version 6.0.0.
+
+See the [GitHub release for v6.0.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.0.0).
+
 ### v5.1.0 — 2026-08-29
 
 - Added a public submission wire contract, Zod runtime schemas, submission serialization, and JSON-serializable submission errors for API and persistence boundaries.

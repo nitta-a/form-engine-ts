@@ -47,6 +47,53 @@ export interface AzureTableEntityCodec<T> {
   readonly deserialize: (entity: Record<string, unknown>) => T;
 }
 
+export interface AzureTableLegacyEntity {
+  readonly PartitionKey: string;
+  readonly RowKey: string;
+  readonly answers?: string;
+  readonly answeredAt?: string;
+  readonly surveyVersion?: number;
+  readonly Timestamp?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface AzureTableLegacyCodec {
+  readonly decode: (entity: AzureTableLegacyEntity) => FormSubmission;
+  readonly createPartitionKey: (formId: string, submissionId: string) => string;
+  readonly createRowKey: (submittedAt: string, submissionId: string) => string;
+}
+
+export const createLegacyAzureTableCodec = (
+  options: {
+    readonly partitionKeyGenerator?: (formId: string, submissionId: string) => string;
+    readonly rowKeyGenerator?: (submittedAt: string, submissionId: string) => string;
+  } = {}
+): AzureTableLegacyCodec => {
+  const createPartitionKey = options.partitionKeyGenerator ?? ((formId: string) => formId);
+  const createRowKey =
+    options.rowKeyGenerator ?? ((submittedAt: string, submissionId: string) => `${submittedAt}_${submissionId}`);
+
+  return {
+    decode: (entity) => {
+      const values = entity.answers === undefined ? {} : parseLegacyJsonObject(entity.answers, "answers");
+      const submittedAt = entity.answeredAt ?? entity.Timestamp;
+      if (submittedAt === undefined || submittedAt.trim().length === 0) {
+        throw new Error("Azure Table legacy submission is missing answeredAt or Timestamp.");
+      }
+      return {
+        id: entity.RowKey,
+        formId: entity.PartitionKey,
+        formVersion: entity.surveyVersion ?? 1,
+        values,
+        metadata: {},
+        submittedAt
+      } as unknown as FormSubmission;
+    },
+    createPartitionKey: (formId, submissionId) => createPartitionKey(formId, submissionId),
+    createRowKey: (submittedAt, submissionId) => createRowKey(submittedAt, submissionId)
+  };
+};
+
 export interface AzureTableSubmissionCodec<T = FormSubmission> {
   readonly createEntity: (value: T) => Record<string, unknown>;
   readonly deserialize: (entity: Record<string, unknown>) => T;
@@ -285,6 +332,12 @@ function parseJson(value: unknown, location: string): unknown {
   } catch (cause) {
     throw new Error(`Azure Table ${location} payload is invalid.`, { cause });
   }
+}
+
+function parseLegacyJsonObject(value: string, property: string): Record<string, unknown> {
+  const parsed = parseJson(value, `legacy ${property}`);
+  if (!isRecord(parsed)) throw new Error(`Azure Table legacy ${property} payload must be an object.`);
+  return parsed;
 }
 
 function parseSubmission(value: unknown, location: string): FormSubmission {
@@ -788,6 +841,14 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
             continue;
           }
           const answers = submissionTextAnswers(submission, fieldIds);
+          const metadata =
+            submission.metadata === undefined
+              ? undefined
+              : Object.fromEntries(
+                  Object.entries(submission.metadata).filter(
+                    (entry): entry is [string, JsonValue] => entry[1] !== undefined
+                  )
+                );
           for (
             let fieldIndex = entityIndex === entityStartIndex ? fieldStartIndex : 0;
             fieldIndex < answers.length;
@@ -801,9 +862,9 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
               formVersion: submission.formVersion,
               fieldId: answer.fieldId,
               text: answer.text,
-              locale: submission.locale,
+              ...(submission.locale === undefined ? {} : { locale: submission.locale }),
               submittedAt: submission.submittedAt,
-              ...(submission.metadata === undefined ? {} : { metadata: submission.metadata })
+              ...(metadata === undefined ? {} : { metadata })
             });
             if (items.length < pageSize) continue;
 

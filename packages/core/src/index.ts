@@ -1,5 +1,6 @@
 export * from "./aggregation";
 export * from "./analytics";
+export * from "./compat/legacy";
 export * from "./errors";
 export * from "./events";
 export * from "./field";

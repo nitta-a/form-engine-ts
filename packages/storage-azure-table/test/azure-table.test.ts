@@ -5,7 +5,8 @@ import {
   type AzureTableEntityCodec,
   type AzureTableEntityPage,
   type AzureTableSubmissionCodec,
-  createAzureTableStorage
+  createAzureTableStorage,
+  createLegacyAzureTableCodec
 } from "../src";
 
 function clone<T>(value: T): T {
@@ -377,5 +378,28 @@ describe("createAzureTableStorage", () => {
     expect(page.items).toEqual([submission("mapped")]);
     expect(filters.at(-1)).toContain("surveyVersion eq 2");
     expect(filters.at(-1)).toContain("answeredAt ge '2026-08-24T00:00:00.000Z'");
+  });
+});
+
+describe("createLegacyAzureTableCodec", () => {
+  it("decodes legacy answers and timestamp properties into canonical values", () => {
+    const codec = createLegacyAzureTableCodec();
+
+    expect(
+      codec.decode({
+        PartitionKey: "form",
+        RowKey: "submission",
+        answers: JSON.stringify({ name: "Ada" }),
+        answeredAt: "2026-08-29T00:00:00.000Z",
+        surveyVersion: 3
+      })
+    ).toEqual({
+      id: "submission",
+      formId: "form",
+      formVersion: 3,
+      values: { name: "Ada" },
+      metadata: {},
+      submittedAt: "2026-08-29T00:00:00.000Z"
+    });
   });
 });

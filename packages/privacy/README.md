@@ -18,3 +18,6 @@ const findings = detector.detect(schema, values);
 
 Use `normalizePiiFindingsToMetadata(findings, userConfirmed)` to persist a compact confirmation flag, distinct finding
 types, and the detected count alongside a submission.
+
+Use `createSubmissionErrorFromPii(findings)` to turn findings into a typed `FormSubmissionError` requiring confirmation;
+the optional `messageKey` customizes the renderer message key.

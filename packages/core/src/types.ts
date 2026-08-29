@@ -256,14 +256,12 @@ export type AnswerValidationResult =
   | { readonly valid: true; readonly issues: readonly [] }
   | { readonly valid: false; readonly issues: readonly ValidationIssue[] };
 
-interface FormSubmissionBase extends ExtensibleNode {
+interface FormSubmissionBase extends Pick<ExtensibleNode, "translationMetadata"> {
   readonly id: string;
   readonly formId: string;
   readonly formVersion: number;
-  readonly locale: string;
+  readonly locale?: string;
   readonly values: FormValues;
-  /** Alias used by API-facing consumers; values remains the canonical v4 field. */
-  readonly answers?: Readonly<Record<string, unknown>>;
   readonly submittedAt: string;
   readonly schemaRevision?: number;
 }
@@ -276,7 +274,8 @@ export interface FormSubmissionWire<TMeta extends BaseSubmissionMetadata = BaseS
   readonly id: string;
   readonly formId: string;
   readonly formVersion: number;
-  readonly values: Record<string, unknown>;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly locale?: string;
   readonly metadata: TMeta;
   readonly submittedAt: string;
   readonly schemaRevision?: number;

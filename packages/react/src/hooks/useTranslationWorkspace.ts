@@ -1,12 +1,12 @@
 import {
   type AsyncTranslationAdapter,
+  type CanonicalTranslationMetadata,
   collectSchemaLocales,
   collectTranslationSlots,
   computeSourceTextHash,
   type FormField,
   type FormPolicy,
   type FormSchema,
-  type JsonValue,
   type LocaleOption,
   normalizeLocale,
   type PopulateTranslationOptions,
@@ -17,7 +17,13 @@ import {
   type TranslationSlot,
   type TranslationStatus
 } from "@form-engine-ts/core";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import type {
+  ConfirmRemoveLocaleSlotProps,
+  TranslationEventPayload,
+  TranslationSlotChangeEvent,
+  TranslationWorkspaceSlots
+} from "../types";
 
 export interface UseTranslationWorkspaceOptions {
   readonly schema: FormSchema;
@@ -32,6 +38,18 @@ export interface UseTranslationWorkspaceOptions {
   readonly onLocaleRemoved?: (locale: string) => void;
   readonly onLocaleChange?: (targetLocale: string) => void;
   readonly beforeRemoveLocale?: (locale: string, context: { readonly slotCount: number }) => Promise<boolean> | boolean;
+  readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
+  readonly slots?: Pick<TranslationWorkspaceSlots, "confirmRemoveLocale">;
+  readonly onTranslationStart?: (params: {
+    readonly targetLocale: string;
+    readonly mode: "manual" | "automatic";
+  }) => void;
+  readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+  readonly onTranslationError?: (params: {
+    readonly targetLocale: string;
+    readonly error: TranslationWorkspaceError;
+  }) => void;
+  readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
   readonly validateLocale?:
     | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
     | CustomLocaleValidator;
@@ -94,6 +112,7 @@ export interface UseTranslationWorkspaceResult {
   readonly addLocale: (locale: string) => { readonly success: boolean; readonly error?: TranslationWorkspaceError };
   readonly isAddLocaleAllowed: (locale: string) => boolean;
   readonly removeLocale: (locale: string) => boolean | Promise<boolean>;
+  readonly removeLocaleConfirmation?: ReactNode;
   readonly setTranslation: (slot: TranslationSlot, text: string) => void;
   readonly translateAll: (options?: PopulateTranslationOptions) => Promise<{
     readonly success: boolean;
@@ -258,12 +277,16 @@ function workspaceLocaleValidationError(
   return { type: "custom_validation_failed", message: error.message };
 }
 
-function manualMetadata(sourceText: string, sourceLocale: string): Readonly<Record<string, JsonValue>> {
+function translationMetadata(
+  sourceText: string,
+  sourceLocale: string,
+  mode: "manual" | "automatic"
+): CanonicalTranslationMetadata {
   return {
     sourceLocale,
     sourceTextHash: computeSourceTextHash(sourceText),
-    translationSource: "manual",
-    editedAt: new Date().toISOString()
+    translationSource: mode,
+    ...(mode === "manual" ? { editedAt: new Date().toISOString() } : { translatedAt: new Date().toISOString() })
   };
 }
 
@@ -271,13 +294,14 @@ function setNodeMetadata<T extends { readonly translationMetadata?: FormSchema["
   node: T,
   slot: TranslationSlot,
   text: string,
-  sourceLocale: string
+  sourceLocale: string,
+  mode: "manual" | "automatic"
 ): T {
   const localeMetadata = node.translationMetadata?.[slot.locale];
   const nextMetadata =
     text.trim().length === 0
       ? Object.fromEntries(Object.entries(localeMetadata ?? {}).filter(([key]) => key !== slot.property))
-      : { ...localeMetadata, [slot.property]: manualMetadata(slot.sourceText, sourceLocale) };
+      : { ...localeMetadata, [slot.property]: translationMetadata(slot.sourceText, sourceLocale, mode) };
   return { ...node, translationMetadata: { ...node.translationMetadata, [slot.locale]: nextMetadata } };
 }
 
@@ -285,14 +309,16 @@ function updateSchemaTranslation(
   schema: FormSchema,
   slot: TranslationSlot,
   text: string,
-  sourceLocale: string
+  sourceLocale: string,
+  mode: "manual" | "automatic" = "manual"
 ): FormSchema {
   if (slot.kind === "form") {
     return setNodeMetadata(
       { ...schema, translations: updateTranslationMap(schema.translations, slot.locale, slot.property, text) },
       slot,
       text,
-      sourceLocale
+      sourceLocale,
+      mode
     );
   }
   if (slot.kind === "field") {
@@ -301,7 +327,7 @@ function updateSchemaTranslation(
       fields: schema.fields.map((field) => {
         if (field.id !== slot.nodeId) return field;
         const translations = updateTranslationMap(field.translations, slot.locale, slot.property, text);
-        return setNodeMetadata({ ...field, translations } as FormField, slot, text, sourceLocale);
+        return setNodeMetadata({ ...field, translations } as FormField, slot, text, sourceLocale, mode);
       })
     };
   }
@@ -320,7 +346,7 @@ function updateSchemaTranslation(
                     Object.entries(option.translations ?? {}).filter(([locale]) => locale !== slot.locale)
                   )
                 : { ...option.translations, [slot.locale]: text };
-            return setNodeMetadata({ ...option, translations }, slot, text, sourceLocale);
+            return setNodeMetadata({ ...option, translations }, slot, text, sourceLocale, mode);
           })
         } as FormField;
       })
@@ -334,7 +360,7 @@ function updateSchemaTranslation(
           pages: schema.pages.map((page) => {
             if (page.id !== slot.nodeId) return page;
             const translations = updateTranslationMap(page.translations, slot.locale, slot.property, text);
-            return setNodeMetadata({ ...page, translations }, slot, text, sourceLocale);
+            return setNodeMetadata({ ...page, translations }, slot, text, sourceLocale, mode);
           })
         })
   };
@@ -353,13 +379,26 @@ export function useTranslationWorkspace({
   onLocaleRemoved,
   onLocaleChange,
   beforeRemoveLocale,
+  confirmRemoveLocale,
+  slots: workspaceSlots,
+  onTranslationStart,
+  onTranslationSuccess,
+  onTranslationError,
+  onTranslationChange,
   validateLocale
 }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult {
   const [draftSchema, setDraftSchema] = useState(schema);
   const [selectedLocale, setSelectedLocale] = useState(normalizeLocale(targetLocale ?? "") ?? targetLocale ?? "");
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<TranslationWorkspaceError>();
+  const [pendingRemoval, setPendingRemoval] = useState<{
+    readonly locale: string;
+    readonly localeLabel: string;
+    readonly translatedSlotsCount: number;
+  }>();
+  const pendingRemovalResolver = useRef<((allowed: boolean) => void) | undefined>(undefined);
   const currentSchema = onChange === undefined ? draftSchema : schema;
+  const confirmRemoveLocaleRenderer = confirmRemoveLocale ?? workspaceSlots?.confirmRemoveLocale;
   const targetLocales = useMemo(() => {
     const locales = collectSchemaLocales(currentSchema).allUniqueLocales;
     return [...new Set([...(currentSchema.supportedLocales ?? []), ...locales])].filter(
@@ -409,9 +448,17 @@ export function useTranslationWorkspace({
   const setTranslation = useCallback(
     (slot: TranslationSlot, text: string): void => {
       if (readOnly) return;
-      commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale));
+      const metadata = translationMetadata(slot.sourceText, sourceLocale, "manual");
+      commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "manual"));
+      onTranslationChange?.({
+        slot,
+        ...(slot.existingText === undefined ? {} : { previousText: slot.existingText }),
+        nextText: text,
+        mode: "manual",
+        metadata
+      });
     },
-    [commit, currentSchema, readOnly, sourceLocale]
+    [commit, currentSchema, onTranslationChange, readOnly, sourceLocale]
   );
   const addLocale = useCallback(
     (locale: string): { readonly success: boolean; readonly error?: TranslationWorkspaceError } => {
@@ -475,21 +522,37 @@ export function useTranslationWorkspace({
         onLocaleRemoved?.(normalized);
       };
       const slotCount = collectTranslationSlots(currentSchema, normalized).length;
+      const translatedSlotsCount = collectTranslationSlots(currentSchema, normalized).filter(
+        (slot) => slot.existingText !== undefined && slot.existingText.trim().length > 0
+      ).length;
+      const requestConfirmation = (): Promise<boolean> =>
+        new Promise((resolve) => {
+          pendingRemovalResolver.current = resolve;
+          setPendingRemoval({
+            locale: normalized,
+            localeLabel: localeOptions.find((option) => option.locale === normalized)?.label ?? normalized,
+            translatedSlotsCount
+          });
+        });
+      const removeAfterApproval = (): boolean | Promise<boolean> => {
+        if (confirmRemoveLocaleRenderer === undefined) {
+          remove();
+          return true;
+        }
+        return requestConfirmation();
+      };
       if (beforeRemoveLocale === undefined) {
-        remove();
-        return true;
+        return removeAfterApproval();
       }
       try {
         const decision = beforeRemoveLocale(normalized, { slotCount });
         if (typeof decision === "boolean") {
           if (!decision) return false;
-          remove();
-          return true;
+          return removeAfterApproval();
         }
         return decision.then((allowed) => {
           if (!allowed) return false;
-          remove();
-          return true;
+          return removeAfterApproval();
         });
       } catch (cause) {
         const workspaceError: TranslationWorkspaceError = {
@@ -501,8 +564,45 @@ export function useTranslationWorkspace({
         return Promise.reject(cause);
       }
     },
-    [activeLocale, beforeRemoveLocale, commit, currentSchema, onLocaleRemoved, readOnly, sourceLocale]
+    [
+      activeLocale,
+      beforeRemoveLocale,
+      commit,
+      confirmRemoveLocaleRenderer,
+      currentSchema,
+      localeOptions,
+      onLocaleRemoved,
+      readOnly,
+      sourceLocale
+    ]
   );
+  const confirmPendingRemoval = useCallback((): void => {
+    const pending = pendingRemoval;
+    const resolve = pendingRemovalResolver.current;
+    if (pending === undefined || resolve === undefined) return;
+    pendingRemovalResolver.current = undefined;
+    setPendingRemoval(undefined);
+    commit(removeLocaleFromSchema(currentSchema, pending.locale));
+    if (activeLocale === pending.locale) setSelectedLocale("");
+    onLocaleRemoved?.(pending.locale);
+    resolve(true);
+  }, [activeLocale, commit, currentSchema, onLocaleRemoved, pendingRemoval]);
+  const cancelPendingRemoval = useCallback((): void => {
+    const resolve = pendingRemovalResolver.current;
+    if (resolve === undefined) return;
+    pendingRemovalResolver.current = undefined;
+    setPendingRemoval(undefined);
+    resolve(false);
+  }, []);
+  const removeLocaleConfirmation = useMemo(() => {
+    if (confirmRemoveLocaleRenderer === undefined || pendingRemoval === undefined) return null;
+    return confirmRemoveLocaleRenderer({
+      ...pendingRemoval,
+      isOpen: true,
+      onConfirm: confirmPendingRemoval,
+      onCancel: cancelPendingRemoval
+    });
+  }, [cancelPendingRemoval, confirmPendingRemoval, confirmRemoveLocaleRenderer, pendingRemoval]);
   const translateAll = useCallback(
     async (
       options: PopulateTranslationOptions = {}
@@ -545,6 +645,7 @@ export function useTranslationWorkspace({
       }
       setIsTranslating(true);
       setError(undefined);
+      onTranslationStart?.({ targetLocale: activeLocale, mode: "automatic" });
       try {
         const populated = await populateSchemaTranslations(
           currentSchema,
@@ -557,6 +658,17 @@ export function useTranslationWorkspace({
           }
         );
         commit(populated.schema);
+        const missingSlotsCount = collectTranslationSlots(populated.schema, activeLocale).filter(
+          (slot) => slot.status === "missing"
+        ).length;
+        onTranslationSuccess?.({
+          sourceLocale,
+          targetLocale: activeLocale,
+          mode: "automatic",
+          updatedSlots: populated.report.updatedSlots,
+          skippedSlots: populated.report.skippedSlots,
+          missingSlotsCount
+        });
         return { success: true, report: populated.report };
       } catch (cause) {
         const workspaceError: TranslationWorkspaceError = {
@@ -565,12 +677,25 @@ export function useTranslationWorkspace({
           cause
         };
         setError(workspaceError);
+        onTranslationError?.({ targetLocale: activeLocale, error: workspaceError });
         return { success: false, error: workspaceError };
       } finally {
         setIsTranslating(false);
       }
     },
-    [activeLocale, commit, currentSchema, localeOptions, readOnly, slots, translationAdapter]
+    [
+      activeLocale,
+      commit,
+      currentSchema,
+      localeOptions,
+      onTranslationError,
+      onTranslationStart,
+      onTranslationSuccess,
+      readOnly,
+      slots,
+      sourceLocale,
+      translationAdapter
+    ]
   );
   const translateSlot = useCallback(
     async (
@@ -590,7 +715,15 @@ export function useTranslationWorkspace({
       setError(undefined);
       try {
         const text = await asAsyncAdapter(translationAdapter).translateText(slot.sourceText, slot.locale, sourceLocale);
-        commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale));
+        const metadata = translationMetadata(slot.sourceText, sourceLocale, "automatic");
+        commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "automatic"));
+        onTranslationChange?.({
+          slot,
+          ...(slot.existingText === undefined ? {} : { previousText: slot.existingText }),
+          nextText: text,
+          mode: "automatic",
+          metadata
+        });
         return { success: true };
       } catch (cause) {
         const workspaceError: TranslationWorkspaceError = {
@@ -604,7 +737,7 @@ export function useTranslationWorkspace({
         setIsTranslating(false);
       }
     },
-    [commit, currentSchema, readOnly, sourceLocale, translationAdapter]
+    [commit, currentSchema, onTranslationChange, readOnly, sourceLocale, translationAdapter]
   );
   return {
     sourceLocale,
@@ -621,6 +754,7 @@ export function useTranslationWorkspace({
     addLocale,
     isAddLocaleAllowed,
     removeLocale,
+    ...(removeLocaleConfirmation === null ? {} : { removeLocaleConfirmation }),
     setTranslation,
     translateAll,
     translateSlot,

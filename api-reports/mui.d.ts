@@ -1,4 +1,4 @@
-import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, TranslationWorkspaceSlots } from '@form-engine-ts/react';
+import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
 import { FormEngineMessages, FormEngineTranslator, LocaleOption, FormSchema, DisplayRule, TranslationAdapter, AsyncTranslationAdapter } from '@form-engine-ts/core';
@@ -230,8 +230,18 @@ interface TranslationWorkspaceProps {
     readonly beforeRemoveLocale?: (locale: string, context: {
         readonly slotCount: number;
     }) => Promise<boolean> | boolean;
+    readonly onTranslationStart?: (params: {
+        readonly targetLocale: string;
+        readonly mode: "manual" | "automatic";
+    }) => void;
+    readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+    readonly onTranslationError?: (params: {
+        readonly targetLocale: string;
+        readonly error: TranslationWorkspaceError;
+    }) => void;
+    readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
     readonly slots?: TranslationWorkspaceSlots;
 }
-declare function TranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, readOnly, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, slots: workspaceSlots }: TranslationWorkspaceProps): react.JSX.Element;
+declare function TranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, readOnly, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, onTranslationStart, onTranslationSuccess, onTranslationError, onTranslationChange, slots: workspaceSlots }: TranslationWorkspaceProps): react.JSX.Element;
 
 export { type BuilderSectionName, ConditionEditor, type ConditionEditorProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, MuiOptionEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, type ResolvedMuiAdapterOptions, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

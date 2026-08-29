@@ -56,6 +56,11 @@ translation adapter runs.
 `ja_JP`, and returns `null` for invalid tags. Schema validation, sanitization, locale policy checks, and translation
 slot lookup use this same normalization so equivalent locale spellings cannot bypass constraints.
 
+Submissions use `values` as their canonical answer property. `toFormSubmissionWire` and
+`fromFormSubmissionWire` preserve the optional submission `locale` across validated wire payloads. Legacy payloads with
+`answers` are isolated under `LegacyFormSubmission` and `fromLegacyFormSubmission` in the compatibility namespace.
+`serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`.
+
 Fields can use a `displayRule` with nested `all`/`any` condition groups and `show` or `hide` actions. Supported
 operators include equality, containment, emptiness, and numeric comparisons; the legacy `displayCondition` and
 `not_empty` forms remain supported. `submissionSettings` can enable pre-submit confirmation and select its

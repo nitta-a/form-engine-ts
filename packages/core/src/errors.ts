@@ -25,3 +25,8 @@ export class FormSubmissionError extends Error {
     return this.payload;
   }
 }
+
+export const serializeSubmissionError = (error: FormSubmissionError): FormSubmissionSerializedError => error.toJSON();
+
+export const deserializeSubmissionError = (json: FormSubmissionSerializedError): FormSubmissionError =>
+  new FormSubmissionError(json);

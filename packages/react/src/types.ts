@@ -1,4 +1,5 @@
 import type {
+  CanonicalTranslationMetadata,
   FieldOption,
   FormField,
   FormPage,
@@ -10,6 +11,7 @@ import type {
   Question,
   QuestionType,
   TranslationReport,
+  TranslationSlot,
   ValidationError,
   ValidationIssue
 } from "@form-engine-ts/core";
@@ -345,6 +347,32 @@ export interface TranslationWorkspaceActionsProps {
   readonly readOnly: boolean;
 }
 
+export interface TranslationEventPayload {
+  readonly sourceLocale: string;
+  readonly targetLocale: string;
+  readonly mode: "manual" | "automatic";
+  readonly updatedSlots: readonly TranslationSlot[];
+  readonly skippedSlots: readonly TranslationSlot[];
+  readonly missingSlotsCount: number;
+}
+
+export interface TranslationSlotChangeEvent {
+  readonly slot: TranslationSlot;
+  readonly previousText?: string;
+  readonly nextText: string;
+  readonly mode: "manual" | "automatic";
+  readonly metadata: CanonicalTranslationMetadata;
+}
+
+export interface ConfirmRemoveLocaleSlotProps {
+  readonly locale: string;
+  readonly localeLabel: string;
+  readonly translatedSlotsCount: number;
+  readonly isOpen: boolean;
+  readonly onConfirm: () => void;
+  readonly onCancel: () => void;
+}
+
 export interface TranslationWorkspaceSlots {
   readonly renderHeader?: (props: TranslationWorkspaceHeaderProps) => ReactNode;
   readonly renderSlotRow?: (props: TranslationSlotRowProps) => ReactNode;
@@ -353,6 +381,7 @@ export interface TranslationWorkspaceSlots {
     readonly status: import("@form-engine-ts/core").TranslationStatus;
   }) => ReactNode;
   readonly renderActions?: (props: TranslationWorkspaceActionsProps) => ReactNode;
+  readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
 }
 
 export interface LocalizationSummaryContext {

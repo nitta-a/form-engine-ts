@@ -9,6 +9,7 @@ export const FormSubmissionWireSchema = z.object({
   formId: z.string().min(1),
   formVersion: z.number().int().positive(),
   values: z.record(z.string(), z.unknown()),
+  locale: z.string().min(1).optional(),
   metadata: FormSubmissionMetadataSchema,
   submittedAt: z.string().datetime(),
   schemaRevision: z.number().int().optional()

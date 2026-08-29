@@ -10,6 +10,7 @@ import type {
   FormSubmission,
   FormValue,
   FormValues,
+  JsonValue,
   QuestionAggregate
 } from "./types";
 import { calculateFieldVisibility, selectVisibleAnswers } from "./visibility";
@@ -226,7 +227,7 @@ interface FieldAccumulator {
 function responseValues(submission: AccumulatorResponse): unknown {
   if (typeof submission !== "object" || submission === null) return undefined;
   if ("values" in submission) return submission.values;
-  return "answers" in submission ? submission.answers : undefined;
+  return submission.answers;
 }
 
 function responseIdentifier(submission: AccumulatorResponse): string {
@@ -511,14 +512,20 @@ export interface StreamCsvOptions extends CsvExportOptions {
 
 function asFormResponse(submission: AccumulatorResponse): FormResponse {
   if (!("values" in submission)) return submission;
+  const metadata =
+    submission.metadata === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(submission.metadata).filter((entry): entry is [string, JsonValue] => entry[1] !== undefined)
+        );
   return {
     responseId: submission.id,
     formId: submission.formId,
-    sourceLocale: submission.locale,
+    ...(submission.locale === undefined ? {} : { sourceLocale: submission.locale }),
     formVersion: submission.formVersion,
     answers: submission.values,
     submittedAt: submission.submittedAt,
-    ...(submission.metadata === undefined ? {} : { metadata: submission.metadata }),
+    ...(metadata === undefined ? {} : { metadata }),
     ...(submission.translationMetadata === undefined ? {} : { translationMetadata: submission.translationMetadata })
   };
 }

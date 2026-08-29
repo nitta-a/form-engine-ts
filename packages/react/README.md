@@ -89,6 +89,10 @@ underscore-separated values such as `EN_us` are accepted as compatibility input.
 Use `isAddLocaleAllowed` to disable locale controls before submission. Removing a locale also clears its
 localized values and metadata; the default locale remains protected.
 
+`useTranslationWorkspace` can notify `onTranslationStart`, `onTranslationSuccess`, `onTranslationError`, and
+`onTranslationChange` with typed lifecycle payloads. The MUI workspace accepts a `confirmRemoveLocale` slot for an
+async confirmation UI; its `onConfirm` callback completes the locale removal.
+
 Wrap a builder or renderer in `FormEngineI18nProvider` to supply a UI locale and typed Core translator independently
 from the schema's `defaultLocale` and `supportedLocales`:
 
