@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v5.0.0 — 2026-08-29
+
+- Major release: typed submission and validation APIs, cursor pagination, transition commits, PII metadata normalization, and the shared `@form-engine-ts/storage` package are now available together.
+- Added typed English/Japanese i18n catalogs, fallback translation, and independent `FormEngineI18nProvider` UI/content locale support across React and MUI.
+- Translation workspace mutations now return structured results with typed failure details; consumers should handle the new result shapes and `TranslationWorkspaceError` values.
+- Preserved the legacy `BuilderTranslationKey` pattern alias while adding the strict known-key catalog types.
+- Aligned all public packages to version 5.0.0.
+
+See the [GitHub release for v5.0.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.0).
+
 ### v4.9.0 — 2026-08-29
 
 - Added typed submission metadata and the object-input `createSubmission` overload with generated IDs, answer snapshots, and schema revisions.
@@ -225,6 +235,16 @@ translation caches can bypass backend failures or propagate them by policy. Rele
 changes without a major release, publishes npm provenance, and generates API migration notes.
 
 ## 日本語の履歴
+
+### v5.0.0 — 2026-08-29
+
+- メジャーリリースです。型付きSubmission／検証API、カーソルページング、遷移コミット、PIIメタデータ正規化、共通`@form-engine-ts/storage`パッケージを統合しました。
+- 型付き日本語／英語i18nカタログ、フォールバック翻訳、React／MUIでUIロケールとコンテンツロケールを分離する`FormEngineI18nProvider`を追加しました。
+- 翻訳ワークスペースの変更処理が型付きのエラー詳細を含む構造化結果を返すようになりました。新しい結果型と`TranslationWorkspaceError`への対応が必要です。
+- 既存の`BuilderTranslationKey`パターンaliasを維持しつつ、既知のキーを厳密に表すカタログ型を追加しました。
+- 公開パッケージのバージョンを5.0.0に統一しました。
+
+[v5.0.0のGitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v5.0.0)も参照してください。
 
 ### v4.9.0 — 2026-08-29
 
