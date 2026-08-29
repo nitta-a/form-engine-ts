@@ -33,7 +33,9 @@ Store authoring-time translations on forms, fields, options, and pages. `resolve
 them synchronously and returns the original schema when no locale is supplied,
 while `populateSchemaTranslations` fills them through an injected `AsyncTranslationAdapter`. Population defaults to
 `overwrite: "missing-only"`, accepts per-slot `shouldOverwrite` and `createMetadata` callbacks, and returns
-`{ schema, report }` with updated and skipped translation slots.
+`{ schema, report }` with updated and skipped translation slots. The optional `signal` is forwarded to async adapters;
+`continueOnError` keeps successful slots and reports failed slots, cancellation, counts, and progress through
+`TranslationReport` and `onProgress`.
 
 Forms, pages, fields, options, and submissions accept JSON-only `metadata` and per-locale/property
 `translationMetadata`. These extension values survive sanitization, localization, submission creation, and storage

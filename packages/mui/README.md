@@ -25,7 +25,10 @@ section with `submissionSettingsOptions={{ enabled: true }}` and use `layoutOpti
 
 `TranslationComparisonWorkspace` provides a responsive source/translation view: two columns at the `md` breakpoint
 and a stacked layout on smaller screens. Its source panel is read-only, while the target panel exposes status badges,
-manual editing, stale-source highlighting, and single-slot automatic translation.
+manual editing, stale-source highlighting, single-slot automatic translation, and standard batch progress, retry, and
+cancellation controls. It accepts both `TranslationAdapter` and `AsyncTranslationAdapter`; `TranslationWorkspace`
+combines the same comparison layout with locale add/switch/remove operations. Both surfaces preserve keyboard access
+and expose `renderHeader`/`renderItemRow` customization slots.
 
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";

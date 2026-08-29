@@ -311,8 +311,13 @@ export interface TranslationAdapter {
 }
 
 export interface AsyncTranslationAdapter {
-  translateText(text: string, targetLocale: string, sourceLocale?: string): Promise<string>;
-  translateBatch(texts: readonly string[], targetLocale: string, sourceLocale?: string): Promise<readonly string[]>;
+  translateText(text: string, targetLocale: string, sourceLocale?: string, signal?: AbortSignal): Promise<string>;
+  translateBatch(
+    texts: readonly string[],
+    targetLocale: string,
+    sourceLocale?: string,
+    signal?: AbortSignal
+  ): Promise<readonly string[]>;
 }
 
 export interface SubmissionQueryOptions {

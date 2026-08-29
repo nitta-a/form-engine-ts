@@ -13,6 +13,7 @@ import {
   populateSchemaTranslations,
   removeLocaleFromSchema,
   type TranslationAdapter,
+  type TranslationProgress,
   type TranslationReport,
   type TranslationSlot,
   type TranslationStatus
@@ -31,6 +32,7 @@ export interface UseTranslationWorkspaceOptions {
   readonly sourceLocale?: string;
   readonly targetLocale?: string;
   readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+  readonly signal?: AbortSignal;
   readonly readOnly?: boolean;
   readonly policy?: FormPolicy;
   readonly availableLocales?: readonly (string | LocaleOption)[];
@@ -45,6 +47,7 @@ export interface UseTranslationWorkspaceOptions {
     readonly mode: "manual" | "automatic";
   }) => void;
   readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+  readonly onTranslationReport?: (report: TranslationReport) => void;
   readonly onTranslationError?: (params: {
     readonly targetLocale: string;
     readonly error: TranslationWorkspaceError;
@@ -99,6 +102,8 @@ export type TranslationWorkspaceError =
   | { readonly type: "adapter_not_configured" }
   | { readonly type: "target_locale_missing" }
   | { readonly type: "translation_failed"; readonly message: string; readonly cause?: unknown }
+  | { readonly type: "partial_failure"; readonly succeeded: number; readonly failed: number }
+  | { readonly type: "cancelled" }
   | { readonly type: "custom_validation_failed"; readonly message: string };
 
 export interface UseTranslationWorkspaceResult {
@@ -120,9 +125,12 @@ export interface UseTranslationWorkspaceResult {
     readonly error?: TranslationWorkspaceError;
   }>;
   readonly translateSlot: (
-    slot: TranslationSlot
+    slot: TranslationSlot,
+    options?: { readonly signal?: AbortSignal }
   ) => Promise<{ readonly success: boolean; readonly error?: TranslationWorkspaceError }>;
+  readonly cancelTranslation: () => void;
   readonly isTranslating: boolean;
+  readonly progress?: TranslationProgress;
   readonly error?: TranslationWorkspaceError;
 }
 
@@ -372,6 +380,7 @@ export function useTranslationWorkspace({
   sourceLocale = schema.defaultLocale ?? "en",
   targetLocale,
   translationAdapter,
+  signal,
   readOnly = false,
   policy,
   availableLocales,
@@ -383,6 +392,7 @@ export function useTranslationWorkspace({
   slots: workspaceSlots,
   onTranslationStart,
   onTranslationSuccess,
+  onTranslationReport,
   onTranslationError,
   onTranslationChange,
   validateLocale
@@ -390,12 +400,14 @@ export function useTranslationWorkspace({
   const [draftSchema, setDraftSchema] = useState(schema);
   const [selectedLocale, setSelectedLocale] = useState(normalizeLocale(targetLocale ?? "") ?? targetLocale ?? "");
   const [isTranslating, setIsTranslating] = useState(false);
+  const [progress, setProgress] = useState<TranslationProgress>();
   const [error, setError] = useState<TranslationWorkspaceError>();
   const [pendingRemoval, setPendingRemoval] = useState<{
     readonly locale: string;
     readonly localeLabel: string;
     readonly translatedSlotsCount: number;
   }>();
+  const activeAbortController = useRef<AbortController | undefined>(undefined);
   const pendingRemovalResolver = useRef<((allowed: boolean) => void) | undefined>(undefined);
   const currentSchema = onChange === undefined ? draftSchema : schema;
   const confirmRemoveLocaleRenderer = confirmRemoveLocale ?? workspaceSlots?.confirmRemoveLocale;
@@ -645,7 +657,15 @@ export function useTranslationWorkspace({
       }
       setIsTranslating(true);
       setError(undefined);
+      setProgress(undefined);
       onTranslationStart?.({ targetLocale: activeLocale, mode: "automatic" });
+      const controller = new AbortController();
+      activeAbortController.current = controller;
+      const operationSignal = options.signal ?? signal;
+      const abortListener = operationSignal === undefined ? undefined : () => controller.abort(operationSignal.reason);
+      if (operationSignal?.aborted) controller.abort(operationSignal.reason);
+      else if (operationSignal !== undefined && abortListener !== undefined)
+        operationSignal.addEventListener("abort", abortListener, { once: true });
       try {
         const populated = await populateSchemaTranslations(
           currentSchema,
@@ -654,13 +674,36 @@ export function useTranslationWorkspace({
           {
             overwrite: "stale-and-missing",
             preserveManualTranslations: true,
-            ...options
+            ...options,
+            continueOnError: true,
+            signal: controller.signal,
+            onProgress: (nextProgress) => {
+              setProgress(nextProgress);
+              options.onProgress?.(nextProgress);
+            }
           }
         );
         commit(populated.schema);
+        onTranslationReport?.(populated.report);
         const missingSlotsCount = collectTranslationSlots(populated.schema, activeLocale).filter(
           (slot) => slot.status === "missing"
         ).length;
+        if (populated.report.cancelled === true) {
+          const workspaceError: TranslationWorkspaceError = { type: "cancelled" };
+          setError(workspaceError);
+          onTranslationError?.({ targetLocale: activeLocale, error: workspaceError });
+          return { success: false, report: populated.report, error: workspaceError };
+        }
+        if ((populated.report.failed ?? 0) > 0) {
+          const workspaceError: TranslationWorkspaceError = {
+            type: "partial_failure",
+            succeeded: populated.report.succeeded ?? populated.report.updatedSlots.length,
+            failed: populated.report.failed ?? 0
+          };
+          setError(workspaceError);
+          onTranslationError?.({ targetLocale: activeLocale, error: workspaceError });
+          return { success: false, report: populated.report, error: workspaceError };
+        }
         onTranslationSuccess?.({
           sourceLocale,
           targetLocale: activeLocale,
@@ -671,6 +714,12 @@ export function useTranslationWorkspace({
         });
         return { success: true, report: populated.report };
       } catch (cause) {
+        if (controller.signal.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
+          const workspaceError: TranslationWorkspaceError = { type: "cancelled" };
+          setError(workspaceError);
+          onTranslationError?.({ targetLocale: activeLocale, error: workspaceError });
+          return { success: false, error: workspaceError };
+        }
         const workspaceError: TranslationWorkspaceError = {
           type: "translation_failed",
           message: cause instanceof Error ? cause.message : String(cause),
@@ -680,6 +729,11 @@ export function useTranslationWorkspace({
         onTranslationError?.({ targetLocale: activeLocale, error: workspaceError });
         return { success: false, error: workspaceError };
       } finally {
+        if (operationSignal !== undefined && abortListener !== undefined) {
+          const listener = abortListener;
+          operationSignal.removeEventListener("abort", listener);
+        }
+        if (activeAbortController.current === controller) activeAbortController.current = undefined;
         setIsTranslating(false);
       }
     },
@@ -691,15 +745,21 @@ export function useTranslationWorkspace({
       onTranslationError,
       onTranslationStart,
       onTranslationSuccess,
+      onTranslationReport,
       readOnly,
       slots,
       sourceLocale,
-      translationAdapter
+      translationAdapter,
+      signal
     ]
   );
+  const cancelTranslation = useCallback(() => {
+    activeAbortController.current?.abort(new DOMException("The translation was cancelled.", "AbortError"));
+  }, []);
   const translateSlot = useCallback(
     async (
-      slot: TranslationSlot
+      slot: TranslationSlot,
+      options: { readonly signal?: AbortSignal } = {}
     ): Promise<{ readonly success: boolean; readonly error?: TranslationWorkspaceError }> => {
       if (translationAdapter === undefined) {
         const workspaceError: TranslationWorkspaceError = { type: "adapter_not_configured" };
@@ -713,8 +773,21 @@ export function useTranslationWorkspace({
       }
       setIsTranslating(true);
       setError(undefined);
+      setProgress({ total: 1, completed: 0, succeeded: 0, failed: 0, percentage: 0 });
+      const controller = new AbortController();
+      activeAbortController.current = controller;
+      const operationSignal = options.signal ?? signal;
+      const abortListener = operationSignal === undefined ? undefined : () => controller.abort(operationSignal.reason);
+      if (operationSignal?.aborted) controller.abort(operationSignal.reason);
+      else if (operationSignal !== undefined && abortListener !== undefined)
+        operationSignal.addEventListener("abort", abortListener, { once: true });
       try {
-        const text = await asAsyncAdapter(translationAdapter).translateText(slot.sourceText, slot.locale, sourceLocale);
+        const text = await asAsyncAdapter(translationAdapter).translateText(
+          slot.sourceText,
+          slot.locale,
+          sourceLocale,
+          controller.signal
+        );
         const metadata = translationMetadata(slot.sourceText, sourceLocale, "automatic");
         commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "automatic"));
         onTranslationChange?.({
@@ -724,8 +797,15 @@ export function useTranslationWorkspace({
           mode: "automatic",
           metadata
         });
+        setProgress({ total: 1, completed: 1, succeeded: 1, failed: 0, percentage: 100 });
         return { success: true };
       } catch (cause) {
+        if (controller.signal.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
+          const workspaceError: TranslationWorkspaceError = { type: "cancelled" };
+          setError(workspaceError);
+          onTranslationError?.({ targetLocale: slot.locale, error: workspaceError });
+          return { success: false, error: workspaceError };
+        }
         const workspaceError: TranslationWorkspaceError = {
           type: "translation_failed",
           message: cause instanceof Error ? cause.message : String(cause),
@@ -734,10 +814,15 @@ export function useTranslationWorkspace({
         setError(workspaceError);
         return { success: false, error: workspaceError };
       } finally {
+        if (operationSignal !== undefined && abortListener !== undefined) {
+          const listener = abortListener;
+          operationSignal.removeEventListener("abort", listener);
+        }
+        if (activeAbortController.current === controller) activeAbortController.current = undefined;
         setIsTranslating(false);
       }
     },
-    [commit, currentSchema, onTranslationChange, readOnly, sourceLocale, translationAdapter]
+    [commit, currentSchema, onTranslationChange, onTranslationError, readOnly, signal, sourceLocale, translationAdapter]
   );
   return {
     sourceLocale,
@@ -758,7 +843,9 @@ export function useTranslationWorkspace({
     setTranslation,
     translateAll,
     translateSlot,
+    cancelTranslation,
     isTranslating,
+    ...(progress === undefined ? {} : { progress }),
     ...(error === undefined ? {} : { error })
   };
 }

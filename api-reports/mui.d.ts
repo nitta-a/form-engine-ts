@@ -1,7 +1,8 @@
 import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonHeaderProps, TranslationComparisonItemRowProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
-import { FormEngineMessages, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormSchema, DisplayRule, TranslationAdapter, TranslationStatus, AsyncTranslationAdapter, FormPolicy } from '@form-engine-ts/core';
+import * as _form_engine_ts_core from '@form-engine-ts/core';
+import { FormEngineMessages, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormSchema, DisplayRule, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus, FormPolicy } from '@form-engine-ts/core';
 import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, ButtonProps, IconButtonProps } from '@mui/material';
 
 type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization" | "submissionSettings";
@@ -230,9 +231,12 @@ interface TranslationComparisonWorkspaceProps {
     readonly sourceLocale?: string;
     readonly targetLocale: string;
     readonly readOnly?: boolean;
-    readonly translationAdapter?: TranslationAdapter;
+    readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+    readonly signal?: AbortSignal;
     readonly onChange?: (nextSchema: FormSchema) => void;
     readonly onTranslationChange?: UseTranslationComparisonOptions["onTranslationChange"];
+    readonly onTranslationReport?: (report: TranslationReport) => void;
+    readonly onTranslationError?: UseTranslationComparisonOptions["onTranslationError"];
     readonly i18n?: MuiFormEngineI18nOptions;
     readonly slots?: {
         readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
@@ -250,6 +254,7 @@ interface TranslationWorkspaceProps {
     readonly sourceLocale?: string;
     readonly targetLocale?: string;
     readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+    readonly signal?: AbortSignal;
     readonly readOnly?: boolean;
     readonly policy?: FormPolicy;
     readonly availableLocales?: readonly (string | LocaleOption)[];
@@ -264,6 +269,7 @@ interface TranslationWorkspaceProps {
         readonly mode: "manual" | "automatic";
     }) => void;
     readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+    readonly onTranslationReport?: (report: _form_engine_ts_core.TranslationReport) => void;
     readonly onTranslationError?: (params: {
         readonly targetLocale: string;
         readonly error: TranslationWorkspaceError;
@@ -272,6 +278,6 @@ interface TranslationWorkspaceProps {
     readonly validateLocale?: UseTranslationWorkspaceOptions["validateLocale"];
     readonly slots?: TranslationWorkspaceSlots;
 }
-declare function TranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, onTranslationStart, onTranslationSuccess, onTranslationError, onTranslationChange, validateLocale, slots: workspaceSlots }: TranslationWorkspaceProps): react.JSX.Element;
+declare function TranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, signal, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, onTranslationStart, onTranslationSuccess, onTranslationReport, onTranslationError, onTranslationChange, validateLocale, slots: workspaceSlots }: TranslationWorkspaceProps): react.JSX.Element;
 
 export { type BuilderSectionName, ConditionEditor, type ConditionEditorProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, type ResolvedMuiAdapterOptions, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

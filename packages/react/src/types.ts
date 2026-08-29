@@ -1,4 +1,5 @@
 import type {
+  AsyncTranslationAdapter,
   CanonicalTranslationMetadata,
   FieldOption,
   FormField,
@@ -8,9 +9,11 @@ import type {
   FormValues,
   JsonValue,
   LocaleOption,
+  PopulateTranslationOptions,
   Question,
   QuestionType,
   TranslationAdapter,
+  TranslationProgress,
   TranslationReport,
   TranslationSlot,
   TranslationStatus,
@@ -328,6 +331,8 @@ export interface TranslationWorkspaceHeaderProps {
   readonly onTranslateAll: () => void;
   readonly isTranslating: boolean;
   readonly readOnly: boolean;
+  readonly progress?: TranslationProgress;
+  readonly onCancel?: () => void;
 }
 
 export interface TranslationSlotRowProps {
@@ -365,23 +370,37 @@ export interface TranslationComparisonHeaderProps {
   readonly onTranslateAll: () => void;
   readonly isTranslating: boolean;
   readonly readOnly: boolean;
+  readonly report?: TranslationReport;
+  readonly progress?: TranslationProgress;
+  readonly onCancel?: () => void;
 }
 
 export interface TranslationComparisonItemRowProps {
   readonly item: TranslationComparisonItem;
+  readonly questionIndex?: number;
+  readonly fieldType?: string;
+  readonly optionIndex?: number;
+  readonly sourceLocaleLabel?: string;
+  readonly targetLocaleLabel?: string;
   readonly readOnly: boolean;
   readonly onChange: (text: string) => void;
-  readonly onTranslate: () => void;
+  readonly onTranslate: () => Promise<void>;
 }
 
 export interface UseTranslationComparisonOptions {
   readonly schema: FormSchema;
   readonly sourceLocale?: string;
   readonly targetLocale: string;
-  readonly translationAdapter?: TranslationAdapter;
+  readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+  readonly signal?: AbortSignal;
   readonly readOnly?: boolean;
   readonly onChange?: (nextSchema: FormSchema) => void;
   readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+  readonly onTranslationReport?: (report: TranslationReport) => void;
+  readonly onTranslationError?: (params: {
+    readonly targetLocale: string;
+    readonly error: import("./hooks/useTranslationWorkspace").TranslationWorkspaceError;
+  }) => void;
 }
 
 export interface UseTranslationComparisonResult {
@@ -392,7 +411,11 @@ export interface UseTranslationComparisonResult {
   readonly isTranslating: boolean;
   readonly updateTranslation: (path: string, text: string) => void;
   readonly translateSingle: (path: string) => Promise<void>;
-  readonly translateAll: () => Promise<TranslationReport>;
+  readonly translateAll: (options?: PopulateTranslationOptions) => Promise<TranslationReport>;
+  readonly cancelTranslation: () => void;
+  readonly progress?: TranslationProgress;
+  readonly error?: import("./hooks/useTranslationWorkspace").TranslationWorkspaceError;
+  readonly report?: TranslationReport;
 }
 
 export interface LocaleSelectorProps {
@@ -441,6 +464,7 @@ export interface ConfirmRemoveLocaleSlotProps {
 export interface TranslationWorkspaceSlots {
   readonly renderHeader?: (props: TranslationWorkspaceHeaderProps) => ReactNode;
   readonly renderSlotRow?: (props: TranslationSlotRowProps) => ReactNode;
+  readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
   readonly renderLocaleSelector?: (props: LocaleSelectorProps) => ReactNode;
   readonly renderStatusBadge?: (props: {
     readonly status: import("@form-engine-ts/core").TranslationStatus;

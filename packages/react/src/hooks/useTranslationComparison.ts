@@ -1,12 +1,14 @@
 import type {
   CanonicalTranslationMetadata,
   FormSchema,
+  JsonValue,
+  PopulateTranslationOptions,
   TranslationReport,
   TranslationSlot,
   TranslationStatus
 } from "@form-engine-ts/core";
 import { computeSourceTextHash } from "@form-engine-ts/core";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   TranslationComparisonItem,
   TranslationComparisonSummary,
@@ -16,7 +18,7 @@ import type {
 import { useTranslationWorkspace } from "./useTranslationWorkspace";
 
 function canonicalMetadata(
-  metadata: Readonly<Record<string, unknown>> | undefined,
+  metadata: Readonly<Record<string, JsonValue>> | undefined,
   sourceText: string,
   sourceLocale: string,
   translatedText: string | undefined
@@ -29,6 +31,7 @@ function canonicalMetadata(
     (metadata.translationSource === "automatic" || metadata.translationSource === "manual")
   ) {
     return {
+      ...metadata,
       sourceLocale: metadata.sourceLocale,
       sourceTextHash: metadata.sourceTextHash,
       translationSource: metadata.translationSource,
@@ -36,7 +39,10 @@ function canonicalMetadata(
       ...(typeof metadata.editedAt === "string" ? { editedAt: metadata.editedAt } : {})
     };
   }
+  const canonicalKeys = new Set(["sourceLocale", "sourceTextHash", "translationSource", "translatedAt", "editedAt"]);
+  const extensions = Object.fromEntries(Object.entries(metadata ?? {}).filter(([key]) => !canonicalKeys.has(key)));
   return {
+    ...extensions,
     sourceLocale: typeof metadata?.sourceLocale === "string" ? metadata.sourceLocale : sourceLocale,
     sourceTextHash: computeSourceTextHash(sourceText),
     translationSource:
@@ -111,7 +117,10 @@ export function useTranslationComparison({
   translationAdapter,
   readOnly = false,
   onChange,
-  onTranslationChange
+  onTranslationChange,
+  onTranslationReport,
+  onTranslationError,
+  signal
 }: UseTranslationComparisonOptions): UseTranslationComparisonResult {
   const workspace = useTranslationWorkspace({
     schema,
@@ -120,8 +129,12 @@ export function useTranslationComparison({
     ...(translationAdapter === undefined ? {} : { translationAdapter }),
     readOnly,
     ...(onChange === undefined ? {} : { onChange }),
-    ...(onTranslationChange === undefined ? {} : { onTranslationChange })
+    ...(onTranslationChange === undefined ? {} : { onTranslationChange }),
+    ...(onTranslationReport === undefined ? {} : { onTranslationReport }),
+    ...(onTranslationError === undefined ? {} : { onTranslationError }),
+    ...(signal === undefined ? {} : { signal })
   });
+  const [report, setReport] = useState<TranslationReport>();
   const items = useMemo(
     () => workspace.slots.map((slot) => comparisonItem(schema, slot, sourceLocale, translationAdapter !== undefined)),
     [schema, sourceLocale, translationAdapter, workspace.slots]
@@ -143,11 +156,17 @@ export function useTranslationComparison({
     },
     [itemByPath, workspace]
   );
-  const translateAll = useCallback(async (): Promise<TranslationReport> => {
-    const result = await workspace.translateAll();
-    if (result.report !== undefined) return result.report;
-    throw new Error(result.error?.type ?? "Translation failed.");
-  }, [workspace]);
+  const translateAll = useCallback(
+    async (options?: PopulateTranslationOptions): Promise<TranslationReport> => {
+      const result = await workspace.translateAll(options);
+      if (result.report !== undefined) {
+        setReport(result.report);
+        return result.report;
+      }
+      throw new Error(result.error?.type ?? "Translation failed.");
+    },
+    [workspace]
+  );
   return {
     sourceLocale: workspace.sourceLocale,
     targetLocale: workspace.targetLocale,
@@ -156,6 +175,10 @@ export function useTranslationComparison({
     isTranslating: workspace.isTranslating,
     updateTranslation,
     translateSingle,
-    translateAll
+    translateAll,
+    cancelTranslation: workspace.cancelTranslation,
+    ...(workspace.progress === undefined ? {} : { progress: workspace.progress }),
+    ...(workspace.error === undefined ? {} : { error: workspace.error }),
+    ...(report === undefined ? {} : { report })
   };
 }

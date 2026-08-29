@@ -119,6 +119,12 @@ export interface PopulateTranslationOptions {
   readonly normalizeMetadata?: (metadata: unknown, sourceText: string) => CanonicalTranslationMetadata;
   /** Applies locale admission and count limits before the adapter is called. */
   readonly policy?: Pick<FormPolicy, "allowedLocales" | "maxLocales">;
+  /** Aborts an in-flight translation operation when requested. */
+  readonly signal?: AbortSignal;
+  /** Reports progress for the slots selected for translation. */
+  readonly onProgress?: (progress: TranslationProgress) => void;
+  /** Keeps successful slots when individual translation calls fail. */
+  readonly continueOnError?: boolean;
 }
 
 /** Compatibility alias for clients that used the pluralized options name. */
@@ -129,6 +135,25 @@ export interface TranslationReport {
   readonly skippedSlots: readonly TranslationSlot[];
   readonly staleSlots?: readonly TranslationSlot[];
   readonly skippedReasons?: Readonly<Record<string, "manual" | "unchanged" | "unsupported">>;
+  readonly totalSlots?: number;
+  readonly attemptedSlots?: number;
+  readonly succeeded?: number;
+  readonly failed?: number;
+  readonly cancelled?: boolean;
+  readonly failures?: readonly TranslationFailure[];
+}
+
+export interface TranslationProgress {
+  readonly total: number;
+  readonly completed: number;
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly percentage: number;
+}
+
+export interface TranslationFailure {
+  readonly slot: TranslationSlot;
+  readonly cause: unknown;
 }
 
 export const computeSourceTextHash = (text: string): string => {
@@ -180,12 +205,20 @@ async function translateBatch(
   adapter: TranslationProvider,
   texts: readonly string[],
   locale: string,
-  sourceLocale: string | undefined
+  sourceLocale: string | undefined,
+  signal?: AbortSignal
 ): Promise<readonly string[]> {
-  if ("translateBatch" in adapter) return adapter.translateBatch(texts, locale, sourceLocale);
+  if ("translateBatch" in adapter) {
+    if (signal === undefined) return adapter.translateBatch(texts, locale, sourceLocale);
+    return adapter.translateBatch(texts, locale, sourceLocale, signal);
+  }
   return texts.map(
     (text) => adapter.translate(text, locale, sourceLocale === undefined ? undefined : { sourceLocale }) ?? text
   );
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw signal.reason ?? new DOMException("The translation was cancelled.", "AbortError");
 }
 
 type LocalizedProperty = "title" | "description" | "completionMessage";
@@ -763,6 +796,10 @@ export async function populateSchemaTranslations(
   const skippedSlots: TranslationSlot[] = [];
   const staleSlots: TranslationSlot[] = [];
   const skippedReasons: Record<string, "manual" | "unchanged" | "unsupported"> = {};
+  const failures: TranslationFailure[] = [];
+  let attemptedSlots = 0;
+  let completedSlots = 0;
+  let cancelled = false;
   let result = schema;
 
   for (const locale of locales) {
@@ -797,18 +834,8 @@ export async function populateSchemaTranslations(
       }
     }
     if (selected.length === 0) continue;
-    const translated = await translateBatch(
-      adapter,
-      selected.map((descriptor) => descriptor.slot.sourceText),
-      locale,
-      defaultLocale
-    );
-    if (translated.length !== selected.length) {
-      throw new Error(`Translation adapter returned ${translated.length} texts for ${selected.length} inputs.`);
-    }
-    selected.forEach((descriptor, index) => {
-      const translatedText = translated[index];
-      if (translatedText === undefined) throw new Error("Translation adapter returned an unexpected result.");
+    attemptedSlots += selected.length;
+    const applyTranslation = (descriptor: SlotDescriptor, translatedText: string): void => {
       const metadata =
         options.createMetadata?.(descriptor.slot, translatedText) ??
         ({
@@ -819,7 +846,80 @@ export async function populateSchemaTranslations(
         } satisfies CanonicalTranslationMetadata);
       result = descriptor.apply(result, translatedText, metadata);
       updatedSlots.push(descriptor.slot);
-    });
+      completedSlots += 1;
+      options.onProgress?.({
+        total: attemptedSlots,
+        completed: completedSlots,
+        succeeded: updatedSlots.length,
+        failed: failures.length,
+        percentage: attemptedSlots === 0 ? 100 : Math.round((completedSlots / attemptedSlots) * 100)
+      });
+    };
+    const recordFailure = (descriptor: SlotDescriptor, cause: unknown): void => {
+      failures.push({ slot: descriptor.slot, cause });
+      completedSlots += 1;
+      options.onProgress?.({
+        total: attemptedSlots,
+        completed: completedSlots,
+        succeeded: updatedSlots.length,
+        failed: failures.length,
+        percentage: attemptedSlots === 0 ? 100 : Math.round((completedSlots / attemptedSlots) * 100)
+      });
+    };
+    let translated: readonly string[] | undefined;
+    try {
+      throwIfAborted(options.signal);
+      translated = await translateBatch(
+        adapter,
+        selected.map((descriptor) => descriptor.slot.sourceText),
+        locale,
+        defaultLocale,
+        options.signal
+      );
+      if (translated.length !== selected.length) {
+        throw new Error(`Translation adapter returned ${translated.length} texts for ${selected.length} inputs.`);
+      }
+    } catch (cause) {
+      if (options.continueOnError !== true) throw cause;
+      if (options.signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
+        cancelled = true;
+        break;
+      }
+      translated = undefined;
+    }
+    if (translated !== undefined) {
+      selected.forEach((descriptor, index) => {
+        const translatedText = translated?.[index];
+        if (translatedText === undefined) {
+          if (options.continueOnError === true) recordFailure(descriptor, new Error("Unexpected empty translation."));
+          else throw new Error("Translation adapter returned an unexpected result.");
+          return;
+        }
+        applyTranslation(descriptor, translatedText);
+      });
+    } else {
+      for (const descriptor of selected) {
+        try {
+          throwIfAborted(options.signal);
+          const translatedText =
+            "translateText" in adapter
+              ? await adapter.translateText(descriptor.slot.sourceText, locale, defaultLocale, options.signal)
+              : (adapter.translate(
+                  descriptor.slot.sourceText,
+                  locale,
+                  defaultLocale === undefined ? undefined : { sourceLocale: defaultLocale }
+                ) ?? descriptor.slot.sourceText);
+          applyTranslation(descriptor, translatedText);
+        } catch (cause) {
+          if (options.signal?.aborted || (cause instanceof DOMException && cause.name === "AbortError")) {
+            cancelled = true;
+            break;
+          }
+          recordFailure(descriptor, cause);
+        }
+      }
+      if (cancelled) break;
+    }
   }
 
   const supportedLocales = [
@@ -831,7 +931,21 @@ export async function populateSchemaTranslations(
   ];
   if (supportedLocales.length > 0) result = { ...result, supportedLocales };
   assertValidFormSchema(result);
-  return { schema: result, report: { updatedSlots, skippedSlots, staleSlots, skippedReasons } };
+  return {
+    schema: result,
+    report: {
+      updatedSlots,
+      skippedSlots,
+      staleSlots,
+      skippedReasons,
+      totalSlots: attemptedSlots,
+      attemptedSlots,
+      succeeded: updatedSlots.length,
+      failed: failures.length,
+      cancelled,
+      failures
+    }
+  };
 }
 
 export async function resolveFormTranslation(

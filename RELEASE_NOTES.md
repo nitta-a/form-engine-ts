@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v6.2.0 — 2026-08-29
+
+- Added cancellation, progress reporting, and partial-failure handling to asynchronous schema translation through `AbortSignal`, `onProgress`, and `continueOnError`.
+- Extended `AsyncTranslationAdapter` and translation workspace hooks with cancellation controls, typed progress, reports, and retryable failure details.
+- Added batch progress, retry, and cancellation controls to the MUI translation and comparison workspaces while preserving customizable header and row slots.
+- Aligned all public packages to version 6.2.0.
+
+See the [GitHub release for v6.2.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.2.0).
+
 ### v6.1.0 — 2026-08-29
 
 - Added `useTranslationComparison` and `TranslationComparisonWorkspace` for side-by-side source/translation editing with status summaries, stale-source highlighting, and single-slot or batch translation.

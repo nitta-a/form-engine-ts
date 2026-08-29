@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, Question, FieldOption, TranslationReport, ValidationIssue, ValidationError, FormValues, LocaleOption, TranslationStatus, CanonicalTranslationMetadata, TranslationSlot, TranslationAdapter, AsyncTranslationAdapter, PopulateTranslationOptions, FormValue, AnswerValidationResult, FormEngineTranslator, FormEngineMessages, TranslationMissingKeyEvent, FieldType } from '@form-engine-ts/core';
+import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, Question, FieldOption, ValidationIssue, ValidationError, FormValues, TranslationStatus, CanonicalTranslationMetadata, FormValue, AnswerValidationResult, FormEngineTranslator, FormEngineMessages, TranslationMissingKeyEvent, FieldType } from '@form-engine-ts/core';
 export { FormSubmissionError, FormSubmissionSerializedError, QuestionType } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
@@ -124,6 +124,127 @@ interface UseFormBuilderResult extends FormBuilderResult {
     readonly getFieldEditorProps: NonNullable<FormBuilderResult["getFieldEditorProps"]>;
 }
 declare function useFormBuilder({ schema, onChange, policy, idFactory, factories, fieldEditorMode, activeFieldId: controlledActiveFieldId, defaultActiveFieldId, onActiveFieldChange }: FormBuilderOptions): FormBuilderResult;
+
+interface UseTranslationWorkspaceOptions {
+    readonly schema: FormSchema;
+    readonly onChange?: (schema: FormSchema) => void;
+    readonly sourceLocale?: string;
+    readonly targetLocale?: string;
+    readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+    readonly signal?: AbortSignal;
+    readonly readOnly?: boolean;
+    readonly policy?: FormPolicy;
+    readonly availableLocales?: readonly (string | LocaleOption)[];
+    readonly onLocaleAdded?: (locale: string) => void;
+    readonly onLocaleRemoved?: (locale: string) => void;
+    readonly onLocaleChange?: (targetLocale: string) => void;
+    readonly beforeRemoveLocale?: (locale: string, context: {
+        readonly slotCount: number;
+    }) => Promise<boolean> | boolean;
+    readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
+    readonly slots?: Pick<TranslationWorkspaceSlots, "confirmRemoveLocale">;
+    readonly onTranslationStart?: (params: {
+        readonly targetLocale: string;
+        readonly mode: "manual" | "automatic";
+    }) => void;
+    readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+    readonly onTranslationReport?: (report: TranslationReport) => void;
+    readonly onTranslationError?: (params: {
+        readonly targetLocale: string;
+        readonly error: TranslationWorkspaceError;
+    }) => void;
+    readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+    readonly validateLocale?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator;
+}
+interface LocaleValidationContext {
+    readonly locale: string;
+    readonly defaultLocale: string;
+    readonly currentLocales: readonly string[];
+    readonly policy?: FormPolicy;
+}
+type CustomLocaleValidator = (locale: string, context: LocaleValidationContext) => LocaleValidationResult | boolean | string | undefined | void;
+interface LocaleValidationResult {
+    readonly valid: boolean;
+    readonly error?: {
+        readonly type: "locale_not_allowed" | "max_locales_exceeded" | "invalid_locale_format" | "locale_already_exists" | "custom_validation_failed";
+        readonly message: string;
+    };
+}
+interface TranslationSummary {
+    readonly totalSlots: number;
+    readonly translatedCount: number;
+    readonly missingCount: number;
+    readonly staleCount: number;
+    readonly manualCount: number;
+    readonly completionPercentage: number;
+}
+type TranslationWorkspaceError = {
+    readonly type: "locale_not_allowed";
+    readonly locale: string;
+} | {
+    readonly type: "locale_already_exists";
+    readonly locale: string;
+} | {
+    readonly type: "invalid_locale_format";
+    readonly locale: string;
+} | {
+    readonly type: "max_locales_exceeded";
+    readonly max: number;
+    readonly current: number;
+} | {
+    readonly type: "read_only_mode";
+} | {
+    readonly type: "adapter_not_configured";
+} | {
+    readonly type: "target_locale_missing";
+} | {
+    readonly type: "translation_failed";
+    readonly message: string;
+    readonly cause?: unknown;
+} | {
+    readonly type: "partial_failure";
+    readonly succeeded: number;
+    readonly failed: number;
+} | {
+    readonly type: "cancelled";
+} | {
+    readonly type: "custom_validation_failed";
+    readonly message: string;
+};
+interface UseTranslationWorkspaceResult {
+    readonly sourceLocale: string;
+    readonly targetLocale: string;
+    readonly targetLocales: readonly string[];
+    readonly localeOptions: readonly LocaleOption[];
+    readonly setTargetLocale: (locale: string) => void;
+    readonly slots: readonly TranslationSlot[];
+    readonly summary: TranslationSummary;
+    readonly addLocale: (locale: string) => {
+        readonly success: boolean;
+        readonly error?: TranslationWorkspaceError;
+    };
+    readonly isAddLocaleAllowed: (locale: string) => boolean;
+    readonly removeLocale: (locale: string) => boolean | Promise<boolean>;
+    readonly removeLocaleConfirmation?: ReactNode;
+    readonly setTranslation: (slot: TranslationSlot, text: string) => void;
+    readonly translateAll: (options?: PopulateTranslationOptions) => Promise<{
+        readonly success: boolean;
+        readonly report?: TranslationReport;
+        readonly error?: TranslationWorkspaceError;
+    }>;
+    readonly translateSlot: (slot: TranslationSlot, options?: {
+        readonly signal?: AbortSignal;
+    }) => Promise<{
+        readonly success: boolean;
+        readonly error?: TranslationWorkspaceError;
+    }>;
+    readonly cancelTranslation: () => void;
+    readonly isTranslating: boolean;
+    readonly progress?: TranslationProgress;
+    readonly error?: TranslationWorkspaceError;
+}
+declare const validateLocalePipeline: (locale: string, schema: FormSchema, policy?: FormPolicy, customValidator?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator, availableLocales?: readonly (string | LocaleOption)[]) => LocaleValidationResult;
+declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, signal, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, slots: workspaceSlots, onTranslationStart, onTranslationSuccess, onTranslationReport, onTranslationError, onTranslationChange, validateLocale }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
 
 interface SubmissionReceipt {
     readonly formId: string;
@@ -396,6 +517,8 @@ interface TranslationWorkspaceHeaderProps {
     readonly onTranslateAll: () => void;
     readonly isTranslating: boolean;
     readonly readOnly: boolean;
+    readonly progress?: TranslationProgress;
+    readonly onCancel?: () => void;
 }
 interface TranslationSlotRowProps {
     readonly slot: _form_engine_ts_core.TranslationSlot;
@@ -429,21 +552,35 @@ interface TranslationComparisonHeaderProps {
     readonly onTranslateAll: () => void;
     readonly isTranslating: boolean;
     readonly readOnly: boolean;
+    readonly report?: TranslationReport;
+    readonly progress?: TranslationProgress;
+    readonly onCancel?: () => void;
 }
 interface TranslationComparisonItemRowProps {
     readonly item: TranslationComparisonItem;
+    readonly questionIndex?: number;
+    readonly fieldType?: string;
+    readonly optionIndex?: number;
+    readonly sourceLocaleLabel?: string;
+    readonly targetLocaleLabel?: string;
     readonly readOnly: boolean;
     readonly onChange: (text: string) => void;
-    readonly onTranslate: () => void;
+    readonly onTranslate: () => Promise<void>;
 }
 interface UseTranslationComparisonOptions {
     readonly schema: FormSchema;
     readonly sourceLocale?: string;
     readonly targetLocale: string;
-    readonly translationAdapter?: TranslationAdapter;
+    readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+    readonly signal?: AbortSignal;
     readonly readOnly?: boolean;
     readonly onChange?: (nextSchema: FormSchema) => void;
     readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+    readonly onTranslationReport?: (report: TranslationReport) => void;
+    readonly onTranslationError?: (params: {
+        readonly targetLocale: string;
+        readonly error: TranslationWorkspaceError;
+    }) => void;
 }
 interface UseTranslationComparisonResult {
     readonly sourceLocale: string;
@@ -453,7 +590,11 @@ interface UseTranslationComparisonResult {
     readonly isTranslating: boolean;
     readonly updateTranslation: (path: string, text: string) => void;
     readonly translateSingle: (path: string) => Promise<void>;
-    readonly translateAll: () => Promise<TranslationReport>;
+    readonly translateAll: (options?: PopulateTranslationOptions) => Promise<TranslationReport>;
+    readonly cancelTranslation: () => void;
+    readonly progress?: TranslationProgress;
+    readonly error?: TranslationWorkspaceError;
+    readonly report?: TranslationReport;
 }
 interface LocaleSelectorProps {
     readonly targetLocale: string;
@@ -496,6 +637,7 @@ interface ConfirmRemoveLocaleSlotProps {
 interface TranslationWorkspaceSlots {
     readonly renderHeader?: (props: TranslationWorkspaceHeaderProps) => ReactNode;
     readonly renderSlotRow?: (props: TranslationSlotRowProps) => ReactNode;
+    readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
     readonly renderLocaleSelector?: (props: LocaleSelectorProps) => ReactNode;
     readonly renderStatusBadge?: (props: {
         readonly status: _form_engine_ts_core.TranslationStatus;
@@ -820,116 +962,7 @@ interface FieldState {
 }
 declare function useField(fieldId: string): FieldState;
 
-declare function useTranslationComparison({ schema, sourceLocale, targetLocale, translationAdapter, readOnly, onChange, onTranslationChange }: UseTranslationComparisonOptions): UseTranslationComparisonResult;
-
-interface UseTranslationWorkspaceOptions {
-    readonly schema: FormSchema;
-    readonly onChange?: (schema: FormSchema) => void;
-    readonly sourceLocale?: string;
-    readonly targetLocale?: string;
-    readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
-    readonly readOnly?: boolean;
-    readonly policy?: FormPolicy;
-    readonly availableLocales?: readonly (string | LocaleOption)[];
-    readonly onLocaleAdded?: (locale: string) => void;
-    readonly onLocaleRemoved?: (locale: string) => void;
-    readonly onLocaleChange?: (targetLocale: string) => void;
-    readonly beforeRemoveLocale?: (locale: string, context: {
-        readonly slotCount: number;
-    }) => Promise<boolean> | boolean;
-    readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
-    readonly slots?: Pick<TranslationWorkspaceSlots, "confirmRemoveLocale">;
-    readonly onTranslationStart?: (params: {
-        readonly targetLocale: string;
-        readonly mode: "manual" | "automatic";
-    }) => void;
-    readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
-    readonly onTranslationError?: (params: {
-        readonly targetLocale: string;
-        readonly error: TranslationWorkspaceError;
-    }) => void;
-    readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
-    readonly validateLocale?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator;
-}
-interface LocaleValidationContext {
-    readonly locale: string;
-    readonly defaultLocale: string;
-    readonly currentLocales: readonly string[];
-    readonly policy?: FormPolicy;
-}
-type CustomLocaleValidator = (locale: string, context: LocaleValidationContext) => LocaleValidationResult | boolean | string | undefined | void;
-interface LocaleValidationResult {
-    readonly valid: boolean;
-    readonly error?: {
-        readonly type: "locale_not_allowed" | "max_locales_exceeded" | "invalid_locale_format" | "locale_already_exists" | "custom_validation_failed";
-        readonly message: string;
-    };
-}
-interface TranslationSummary {
-    readonly totalSlots: number;
-    readonly translatedCount: number;
-    readonly missingCount: number;
-    readonly staleCount: number;
-    readonly manualCount: number;
-    readonly completionPercentage: number;
-}
-type TranslationWorkspaceError = {
-    readonly type: "locale_not_allowed";
-    readonly locale: string;
-} | {
-    readonly type: "locale_already_exists";
-    readonly locale: string;
-} | {
-    readonly type: "invalid_locale_format";
-    readonly locale: string;
-} | {
-    readonly type: "max_locales_exceeded";
-    readonly max: number;
-    readonly current: number;
-} | {
-    readonly type: "read_only_mode";
-} | {
-    readonly type: "adapter_not_configured";
-} | {
-    readonly type: "target_locale_missing";
-} | {
-    readonly type: "translation_failed";
-    readonly message: string;
-    readonly cause?: unknown;
-} | {
-    readonly type: "custom_validation_failed";
-    readonly message: string;
-};
-interface UseTranslationWorkspaceResult {
-    readonly sourceLocale: string;
-    readonly targetLocale: string;
-    readonly targetLocales: readonly string[];
-    readonly localeOptions: readonly LocaleOption[];
-    readonly setTargetLocale: (locale: string) => void;
-    readonly slots: readonly TranslationSlot[];
-    readonly summary: TranslationSummary;
-    readonly addLocale: (locale: string) => {
-        readonly success: boolean;
-        readonly error?: TranslationWorkspaceError;
-    };
-    readonly isAddLocaleAllowed: (locale: string) => boolean;
-    readonly removeLocale: (locale: string) => boolean | Promise<boolean>;
-    readonly removeLocaleConfirmation?: ReactNode;
-    readonly setTranslation: (slot: TranslationSlot, text: string) => void;
-    readonly translateAll: (options?: PopulateTranslationOptions) => Promise<{
-        readonly success: boolean;
-        readonly report?: TranslationReport;
-        readonly error?: TranslationWorkspaceError;
-    }>;
-    readonly translateSlot: (slot: TranslationSlot) => Promise<{
-        readonly success: boolean;
-        readonly error?: TranslationWorkspaceError;
-    }>;
-    readonly isTranslating: boolean;
-    readonly error?: TranslationWorkspaceError;
-}
-declare const validateLocalePipeline: (locale: string, schema: FormSchema, policy?: FormPolicy, customValidator?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator, availableLocales?: readonly (string | LocaleOption)[]) => LocaleValidationResult;
-declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, slots: workspaceSlots, onTranslationStart, onTranslationSuccess, onTranslationError, onTranslationChange, validateLocale }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
+declare function useTranslationComparison({ schema, sourceLocale, targetLocale, translationAdapter, readOnly, onChange, onTranslationChange, onTranslationReport, onTranslationError, signal }: UseTranslationComparisonOptions): UseTranslationComparisonResult;
 
 declare const BUILDER_TRANSLATION_KEYS: {
     readonly ADD_FIELD: "builder.actions.addField";

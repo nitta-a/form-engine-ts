@@ -172,14 +172,22 @@ export type TranslationWorkspaceTranslationKey =
   | "workspace.errors.maxLocalesExceeded"
   | "workspace.errors.readOnly"
   | "workspace.errors.adapterNotConfigured"
-  | "workspace.errors.translationFailed";
+  | "workspace.errors.translationFailed"
+  | "workspace.errors.localeAlreadyExists"
+  | "workspace.errors.invalidLocale"
+  | "workspace.errors.targetLocaleMissing"
+  | "workspace.errors.partialFailure"
+  | "workspace.errors.cancelled";
 
 export type TranslationWorkspaceDetailedKey =
   | "workspace.header.title"
   | "workspace.header.sourceLocale"
   | "workspace.header.targetLocale"
   | "workspace.header.translateAll"
+  | "workspace.header.cancel"
+  | "workspace.header.retry"
   | "workspace.header.progress"
+  | "workspace.header.batchProgress"
   | "workspace.slot.sourceText"
   | "workspace.slot.translatedText"
   | "workspace.slot.translateSingle"

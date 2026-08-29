@@ -89,13 +89,16 @@ underscore-separated values such as `EN_us` are accepted as compatibility input.
 Use `isAddLocaleAllowed` to disable locale controls before submission. Removing a locale also clears its
 localized values and metadata; the default locale remains protected.
 
-`useTranslationWorkspace` can notify `onTranslationStart`, `onTranslationSuccess`, `onTranslationError`, and
-`onTranslationChange` with typed lifecycle payloads. The MUI workspace accepts a `confirmRemoveLocale` slot for an
-async confirmation UI; its `onConfirm` callback completes the locale removal.
+`useTranslationWorkspace` accepts either a synchronous or asynchronous translation adapter, forwards an optional
+`AbortSignal`, and exposes `cancelTranslation`, progress, and typed partial-failure/cancellation errors. It can notify
+`onTranslationStart`, `onTranslationSuccess`, `onTranslationReport`, `onTranslationError`, and `onTranslationChange`
+with typed lifecycle payloads. The MUI workspace accepts a `confirmRemoveLocale` slot for an async confirmation UI;
+its `onConfirm` callback completes the locale removal.
 
 `useTranslationComparison` provides a focused, controlled comparison model for form, page, field, and option text.
 Its items expose source text, target text, status, canonical metadata, and path-based `updateTranslation`,
-`translateSingle`, and `translateAll` actions.
+`translateSingle`, and `translateAll` actions. Comparison row slots receive locale labels, read-only state, field type,
+question and option indexes, plus async single-translation actions.
 
 Wrap a builder or renderer in `FormEngineI18nProvider` to supply a UI locale and typed Core translator independently
 from the schema's `defaultLocale` and `supportedLocales`:

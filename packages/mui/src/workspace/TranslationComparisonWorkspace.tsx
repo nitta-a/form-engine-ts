@@ -1,4 +1,10 @@
-import type { FormSchema, TranslationAdapter, TranslationStatus } from "@form-engine-ts/core";
+import type {
+  AsyncTranslationAdapter,
+  FormSchema,
+  TranslationAdapter,
+  TranslationReport,
+  TranslationStatus
+} from "@form-engine-ts/core";
 import {
   FormEngineI18nProvider,
   type TranslationComparisonHeaderProps,
@@ -9,7 +15,7 @@ import {
   useTranslationComparison
 } from "@form-engine-ts/react";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
-import { Box, Chip, IconButton, Paper, TextField, Typography } from "@mui/material";
+import { Box, Button, Chip, IconButton, LinearProgress, Paper, TextField, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import type { MuiFormEngineI18nOptions } from "../types";
 
@@ -18,9 +24,12 @@ export interface TranslationComparisonWorkspaceProps {
   readonly sourceLocale?: string;
   readonly targetLocale: string;
   readonly readOnly?: boolean;
-  readonly translationAdapter?: TranslationAdapter;
+  readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
+  readonly signal?: AbortSignal;
   readonly onChange?: (nextSchema: FormSchema) => void;
   readonly onTranslationChange?: UseTranslationComparisonOptions["onTranslationChange"];
+  readonly onTranslationReport?: (report: TranslationReport) => void;
+  readonly onTranslationError?: UseTranslationComparisonOptions["onTranslationError"];
   readonly i18n?: MuiFormEngineI18nOptions;
   readonly slots?: {
     readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
@@ -50,6 +59,28 @@ function statusColor(status: TranslationStatus): "default" | "success" | "warnin
   return "default";
 }
 
+function fieldContext(
+  schema: FormSchema,
+  item: TranslationComparisonItem
+): {
+  readonly questionIndex?: number;
+  readonly fieldType?: string;
+  readonly optionIndex?: number;
+} {
+  if (item.targetKind !== "field" && item.targetKind !== "option") return {};
+  const parentId = /^fields\.([^.]+)\./u.exec(item.path)?.[1];
+  const fieldIndex = schema.fields.findIndex((field) => field.id === parentId);
+  const field = fieldIndex < 0 ? undefined : schema.fields[fieldIndex];
+  if (field === undefined) return {};
+  if (item.targetKind === "field") return { questionIndex: fieldIndex, fieldType: field.type };
+  const optionIndex = "options" in field ? field.options.findIndex((option) => option.id === item.id) : -1;
+  return {
+    questionIndex: fieldIndex,
+    fieldType: field.type,
+    ...(optionIndex < 0 ? {} : { optionIndex })
+  };
+}
+
 function ComparisonContent({
   schema,
   sourceLocale,
@@ -58,6 +89,9 @@ function ComparisonContent({
   translationAdapter,
   onChange,
   onTranslationChange,
+  onTranslationReport,
+  onTranslationError,
+  signal,
   slots
 }: TranslationComparisonWorkspaceProps) {
   const { translator } = useFormEngineI18n();
@@ -67,9 +101,12 @@ function ComparisonContent({
     targetLocale,
     ...(sourceLocale === undefined ? {} : { sourceLocale }),
     ...(translationAdapter === undefined ? {} : { translationAdapter }),
+    ...(signal === undefined ? {} : { signal }),
     readOnly,
     ...(onChange === undefined ? {} : { onChange }),
-    ...(onTranslationChange === undefined ? {} : { onTranslationChange })
+    ...(onTranslationChange === undefined ? {} : { onTranslationChange }),
+    ...(onTranslationReport === undefined ? {} : { onTranslationReport }),
+    ...(onTranslationError === undefined ? {} : { onTranslationError })
   });
   const headerProps: TranslationComparisonHeaderProps = {
     sourceLocale: comparison.sourceLocale,
@@ -77,7 +114,10 @@ function ComparisonContent({
     summary: comparison.summary,
     onTranslateAll: () => void comparison.translateAll(),
     isTranslating: comparison.isTranslating,
-    readOnly
+    readOnly,
+    ...(comparison.report === undefined ? {} : { report: comparison.report }),
+    ...(comparison.progress === undefined ? {} : { progress: comparison.progress }),
+    onCancel: comparison.cancelTranslation
   };
   const sourceHeader = translate("workspace.comparison.sourceHeader", { locale: comparison.sourceLocale });
   const targetHeader = translate("workspace.comparison.targetHeader", { locale: comparison.targetLocale });
@@ -85,11 +125,74 @@ function ComparisonContent({
   return (
     <Box data-testid="translation-comparison-workspace">
       {slots?.renderHeader?.(headerProps) ?? (
-        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center", mb: 2 }}>
-          <Typography variant="h6">{translate("workspace.comparison.title")}</Typography>
+        <Box sx={{ display: "grid", gap: 1, mb: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center" }}>
+            <Typography variant="h6">{translate("workspace.comparison.title")}</Typography>
+            <Button
+              variant="contained"
+              onClick={headerProps.onTranslateAll}
+              disabled={readOnly || comparison.isTranslating || comparison.items.length === 0}
+            >
+              {translate("workspace.header.translateAll")}
+            </Button>
+          </Box>
           <Typography variant="body2" color="text.secondary">
-            {comparison.summary.translated}/{comparison.summary.total}
+            {comparison.progress === undefined
+              ? translate("workspace.header.progress", {
+                  translated: comparison.summary.translated,
+                  total: comparison.summary.total,
+                  percent:
+                    comparison.summary.total === 0
+                      ? 100
+                      : Math.round((comparison.summary.translated / comparison.summary.total) * 100)
+                })
+              : translate("workspace.header.batchProgress", {
+                  completed: comparison.progress.completed,
+                  total: comparison.progress.total,
+                  succeeded: comparison.progress.succeeded,
+                  failed: comparison.progress.failed,
+                  percent: comparison.progress.percentage
+                })}
           </Typography>
+          <LinearProgress
+            variant="determinate"
+            value={
+              comparison.progress?.percentage ??
+              (comparison.summary.total === 0 ? 100 : (comparison.summary.translated / comparison.summary.total) * 100)
+            }
+            aria-label={translate("workspace.header.progress", {
+              translated: comparison.summary.translated,
+              total: comparison.summary.total,
+              percent:
+                comparison.summary.total === 0
+                  ? 100
+                  : Math.round((comparison.summary.translated / comparison.summary.total) * 100)
+            })}
+          />
+          {comparison.isTranslating ? (
+            <Button size="small" onClick={headerProps.onCancel}>
+              {translate("workspace.header.cancel")}
+            </Button>
+          ) : null}
+          {comparison.error?.type === "partial_failure" ? (
+            <Typography color="error" role="alert">
+              {translate("workspace.errors.partialFailure", {
+                succeeded: comparison.error.succeeded,
+                failed: comparison.error.failed
+              })}
+            </Typography>
+          ) : comparison.error?.type === "cancelled" ? (
+            <Typography color="error" role="alert">
+              {translate("workspace.errors.cancelled")}
+            </Typography>
+          ) : comparison.error !== undefined ? (
+            <Box role="alert" sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              <Typography color="error">{translate("workspace.errors.translationFailed")}</Typography>
+              <Button size="small" onClick={headerProps.onTranslateAll}>
+                {translate("workspace.header.retry")}
+              </Button>
+            </Box>
+          ) : null}
         </Box>
       )}
       <Box
@@ -110,11 +213,15 @@ function ComparisonContent({
       </Box>
       <Box sx={{ display: "grid", gap: 1.5 }}>
         {comparison.items.map((item) => {
+          const context = fieldContext(schema, item);
           const rowProps: TranslationComparisonItemRowProps = {
             item,
+            ...context,
+            sourceLocaleLabel: sourceHeader,
+            targetLocaleLabel: targetHeader,
             readOnly,
             onChange: (text) => comparison.updateTranslation(item.path, text),
-            onTranslate: () => void comparison.translateSingle(item.path)
+            onTranslate: () => comparison.translateSingle(item.path)
           };
           return (
             <Box
@@ -131,7 +238,7 @@ function ComparisonContent({
             >
               {slots?.renderItemRow?.(rowProps) ?? (
                 <>
-                  <Box>
+                  <Box aria-readonly="true">
                     <Typography variant="caption" color="text.secondary">
                       {item.nodeTitle === undefined
                         ? translate(propertyKey[item.targetProperty])
@@ -149,13 +256,17 @@ function ComparisonContent({
                           : {})
                       }}
                     >
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }} aria-label={sourceHeader}>
                         {item.sourceText || translate("workspace.comparison.emptySource")}
                       </Typography>
                     </Paper>
                   </Box>
                   <Box>
-                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                    <Box
+                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}
+                      role="status"
+                      aria-live="polite"
+                    >
                       {slots?.renderStatusBadge?.({ status: item.status }) ?? (
                         <Chip size="small" color={statusColor(item.status)} label={translate(statusKey[item.status])} />
                       )}
@@ -179,6 +290,11 @@ function ComparisonContent({
                       value={item.translatedText}
                       onChange={(event) => rowProps.onChange(event.target.value)}
                       disabled={readOnly}
+                      inputProps={{
+                        "aria-label": `${targetHeader} · ${
+                          item.nodeTitle ?? translate(propertyKey[item.targetProperty])
+                        }`
+                      }}
                       placeholder={item.status === "missing" ? targetHeader : undefined}
                       sx={
                         item.status === "stale" || item.status === "manual-stale"
@@ -187,7 +303,7 @@ function ComparisonContent({
                       }
                     />
                     {item.status === "stale" || item.status === "manual-stale" ? (
-                      <Typography color="warning.main" variant="caption">
+                      <Typography color="warning.main" variant="caption" role="status" aria-live="polite">
                         {translate("workspace.comparison.staleWarning")}
                       </Typography>
                     ) : null}

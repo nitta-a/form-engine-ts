@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.1.0** (2026-08-29). All public packages are currently published at version `6.1.0`.
-This release adds the side-by-side `useTranslationComparison` and `TranslationComparisonWorkspace`, strict locale-required submission and wire contracts, missing-translation diagnostics, and policy-aware localization workspace options. It builds on v6.0.0's breaking `values` submission property, explicit legacy compatibility helpers, serializable submission errors, and typed translation workspace lifecycle events.
+The latest release is **v6.2.0** (2026-08-29). All public packages are currently published at version `6.2.0`.
+This release adds cancellation, progress reporting, and partial-failure handling for asynchronous translation, including batch progress, retry, and cancellation controls in the React and MUI workspaces. It builds on v6.1.0's side-by-side translation comparison workspace, strict locale-required submission contracts, and missing-translation diagnostics.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.1.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.2.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.1.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.1.0` で公開されています。
-本リリースでは、左右比較型の`useTranslationComparison`と`TranslationComparisonWorkspace`、locale必須のstrict Submission／wire契約、翻訳キー不足の診断、ポリシー対応のローカライゼーションワークスペースオプションを追加しました。v6.0.0の破壊的な`values`統一、legacy互換ヘルパー、シリアライズ可能なSubmissionエラー、型付き翻訳ワークスペースイベントも引き継いでいます。
+最新版は **v6.2.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.2.0` で公開されています。
+本リリースでは、非同期翻訳のキャンセル、進捗報告、部分的な失敗処理に加え、React／MUIワークスペースの一括翻訳に進捗・再試行・キャンセル操作を追加しました。v6.1.0の左右比較型翻訳ワークスペース、locale必須のstrict Submission契約、翻訳キー不足の診断も引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.1.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.2.0) を参照してください。
 
 ### 編集・回答体験
 
