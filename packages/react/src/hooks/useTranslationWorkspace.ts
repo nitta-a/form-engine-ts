@@ -7,6 +7,7 @@ import {
   type FormField,
   type FormPolicy,
   type FormSchema,
+  type JsonValue,
   type LocaleOption,
   normalizeLocale,
   type PopulateTranslationOptions,
@@ -53,6 +54,11 @@ export interface UseTranslationWorkspaceOptions {
     readonly error: TranslationWorkspaceError;
   }) => void;
   readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+  readonly createTranslationMetadata?: (params: {
+    readonly slot: TranslationSlot;
+    readonly translatedText: string;
+    readonly mode: "manual" | "automatic";
+  }) => Readonly<Record<string, import("@form-engine-ts/core").JsonValue>>;
   readonly validateLocale?:
     | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
     | CustomLocaleValidator;
@@ -79,6 +85,7 @@ export interface LocaleValidationResult {
       | "max_locales_exceeded"
       | "invalid_locale_format"
       | "locale_already_exists"
+      | "source_locale"
       | "custom_validation_failed";
     readonly message: string;
   };
@@ -96,6 +103,7 @@ export interface TranslationSummary {
 export type TranslationWorkspaceError =
   | { readonly type: "locale_not_allowed"; readonly locale: string }
   | { readonly type: "locale_already_exists"; readonly locale: string }
+  | { readonly type: "source_locale"; readonly locale: string }
   | { readonly type: "invalid_locale_format"; readonly locale: string }
   | { readonly type: "max_locales_exceeded"; readonly max: number; readonly current: number }
   | { readonly type: "read_only_mode" }
@@ -167,7 +175,8 @@ export const validateLocalePipeline = (
   customValidator?:
     | ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult)
     | CustomLocaleValidator,
-  availableLocales?: readonly (string | LocaleOption)[]
+  availableLocales?: readonly (string | LocaleOption)[],
+  sourceLocale?: string
 ): LocaleValidationResult => {
   const canonicalLocale = normalizeLocale(locale);
 
@@ -183,7 +192,27 @@ export const validateLocalePipeline = (
 
   const currentLocales = (schema.supportedLocales ?? []).map((candidate) => normalizeLocale(candidate) ?? candidate);
   const defaultLocale =
-    schema.defaultLocale === undefined ? "" : (normalizeLocale(schema.defaultLocale) ?? schema.defaultLocale);
+    normalizeLocale(sourceLocale ?? schema.defaultLocale ?? "") ?? sourceLocale ?? schema.defaultLocale ?? "";
+
+  if (canonicalLocale === defaultLocale) {
+    return {
+      valid: false,
+      error: {
+        type: "source_locale",
+        message: `Locale "${canonicalLocale}" is the source locale and cannot be added as a translation.`
+      }
+    };
+  }
+
+  if (currentLocales.includes(canonicalLocale)) {
+    return {
+      valid: false,
+      error: {
+        type: "locale_already_exists",
+        message: `Locale "${canonicalLocale}" is already registered.`
+      }
+    };
+  }
 
   if (
     availableLocales !== undefined &&
@@ -197,16 +226,6 @@ export const validateLocalePipeline = (
       error: {
         type: "locale_not_allowed",
         message: `Locale "${canonicalLocale}" is not available in the locale catalog.`
-      }
-    };
-  }
-
-  if (canonicalLocale === defaultLocale || currentLocales.includes(canonicalLocale)) {
-    return {
-      valid: false,
-      error: {
-        type: "locale_already_exists",
-        message: `Locale "${canonicalLocale}" is already registered.`
       }
     };
   }
@@ -275,6 +294,7 @@ function workspaceLocaleValidationError(
   if (error.type === "locale_already_exists") {
     return { type: "locale_already_exists", locale: requestedLocale };
   }
+  if (error.type === "source_locale") return { type: "source_locale", locale: requestedLocale };
   if (error.type === "invalid_locale_format") {
     return { type: "invalid_locale_format", locale: requestedLocale };
   }
@@ -298,18 +318,37 @@ function translationMetadata(
   };
 }
 
+type WorkspaceTranslationMetadata = Readonly<Record<string, JsonValue>> & CanonicalTranslationMetadata;
+
+function createTranslationMetadata(
+  slot: TranslationSlot,
+  sourceLocale: string,
+  translatedText: string,
+  mode: "manual" | "automatic",
+  factory: UseTranslationWorkspaceOptions["createTranslationMetadata"]
+): WorkspaceTranslationMetadata {
+  return {
+    ...(factory?.({ slot, translatedText, mode }) ?? {}),
+    ...translationMetadata(slot.sourceText, sourceLocale, mode)
+  };
+}
+
 function setNodeMetadata<T extends { readonly translationMetadata?: FormSchema["translationMetadata"] }>(
   node: T,
   slot: TranslationSlot,
   text: string,
   sourceLocale: string,
-  mode: "manual" | "automatic"
+  mode: "manual" | "automatic",
+  metadataOverride?: CanonicalTranslationMetadata
 ): T {
   const localeMetadata = node.translationMetadata?.[slot.locale];
   const nextMetadata =
     text.trim().length === 0
       ? Object.fromEntries(Object.entries(localeMetadata ?? {}).filter(([key]) => key !== slot.property))
-      : { ...localeMetadata, [slot.property]: translationMetadata(slot.sourceText, sourceLocale, mode) };
+      : {
+          ...localeMetadata,
+          [slot.property]: metadataOverride ?? translationMetadata(slot.sourceText, sourceLocale, mode)
+        };
   return { ...node, translationMetadata: { ...node.translationMetadata, [slot.locale]: nextMetadata } };
 }
 
@@ -318,7 +357,8 @@ function updateSchemaTranslation(
   slot: TranslationSlot,
   text: string,
   sourceLocale: string,
-  mode: "manual" | "automatic" = "manual"
+  mode: "manual" | "automatic" = "manual",
+  metadataOverride?: CanonicalTranslationMetadata
 ): FormSchema {
   if (slot.kind === "form") {
     return setNodeMetadata(
@@ -326,7 +366,8 @@ function updateSchemaTranslation(
       slot,
       text,
       sourceLocale,
-      mode
+      mode,
+      metadataOverride
     );
   }
   if (slot.kind === "field") {
@@ -335,7 +376,14 @@ function updateSchemaTranslation(
       fields: schema.fields.map((field) => {
         if (field.id !== slot.nodeId) return field;
         const translations = updateTranslationMap(field.translations, slot.locale, slot.property, text);
-        return setNodeMetadata({ ...field, translations } as FormField, slot, text, sourceLocale, mode);
+        return setNodeMetadata(
+          { ...field, translations } as FormField,
+          slot,
+          text,
+          sourceLocale,
+          mode,
+          metadataOverride
+        );
       })
     };
   }
@@ -354,7 +402,7 @@ function updateSchemaTranslation(
                     Object.entries(option.translations ?? {}).filter(([locale]) => locale !== slot.locale)
                   )
                 : { ...option.translations, [slot.locale]: text };
-            return setNodeMetadata({ ...option, translations }, slot, text, sourceLocale, mode);
+            return setNodeMetadata({ ...option, translations }, slot, text, sourceLocale, mode, metadataOverride);
           })
         } as FormField;
       })
@@ -368,7 +416,7 @@ function updateSchemaTranslation(
           pages: schema.pages.map((page) => {
             if (page.id !== slot.nodeId) return page;
             const translations = updateTranslationMap(page.translations, slot.locale, slot.property, text);
-            return setNodeMetadata({ ...page, translations }, slot, text, sourceLocale, mode);
+            return setNodeMetadata({ ...page, translations }, slot, text, sourceLocale, mode, metadataOverride);
           })
         })
   };
@@ -395,7 +443,8 @@ export function useTranslationWorkspace({
   onTranslationReport,
   onTranslationError,
   onTranslationChange,
-  validateLocale
+  validateLocale,
+  createTranslationMetadata: metadataFactory
 }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult {
   const [draftSchema, setDraftSchema] = useState(schema);
   const [selectedLocale, setSelectedLocale] = useState(normalizeLocale(targetLocale ?? "") ?? targetLocale ?? "");
@@ -413,20 +462,34 @@ export function useTranslationWorkspace({
   const confirmRemoveLocaleRenderer = confirmRemoveLocale ?? workspaceSlots?.confirmRemoveLocale;
   const targetLocales = useMemo(() => {
     const locales = collectSchemaLocales(currentSchema).allUniqueLocales;
-    return [...new Set([...(currentSchema.supportedLocales ?? []), ...locales])].filter(
-      (locale) => locale !== sourceLocale
-    );
+    const normalizedSourceLocale = normalizeLocale(sourceLocale) ?? sourceLocale;
+    return [
+      ...new Set(
+        [...(currentSchema.supportedLocales ?? []), ...locales].map((locale) => normalizeLocale(locale) ?? locale)
+      )
+    ].filter((locale) => locale !== normalizedSourceLocale);
   }, [currentSchema, sourceLocale]);
   const activeLocale = selectedLocale.length > 0 ? selectedLocale : (targetLocales[0] ?? "");
   const localeOptions = useMemo<readonly LocaleOption[]>(() => {
     if (availableLocales === undefined) {
       return targetLocales.map((locale) => ({ locale, label: locale }));
     }
-    return availableLocales.map((candidate) => {
-      if (typeof candidate !== "string") return candidate;
-      return { locale: normalizeLocale(candidate) ?? candidate, label: candidate };
-    });
-  }, [availableLocales, targetLocales]);
+    const targetLocaleSet = new Set(targetLocales);
+    const allowedLocales = policy?.allowedLocales?.map((locale) => normalizeLocale(locale) ?? locale);
+    const options = new Map<string, LocaleOption>();
+    for (const candidate of availableLocales) {
+      const option =
+        typeof candidate === "string"
+          ? { locale: normalizeLocale(candidate) ?? candidate, label: candidate }
+          : { ...candidate, locale: normalizeLocale(candidate.locale) ?? candidate.locale };
+      const allowed = allowedLocales === undefined || allowedLocales.includes(option.locale);
+      if (allowed || targetLocaleSet.has(option.locale)) options.set(option.locale, option);
+    }
+    for (const locale of targetLocales) {
+      if (!options.has(locale)) options.set(locale, { locale, label: locale });
+    }
+    return [...options.values()];
+  }, [availableLocales, policy?.allowedLocales, targetLocales]);
   const slots = useMemo(
     () => (activeLocale.length === 0 ? [] : collectTranslationSlots(currentSchema, activeLocale)),
     [activeLocale, currentSchema]
@@ -460,8 +523,8 @@ export function useTranslationWorkspace({
   const setTranslation = useCallback(
     (slot: TranslationSlot, text: string): void => {
       if (readOnly) return;
-      const metadata = translationMetadata(slot.sourceText, sourceLocale, "manual");
-      commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "manual"));
+      const metadata = createTranslationMetadata(slot, sourceLocale, text, "manual", metadataFactory);
+      commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "manual", metadata));
       onTranslationChange?.({
         slot,
         ...(slot.existingText === undefined ? {} : { previousText: slot.existingText }),
@@ -470,7 +533,7 @@ export function useTranslationWorkspace({
         metadata
       });
     },
-    [commit, currentSchema, onTranslationChange, readOnly, sourceLocale]
+    [commit, currentSchema, metadataFactory, onTranslationChange, readOnly, sourceLocale]
   );
   const addLocale = useCallback(
     (locale: string): { readonly success: boolean; readonly error?: TranslationWorkspaceError } => {
@@ -482,14 +545,21 @@ export function useTranslationWorkspace({
       const normalized = normalizeLocale(locale);
       if (normalized === null) {
         const workspaceError = workspaceLocaleValidationError(
-          validateLocalePipeline(locale, currentSchema, policy, validateLocale, availableLocales),
+          validateLocalePipeline(locale, currentSchema, policy, validateLocale, availableLocales, sourceLocale),
           collectSchemaLocales(currentSchema).allUniqueLocales.size,
           locale
         );
         setError(workspaceError);
         return { success: false, error: workspaceError };
       }
-      const validation = validateLocalePipeline(normalized, currentSchema, policy, validateLocale, availableLocales);
+      const validation = validateLocalePipeline(
+        normalized,
+        currentSchema,
+        policy,
+        validateLocale,
+        availableLocales,
+        sourceLocale
+      );
       if (!validation.valid) {
         const workspaceError = workspaceLocaleValidationError(
           validation,
@@ -508,16 +578,17 @@ export function useTranslationWorkspace({
       onLocaleAdded?.(normalized);
       return { success: true };
     },
-    [availableLocales, commit, currentSchema, onLocaleAdded, policy, readOnly, validateLocale]
+    [availableLocales, commit, currentSchema, onLocaleAdded, policy, readOnly, sourceLocale, validateLocale]
   );
   const isAddLocaleAllowed = useCallback(
     (locale: string): boolean => {
       if (readOnly) return false;
       const normalized = normalizeLocale(locale);
       if (normalized === null) return false;
-      return validateLocalePipeline(normalized, currentSchema, policy, validateLocale, availableLocales).valid;
+      return validateLocalePipeline(normalized, currentSchema, policy, validateLocale, availableLocales, sourceLocale)
+        .valid;
     },
-    [availableLocales, currentSchema, policy, readOnly, validateLocale]
+    [availableLocales, currentSchema, policy, readOnly, sourceLocale, validateLocale]
   );
   const removeLocale = useCallback(
     (locale: string): boolean | Promise<boolean> => {
@@ -677,6 +748,9 @@ export function useTranslationWorkspace({
             ...options,
             continueOnError: true,
             signal: controller.signal,
+            createMetadata: (slot, translatedText) =>
+              options.createMetadata?.(slot, translatedText) ??
+              createTranslationMetadata(slot, sourceLocale, translatedText, "automatic", metadataFactory),
             onProgress: (nextProgress) => {
               setProgress(nextProgress);
               options.onProgress?.(nextProgress);
@@ -749,6 +823,7 @@ export function useTranslationWorkspace({
       readOnly,
       slots,
       sourceLocale,
+      metadataFactory,
       translationAdapter,
       signal
     ]
@@ -788,8 +863,8 @@ export function useTranslationWorkspace({
           sourceLocale,
           controller.signal
         );
-        const metadata = translationMetadata(slot.sourceText, sourceLocale, "automatic");
-        commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "automatic"));
+        const metadata = createTranslationMetadata(slot, sourceLocale, text, "automatic", metadataFactory);
+        commit(updateSchemaTranslation(currentSchema, slot, text, sourceLocale, "automatic", metadata));
         onTranslationChange?.({
           slot,
           ...(slot.existingText === undefined ? {} : { previousText: slot.existingText }),
@@ -812,6 +887,7 @@ export function useTranslationWorkspace({
           cause
         };
         setError(workspaceError);
+        onTranslationError?.({ targetLocale: slot.locale, error: workspaceError });
         return { success: false, error: workspaceError };
       } finally {
         if (operationSignal !== undefined && abortListener !== undefined) {
@@ -822,7 +898,17 @@ export function useTranslationWorkspace({
         setIsTranslating(false);
       }
     },
-    [commit, currentSchema, onTranslationChange, onTranslationError, readOnly, signal, sourceLocale, translationAdapter]
+    [
+      commit,
+      currentSchema,
+      metadataFactory,
+      onTranslationChange,
+      onTranslationError,
+      readOnly,
+      signal,
+      sourceLocale,
+      translationAdapter
+    ]
   );
   return {
     sourceLocale,

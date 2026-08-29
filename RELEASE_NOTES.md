@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v6.3.0 — 2026-08-29
+
+- Expanded the translation comparison workspace with locale selection, locale add/remove flows, localized labels, internal-path visibility, and policy-aware controls.
+- Added provider-specific JSON extension preservation to canonical translation metadata migrations.
+- Added localized workspace messages for source-locale validation, locale actions, removal confirmation counts, and node-kind labels.
+- Aligned all public packages to version 6.3.0.
+
+See the [GitHub release for v6.3.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.3.0).
+
 ### v6.2.0 — 2026-08-29
 
 - Added cancellation, progress reporting, and partial-failure handling to asynchronous schema translation through `AbortSignal`, `onProgress`, and `continueOnError`.

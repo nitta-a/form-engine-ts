@@ -58,4 +58,43 @@ describe("useTranslationComparison", () => {
       expect.objectContaining({ nextText: "最高", mode: "manual", metadata: expect.any(Object) })
     );
   });
+
+  it("preserves provider metadata extensions when a translation is written", () => {
+    const onChange = vi.fn();
+    const { result } = renderHook(() =>
+      useTranslationComparison({
+        schema,
+        targetLocale: "ja",
+        onChange,
+        createTranslationMetadata: ({ mode }) => ({
+          provider: "gcp",
+          model: "gemini-translate",
+          translationSource: mode
+        })
+      })
+    );
+
+    act(() => result.current.updateTranslation("form.title", "顧客アンケート"));
+
+    expect(onChange.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        translationMetadata: {
+          ja: {
+            title: expect.objectContaining({ provider: "gcp", model: "gemini-translate" })
+          }
+        }
+      })
+    );
+  });
+
+  it("distinguishes the source locale from an already registered locale", () => {
+    const { result } = renderHook(() => useTranslationComparison({ schema, targetLocale: "ja" }));
+
+    let sourceResult: ReturnType<typeof result.current.addLocale> | undefined;
+    act(() => {
+      sourceResult = result.current.addLocale("en");
+    });
+
+    expect(sourceResult).toEqual({ success: false, error: { type: "source_locale", locale: "en" } });
+  });
 });

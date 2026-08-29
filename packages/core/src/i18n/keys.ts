@@ -174,6 +174,7 @@ export type TranslationWorkspaceTranslationKey =
   | "workspace.errors.adapterNotConfigured"
   | "workspace.errors.translationFailed"
   | "workspace.errors.localeAlreadyExists"
+  | "workspace.errors.sourceLocale"
   | "workspace.errors.invalidLocale"
   | "workspace.errors.targetLocaleMissing"
   | "workspace.errors.partialFailure"
@@ -183,6 +184,8 @@ export type TranslationWorkspaceDetailedKey =
   | "workspace.header.title"
   | "workspace.header.sourceLocale"
   | "workspace.header.targetLocale"
+  | "workspace.header.addLocale"
+  | "workspace.header.removeLocale"
   | "workspace.header.translateAll"
   | "workspace.header.cancel"
   | "workspace.header.retry"
@@ -194,6 +197,9 @@ export type TranslationWorkspaceDetailedKey =
   | "workspace.slot.revertManual"
   | "workspace.confirm.removeLocaleTitle"
   | "workspace.confirm.removeLocaleMessage"
+  | "workspace.confirm.removeLocaleTranslatedCount"
+  | "workspace.confirm.cancel"
+  | "workspace.confirm.remove"
   | "workspace.empty.noTargetLocales"
   | "workspace.empty.noSlotsToTranslate";
 
@@ -205,6 +211,10 @@ export type TranslationComparisonTranslationKey =
   | "workspace.comparison.property.description"
   | "workspace.comparison.property.label"
   | "workspace.comparison.property.completionMessage"
+  | "workspace.comparison.nodeKind.form"
+  | "workspace.comparison.nodeKind.page"
+  | "workspace.comparison.nodeKind.field"
+  | "workspace.comparison.nodeKind.option"
   | "workspace.comparison.emptySource"
   | "workspace.comparison.staleWarning";
 

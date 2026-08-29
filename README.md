@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.2.0** (2026-08-29). All public packages are currently published at version `6.2.0`.
-This release adds cancellation, progress reporting, and partial-failure handling for asynchronous translation, including batch progress, retry, and cancellation controls in the React and MUI workspaces. It builds on v6.1.0's side-by-side translation comparison workspace, strict locale-required submission contracts, and missing-translation diagnostics.
+The latest release is **v6.3.0** (2026-08-29). All public packages are currently published at version `6.3.0`.
+This release expands the translation comparison workspace with locale selection and management, localized labels, and policy-aware controls, while preserving provider-specific translation metadata during migration. It builds on v6.2.0's asynchronous translation cancellation, progress reporting, partial-failure handling, retry, and cancellation controls.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.2.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.3.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.2.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.2.0` で公開されています。
-本リリースでは、非同期翻訳のキャンセル、進捗報告、部分的な失敗処理に加え、React／MUIワークスペースの一括翻訳に進捗・再試行・キャンセル操作を追加しました。v6.1.0の左右比較型翻訳ワークスペース、locale必須のstrict Submission契約、翻訳キー不足の診断も引き継いでいます。
+最新版は **v6.3.0**（2026-08-29）です。公開パッケージはすべてバージョン `6.3.0` で公開されています。
+本リリースでは、翻訳比較ワークスペースに言語の選択・追加・削除、ローカライズされたラベル、ポリシー対応の操作を追加し、翻訳メタデータ移行時にプロバイダー固有のJSON拡張を保持するようにしました。v6.2.0の非同期翻訳キャンセル、進捗報告、部分失敗処理、再試行・キャンセル操作も引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.2.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.3.0) を参照してください。
 
 ### 編集・回答体験
 

@@ -183,6 +183,7 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.errors.adapterNotConfigured": "翻訳アダプターが設定されていません。",
   "workspace.errors.translationFailed": "翻訳処理に失敗しました。",
   "workspace.errors.localeAlreadyExists": "言語「{{locale}}」はすでに設定されています。",
+  "workspace.errors.sourceLocale": "言語「{{locale}}」は原文言語のため、翻訳言語には追加できません。",
   "workspace.errors.invalidLocale": "言語「{{locale}}」は有効な言語タグではありません。",
   "workspace.errors.targetLocaleMissing": "翻訳先の言語を選択してください。",
   "workspace.errors.partialFailure": "{{succeeded}}件成功、{{failed}}件失敗で翻訳が完了しました。",
@@ -190,6 +191,8 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.header.title": "多言語翻訳ワークスペース",
   "workspace.header.sourceLocale": "元言語",
   "workspace.header.targetLocale": "翻訳言語",
+  "workspace.header.addLocale": "翻訳言語を追加",
+  "workspace.header.removeLocale": "翻訳言語を削除",
   "workspace.header.translateAll": "一括自動翻訳",
   "workspace.header.cancel": "翻訳をキャンセル",
   "workspace.header.retry": "翻訳を再試行",
@@ -202,6 +205,9 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.slot.revertManual": "手動翻訳を元に戻す",
   "workspace.confirm.removeLocaleTitle": "言語を削除しますか？",
   "workspace.confirm.removeLocaleMessage": "{{locale}} とその翻訳を削除します。",
+  "workspace.confirm.removeLocaleTranslatedCount": "{{count}}件の翻訳も削除されます。",
+  "workspace.confirm.cancel": "キャンセル",
+  "workspace.confirm.remove": "削除",
   "workspace.empty.noTargetLocales": "翻訳先の言語が設定されていません。",
   "workspace.empty.noSlotsToTranslate": "この言語には翻訳項目がありません。",
   "workspace.comparison.title": "翻訳比較ワークスペース",
@@ -212,5 +218,9 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.comparison.property.label": "選択肢ラベル",
   "workspace.comparison.property.completionMessage": "送信完了メッセージ",
   "workspace.comparison.emptySource": "（原文なし）",
-  "workspace.comparison.staleWarning": "原文が変更されています"
+  "workspace.comparison.staleWarning": "原文が変更されています",
+  "workspace.comparison.nodeKind.form": "フォーム",
+  "workspace.comparison.nodeKind.page": "ページ",
+  "workspace.comparison.nodeKind.field": "項目",
+  "workspace.comparison.nodeKind.option": "選択肢"
 });

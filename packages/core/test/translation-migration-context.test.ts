@@ -125,4 +125,15 @@ describe("translation metadata migration context", () => {
       ])
     );
   });
+
+  it("preserves provider-specific metadata with the built-in migrator", () => {
+    const migrated = migrateSchemaTranslationMetadata({
+      ...schema,
+      translationMetadata: { ja: { title: { provider: "gcp", model: "translate-v3" } } }
+    });
+
+    expect(migrated.translationMetadata?.ja?.title).toEqual(
+      expect.objectContaining({ provider: "gcp", model: "translate-v3", translationSource: "automatic" })
+    );
+  });
 });

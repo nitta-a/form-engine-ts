@@ -97,8 +97,9 @@ its `onConfirm` callback completes the locale removal.
 
 `useTranslationComparison` provides a focused, controlled comparison model for form, page, field, and option text.
 Its items expose source text, target text, status, canonical metadata, and path-based `updateTranslation`,
-`translateSingle`, and `translateAll` actions. Comparison row slots receive locale labels, read-only state, field type,
-question and option indexes, plus async single-translation actions.
+`translateSingle`, and `translateAll` actions. Comparison row slots receive `nodeKind`, locale labels, read-only state,
+field type, question and option indexes, metadata, plus async single-translation actions. Use
+`createTranslationMetadata` to add provider/model/hash fields while the canonical metadata fields are retained.
 
 Wrap a builder or renderer in `FormEngineI18nProvider` to supply a UI locale and typed Core translator independently
 from the schema's `defaultLocale` and `supportedLocales`:

@@ -58,6 +58,7 @@ function optionParentId(slot: TranslationSlot): string | undefined {
 }
 
 function getNodeTitle(schema: FormSchema, slot: TranslationSlot): string | undefined {
+  if (slot.kind === "form") return schema.title;
   if (slot.kind === "field") return schema.fields.find((field) => field.id === slot.nodeId)?.title;
   if (slot.kind === "page") return schema.pages?.find((page) => page.id === slot.nodeId)?.title;
   if (slot.kind === "option") return schema.fields.find((field) => field.id === optionParentId(slot))?.title;
@@ -81,6 +82,7 @@ function comparisonItem(
   return {
     id: path,
     path,
+    nodeId: slot.nodeId,
     targetKind: slot.kind,
     targetProperty: slot.property,
     ...(nodeTitle === undefined ? {} : { nodeTitle }),
@@ -116,23 +118,45 @@ export function useTranslationComparison({
   targetLocale,
   translationAdapter,
   readOnly = false,
+  availableLocales,
+  policy,
   onChange,
   onTranslationChange,
   onTranslationReport,
   onTranslationError,
-  signal
+  signal,
+  onLocaleAdded,
+  onLocaleRemoved,
+  onLocaleChange,
+  beforeRemoveLocale,
+  confirmRemoveLocale,
+  onTranslationStart,
+  onTranslationSuccess,
+  validateLocale,
+  createTranslationMetadata
 }: UseTranslationComparisonOptions): UseTranslationComparisonResult {
   const workspace = useTranslationWorkspace({
     schema,
     sourceLocale,
     targetLocale,
+    ...(availableLocales === undefined ? {} : { availableLocales }),
+    ...(policy === undefined ? {} : { policy }),
     ...(translationAdapter === undefined ? {} : { translationAdapter }),
     readOnly,
     ...(onChange === undefined ? {} : { onChange }),
     ...(onTranslationChange === undefined ? {} : { onTranslationChange }),
     ...(onTranslationReport === undefined ? {} : { onTranslationReport }),
     ...(onTranslationError === undefined ? {} : { onTranslationError }),
-    ...(signal === undefined ? {} : { signal })
+    ...(signal === undefined ? {} : { signal }),
+    ...(onLocaleAdded === undefined ? {} : { onLocaleAdded }),
+    ...(onLocaleRemoved === undefined ? {} : { onLocaleRemoved }),
+    ...(onLocaleChange === undefined ? {} : { onLocaleChange }),
+    ...(beforeRemoveLocale === undefined ? {} : { beforeRemoveLocale }),
+    ...(confirmRemoveLocale === undefined ? {} : { confirmRemoveLocale }),
+    ...(onTranslationStart === undefined ? {} : { onTranslationStart }),
+    ...(onTranslationSuccess === undefined ? {} : { onTranslationSuccess }),
+    ...(validateLocale === undefined ? {} : { validateLocale }),
+    ...(createTranslationMetadata === undefined ? {} : { createTranslationMetadata })
   });
   const [report, setReport] = useState<TranslationReport>();
   const items = useMemo(
@@ -170,6 +194,15 @@ export function useTranslationComparison({
   return {
     sourceLocale: workspace.sourceLocale,
     targetLocale: workspace.targetLocale,
+    targetLocales: workspace.targetLocales,
+    localeOptions: workspace.localeOptions,
+    setTargetLocale: workspace.setTargetLocale,
+    addLocale: workspace.addLocale,
+    isAddLocaleAllowed: workspace.isAddLocaleAllowed,
+    removeLocale: workspace.removeLocale,
+    ...(workspace.removeLocaleConfirmation === undefined
+      ? {}
+      : { removeLocaleConfirmation: workspace.removeLocaleConfirmation }),
     items,
     summary: summaryFor(items),
     isTranslating: workspace.isTranslating,

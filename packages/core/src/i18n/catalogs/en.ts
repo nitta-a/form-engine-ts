@@ -171,6 +171,7 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.errors.adapterNotConfigured": "A translation adapter is not configured.",
   "workspace.errors.translationFailed": "Translation failed.",
   "workspace.errors.localeAlreadyExists": "Locale {{locale}} is already configured.",
+  "workspace.errors.sourceLocale": "Locale {{locale}} is the source language and cannot be added as a translation.",
   "workspace.errors.invalidLocale": "Locale {{locale}} is not a valid language tag.",
   "workspace.errors.targetLocaleMissing": "Select a target language first.",
   "workspace.errors.partialFailure": "Translation completed with {{succeeded}} successes and {{failed}} failures.",
@@ -178,6 +179,8 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.header.title": "Translation workspace",
   "workspace.header.sourceLocale": "Source language",
   "workspace.header.targetLocale": "Target language",
+  "workspace.header.addLocale": "Add language",
+  "workspace.header.removeLocale": "Remove language",
   "workspace.header.translateAll": "Translate all",
   "workspace.header.cancel": "Cancel translation",
   "workspace.header.retry": "Retry translation",
@@ -190,6 +193,9 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.slot.revertManual": "Revert manual translation",
   "workspace.confirm.removeLocaleTitle": "Remove language?",
   "workspace.confirm.removeLocaleMessage": "This will remove {{locale}} and its translations.",
+  "workspace.confirm.removeLocaleTranslatedCount": "{{count}} translated items will be removed.",
+  "workspace.confirm.cancel": "Cancel",
+  "workspace.confirm.remove": "Remove",
   "workspace.empty.noTargetLocales": "No target languages are configured.",
   "workspace.empty.noSlotsToTranslate": "There are no translation slots for this language.",
   "workspace.comparison.title": "Translation comparison workspace",
@@ -200,5 +206,9 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.comparison.property.label": "Option label",
   "workspace.comparison.property.completionMessage": "Completion message",
   "workspace.comparison.emptySource": "(No source text)",
-  "workspace.comparison.staleWarning": "The source text has changed"
+  "workspace.comparison.staleWarning": "The source text has changed",
+  "workspace.comparison.nodeKind.form": "Form",
+  "workspace.comparison.nodeKind.page": "Page",
+  "workspace.comparison.nodeKind.field": "Field",
+  "workspace.comparison.nodeKind.option": "Option"
 });

@@ -154,6 +154,11 @@ interface UseTranslationWorkspaceOptions {
         readonly error: TranslationWorkspaceError;
     }) => void;
     readonly onTranslationChange?: (event: TranslationSlotChangeEvent) => void;
+    readonly createTranslationMetadata?: (params: {
+        readonly slot: TranslationSlot;
+        readonly translatedText: string;
+        readonly mode: "manual" | "automatic";
+    }) => Readonly<Record<string, _form_engine_ts_core.JsonValue>>;
     readonly validateLocale?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator;
 }
 interface LocaleValidationContext {
@@ -166,7 +171,7 @@ type CustomLocaleValidator = (locale: string, context: LocaleValidationContext) 
 interface LocaleValidationResult {
     readonly valid: boolean;
     readonly error?: {
-        readonly type: "locale_not_allowed" | "max_locales_exceeded" | "invalid_locale_format" | "locale_already_exists" | "custom_validation_failed";
+        readonly type: "locale_not_allowed" | "max_locales_exceeded" | "invalid_locale_format" | "locale_already_exists" | "source_locale" | "custom_validation_failed";
         readonly message: string;
     };
 }
@@ -183,6 +188,9 @@ type TranslationWorkspaceError = {
     readonly locale: string;
 } | {
     readonly type: "locale_already_exists";
+    readonly locale: string;
+} | {
+    readonly type: "source_locale";
     readonly locale: string;
 } | {
     readonly type: "invalid_locale_format";
@@ -243,8 +251,8 @@ interface UseTranslationWorkspaceResult {
     readonly progress?: TranslationProgress;
     readonly error?: TranslationWorkspaceError;
 }
-declare const validateLocalePipeline: (locale: string, schema: FormSchema, policy?: FormPolicy, customValidator?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator, availableLocales?: readonly (string | LocaleOption)[]) => LocaleValidationResult;
-declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, signal, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, slots: workspaceSlots, onTranslationStart, onTranslationSuccess, onTranslationReport, onTranslationError, onTranslationChange, validateLocale }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
+declare const validateLocalePipeline: (locale: string, schema: FormSchema, policy?: FormPolicy, customValidator?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator, availableLocales?: readonly (string | LocaleOption)[], sourceLocale?: string) => LocaleValidationResult;
+declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, signal, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, slots: workspaceSlots, onTranslationStart, onTranslationSuccess, onTranslationReport, onTranslationError, onTranslationChange, validateLocale, createTranslationMetadata: metadataFactory }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
 
 interface SubmissionReceipt {
     readonly formId: string;
@@ -529,6 +537,7 @@ interface TranslationSlotRowProps {
 interface TranslationComparisonItem {
     readonly id: string;
     readonly path: string;
+    readonly nodeId?: string;
     readonly targetKind: "form" | "page" | "field" | "option";
     readonly targetProperty: "title" | "description" | "label" | "completionMessage";
     readonly nodeTitle?: string;
@@ -558,6 +567,7 @@ interface TranslationComparisonHeaderProps {
 }
 interface TranslationComparisonItemRowProps {
     readonly item: TranslationComparisonItem;
+    readonly nodeKind?: "form" | "page" | "field" | "option";
     readonly questionIndex?: number;
     readonly fieldType?: string;
     readonly optionIndex?: number;
@@ -571,6 +581,8 @@ interface UseTranslationComparisonOptions {
     readonly schema: FormSchema;
     readonly sourceLocale?: string;
     readonly targetLocale: string;
+    readonly availableLocales?: readonly (string | LocaleOption)[];
+    readonly policy?: FormPolicy;
     readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
     readonly signal?: AbortSignal;
     readonly readOnly?: boolean;
@@ -581,10 +593,31 @@ interface UseTranslationComparisonOptions {
         readonly targetLocale: string;
         readonly error: TranslationWorkspaceError;
     }) => void;
+    readonly onLocaleAdded?: (locale: string) => void;
+    readonly onLocaleRemoved?: (locale: string) => void;
+    readonly onLocaleChange?: (locale: string) => void;
+    readonly beforeRemoveLocale?: (locale: string, context: {
+        readonly slotCount: number;
+    }) => Promise<boolean> | boolean;
+    readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
+    readonly onTranslationStart?: (params: {
+        readonly targetLocale: string;
+        readonly mode: "manual" | "automatic";
+    }) => void;
+    readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+    readonly validateLocale?: UseTranslationWorkspaceOptions["validateLocale"];
+    readonly createTranslationMetadata?: UseTranslationWorkspaceOptions["createTranslationMetadata"];
 }
 interface UseTranslationComparisonResult {
     readonly sourceLocale: string;
     readonly targetLocale: string;
+    readonly targetLocales: readonly string[];
+    readonly localeOptions: readonly LocaleOption[];
+    readonly setTargetLocale: (locale: string) => void;
+    readonly addLocale: UseTranslationWorkspaceResult["addLocale"];
+    readonly isAddLocaleAllowed: UseTranslationWorkspaceResult["isAddLocaleAllowed"];
+    readonly removeLocale: UseTranslationWorkspaceResult["removeLocale"];
+    readonly removeLocaleConfirmation?: ReactNode;
     readonly items: readonly TranslationComparisonItem[];
     readonly summary: TranslationComparisonSummary;
     readonly isTranslating: boolean;
@@ -962,7 +995,7 @@ interface FieldState {
 }
 declare function useField(fieldId: string): FieldState;
 
-declare function useTranslationComparison({ schema, sourceLocale, targetLocale, translationAdapter, readOnly, onChange, onTranslationChange, onTranslationReport, onTranslationError, signal }: UseTranslationComparisonOptions): UseTranslationComparisonResult;
+declare function useTranslationComparison({ schema, sourceLocale, targetLocale, translationAdapter, readOnly, availableLocales, policy, onChange, onTranslationChange, onTranslationReport, onTranslationError, signal, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, onTranslationStart, onTranslationSuccess, validateLocale, createTranslationMetadata }: UseTranslationComparisonOptions): UseTranslationComparisonResult;
 
 declare const BUILDER_TRANSLATION_KEYS: {
     readonly ADD_FIELD: "builder.actions.addField";

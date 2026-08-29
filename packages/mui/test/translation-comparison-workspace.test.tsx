@@ -36,4 +36,36 @@ describe("TranslationComparisonWorkspace", () => {
       expect.objectContaining({ translations: { ja: { title: "顧客アンケート" } } })
     );
   });
+
+  it("keeps internal paths out of the default UI and supports locale operations", () => {
+    const onChange = vi.fn();
+    const onLocaleAdded = vi.fn();
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        availableLocales={[{ locale: "fr", label: "Français" }]}
+        onChange={onChange}
+        onLocaleAdded={onLocaleAdded}
+        i18n={{ locale: "ja" }}
+      />
+    );
+
+    expect(screen.getByText(/フォーム/u)).toBeInTheDocument();
+    expect(screen.queryByText("form.title")).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByRole("option", { name: "Français" }));
+    fireEvent.click(screen.getByRole("button", { name: "翻訳言語を追加" }));
+
+    expect(onLocaleAdded).toHaveBeenCalledWith("fr");
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ supportedLocales: ["en", "ja", "fr"] }));
+  });
+
+  it("shows the internal path only when explicitly requested", () => {
+    render(
+      <TranslationComparisonWorkspace schema={schema} targetLocale="ja" showInternalPath i18n={{ locale: "ja" }} />
+    );
+
+    expect(screen.getByText(/form\.title/u)).toBeInTheDocument();
+  });
 });

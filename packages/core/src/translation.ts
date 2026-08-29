@@ -524,13 +524,28 @@ function defaultTranslationMetadataMigrator(
     metadata !== null && typeof metadata === "object" ? (metadata as Readonly<Record<string, unknown>>) : undefined;
   const sourceLocale = typeof record?.sourceLocale === "string" ? record.sourceLocale : defaultLocale;
   const translationSource = isManualTranslationMetadata(record) ? "manual" : "automatic";
+  const canonicalKeys = new Set(["sourceLocale", "sourceTextHash", "translationSource", "translatedAt", "editedAt"]);
+  const extensions = Object.fromEntries(
+    Object.entries(record ?? {}).filter(
+      ([key, value]) => key !== "isManual" && !canonicalKeys.has(key) && isJsonValue(value)
+    )
+  );
   return {
+    ...extensions,
     sourceLocale,
     sourceTextHash: computeSourceTextHash(sourceText),
     translationSource,
     ...(typeof record?.translatedAt === "string" ? { translatedAt: record.translatedAt } : {}),
     ...(typeof record?.editedAt === "string" ? { editedAt: record.editedAt } : {})
   };
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return true;
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (typeof value !== "object") return false;
+  return Object.values(value).every(isJsonValue);
 }
 
 function migrateMetadata(

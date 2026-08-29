@@ -34,6 +34,7 @@ import type {
 } from "react";
 import type { SubmissionAttemptStore } from "./attempt";
 import type { BuilderActionResult, FormBuilderResult } from "./hooks/useFormBuilder";
+import type { UseTranslationWorkspaceOptions, UseTranslationWorkspaceResult } from "./hooks/useTranslationWorkspace";
 import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
 
 export interface ComponentBaseProps {
@@ -345,6 +346,7 @@ export interface TranslationSlotRowProps {
 export interface TranslationComparisonItem {
   readonly id: string;
   readonly path: string;
+  readonly nodeId?: string;
   readonly targetKind: "form" | "page" | "field" | "option";
   readonly targetProperty: "title" | "description" | "label" | "completionMessage";
   readonly nodeTitle?: string;
@@ -377,6 +379,7 @@ export interface TranslationComparisonHeaderProps {
 
 export interface TranslationComparisonItemRowProps {
   readonly item: TranslationComparisonItem;
+  readonly nodeKind?: "form" | "page" | "field" | "option";
   readonly questionIndex?: number;
   readonly fieldType?: string;
   readonly optionIndex?: number;
@@ -391,6 +394,8 @@ export interface UseTranslationComparisonOptions {
   readonly schema: FormSchema;
   readonly sourceLocale?: string;
   readonly targetLocale: string;
+  readonly availableLocales?: readonly (string | LocaleOption)[];
+  readonly policy?: FormPolicy;
   readonly translationAdapter?: TranslationAdapter | AsyncTranslationAdapter;
   readonly signal?: AbortSignal;
   readonly readOnly?: boolean;
@@ -401,11 +406,30 @@ export interface UseTranslationComparisonOptions {
     readonly targetLocale: string;
     readonly error: import("./hooks/useTranslationWorkspace").TranslationWorkspaceError;
   }) => void;
+  readonly onLocaleAdded?: (locale: string) => void;
+  readonly onLocaleRemoved?: (locale: string) => void;
+  readonly onLocaleChange?: (locale: string) => void;
+  readonly beforeRemoveLocale?: (locale: string, context: { readonly slotCount: number }) => Promise<boolean> | boolean;
+  readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
+  readonly onTranslationStart?: (params: {
+    readonly targetLocale: string;
+    readonly mode: "manual" | "automatic";
+  }) => void;
+  readonly onTranslationSuccess?: (payload: TranslationEventPayload) => void;
+  readonly validateLocale?: UseTranslationWorkspaceOptions["validateLocale"];
+  readonly createTranslationMetadata?: UseTranslationWorkspaceOptions["createTranslationMetadata"];
 }
 
 export interface UseTranslationComparisonResult {
   readonly sourceLocale: string;
   readonly targetLocale: string;
+  readonly targetLocales: readonly string[];
+  readonly localeOptions: readonly LocaleOption[];
+  readonly setTargetLocale: (locale: string) => void;
+  readonly addLocale: UseTranslationWorkspaceResult["addLocale"];
+  readonly isAddLocaleAllowed: UseTranslationWorkspaceResult["isAddLocaleAllowed"];
+  readonly removeLocale: UseTranslationWorkspaceResult["removeLocale"];
+  readonly removeLocaleConfirmation?: ReactNode;
   readonly items: readonly TranslationComparisonItem[];
   readonly summary: TranslationComparisonSummary;
   readonly isTranslating: boolean;
