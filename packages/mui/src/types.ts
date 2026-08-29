@@ -55,6 +55,7 @@ export interface MuiFormEngineI18nOptions {
   readonly locale?: string;
   readonly fallbackLocale?: string;
   readonly messages?: FormEngineMessages;
+  readonly customCatalogs?: Record<string, FormEngineMessages>;
   readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
   readonly strict?: boolean;
   readonly translator?: FormEngineTranslator;

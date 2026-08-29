@@ -139,4 +139,36 @@ describe("TranslationComparisonWorkspace", () => {
     expect(screen.getByTestId("translation-item-icon-form.title")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByTestId("translation-item-icon-form.title-target")).toHaveAttribute("aria-hidden", "true");
   });
+
+  it("applies configurable comparison layout, input state colors, and status display", () => {
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        appearance={{
+          input: { borderColor: { default: "#111111", missing: "#cc0000", focus: "#0066cc" }, height: 120 },
+          layout: { sourceWidth: "2fr", targetWidth: "3fr", gap: 3, labelPosition: "top", responsive: "columns" },
+          status: { labels: { missing: "未入力" }, visible: true, position: "target" }
+        }}
+        i18n={{ locale: "ja" }}
+      />
+    );
+
+    expect(screen.getByTestId("translation-status-badge-form.title")).toHaveTextContent("未入力");
+    expect(screen.getByText("訳文 (ja) · タイトル")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "訳文 (ja) · タイトル" })).toBeInTheDocument();
+  });
+
+  it("can hide the built-in translation status display", () => {
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        appearance={{ status: { visible: false } }}
+        i18n={{ locale: "ja" }}
+      />
+    );
+
+    expect(screen.queryByTestId("translation-status-badge-form.title")).not.toBeInTheDocument();
+  });
 });

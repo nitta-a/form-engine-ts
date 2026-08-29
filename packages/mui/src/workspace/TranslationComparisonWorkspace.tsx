@@ -10,6 +10,7 @@ import type {
 import {
   type ConfirmRemoveLocaleSlotProps,
   FormEngineI18nProvider,
+  type TranslationComparisonAppearance,
   type TranslationComparisonHeaderProps,
   type TranslationComparisonItemIconProps,
   type TranslationComparisonItemRowProps,
@@ -56,6 +57,7 @@ export interface TranslationComparisonWorkspaceProps {
   readonly localeSelectorMode?: "tabs" | "select";
   readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
   readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
+  readonly appearance?: TranslationComparisonAppearance;
   readonly i18n?: MuiFormEngineI18nOptions;
   readonly slots?: {
     readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
@@ -75,8 +77,15 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
     localeSelectorMode = "tabs",
     renderItemIcon,
     getTranslationSlotIcon,
+    appearance = {},
     slots
   } = props;
+  const layout = appearance.layout ?? {};
+  const statusOptions = appearance.status ?? {};
+  const responsiveMode = layout.responsive ?? "stack";
+  const comparisonColumns = `${layout.sourceWidth ?? "minmax(0, 1fr)"} ${layout.targetWidth ?? "minmax(0, 1fr)"}`;
+  const rowGridTemplateColumns = responsiveMode === "stack" ? { xs: "1fr", md: comparisonColumns } : comparisonColumns;
+  const rowOverflow = responsiveMode === "scroll" ? { overflowX: "auto" } : {};
   const { translator } = useFormEngineI18n();
   const translate = (key: string, params: Record<string, unknown> = {}) => translator(key, params);
   const {
@@ -254,10 +263,11 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-          gap: 1.5,
+          gridTemplateColumns: rowGridTemplateColumns,
+          gap: layout.gap ?? 1.5,
           mb: 1,
-          px: 1
+          px: 1,
+          ...rowOverflow
         }}
       >
         <Typography variant="subtitle2" color="text.secondary">
@@ -267,7 +277,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
           {targetHeader}
         </Typography>
       </Box>
-      <Box sx={{ display: "grid", gap: 1.5 }}>
+      <Box sx={{ display: "grid", gap: layout.rowGap ?? 1.5, ...rowOverflow }}>
         {comparison.items.map((item) => {
           const context = translationComparisonContext(schema, item);
           const itemIconProps: TranslationComparisonItemIconProps = {
@@ -291,14 +301,69 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             onChange: (text) => comparison.updateTranslation(item.path, text),
             onTranslate: () => comparison.translateSingle(item.path)
           };
+          const statusColor = statusOptions.colors?.[item.status];
+          const statusLabel = statusOptions.labels?.[item.status] ?? translate(translationStatusKey[item.status]);
+          const statusIcon = statusOptions.icons?.[item.status];
+          const statusBadge =
+            statusOptions.visible === false
+              ? null
+              : (slots?.renderStatusBadge?.({ status: item.status }) ?? (
+                  <Chip
+                    size="small"
+                    label={
+                      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                        {statusIcon}
+                        <span>{statusLabel}</span>
+                      </Box>
+                    }
+                    color={statusColor === undefined ? translationStatusColor(item.status) : undefined}
+                    sx={statusColor === undefined ? undefined : { backgroundColor: statusColor }}
+                    data-testid={`translation-status-badge-${item.id}`}
+                  />
+                ));
+          const showHeaderStatus = (statusOptions.position ?? "header") === "header";
+          const showSourceStatus = statusOptions.position === "source";
+          const showTargetStatus = statusOptions.position === "target";
+          const inputBorderColors = appearance.input?.borderColor ?? {};
+          const statusBorderColor =
+            inputBorderColors[item.status] ??
+            (item.status === "manual" ? inputBorderColors.translated : undefined) ??
+            (item.status === "manual-stale" ? inputBorderColors.stale : undefined);
+          const normalBorderColor = inputBorderColors.default ?? statusBorderColor;
+          const hoverBorderColor = inputBorderColors.hover ?? statusBorderColor;
+          const focusBorderColor = inputBorderColors.focus ?? statusBorderColor;
+          const inputSx = {
+            ...(normalBorderColor === undefined
+              ? {}
+              : { "& .MuiOutlinedInput-notchedOutline": { borderColor: normalBorderColor } }),
+            ...(hoverBorderColor === undefined
+              ? {}
+              : { "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: hoverBorderColor } }),
+            ...(focusBorderColor === undefined
+              ? {}
+              : { "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: focusBorderColor } }),
+            ...(appearance.input?.height === undefined && layout.inputHeight === undefined
+              ? {}
+              : {
+                  "& .MuiInputBase-root": {
+                    minHeight: appearance.input?.height ?? layout.inputHeight
+                  }
+                })
+          };
+          const targetLabel = `${targetHeader} · ${
+            item.targetKind === "form"
+              ? translate(translationPropertyKey[item.targetProperty])
+              : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
+          }`;
+          const labelPosition = layout.labelPosition ?? "inside";
           return (
             <Box
               key={item.id}
               data-testid={`translation-comparison-row-${item.id.replace(/[^a-zA-Z0-9_-]/gu, "-")}`}
               sx={{
                 display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                gap: 1.5,
+                gridTemplateColumns: rowGridTemplateColumns,
+                gap: layout.gap ?? 1.5,
                 borderBottom: 1,
                 borderColor: "divider",
                 pb: 1.5
@@ -309,8 +374,8 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                   sx={{
                     display: "grid",
                     gridColumn: { xs: "1", md: "1 / -1" },
-                    gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                    gap: 1.5
+                    gridTemplateColumns: rowGridTemplateColumns,
+                    gap: layout.gap ?? 1.5
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75, minWidth: 0 }}>
@@ -335,13 +400,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       <Box component="span" aria-hidden="true" data-testid={`translation-item-icon-${item.id}-target`}>
                         {itemIcon}
                       </Box>
-                      {slots?.renderStatusBadge?.({ status: item.status }) ?? (
-                        <Chip
-                          size="small"
-                          color={translationStatusColor(item.status)}
-                          label={translate(translationStatusKey[item.status])}
-                        />
-                      )}
+                      {showHeaderStatus ? statusBadge : null}
                     </Box>
                     {item.translatable ? (
                       <IconButton
@@ -356,6 +415,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                     ) : null}
                   </Box>
                   <Box aria-readonly="true">
+                    {showSourceStatus ? statusBadge : null}
                     <Paper
                       variant="outlined"
                       sx={{
@@ -373,31 +433,21 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                     </Paper>
                   </Box>
                   <Box>
+                    {showTargetStatus ? statusBadge : null}
+                    {labelPosition === "top" ? <Typography variant="caption">{targetLabel}</Typography> : null}
                     <TextField
                       fullWidth
                       multiline
                       minRows={2}
-                      label={`${targetHeader} · ${
-                        item.targetKind === "form"
-                          ? translate(translationPropertyKey[item.targetProperty])
-                          : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
-                      }`}
+                      label={labelPosition === "inside" ? targetLabel : undefined}
                       value={item.translatedText}
                       onChange={(event) => rowProps.onChange(event.target.value)}
                       disabled={readOnly}
                       inputProps={{
-                        "aria-label": `${targetHeader} · ${
-                          item.targetKind === "form"
-                            ? translate(translationPropertyKey[item.targetProperty])
-                            : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
-                        }`
+                        "aria-label": targetLabel
                       }}
                       placeholder={item.status === "missing" ? targetHeader : undefined}
-                      sx={
-                        item.status === "stale" || item.status === "manual-stale"
-                          ? { "& .MuiOutlinedInput-notchedOutline": { borderColor: "warning.main" } }
-                          : undefined
-                      }
+                      sx={inputSx}
                     />
                     {item.status === "stale" || item.status === "manual-stale" ? (
                       <Typography color="warning.main" variant="caption" role="status" aria-live="polite">
@@ -423,6 +473,7 @@ export function TranslationComparisonWorkspace(props: TranslationComparisonWorks
       {...(i18n.locale === undefined ? {} : { locale: i18n.locale })}
       {...(i18n.fallbackLocale === undefined ? {} : { fallbackLocale: i18n.fallbackLocale })}
       {...(i18n.messages === undefined ? {} : { messages: i18n.messages })}
+      {...(i18n.customCatalogs === undefined ? {} : { customCatalogs: i18n.customCatalogs })}
       {...(i18n.onMissingKey === undefined ? {} : { onMissingKey: i18n.onMissingKey })}
       {...(i18n.strict === undefined ? {} : { strict: i18n.strict })}
       {...(i18n.translator === undefined ? {} : { translator: i18n.translator })}

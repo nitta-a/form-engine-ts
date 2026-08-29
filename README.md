@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.4.0** (2026-08-30). All public packages are currently published at version `6.4.0`.
-This release adds configurable tabs/select locale controls, localized workspace labels, and customizable translation comparison item icons. It builds on v6.3.0's locale management, policy-aware controls, and provider-specific translation metadata preservation during migration.
+The latest release is **v6.5.0** (2026-08-30). All public packages are currently published at version `6.5.0`.
+This release adds typed submission metadata, scoped receipt storage, configurable pre-submit confirmation behavior, comparison-workspace appearance controls, and richer MUI select controls. It builds on v6.4.0's configurable locale controls, localized labels, and customizable translation comparison item icons.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.4.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.5.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.4.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.4.0` で公開されています。
-本リリースでは、翻訳ワークスペースのタブ／セレクト式ロケール操作、ローカライズされたラベル、翻訳比較項目のアイコンとカスタマイズ用コールバックを追加しました。v6.3.0のロケール管理、ポリシー対応の操作、翻訳メタデータ移行時のプロバイダー固有JSON拡張の保持も引き継いでいます。
+最新版は **v6.5.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.5.0` で公開されています。
+本リリースでは、型付き送信メタデータ、スコープ付きレシート保存、送信前確認の表示・再確認設定、翻訳比較ワークスペースの外観設定、MUIセレクトの表示拡張を追加しました。v6.4.0のロケール操作、ローカライズされたラベル、翻訳比較項目のアイコンカスタマイズも引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.4.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.5.0) を参照してください。
 
 ### 編集・回答体験
 

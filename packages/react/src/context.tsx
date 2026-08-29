@@ -1,6 +1,7 @@
 import {
   type AnswerValidationResult,
   assertValidFormSchema,
+  type BaseSubmissionMetadata,
   calculateFieldVisibility,
   calculatePageVisibility,
   type FormField,
@@ -16,8 +17,17 @@ import {
   validateAnswers,
   validatePageAnswers
 } from "@form-engine-ts/core";
+import type * as React from "react";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { BeforeSubmit, FormServerErrorPayload, FormSubmitHandler, SubmitContext, SubmitResult } from "./types";
+import type {
+  BeforeSubmit,
+  FormServerErrorPayload,
+  FormSubmitHandler,
+  SubmitContext,
+  SubmitResult,
+  TypedFormSubmitHandler,
+  TypedSubmitContext
+} from "./types";
 
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
@@ -39,6 +49,11 @@ export interface FormContextValue {
   readonly reset: () => void;
   readonly submit: (beforeSubmit?: BeforeSubmit, submitContext?: SubmitContext) => Promise<SubmitResult>;
   readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
+}
+
+export interface TypedFormContextValue<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends Omit<FormContextValue, "submit"> {
+  readonly submit: (beforeSubmit?: BeforeSubmit, submitContext?: TypedSubmitContext<TMeta>) => Promise<SubmitResult>;
 }
 
 const FormContext = createContext<FormContextValue | null>(null);
@@ -81,7 +96,16 @@ export interface FormProviderProps {
   readonly children: ReactNode;
 }
 
-export function FormProvider({
+export interface TypedFormProviderProps<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends Omit<FormProviderProps, "onSubmit"> {
+  readonly onSubmit: TypedFormSubmitHandler<TMeta>;
+}
+
+export function FormProvider(props: FormProviderProps): React.JSX.Element;
+export function FormProvider<TMeta extends BaseSubmissionMetadata>(
+  props: TypedFormProviderProps<TMeta>
+): React.JSX.Element;
+export function FormProvider<TMeta extends BaseSubmissionMetadata>({
   schema,
   locale,
   translator,
@@ -89,7 +113,7 @@ export function FormProvider({
   resetOnSuccess = false,
   onSubmit,
   children
-}: FormProviderProps) {
+}: FormProviderProps | TypedFormProviderProps<TMeta>) {
   const validSchema = useMemo(() => {
     assertValidFormSchema(schema);
     const localized = resolveLocalizedSchema(schema, locale);
@@ -175,7 +199,7 @@ export function FormProvider({
   }, [initialValues]);
 
   const submit = useCallback(
-    async (beforeSubmit?: BeforeSubmit, submitContext?: SubmitContext): Promise<SubmitResult> => {
+    async (beforeSubmit?: BeforeSubmit, submitContext?: TypedSubmitContext<TMeta>): Promise<SubmitResult> => {
       if (submissionInFlight.current) return { status: "cancelled" };
       const validation = validateAnswers(validSchema, values);
       if (!validation.valid) {
@@ -236,7 +260,7 @@ export function FormProvider({
     [locale, translator]
   );
 
-  const contextValue = useMemo<FormContextValue>(
+  const contextValue = useMemo<TypedFormContextValue<TMeta>>(
     () => ({
       schema: validSchema,
       locale,
@@ -276,10 +300,12 @@ export function FormProvider({
     ]
   );
 
-  return <FormContext.Provider value={contextValue}>{children}</FormContext.Provider>;
+  return <FormContext.Provider value={contextValue as FormContextValue}>{children}</FormContext.Provider>;
 }
 
-export function useForm(): FormContextValue {
+export function useForm(): FormContextValue;
+export function useForm<TMeta extends BaseSubmissionMetadata>(): TypedFormContextValue<TMeta>;
+export function useForm<TMeta extends BaseSubmissionMetadata>(): FormContextValue | TypedFormContextValue<TMeta> {
   const context = useContext(FormContext);
   if (context === null) throw new Error("useForm must be called inside a FormProvider.");
   return context;

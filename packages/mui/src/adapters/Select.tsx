@@ -81,6 +81,9 @@ export function createMuiSelectAdapter<T extends string = string>(
     required,
     error,
     helperText,
+    description,
+    optionDisplay = "rich",
+    appearance,
     value,
     onChange,
     onKeyDown,
@@ -92,7 +95,18 @@ export function createMuiSelectAdapter<T extends string = string>(
     const normalizedOptions = normalizeOptions(selectOptions);
     const groupedOptions = groupSelectOptions(normalizedOptions);
     const selectSlotProps = resolved.muiSlotProps?.select;
-    const menuProps = { ...selectSlotProps?.MenuProps, ...resolved.muiSlotProps?.selectMenu };
+    const baseMenuProps = { ...selectSlotProps?.MenuProps, ...resolved.muiSlotProps?.selectMenu };
+    const menuProps = {
+      ...baseMenuProps,
+      ...(appearance?.menuMaxHeight === undefined
+        ? {}
+        : {
+            PaperProps: {
+              ...baseMenuProps.PaperProps,
+              style: { ...baseMenuProps.PaperProps?.style, maxHeight: appearance.menuMaxHeight }
+            }
+          })
+    };
     const slotInputProps = selectSlotProps?.inputProps;
     const labelId = id === undefined || label === undefined ? undefined : `${id}-label`;
     const helperId = id === undefined ? undefined : (ariaDescribedBy?.split(/\s+/u)[0] ?? `${id}-helper-text`);
@@ -101,9 +115,9 @@ export function createMuiSelectAdapter<T extends string = string>(
     return (
       <FormControl
         className={className}
-        fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
-        size={resolved.size}
-        variant={resolved.variant}
+        fullWidth={appearance?.fullWidth ?? resolved.inputFullWidth ?? resolved.fullWidth}
+        size={appearance?.size ?? resolved.size}
+        variant={appearance?.variant ?? resolved.variant}
         error={Boolean(error)}
         required={required}
         disabled={disabled}
@@ -121,14 +135,16 @@ export function createMuiSelectAdapter<T extends string = string>(
           onKeyDown={onKeyDown}
           required={required}
           readOnly={readOnly}
-          variant={selectSlotProps?.variant ?? resolved.variant}
+          variant={selectSlotProps?.variant ?? appearance?.variant ?? resolved.variant}
           {...(Object.keys(menuProps).length === 0 ? {} : { MenuProps: menuProps })}
           renderValue={(selected) => {
             const selectedValue = typeof selected === "string" ? selected : String(selected ?? "");
             const option = normalizedOptions.find((candidate) => candidate.value === selectedValue);
             if (renderValue !== undefined) return renderValue(option);
             if (option === undefined) return selectedValue;
-            return (
+            return optionDisplay === "label" ? (
+              <span>{option.label}</span>
+            ) : (
               <Box display="flex" alignItems="center" gap={0.75}>
                 {option.icon}
                 <span>{option.label}</span>
@@ -159,10 +175,13 @@ export function createMuiSelectAdapter<T extends string = string>(
               >
                 {renderOption === undefined ? (
                   <>
-                    {option.icon === undefined ? null : (
+                    {optionDisplay === "label" || option.icon === undefined ? null : (
                       <ListItemIcon sx={{ minWidth: 32 }}>{option.icon}</ListItemIcon>
                     )}
-                    <ListItemText primary={option.label} secondary={option.description} />
+                    <ListItemText
+                      primary={option.label}
+                      secondary={optionDisplay === "label" ? undefined : option.description}
+                    />
                   </>
                 ) : (
                   renderOption(option)
@@ -171,8 +190,8 @@ export function createMuiSelectAdapter<T extends string = string>(
             ))
           ])}
         </Select>
-        {helperText === undefined || helperText.length === 0 ? null : (
-          <FormHelperText id={helperId}>{helperText}</FormHelperText>
+        {helperText === undefined && description === undefined ? null : (
+          <FormHelperText id={helperId}>{helperText ?? description}</FormHelperText>
         )}
       </FormControl>
     );

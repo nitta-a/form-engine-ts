@@ -104,4 +104,37 @@ describe("FormRenderer generic submission confirmation", () => {
       expect.objectContaining({ formId: schema.id, formVersion: schema.version, submissionId: "confirmation-1" })
     );
   });
+
+  it("uses configured confirmation copy and sensitive-value display settings", async () => {
+    const user = userEvent.setup();
+    render(
+      <FormRenderer
+        schema={schema}
+        onSubmit={async () => undefined}
+        submissionGuards={[
+          () => ({
+            status: "confirm",
+            findings: [{ fieldId: "name", type: "email", matchedText: "ada@example.com" }]
+          })
+        ]}
+        submissionConfirmation={{
+          title: "個人情報の確認",
+          message: "入力内容を確認してください。",
+          confirmLabel: "送信",
+          cancelLabel: "戻る",
+          findingDisplay: "type"
+        }}
+      />
+    );
+
+    await user.type(screen.getByLabelText(/Name/), "ada@example.com");
+    await user.selectOptions(screen.getByLabelText(/Team/), "engineering");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(await screen.findByText("個人情報の確認")).toBeInTheDocument();
+    expect(screen.getByText("入力内容を確認してください。")).toBeInTheDocument();
+    expect(screen.queryByText("ada@example.com")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "送信" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "戻る" })).toBeInTheDocument();
+  });
 });

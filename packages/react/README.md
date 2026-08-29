@@ -253,3 +253,10 @@ validation, retry, already-submitted, server-error, and sensitive-data confirmat
 by throwing `FormSubmissionError` or a payload with `fieldErrors` and `formError`; field messages are mapped back to the
 form, scrolled into view, and focused. Use `submissionConfirmationRenderMode="replace"` or `"dialog"` for alternate
 confirmation presentations, and `fieldsClassName` or `renderFields` to control the fields wrapper.
+
+`FormRenderer` accepts typed `submissionMetadata`, which is passed to `onSubmit` as `context.metadata`. The exported
+`createSubmissionController` and `useSubmissionController` provide a reusable lifecycle with idle, submitting, success,
+and error states, duplicate-request protection, retry, and reset. Receipt stores accept optional `deckId` and
+`sessionId` scopes; pass the same values as `submissionScope` to make completion state deck- or session-specific.
+`submissionConfirmation` can configure title, message, button labels, finding display (`full`, `masked`, `type`, or
+`hidden`), visibility, and recheck behavior (`always`, `on-change`, or `once`).

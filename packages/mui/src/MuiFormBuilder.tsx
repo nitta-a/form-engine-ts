@@ -114,6 +114,7 @@ export function MuiFormBuilder({
       {...(i18n.locale === undefined ? {} : { locale: i18n.locale })}
       {...(i18n.fallbackLocale === undefined ? {} : { fallbackLocale: i18n.fallbackLocale })}
       {...(i18n.messages === undefined ? {} : { messages: i18n.messages })}
+      {...(i18n.customCatalogs === undefined ? {} : { customCatalogs: i18n.customCatalogs })}
       {...(i18n.onMissingKey === undefined ? {} : { onMissingKey: i18n.onMissingKey })}
       {...(i18n.strict === undefined ? {} : { strict: i18n.strict })}
       {...(i18n.translator === undefined ? {} : { translator: i18n.translator })}

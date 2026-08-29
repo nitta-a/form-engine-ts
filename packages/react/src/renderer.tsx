@@ -1,4 +1,5 @@
 import {
+  type BaseSubmissionMetadata,
   type FieldType,
   type FormField,
   type FormSchema,
@@ -12,6 +13,7 @@ import {
   validateAnswers
 } from "@form-engine-ts/core";
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
+import type * as React from "react";
 import {
   type ComponentType,
   type FormEvent,
@@ -38,6 +40,7 @@ import type {
   FormRendererMessages,
   FormRendererSlotProps,
   FormRendererSlots,
+  FormSubmissionMetadata,
   FormSubmitHandler,
   FormSubmitStatus,
   FormSubmittedAnswerItem,
@@ -48,7 +51,8 @@ import type {
   SubmissionGuard,
   SubmissionProtectionProps,
   SubmitResponse,
-  SubmitResult
+  SubmitResult,
+  TypedFormSubmitHandler
 } from "./types";
 
 const isChoiceFieldType = (type: FieldType): boolean =>
@@ -564,6 +568,8 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly successMessageKey?: string;
   readonly errorMessageKey?: string;
   readonly attemptIdFactory?: () => string;
+  /** Metadata copied into the submission context for typed application integrations. */
+  readonly submissionMetadata?: BaseSubmissionMetadata;
   readonly messages?: Partial<FormRendererMessages>;
   readonly messageResolver?: (key: keyof FormRendererMessages, defaultText: string) => string;
   readonly autoSaveKey?: string;
@@ -580,6 +586,25 @@ export interface StandaloneFormRendererProps extends FormRendererPresentationPro
   readonly resetOnSuccess?: boolean;
   readonly onSubmit: FormSubmitHandler;
 }
+
+export interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>
+  extends Omit<FormRendererPresentationProps, "submissionMetadata"> {
+  readonly submissionMetadata?: TMeta;
+}
+
+export interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>
+  extends TypedFormRendererPresentationProps<TMeta> {
+  readonly schema: FormSchema;
+  readonly locale?: string;
+  readonly translator?: TranslationAdapter;
+  readonly initialValues?: FormValues;
+  readonly resetOnSuccess?: boolean;
+  readonly onSubmit: TypedFormSubmitHandler<TMeta>;
+}
+
+export type TypedFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> =
+  | TypedFormRendererPresentationProps<TMeta>
+  | TypedStandaloneFormRendererProps<TMeta>;
 
 export type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
 
@@ -712,12 +737,21 @@ function maskSensitiveValue(finding: SensitiveDataFinding): string | undefined {
   return value.length <= 2 ? "***" : `${value.slice(0, 2)}***`;
 }
 
-function ContextFormRenderer({
+function sensitiveValueForDisplay(
+  finding: SensitiveDataFinding,
+  mode: "full" | "masked" | "type" | "hidden"
+): string | undefined {
+  if (mode === "hidden" || mode === "type") return undefined;
+  return mode === "full" ? finding.matchedText : maskSensitiveValue(finding);
+}
+
+function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>({
   components = {},
   className = "",
   successMessageKey,
   errorMessageKey,
   attemptIdFactory,
+  submissionMetadata,
   messages = {},
   messageResolver,
   autoSaveKey,
@@ -734,11 +768,12 @@ function ContextFormRenderer({
   hideFormOnSuccess = false,
   submissionGuards = [],
   receiptStore,
+  submissionScope,
   attemptStore,
   onReceiptError,
   slots = {}
-}: FormRendererPresentationProps) {
-  const form = useForm();
+}: TypedFormRendererPresentationProps<TMeta>) {
+  const form = useForm<TMeta>();
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const prefix = useId().replace(/:/g, "");
@@ -763,6 +798,8 @@ function ContextFormRenderer({
   const [receiptLoaded, setReceiptLoaded] = useState(receiptStore === undefined);
   const rendererSubmissionInFlight = useRef(false);
   const fallbackAttemptId = useRef<string | null>(null);
+  const confirmedSubmissionSignature = useRef<string | null>(null);
+  const piiWarningAcknowledged = useRef(false);
   const completionRef = useRef<HTMLDivElement>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
   const pages = form.schema.pages;
@@ -786,6 +823,7 @@ function ContextFormRenderer({
     "inline";
   const confirmationEnabled =
     submissionConfirmation?.enabled ?? form.schema.submissionSettings?.showConfirmationBeforeSubmit ?? false;
+  const confirmationRecheck = submissionConfirmation?.recheck ?? "always";
   const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
@@ -828,7 +866,7 @@ function ContextFormRenderer({
     }
     setReceiptLoaded(false);
     void receiptStore
-      .get(form.schema.id, form.schema.version)
+      .get(form.schema.id, form.schema.version, submissionScope)
       .then((stored) => {
         if (active) setReceipt(stored);
       })
@@ -841,7 +879,7 @@ function ContextFormRenderer({
     return () => {
       active = false;
     };
-  }, [form.schema.id, form.schema.version, receiptStore]);
+  }, [form.schema.id, form.schema.version, receiptStore, submissionScope]);
 
   useEffect(() => {
     if (pages === undefined || visiblePageIndexes.length === 0) {
@@ -982,6 +1020,14 @@ function ContextFormRenderer({
         };
   };
 
+  const confirmationSignature = (findings: readonly SensitiveDataFinding[]) =>
+    JSON.stringify({ findings, values: visibleValues });
+
+  const shouldRequestConfirmation = (findings: readonly SensitiveDataFinding[]): boolean => {
+    if (confirmationRecheck === "always") return true;
+    return confirmedSubmissionSignature.current !== confirmationSignature(findings);
+  };
+
   const submitValues = async (guardsConfirmed = false): Promise<SubmitResult> => {
     if (
       rendererSubmissionInFlight.current ||
@@ -1003,7 +1049,7 @@ function ContextFormRenderer({
             setGuardMessage(guardResult.message ?? form.translate("form.submissionBlocked"));
             return { status: "cancelled" };
           }
-          if (guardResult.status === "confirm") {
+          if (guardResult.status === "confirm" && shouldRequestConfirmation(guardResult.findings)) {
             setGuardMessage(null);
             setConfirmation({
               findings: guardResult.findings,
@@ -1013,7 +1059,7 @@ function ContextFormRenderer({
             return { status: "cancelled" };
           }
         }
-        if (confirmationEnabled) {
+        if (confirmationEnabled && shouldRequestConfirmation([])) {
           setGuardMessage(null);
           setConfirmation({ findings: [], generic: true });
           return { status: "cancelled" };
@@ -1042,7 +1088,9 @@ function ContextFormRenderer({
         formId: form.schema.id,
         formVersion: form.schema.version,
         locale: form.locale,
-        submittedAt
+        submittedAt,
+        ...(piiWarningAcknowledged.current ? { piiWarningAcknowledged: true } : {}),
+        ...(submissionMetadata === undefined ? {} : { metadata: submissionMetadata })
       };
       const result = await form.submit(beforeSubmit, submitContext);
       if (result.status === "invalid") {
@@ -1100,7 +1148,7 @@ function ContextFormRenderer({
           ...(submissionId === undefined ? {} : { submissionId })
         };
         try {
-          await receiptStore.save(storedReceipt);
+          await receiptStore.save({ ...storedReceipt, ...submissionScope });
         } catch (cause) {
           const error = cause instanceof Error ? cause : new Error(String(cause));
           try {
@@ -1136,6 +1184,10 @@ function ContextFormRenderer({
   };
 
   const confirmSubmission = () => {
+    if (confirmation !== null) {
+      confirmedSubmissionSignature.current = confirmationSignature(confirmation.findings);
+      piiWarningAcknowledged.current = confirmation.findings.length > 0;
+    }
     setConfirmation(null);
     void submitValues(true);
   };
@@ -1147,7 +1199,7 @@ function ContextFormRenderer({
 
   const resetReceipt = async () => {
     if (receiptStore === undefined) return;
-    await receiptStore.remove(form.schema.id, form.schema.version);
+    await receiptStore.remove(form.schema.id, form.schema.version, submissionScope);
     setReceipt(null);
     form.reset();
   };
@@ -1202,6 +1254,24 @@ function ContextFormRenderer({
     </div>
   );
 
+  const confirmationTitle =
+    submissionConfirmation?.title ??
+    (confirmation?.generic === true
+      ? form.locale.toLowerCase().startsWith("ja")
+        ? "回答内容の確認"
+        : "Review your answers"
+      : resolveMessage("confirmSensitiveDataTitle"));
+  const confirmationMessage =
+    confirmation?.message ??
+    submissionConfirmation?.message ??
+    (confirmation?.generic === true
+      ? form.locale.toLowerCase().startsWith("ja")
+        ? "回答内容をご確認のうえ、送信してください。"
+        : "Please review your answers before submitting."
+      : resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData")));
+  const findingDisplay = submissionConfirmation?.findingDisplay ?? "masked";
+  const showFindings = submissionConfirmation?.showFindings !== false && findingDisplay !== "hidden";
+
   const confirmationContent = (
     <div
       ref={confirmationRef}
@@ -1210,13 +1280,7 @@ function ContextFormRenderer({
     >
       {slots.renderSubmissionConfirmation?.({
         findings: confirmation?.findings ?? [],
-        message:
-          confirmation?.message ??
-          (confirmation?.generic === true
-            ? form.locale.toLowerCase().startsWith("ja")
-              ? "回答内容をご確認のうえ、送信してください。"
-              : "Please review your answers before submitting."
-            : resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData"))),
+        message: confirmationMessage,
         schema: form.schema,
         visibleValues,
         visibleItems,
@@ -1224,22 +1288,9 @@ function ContextFormRenderer({
         onCancel: cancelSubmission
       }) ?? (
         <>
-          <h2>
-            {confirmation?.generic === true
-              ? form.locale.toLowerCase().startsWith("ja")
-                ? "回答内容の確認"
-                : "Review your answers"
-              : resolveMessage("confirmSensitiveDataTitle")}
-          </h2>
-          <p>
-            {confirmation?.message ??
-              (confirmation?.generic === true
-                ? form.locale.toLowerCase().startsWith("ja")
-                  ? "回答内容をご確認のうえ、送信してください。"
-                  : "Please review your answers before submitting."
-                : resolveMessage("confirmSensitiveDataMessage", form.translate("form.confirmSensitiveData")))}
-          </p>
-          {(confirmation?.findings ?? []).length === 0 ? null : (
+          <h2>{confirmationTitle}</h2>
+          <p>{confirmationMessage}</p>
+          {!showFindings || (confirmation?.findings ?? []).length === 0 ? null : (
             <ul>
               {(confirmation?.findings ?? []).map((finding, index) => {
                 const field = form.schema.fields.find((candidate) => candidate.id === finding.fieldId);
@@ -1247,7 +1298,7 @@ function ContextFormRenderer({
                   ? { email: "メールアドレス", phone: "電話番号", url: "URL", postal_code: "郵便番号" }
                   : { email: "Email address", phone: "Phone number", url: "URL", postal_code: "Postal code" };
                 const typeLabel = finding.typeLabel ?? typeLabels[finding.type] ?? finding.type;
-                const value = maskSensitiveValue(finding);
+                const value = sensitiveValueForDisplay(finding, findingDisplay);
                 return (
                   <li key={`${finding.fieldId}-${finding.type}-${finding.start ?? index}`}>
                     <span>{finding.fieldTitle ?? field?.title ?? finding.fieldId}</span>{" "}
@@ -1268,10 +1319,12 @@ function ContextFormRenderer({
             </ul>
           ) : null}
           <button type="button" data-fe-confirm="true" onClick={confirmSubmission}>
-            {resolveMessage("confirmButton", form.translate("form.confirmSubmission"))}
+            {submissionConfirmation?.confirmLabel ??
+              resolveMessage("confirmButton", form.translate("form.confirmSubmission"))}
           </button>
           <button type="button" onClick={cancelSubmission}>
-            {resolveMessage("cancelButton", form.translate("form.cancelSubmission"))}
+            {submissionConfirmation?.cancelLabel ??
+              resolveMessage("cancelButton", form.translate("form.cancelSubmission"))}
           </button>
         </>
       )}
@@ -1547,10 +1600,18 @@ const defaultRendererTranslator: TranslationAdapter = {
   }
 };
 
-export function FormRenderer(props: FormRendererProps) {
+export function FormRenderer(props: FormRendererProps): React.JSX.Element;
+export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(
+  props: TypedFormRendererProps<TMeta>
+): React.JSX.Element;
+export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(
+  props: FormRendererProps | TypedFormRendererProps<TMeta>
+) {
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
-  if (!("schema" in props)) return <ContextFormRenderer {...props} />;
+  if (!("schema" in props)) {
+    return <ContextFormRenderer<TMeta> {...(props as TypedFormRendererPresentationProps<TMeta>)} />;
+  }
   const {
     schema,
     locale = schema.defaultLocale ?? "en",
@@ -1569,15 +1630,15 @@ export function FormRenderer(props: FormRendererProps) {
         }
       : defaultRendererTranslator);
   return (
-    <FormProvider
+    <FormProvider<TMeta>
       schema={schema}
       locale={locale}
       translator={translator}
-      onSubmit={onSubmit}
+      onSubmit={onSubmit as TypedFormSubmitHandler<TMeta>}
       {...(initialValues === undefined ? {} : { initialValues })}
       {...(resetOnSuccess === undefined ? {} : { resetOnSuccess })}
     >
-      <ContextFormRenderer {...rendererProps} />
+      <ContextFormRenderer<TMeta> {...(rendererProps as TypedFormRendererPresentationProps<TMeta>)} />
     </FormProvider>
   );
 }

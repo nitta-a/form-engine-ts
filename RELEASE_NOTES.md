@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v6.5.0 — 2026-08-30
+
+- Added typed submission metadata across the React provider and renderer, including reusable submission helpers and scoped receipt storage.
+- Added configurable pre-submit confirmation text, sensitive-value display modes, and confirmation recheck behavior.
+- Added comparison-workspace appearance controls for input borders, layout, responsive behavior, and status presentation.
+- Improved MUI select controls with descriptions, label/rich option display, and appearance overrides; application i18n catalogs can also be supplied to the builder.
+- Aligned all public packages to version 6.5.0.
+
+See the [GitHub release for v6.5.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.5.0).
+
 ### v6.4.0 — 2026-08-30
 
 - Added configurable tabs/select locale controls and a custom locale-selector slot to the MUI translation workspaces.

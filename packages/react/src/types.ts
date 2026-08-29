@@ -1,5 +1,6 @@
 import type {
   AsyncTranslationAdapter,
+  BaseSubmissionMetadata,
   CanonicalTranslationMetadata,
   FieldOption,
   FormField,
@@ -35,7 +36,7 @@ import type {
 import type { SubmissionAttemptStore } from "./attempt";
 import type { BuilderActionResult, FormBuilderResult } from "./hooks/useFormBuilder";
 import type { UseTranslationWorkspaceOptions, UseTranslationWorkspaceResult } from "./hooks/useTranslationWorkspace";
-import type { SubmissionReceipt, SubmissionReceiptStore } from "./receipt";
+import type { SubmissionReceipt, SubmissionReceiptQuery, SubmissionReceiptStore } from "./receipt";
 
 export interface ComponentBaseProps {
   readonly id?: string;
@@ -163,6 +164,14 @@ export interface SelectComponentProps<T extends string = string>
   readonly value: T;
   readonly onChange: (value: T) => void;
   readonly options: readonly (T | BuilderSelectOption<T>)[];
+  readonly description?: string;
+  readonly optionDisplay?: "label" | "rich";
+  readonly appearance?: {
+    readonly size?: "small" | "medium";
+    readonly variant?: "outlined" | "filled" | "standard";
+    readonly fullWidth?: boolean;
+    readonly menuMaxHeight?: number | string;
+  };
   readonly renderOption?: (option: BuilderSelectOption<T>) => ReactNode;
   readonly renderValue?: (option: BuilderSelectOption<T> | undefined) => ReactNode;
 }
@@ -605,12 +614,22 @@ export interface SubmitResponse {
   readonly submittedAt?: string;
 }
 
+export type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseSubmissionMetadata> =
+  BaseSubmissionMetadata & TExtra;
+
 export interface SubmitContext {
   readonly attemptId: string;
   readonly formId: string;
   readonly formVersion: number;
   readonly locale?: string;
   readonly submittedAt: string;
+  readonly metadata?: BaseSubmissionMetadata;
+  readonly piiWarningAcknowledged?: boolean;
+}
+
+export interface TypedSubmitContext<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends SubmitContext {
+  readonly metadata?: TMeta;
 }
 
 export interface FormRendererMessages {
@@ -656,6 +675,11 @@ export type FormSubmitHandler = (
   context: SubmitContext
 ) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
 
+export type TypedFormSubmitHandler<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> = (
+  answers: FormValues,
+  context: TypedSubmitContext<TMeta>
+) => SubmitResponse | void | Promise<SubmitResponse | undefined> | Promise<void>;
+
 export type SubmissionGuardResult =
   | { readonly status: "allow" }
   | { readonly status: "confirm"; readonly findings: readonly SensitiveDataFinding[]; readonly message?: string }
@@ -691,11 +715,63 @@ export interface FormRendererAppearance {
   readonly choiceField?: ChoiceFieldLayoutMode | ChoiceFieldTypeLayoutMap;
 }
 
+export type TranslationComparisonInputState =
+  | "default"
+  | "hover"
+  | "focus"
+  | "missing"
+  | "translated"
+  | "stale"
+  | "manual"
+  | "manual-stale";
+
+export interface TranslationComparisonInputAppearance {
+  readonly borderColor?: Partial<Record<TranslationComparisonInputState, string>>;
+  readonly height?: number | string;
+}
+
+export type TranslationComparisonResponsiveMode = "stack" | "columns" | "scroll";
+
+export interface TranslationComparisonLayoutOptions {
+  readonly sourceWidth?: number | string;
+  readonly targetWidth?: number | string;
+  readonly gap?: number | string;
+  readonly rowGap?: number | string;
+  readonly inputHeight?: number | string;
+  readonly labelPosition?: "top" | "inside" | "hidden";
+  readonly responsive?: TranslationComparisonResponsiveMode;
+}
+
+export interface TranslationComparisonStatusDisplayOptions {
+  readonly visible?: boolean;
+  readonly labels?: Partial<Record<TranslationStatus, string>>;
+  readonly colors?: Partial<Record<TranslationStatus, string>>;
+  readonly icons?: Partial<Record<TranslationStatus, ReactNode>>;
+  readonly position?: "header" | "source" | "target";
+}
+
+export interface TranslationComparisonAppearance {
+  readonly input?: TranslationComparisonInputAppearance;
+  readonly layout?: TranslationComparisonLayoutOptions;
+  readonly status?: TranslationComparisonStatusDisplayOptions;
+}
+
 export type SubmissionConfirmationRenderMode = "inline" | "replace" | "dialog";
+
+export type SensitiveFindingDisplayMode = "full" | "masked" | "type" | "hidden";
+
+export type SubmissionConfirmationRecheck = "always" | "on-change" | "once";
 
 export interface SubmissionConfirmationOptions {
   readonly enabled?: boolean;
   readonly renderMode?: SubmissionConfirmationRenderMode;
+  readonly title?: string;
+  readonly message?: string;
+  readonly confirmLabel?: string;
+  readonly cancelLabel?: string;
+  readonly findingDisplay?: SensitiveFindingDisplayMode;
+  readonly showFindings?: boolean;
+  readonly recheck?: SubmissionConfirmationRecheck;
 }
 
 export type FormSubmitStatus = "idle" | "submitting" | "confirming" | "success" | "error";
@@ -790,6 +866,7 @@ export interface FormRendererSlots {
 export interface SubmissionProtectionProps {
   readonly submissionGuards?: readonly SubmissionGuard[];
   readonly receiptStore?: SubmissionReceiptStore;
+  readonly submissionScope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">;
   readonly attemptStore?: SubmissionAttemptStore;
   readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
 }

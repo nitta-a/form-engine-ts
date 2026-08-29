@@ -39,6 +39,12 @@ show display names such as `日本語` and `English` everywhere locale names are
 same default type icon on both sides; replace it with `renderItemIcon` or `getTranslationSlotIcon`. The icon callback
 receives the item, `nodeKind`, `targetProperty`, and field/option position metadata.
 
+`TranslationComparisonWorkspace` accepts `appearance` for Maker-specific customization. `appearance.input.borderColor`
+supports default, hover, focus, missing, translated, and stale states; `appearance.layout` controls source/target widths,
+gaps, input height, label position, and responsive mode; `appearance.status` controls visibility, labels, colors, icons,
+and badge placement. The existing `i18n.messages`/`customCatalogs` options override FormEngine's built-in Japanese or
+English catalog, so application dictionaries can remove residual English UI text.
+
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";
 
@@ -118,8 +124,9 @@ default.
 as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
 
 Select options in the MUI adapter support icons, descriptions, groups (`group`/`groupLabel` or `kind`), custom metadata,
-and custom `renderOption`/`renderValue` callbacks. Without a custom renderer, icons appear beside labels in the menu and
-in the selected value. The standard
+and custom `renderOption`/`renderValue` callbacks, label-only or rich option display, description text, and per-control
+size, variant, and width settings. Without a custom renderer, icons appear beside labels in the menu and in the selected
+value. The standard
 MUI field editor supplies icons for every field type and accepts `slots.fieldTypeSelect` and `slots.fieldEditorHeader`
 for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `button`, and
 `iconButton` MUI props in addition to the layout props.

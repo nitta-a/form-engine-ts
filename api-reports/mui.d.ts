@@ -1,4 +1,4 @@
-import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
+import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderOptionEditorSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonAppearance, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
 import * as _form_engine_ts_core from '@form-engine-ts/core';
@@ -22,6 +22,7 @@ interface MuiFormEngineI18nOptions {
     readonly locale?: string;
     readonly fallbackLocale?: string;
     readonly messages?: FormEngineMessages;
+    readonly customCatalogs?: Record<string, FormEngineMessages>;
     readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
     readonly strict?: boolean;
     readonly translator?: FormEngineTranslator;
@@ -251,6 +252,7 @@ interface TranslationComparisonWorkspaceProps {
     readonly localeSelectorMode?: "tabs" | "select";
     readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
     readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
+    readonly appearance?: TranslationComparisonAppearance;
     readonly i18n?: MuiFormEngineI18nOptions;
     readonly slots?: {
         readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
