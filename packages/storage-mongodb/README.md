@@ -31,6 +31,11 @@ typed `created`, `duplicate`, and `conflict` results based on the submission ID 
 `validateSubmissions: true` (or pass `validateAgainstSchema` to `saveSubmission`) to re-validate against the stored
 `FormSchema`.
 
+For save-time validation independent of the stored schema, provide `submissionSchema` or `submissionValidator` (or
+the aliases `schema`, `validator`, and `validation`) when creating the adapter, or pass `{ validation }` to
+`saveSubmission`. Sources can be a `FormSchema`, a Zod-like `safeParse` schema, or a synchronous/asynchronous
+validator callback.
+
 The caller owns the MongoDB connection lifecycle. Collection names can be customized with the legacy flat options or
 with `collectionNames`. `customIndexes` adds application-owned indexes to the configured forms, versions, or response
 collections; `createIndexes()` creates the built-in indexes first and then the custom definitions. Range boundaries are

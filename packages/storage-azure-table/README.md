@@ -43,7 +43,10 @@ owns table creation, credentials, retries, and client lifecycle.
 The default codec persists the canonical `FormSubmission.values` payload and never creates an `answers` property. Set
 `rejectLegacyAnswers: true` to fail explicitly when a legacy entity is encountered; no legacy decoding or migration is
 performed. `idempotentSubmissions: true` enables typed `created`, `duplicate`, and `conflict` results from
-`saveSubmission(submission)`. Pass `validateAgainstSchema: true` to re-validate against the stored schema.
+`saveSubmission(submission)`. Pass `validateAgainstSchema: true` to re-validate against the stored schema. Pass
+`submissionSchema`, `submissionValidator`, or `validation` to validate every submission before it is written; the same
+source can be supplied per call as `saveSubmission(submission, { validation })`. A source can be a FormSchema, a
+Zod-compatible object with `safeParse`, or an async validator callback.
 
 `listTextAnswerPage` accepts either the legacy single field ID or `TextAnswerPageQueryOptions.fieldIds`. Page size counts
 emitted text items rather than entities. Its opaque Base64 JSON cursor retains the Azure continuation token plus entity

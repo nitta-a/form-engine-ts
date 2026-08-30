@@ -61,9 +61,11 @@ slot lookup use this same normalization so equivalent locale spellings cannot by
 Submissions use `values` as their canonical answer property. `FormSubmission<TMeta>` carries application metadata types
 through creation and wire conversion. Applications that own storage contracts can use `TypedFormStorageAdapter<TMeta>`
 and `TypedPagedSubmissionStorageAdapter<TMeta>` to retain that type through persistence and pagination. `toFormSubmissionWire` and
-`fromFormSubmissionWire` preserve the optional submission `locale` across validated wire payloads. Legacy payloads with
-`answers` are isolated under `LegacyFormSubmission` and `fromLegacyFormSubmission` in the compatibility namespace.
-`serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`.
+`fromFormSubmissionWire` preserve the optional submission `locale` across validated wire payloads. Use
+`createFormSubmissionSchema({ metadata })` to generate a wire schema with application-owned metadata validation. Legacy
+payloads with `answers` are provided by the separate `@form-engine-ts/legacy` package.
+`serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`, while
+`trpcSubmissionErrorAdapter` handles tRPC `data` and `shape.data` boundaries.
 
 Fields can use a `displayRule` with nested `all`/`any` condition groups and `show` or `hide` actions. Supported
 operators include equality, containment, emptiness, and numeric comparisons; the legacy `displayCondition` and

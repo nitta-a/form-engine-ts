@@ -4,6 +4,7 @@ import {
   type BaseSubmissionMetadata,
   calculateFieldVisibility,
   calculatePageVisibility,
+  deserializeSubmissionErrorFromTrpc,
   type FormField,
   type FormSchema,
   FormSubmissionError,
@@ -232,18 +233,20 @@ export function FormProvider<TMeta extends BaseSubmissionMetadata>({
         setSubmitStatus("success");
         return response === undefined ? { status: "success" } : { status: "success", response };
       } catch (cause) {
-        const error = isFormSubmissionSerializedError(cause)
-          ? new FormSubmissionError(cause)
-          : isServerErrorPayload(cause)
-            ? new FormSubmissionError({
-                code: "VALIDATION_FAILED",
-                messageKey: cause.formError ?? "Submission failed",
-                fieldErrors: cause.fieldErrors ?? {},
-                formErrors: cause.formError === undefined ? [] : [cause.formError]
-              })
-            : cause instanceof Error
-              ? cause
-              : new Error(String(cause));
+        const error =
+          deserializeSubmissionErrorFromTrpc(cause) ??
+          (isFormSubmissionSerializedError(cause)
+            ? new FormSubmissionError(cause)
+            : isServerErrorPayload(cause)
+              ? new FormSubmissionError({
+                  code: "VALIDATION_FAILED",
+                  messageKey: cause.formError ?? "Submission failed",
+                  fieldErrors: cause.fieldErrors ?? {},
+                  formErrors: cause.formError === undefined ? [] : [cause.formError]
+                })
+              : cause instanceof Error
+                ? cause
+                : new Error(String(cause)));
         setSubmitError(error);
         setSubmitStatus("error");
         return { status: "error", error };

@@ -129,6 +129,18 @@ describe("createAzureTableStorage", () => {
     expect([...entities.values()].find((entity) => entity.kind === "submission")).not.toHaveProperty("answers");
   });
 
+  it("validates submissions with an injected validator before creating an entity", async () => {
+    const { client, entities } = createClientStub();
+    const validator = vi.fn((value: FormSubmission) => {
+      if (value.values.answer !== "accepted") throw new Error("submission rejected");
+    });
+    const storage = createAzureTableStorage({ client, submissionValidator: validator });
+
+    await expect(storage.saveSubmission(submission("rejected"))).rejects.toThrow("submission rejected");
+    expect(validator).toHaveBeenCalledOnce();
+    expect([...entities.values()].filter((entity) => entity.kind === "submission")).toHaveLength(0);
+  });
+
   it("can reject legacy answers entities explicitly", async () => {
     const { client, entities } = createClientStub();
     entities.set("form\u0000legacy", {

@@ -1,4 +1,5 @@
 import type { BuilderTranslationKey } from "./i18n/keys";
+import type { FormSubmissionValidationSource } from "./validation";
 import type { FormVersionRecord, FormVersionState, Result, VersionTransitionEvent } from "./versioning";
 
 export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
@@ -292,6 +293,12 @@ export interface SaveSubmissionOptions {
   readonly idempotent?: boolean;
   /** Re-fetch and validate the stored FormSchema before persisting. */
   readonly validateAgainstSchema?: boolean;
+  /** Validate with an explicitly supplied FormSchema, Zod-compatible schema, or callback. */
+  readonly validation?: FormSubmissionValidationSource;
+  /** Alias for `validation` for adapters that expose a validator-oriented API. */
+  readonly validator?: FormSubmissionValidationSource;
+  /** Explicit schema alias for adapters that expose schema-oriented options. */
+  readonly schema?: FormSubmissionValidationSource;
 }
 
 /** A submission whose persisted or transport representation always includes a locale. */

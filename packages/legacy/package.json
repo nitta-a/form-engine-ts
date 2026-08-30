@@ -1,5 +1,5 @@
 {
-  "name": "@form-engine-ts/storage-mongodb",
+  "name": "@form-engine-ts/legacy",
   "version": "6.9.0",
   "publishConfig": {
     "access": "public"
@@ -25,32 +25,15 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nitta-a/form-engine-ts.git",
-    "directory": "packages/storage-mongodb"
+    "directory": "packages/legacy"
   },
-  "bugs": {
-    "url": "https://github.com/nitta-a/form-engine-ts/issues"
-  },
-  "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
-  "keywords": [
-    "form",
-    "survey",
-    "storage",
-    "mongodb",
-    "typescript"
-  ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core --external mongodb",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @form-engine-ts/core",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@form-engine-ts/core": "workspace:*"
-  },
-  "peerDependencies": {
-    "mongodb": "^6.0.0"
-  },
-  "devDependencies": {
-    "mongodb": "^6.0.0"
   }
 }

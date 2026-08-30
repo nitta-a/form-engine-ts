@@ -261,6 +261,8 @@ and error states, duplicate-request protection, retry, and reset. Receipt stores
 `sessionId` scopes; pass the same values as `submissionScope` to make completion state deck- or session-specific.
 For lower-level viewer flows, `useSubmissionController` also accepts a schema/scope configuration and creates
 UUID, ULID, or custom-ID `StrictFormSubmission` payloads with scoped duplicate protection and receipt state.
+`FormRenderer` also accepts `submissionController` directly, so controller state, retry behavior, and submission identity
+do not need a local `onSubmit` adapter.
 `FormRendererFieldConfig.a11y` customizes field labels, descriptions, required indicators, error placement metadata,
 and option labels.
 `submissionConfirmation` can configure title, message, button labels, finding display (`full`, `masked`, `type`, or

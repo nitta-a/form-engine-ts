@@ -613,6 +613,7 @@ export type SubmitResult =
 export interface SubmitResponse {
   readonly submissionId?: string;
   readonly submittedAt?: string;
+  readonly receiptId?: string;
 }
 
 export type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseSubmissionMetadata> =

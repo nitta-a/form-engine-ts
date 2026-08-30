@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, BaseSubmissionMetadata, FormSubmission, SaveSubmissionOptions, SubmissionSaveResult, TextAnswerPageQueryOptions, TypedTextAnswerPage, JsonValue, SubmissionFilter } from '@form-engine-ts/core';
+import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, FormSubmissionValidationSource, FormSubmissionValidator, BaseSubmissionMetadata, FormSubmission, SaveSubmissionOptions, SubmissionSaveResult, TextAnswerPageQueryOptions, TypedTextAnswerPage, JsonValue, SubmissionFilter } from '@form-engine-ts/core';
 import { IndexSpecification, CreateIndexesOptions, Db, Document } from 'mongodb';
 
 interface MongoCustomIndexDefinition {
@@ -29,6 +29,13 @@ interface MongoDbStorageOptions {
     readonly idempotency?: boolean;
     /** Re-validate a submission against the stored FormSchema before saving. */
     readonly validateSubmissions?: boolean;
+    /** Validate every saved submission with an application-owned schema or callback. */
+    readonly submissionSchema?: FormSubmissionValidationSource;
+    readonly submissionValidator?: FormSubmissionValidator;
+    /** Alias for `submissionValidator`/`submissionSchema`. */
+    readonly validation?: FormSubmissionValidationSource;
+    readonly validator?: FormSubmissionValidationSource;
+    readonly schema?: FormSubmissionValidationSource;
 }
 interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
     createIndexes(): Promise<void>;

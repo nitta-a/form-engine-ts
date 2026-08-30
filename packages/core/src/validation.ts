@@ -31,6 +31,25 @@ export interface SubmissionValidationResult {
   readonly piiFindings?: readonly SensitiveDataFinding[];
 }
 
+/** A Zod-compatible schema accepted by storage and RPC integrations. */
+export interface SubmissionSchema<TOutput = unknown> {
+  readonly safeParse: (
+    value: unknown
+  ) => { readonly success: true; readonly data: TOutput } | { readonly success: false; readonly error: unknown };
+}
+
+export type FormSubmissionValidatorResult = undefined | boolean | SubmissionValidationResult;
+
+/** Application-owned submission validation callback. */
+export type FormSubmissionValidator<TMeta extends BaseSubmissionMetadata | undefined = undefined> = (
+  submission: FormSubmission<TMeta>
+) => unknown | Promise<unknown>;
+
+export type FormSubmissionValidationSource<TMeta extends BaseSubmissionMetadata | undefined = undefined> =
+  | FormSchema
+  | SubmissionSchema
+  | FormSubmissionValidator<TMeta>;
+
 const DEFAULT_MESSAGES: Record<ValidationCode, string> = {
   required: "validation.required",
   invalid_type: "validation.invalidType",

@@ -2,6 +2,7 @@ import { FormSubmissionError as CoreFormSubmissionError, type FormSchema } from 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
+  createSubmissionController,
   FormRenderer,
   type RenderSubmitButtonProps,
   type SubmissionReceipt,
@@ -17,6 +18,20 @@ const schema: FormSchema = {
 };
 
 describe("FormRenderer submission presentation", () => {
+  it("accepts a submission controller without a local onSubmit adapter", async () => {
+    const user = userEvent.setup();
+    const submit = vi.fn(async () => ({ submissionId: "controller-submission" }));
+    const controller = createSubmissionController({ submit });
+    render(<FormRenderer schema={schema} submissionController={controller} />);
+
+    await user.type(screen.getByLabelText(/Name/), "Ada");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    await screen.findByRole("status");
+    expect(submit).toHaveBeenCalledOnce();
+    expect(controller.getState()).toMatchObject({ status: "success", canRetry: false });
+  });
+
   it("replaces the form after success and focuses the completion status", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn(async () => undefined);

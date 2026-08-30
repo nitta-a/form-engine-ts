@@ -11,6 +11,16 @@ export interface FormSubmissionSerializedError {
   readonly piiWarningAcknowledged?: boolean;
 }
 
+/** JSON payload carried by a tRPC error's `data` or `shape.data` property. */
+export interface TrpcFormSubmissionErrorData extends FormSubmissionSerializedError {
+  readonly source: "form-engine";
+}
+
+export interface TrpcSubmissionErrorAdapter {
+  readonly serialize: (error: FormSubmissionError) => TrpcFormSubmissionErrorData;
+  readonly deserialize: (error: unknown) => FormSubmissionError | undefined;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -52,3 +62,38 @@ export const serializeSubmissionError = (error: FormSubmissionError): FormSubmis
 
 export const deserializeSubmissionError = (json: FormSubmissionSerializedError): FormSubmissionError =>
   new FormSubmissionError(json);
+
+function findTrpcSubmissionErrorPayload(
+  value: unknown,
+  seen: Set<object> = new Set()
+): FormSubmissionSerializedError | undefined {
+  if (!isRecord(value)) return undefined;
+  if (seen.has(value)) return undefined;
+  seen.add(value);
+  if (isFormSubmissionSerializedError(value)) return value;
+  const candidates = [value.data, value.shape, value.cause];
+  for (const candidate of candidates) {
+    const payload = findTrpcSubmissionErrorPayload(candidate, seen);
+    if (payload !== undefined) return payload;
+  }
+  return undefined;
+}
+
+/** Converts a FormSubmissionError into data safe to return from a tRPC procedure. */
+export function serializeSubmissionErrorForTrpc(error: FormSubmissionError): TrpcFormSubmissionErrorData {
+  return { ...error.payload, source: "form-engine" };
+}
+
+/** Restores a FormSubmissionError from a tRPC error, including `data` and `shape.data`. */
+export function deserializeSubmissionErrorFromTrpc(error: unknown): FormSubmissionError | undefined {
+  const payload = findTrpcSubmissionErrorPayload(error);
+  return payload === undefined ? undefined : new FormSubmissionError(payload);
+}
+
+/** Standard transport adapter for tRPC server/client boundaries. */
+export const trpcSubmissionErrorAdapter: TrpcSubmissionErrorAdapter = {
+  serialize: serializeSubmissionErrorForTrpc,
+  deserialize: deserializeSubmissionErrorFromTrpc
+};
+
+export const createTrpcSubmissionErrorAdapter = (): TrpcSubmissionErrorAdapter => trpcSubmissionErrorAdapter;

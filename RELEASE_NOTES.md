@@ -5,6 +5,17 @@ current release and usage information.
 
 ## Latest release
 
+### v6.9.0 — 2026-08-30
+
+- Added `createFormSubmissionSchema({ metadata })` for metadata-aware wire schemas.
+- Added common FormSchema, Zod-compatible schema, and callback validation sources to Azure Table and MongoDB saves.
+- Added direct `submissionController` integration for `FormRenderer`.
+- Added a typed tRPC submission-error adapter that preserves field errors, form errors, and PII findings.
+- Moved `answers` migration helpers to `@form-engine-ts/legacy`.
+- Aligned all public packages to version 6.9.0.
+
+See the [GitHub release for v6.9.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.9.0).
+
 ### v6.8.0 — 2026-08-30
 
 - Added the canonical Azure Table submission codec, which persists `FormSubmission.values` and never writes legacy `answers` columns; optional strict detection reports legacy entities explicitly.

@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, Question, FieldOption, ValidationIssue, ValidationError, BaseSubmissionMetadata, FormValues, TranslationStatus, CanonicalTranslationMetadata, FormValue, AnswerValidationResult, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FieldType, StrictFormSubmission } from '@form-engine-ts/core';
+import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, Question, FieldOption, ValidationIssue, ValidationError, BaseSubmissionMetadata, FormValues, TranslationStatus, CanonicalTranslationMetadata, FormValue, AnswerValidationResult, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, StrictFormSubmission, FieldType } from '@form-engine-ts/core';
 export { FormSubmissionError, FormSubmissionSerializedError, QuestionType, TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
@@ -785,6 +785,7 @@ type SubmitResult = {
 interface SubmitResponse {
     readonly submissionId?: string;
     readonly submittedAt?: string;
+    readonly receiptId?: string;
 }
 type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseSubmissionMetadata> = BaseSubmissionMetadata & TExtra;
 interface SubmitContext {
@@ -1208,76 +1209,6 @@ interface FormEngineI18nProviderProps {
 declare function FormEngineI18nProvider({ locale, fallbackLocale, messages, customCatalogs, customDictionary, onMissingKey, strict, translator: customTranslator, children }: FormEngineI18nProviderProps): react.JSX.Element;
 declare function useFormEngineI18n(): FormEngineI18nContextValue;
 
-declare function resolveChoiceFieldLayout(type: FieldType, appearance?: FormRendererAppearance, groupedChoiceFieldsLegacy?: boolean): "default" | "grouped";
-interface FieldComponentProps {
-    readonly field: FormField;
-    readonly value: FormValue;
-    readonly error: ValidationIssue | undefined;
-    readonly setValue: (value: FormValue) => void;
-    readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
-    readonly inputId: string;
-    readonly errorId: string;
-    readonly helpId: string;
-    readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
-    readonly a11y?: FormRendererFieldConfig["a11y"];
-}
-type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
-interface FormRendererPresentationProps extends SubmissionProtectionProps {
-    readonly components?: FieldComponents;
-    readonly className?: string;
-    readonly appearance?: FormRendererAppearance;
-    readonly slotProps?: FormRendererSlotProps;
-    /** @deprecated Use appearance.choiceField="grouped" instead. */
-    readonly groupedChoiceFields?: boolean;
-    /**
-     * Controls where the completion message is rendered after a successful submission.
-     * Defaults to "append" for backwards compatibility.
-     */
-    readonly successRenderMode?: FormSuccessRenderMode;
-    readonly submissionConfirmation?: SubmissionConfirmationOptions;
-    /** @deprecated Use submissionConfirmation.renderMode instead. */
-    readonly submissionConfirmationRenderMode?: SubmissionConfirmationRenderMode;
-    readonly showHiddenFieldsInSummary?: boolean;
-    readonly fieldsClassName?: string;
-    /** @deprecated Use successRenderMode="replace" instead. */
-    readonly hideFormOnSuccess?: boolean;
-    readonly successMessageKey?: string;
-    readonly errorMessageKey?: string;
-    readonly attemptIdFactory?: () => string;
-    /** Metadata copied into the submission context for typed application integrations. */
-    readonly submissionMetadata?: BaseSubmissionMetadata;
-    readonly messages?: Partial<FormRendererMessages>;
-    readonly messageResolver?: (key: keyof FormRendererMessages, defaultText: string) => string;
-    readonly autoSaveKey?: string;
-    readonly beforeSubmit?: BeforeSubmit;
-    readonly onDraftSave?: (draft: FormValues) => void;
-    readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
-    readonly slots?: FormRendererSlots;
-}
-interface StandaloneFormRendererProps extends FormRendererPresentationProps {
-    readonly schema: FormSchema;
-    readonly locale?: string;
-    readonly translator?: TranslationAdapter;
-    readonly initialValues?: FormValues;
-    readonly resetOnSuccess?: boolean;
-    readonly onSubmit: FormSubmitHandler;
-}
-interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends Omit<FormRendererPresentationProps, "submissionMetadata"> {
-    readonly submissionMetadata?: TMeta;
-}
-interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends TypedFormRendererPresentationProps<TMeta> {
-    readonly schema: FormSchema;
-    readonly locale?: string;
-    readonly translator?: TranslationAdapter;
-    readonly initialValues?: FormValues;
-    readonly resetOnSuccess?: boolean;
-    readonly onSubmit: TypedFormSubmitHandler<TMeta>;
-}
-type TypedFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> = TypedFormRendererPresentationProps<TMeta> | TypedStandaloneFormRendererProps<TMeta>;
-type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
-declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
-declare function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(props: TypedFormRendererProps<TMeta>): react.JSX.Element;
-
 type SubmissionControllerStatus = "idle" | "submitting" | "success" | "error";
 interface SubmissionControllerState<TResponse = SubmitResponse> {
     readonly status: SubmissionControllerStatus;
@@ -1352,5 +1283,77 @@ declare function createScopedSubmissionController<TMeta extends BaseSubmissionMe
 declare function createSubmissionController<TResponse = SubmitResponse, TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(options: SubmissionControllerOptions<TResponse, TMeta>): SubmissionController<TResponse, TMeta>;
 declare function useSubmissionController<TResponse, TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(controller: SubmissionController<TResponse, TMeta>): SubmissionControllerState<TResponse> & Pick<SubmissionController<TResponse, TMeta>, "submit" | "retry" | "reset">;
 declare function useSubmissionController<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(options: CreateSubmissionControllerOptions<TMeta>): ScopedSubmissionControllerState<TMeta> & Pick<ScopedSubmissionController<TMeta>, "submit" | "reset">;
+
+declare function resolveChoiceFieldLayout(type: FieldType, appearance?: FormRendererAppearance, groupedChoiceFieldsLegacy?: boolean): "default" | "grouped";
+interface FieldComponentProps {
+    readonly field: FormField;
+    readonly value: FormValue;
+    readonly error: ValidationIssue | undefined;
+    readonly setValue: (value: FormValue) => void;
+    readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
+    readonly inputId: string;
+    readonly errorId: string;
+    readonly helpId: string;
+    readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
+    readonly a11y?: FormRendererFieldConfig["a11y"];
+}
+type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
+interface FormRendererPresentationProps extends SubmissionProtectionProps {
+    readonly components?: FieldComponents;
+    readonly className?: string;
+    readonly appearance?: FormRendererAppearance;
+    readonly slotProps?: FormRendererSlotProps;
+    /** @deprecated Use appearance.choiceField="grouped" instead. */
+    readonly groupedChoiceFields?: boolean;
+    /**
+     * Controls where the completion message is rendered after a successful submission.
+     * Defaults to "append" for backwards compatibility.
+     */
+    readonly successRenderMode?: FormSuccessRenderMode;
+    readonly submissionConfirmation?: SubmissionConfirmationOptions;
+    /** @deprecated Use submissionConfirmation.renderMode instead. */
+    readonly submissionConfirmationRenderMode?: SubmissionConfirmationRenderMode;
+    readonly showHiddenFieldsInSummary?: boolean;
+    readonly fieldsClassName?: string;
+    /** @deprecated Use successRenderMode="replace" instead. */
+    readonly hideFormOnSuccess?: boolean;
+    readonly successMessageKey?: string;
+    readonly errorMessageKey?: string;
+    readonly attemptIdFactory?: () => string;
+    /** Metadata copied into the submission context for typed application integrations. */
+    readonly submissionMetadata?: BaseSubmissionMetadata;
+    readonly messages?: Partial<FormRendererMessages>;
+    readonly messageResolver?: (key: keyof FormRendererMessages, defaultText: string) => string;
+    readonly autoSaveKey?: string;
+    readonly beforeSubmit?: BeforeSubmit;
+    readonly onDraftSave?: (draft: FormValues) => void;
+    readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
+    readonly slots?: FormRendererSlots;
+    /** Optional controller used directly for submission lifecycle, retry, and attempt identity. */
+    readonly submissionController?: SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>;
+}
+interface StandaloneFormRendererProps extends FormRendererPresentationProps {
+    readonly schema: FormSchema;
+    readonly locale?: string;
+    readonly translator?: TranslationAdapter;
+    readonly initialValues?: FormValues;
+    readonly resetOnSuccess?: boolean;
+    readonly onSubmit?: FormSubmitHandler;
+}
+interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends Omit<FormRendererPresentationProps, "submissionMetadata"> {
+    readonly submissionMetadata?: TMeta;
+}
+interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends TypedFormRendererPresentationProps<TMeta> {
+    readonly schema: FormSchema;
+    readonly locale?: string;
+    readonly translator?: TranslationAdapter;
+    readonly initialValues?: FormValues;
+    readonly resetOnSuccess?: boolean;
+    readonly onSubmit?: TypedFormSubmitHandler<TMeta>;
+}
+type TypedFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> = TypedFormRendererPresentationProps<TMeta> | TypedStandaloneFormRendererProps<TMeta>;
+type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
+declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
+declare function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(props: TypedFormRendererProps<TMeta>): react.JSX.Element;
 
 export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, validateLocalePipeline };

@@ -2,6 +2,8 @@ import type {
   BaseSubmissionMetadata,
   FormSchema,
   FormSubmission,
+  FormSubmissionValidationSource,
+  FormSubmissionValidator,
   FormValue,
   JsonValue,
   PagedSubmissionStorageAdapter,
@@ -19,6 +21,7 @@ import type {
 import {
   assertValidFormSchema,
   assertValidFormSubmission,
+  assertValidFormSubmissionWith,
   hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
@@ -227,6 +230,13 @@ export interface AzureTableStorageOptions<T = FormSubmission> {
   readonly idempotency?: boolean;
   /** Re-validate a submission against the stored FormSchema before saving. */
   readonly validateSubmissions?: boolean;
+  /** Validate every saved submission with an application-owned schema or callback. */
+  readonly submissionSchema?: FormSubmissionValidationSource;
+  readonly submissionValidator?: FormSubmissionValidator;
+  /** Alias for `submissionValidator`/`submissionSchema`. */
+  readonly validation?: FormSubmissionValidationSource;
+  readonly validator?: FormSubmissionValidationSource;
+  readonly schema?: FormSubmissionValidationSource;
 }
 
 export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
@@ -939,6 +949,17 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
     ): Promise<undefined | SubmissionSaveResult> {
       ensureWritable();
       const stored = parseSubmission(submission, `input ${String(submission?.id)}`);
+      const explicitValidation = saveOptions.validator ?? saveOptions.validation;
+      const configuredValidation =
+        options.submissionValidator ??
+        options.submissionSchema ??
+        options.validator ??
+        options.schema ??
+        options.validation;
+      if (explicitValidation !== undefined) await assertValidFormSubmissionWith(explicitValidation, stored);
+      if (explicitValidation === undefined && configuredValidation !== undefined) {
+        await assertValidFormSubmissionWith(configuredValidation, stored);
+      }
       if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
         const schema = parseSchemaEntity(
           await (await schemaClient(stored.formId)).getEntity(stored.formId, schemaRowKey(stored.formVersion))

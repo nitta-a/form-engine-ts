@@ -12,7 +12,7 @@ import type {
   StrictFormSubmission,
   StrictFormSubmissionWire
 } from "./types";
-import { validateAnswers } from "./validation";
+import { type FormSubmissionValidationSource, type SubmissionValidationResult, validateAnswers } from "./validation";
 import { selectVisibleAnswers } from "./visibility";
 
 export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
@@ -140,7 +140,10 @@ export async function hashFormSubmissionPayload(submission: FormSubmission): Pro
 export const createSubmissionPayloadHash = hashFormSubmissionPayload;
 
 /** Re-validates a submission against the exact schema version used to create it. */
-export function assertValidFormSubmission(schema: FormSchema, submission: FormSubmission): void {
+function assertValidFormSubmissionInternal<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  schema: FormSchema,
+  submission: FormSubmission<TMeta>
+): void {
   assertValidFormSchema(schema);
   if (submission.formId !== schema.id || submission.formVersion !== schema.version) {
     throw new TypeError("Submission form identity does not match the schema.");
@@ -154,6 +157,65 @@ export function assertValidFormSubmission(schema: FormSchema, submission: FormSu
     throw new TypeError(
       `Invalid form answers: ${result.issues.map((item) => `${item.fieldId}:${item.code}`).join(", ")}`
     );
+  }
+}
+
+/** Re-validates a submission against the exact schema version used to create it. */
+export function assertValidFormSubmission(schema: FormSchema, submission: FormSubmission): void {
+  assertValidFormSubmissionInternal(schema, submission);
+}
+
+function isFormSchema<TMeta extends BaseSubmissionMetadata | undefined>(
+  value: FormSubmissionValidationSource<TMeta>
+): value is FormSchema {
+  return typeof value === "object" && value !== null && "fields" in value && "id" in value && "version" in value;
+}
+
+function validationResultError(result: SubmissionValidationResult): Error {
+  return new TypeError(
+    [...Object.values(result.fieldErrors), ...result.formErrors].join("; ") || "Submission validation failed.",
+    { cause: { code: "VALIDATION_FAILED", messageKey: "validation.submission", ...result } }
+  );
+}
+
+function isSubmissionValidationResult(value: unknown): value is SubmissionValidationResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "valid" in value &&
+    typeof value.valid === "boolean" &&
+    "fieldErrors" in value &&
+    typeof value.fieldErrors === "object" &&
+    value.fieldErrors !== null &&
+    "formErrors" in value &&
+    Array.isArray(value.formErrors)
+  );
+}
+
+/** Validates a submission with a FormSchema, a Zod-compatible schema, or a callback. */
+export async function assertValidFormSubmissionWith<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  source: FormSubmissionValidationSource<TMeta>,
+  submission: FormSubmission<TMeta>
+): Promise<void> {
+  if (isFormSchema(source)) {
+    assertValidFormSubmissionInternal(source, submission);
+    return;
+  }
+  if (typeof source === "function") {
+    const result = await source(submission);
+    if (result === false) throw new TypeError("Submission validation failed.");
+    if (isSubmissionValidationResult(result) && result.valid === false) {
+      throw validationResultError(result);
+    }
+    return;
+  }
+  const parsed = source.safeParse({
+    ...submission,
+    values: { ...submission.values },
+    metadata: submission.metadata ?? {}
+  });
+  if (!parsed.success) {
+    throw new TypeError("Submission does not match the configured schema.", { cause: parsed.error });
   }
 }
 

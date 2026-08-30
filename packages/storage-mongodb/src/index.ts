@@ -2,6 +2,8 @@ import type {
   BaseSubmissionMetadata,
   FormSchema,
   FormSubmission,
+  FormSubmissionValidationSource,
+  FormSubmissionValidator,
   FormValue,
   FormVersionRecord,
   FormVersionState,
@@ -20,6 +22,7 @@ import type {
 import {
   assertValidFormSchema,
   assertValidFormSubmission,
+  assertValidFormSubmissionWith,
   decodeSubmissionCursor,
   decodeTextAnswerCursor,
   encodeSubmissionCursor,
@@ -66,6 +69,13 @@ export interface MongoDbStorageOptions {
   readonly idempotency?: boolean;
   /** Re-validate a submission against the stored FormSchema before saving. */
   readonly validateSubmissions?: boolean;
+  /** Validate every saved submission with an application-owned schema or callback. */
+  readonly submissionSchema?: FormSubmissionValidationSource;
+  readonly submissionValidator?: FormSubmissionValidator;
+  /** Alias for `submissionValidator`/`submissionSchema`. */
+  readonly validation?: FormSubmissionValidationSource;
+  readonly validator?: FormSubmissionValidationSource;
+  readonly schema?: FormSubmissionValidationSource;
 }
 
 export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
@@ -572,6 +582,17 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       saveOptions: SaveSubmissionOptions = {}
     ): Promise<undefined | SubmissionSaveResult> {
       const stored = cloneJson(parseSubmission(submission, `input "${String(submission?.id)}"`));
+      const explicitValidation = saveOptions.validator ?? saveOptions.validation;
+      const configuredValidation =
+        options.submissionValidator ??
+        options.submissionSchema ??
+        options.validator ??
+        options.schema ??
+        options.validation;
+      if (explicitValidation !== undefined) await assertValidFormSubmissionWith(explicitValidation, stored);
+      if (explicitValidation === undefined && configuredValidation !== undefined) {
+        await assertValidFormSubmissionWith(configuredValidation, stored);
+      }
       if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
         const schema = await schemas.findOne({ _id: schemaDocumentId(stored.formId, stored.formVersion) });
         if (schema === null) throw new Error("MongoDB submission schema was not found.");

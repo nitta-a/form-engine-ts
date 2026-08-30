@@ -1,5 +1,6 @@
 import {
   type BaseSubmissionMetadata,
+  deserializeSubmissionErrorFromTrpc,
   type FieldType,
   type FormField,
   type FormSchema,
@@ -31,6 +32,7 @@ import { createLocalStorageSubmissionAttemptStore, type SubmissionAttempt } from
 import { FormProvider, useForm } from "./context";
 import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "./i18n/provider";
 import type { SubmissionReceipt } from "./receipt";
+import type { ScopedSubmissionController, SubmissionController } from "./submission";
 import type {
   BeforeSubmit,
   ChoiceFieldTypeLayoutMap,
@@ -609,6 +611,10 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly onDraftSave?: (draft: FormValues) => void;
   readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
   readonly slots?: FormRendererSlots;
+  /** Optional controller used directly for submission lifecycle, retry, and attempt identity. */
+  readonly submissionController?:
+    | SubmissionController<SubmitResponse>
+    | ScopedSubmissionController<BaseSubmissionMetadata>;
 }
 
 export interface StandaloneFormRendererProps extends FormRendererPresentationProps {
@@ -617,7 +623,7 @@ export interface StandaloneFormRendererProps extends FormRendererPresentationPro
   readonly translator?: TranslationAdapter;
   readonly initialValues?: FormValues;
   readonly resetOnSuccess?: boolean;
-  readonly onSubmit: FormSubmitHandler;
+  readonly onSubmit?: FormSubmitHandler;
 }
 
 export interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>
@@ -632,7 +638,7 @@ export interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMe
   readonly translator?: TranslationAdapter;
   readonly initialValues?: FormValues;
   readonly resetOnSuccess?: boolean;
-  readonly onSubmit: TypedFormSubmitHandler<TMeta>;
+  readonly onSubmit?: TypedFormSubmitHandler<TMeta>;
 }
 
 export type TypedFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> =
@@ -640,6 +646,40 @@ export type TypedFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSu
   | TypedStandaloneFormRendererProps<TMeta>;
 
 export type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererProps;
+
+function isScopedSubmissionController(
+  controller: SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>
+): controller is ScopedSubmissionController<BaseSubmissionMetadata> {
+  return "scope" in controller.getState();
+}
+
+function createControllerSubmitHandler<TMeta extends BaseSubmissionMetadata>(
+  controller: SubmissionController<SubmitResponse, TMeta> | ScopedSubmissionController<TMeta>
+): TypedFormSubmitHandler<TMeta> {
+  return async (answers, context) => {
+    const result = isScopedSubmissionController(
+      controller as SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>
+    )
+      ? await (controller as ScopedSubmissionController<TMeta>).submit(answers, context.locale)
+      : await (controller as SubmissionController<SubmitResponse, TMeta>).submit(answers, context);
+    if (result.status === "error") throw result.error;
+    if (result.status === "cancelled") throw new Error("Submission was cancelled.");
+    if (result.response === undefined) return undefined;
+    if (
+      isScopedSubmissionController(
+        controller as SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>
+      )
+    ) {
+      const state = (controller as ScopedSubmissionController<TMeta>).getState();
+      return {
+        ...(state.submission?.id === undefined ? {} : { submissionId: state.submission.id }),
+        ...(state.submission?.submittedAt === undefined ? {} : { submittedAt: state.submission.submittedAt }),
+        ...(result.response.receiptId === undefined ? {} : { receiptId: result.response.receiptId })
+      };
+    }
+    return result.response;
+  };
+}
 
 interface StoredDraft {
   readonly formId: string;
@@ -1148,9 +1188,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         const payload =
           result.error instanceof FormSubmissionError
             ? result.error.payload
-            : isFormSubmissionSerializedError(result.error)
-              ? result.error
-              : undefined;
+            : (deserializeSubmissionErrorFromTrpc(result.error)?.payload ??
+              (isFormSubmissionSerializedError(result.error) ? result.error : undefined));
         if (payload !== undefined) {
           const fieldErrors = payload.fieldErrors ?? {};
           form.setServerErrors?.(fieldErrors);
@@ -1665,6 +1704,7 @@ export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     initialValues,
     resetOnSuccess,
     onSubmit,
+    submissionController,
     ...rendererProps
   } = props;
   const translator =
@@ -1680,7 +1720,16 @@ export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       schema={schema}
       locale={locale}
       translator={translator}
-      onSubmit={onSubmit as TypedFormSubmitHandler<TMeta>}
+      onSubmit={
+        (onSubmit as TypedFormSubmitHandler<TMeta> | undefined) ??
+        (submissionController === undefined
+          ? async () => {
+              throw new Error("FormRenderer requires onSubmit or submissionController.");
+            }
+          : createControllerSubmitHandler(
+              submissionController as SubmissionController<SubmitResponse, TMeta> | ScopedSubmissionController<TMeta>
+            ))
+      }
       {...(initialValues === undefined ? {} : { initialValues })}
       {...(resetOnSuccess === undefined ? {} : { resetOnSuccess })}
     >
