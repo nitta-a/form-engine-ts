@@ -35,8 +35,8 @@ const schema: FormSchema = {
 
 describe("custom survey client", () => {
   it("translates and saves editor state through the adapter", async () => {
-    const save = vi.fn<SurveyEditorAdapter["save"]>().mockResolvedValue(undefined);
-    const translate = vi.fn<SurveyEditorAdapter["translate"]>().mockResolvedValue({
+    const save = vi.fn<NonNullable<SurveyEditorAdapter["save"]>>().mockResolvedValue(undefined);
+    const translate = vi.fn<NonNullable<SurveyEditorAdapter["translate"]>>().mockResolvedValue({
       ...schema,
       title: "Translated survey"
     });
