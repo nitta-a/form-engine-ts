@@ -11,6 +11,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Core | `@form-engine-ts/core` | Schema, visibility, validation, submissions, analytics, CSV, and shared adapter types |
 | Migration package | `@form-engine-ts/legacy` | Isolated compatibility helpers for migrating the deprecated `answers` contract |
 | React renderer / builder | `@form-engine-ts/react` | SSR-safe provider, conditional renderer, accessible visual builder, hooks, overrides, and base styles |
+| Survey client | `@form-engine-ts/custom-survey-client` | Adapter-driven survey editor, free-text translation, version actions, and localized response summaries |
 | Storage adapter | `@form-engine-ts/storage-memory` | Process-local form/submission storage with defensive copying and duplicate protection |
 | Storage adapter | `@form-engine-ts/storage-localstorage` | Prefix-isolated browser persistence with injectable storage for tests and SSR callers |
 | Storage adapter | `@form-engine-ts/storage-mongodb` | MongoDB Native Driver implementation of the complete form storage contract |
@@ -55,10 +56,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.0.0** (2026-08-31). All public packages are currently published at version `7.0.0`.
-This major release separates legacy Azure Table contracts into `@form-engine-ts/legacy`, unifies Submission ID configuration through `createSubmissionIdentity`, adds fully typed tRPC error restoration, and makes the common paging, filtering, listing, aggregation, CSV, idempotency, and validation storage contract required for MongoDB and Azure Table.
+The latest release is **v7.1.0** (2026-08-31). All public packages are currently published at version `7.1.0`.
+This release expands `@form-engine-ts/custom-survey-client` with action-oriented editor and version controllers, quality-issue decisions, `FormResponse` free-text normalization, cancellable PII confirmation, and additional survey editor slots while preserving the previous adapter and hook names.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.0.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.1.0).
 
 ### Authoring and respondent experience
 
@@ -324,6 +325,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Core | `@form-engine-ts/core` | JSON互換型とスキーマ・表示条件・検証・回答・集計・CSVの純粋関数 |
 | Migration package | `@form-engine-ts/legacy` | 非推奨の`answers`契約から移行するための互換ヘルパー |
 | React Renderer / Builder | `@form-engine-ts/react` | SSR対応Provider、条件付きRenderer、アクセシブルなBuilder、フック、標準CSS |
+| Survey client | `@form-engine-ts/custom-survey-client` | adapter駆動のSurvey Editor、自由記述翻訳、version action、ローカライズ済み回答サマリー |
 | Storage Adapter | `@form-engine-ts/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージ |
 | Storage Adapter | `@form-engine-ts/storage-localstorage` | prefix分離とstorage注入に対応するブラウザ永続化 |
 | Storage Adapter | `@form-engine-ts/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージ |
@@ -368,10 +370,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.0.0**（2026-08-31）です。公開パッケージはすべてバージョン `7.0.0` で公開されています。
-本メジャーリリースでは、旧Azure Table契約を`@form-engine-ts/legacy`へ分離し、`createSubmissionIdentity`でSubmission ID設定を一本化しました。tRPCエラー復元を完全型対応にし、MongoDB／Azure Tableの共通ページング、フィルタ、一覧、集計、CSV、冪等保存、検証契約を必須化しています。
+最新版は **v7.1.0**（2026-08-31）です。公開パッケージはすべてバージョン `7.1.0` で公開されています。
+本リリースでは、`@form-engine-ts/custom-survey-client`にaction指向のEditor／version controller、品質問題の判定、`FormResponse`の自由記述正規化、PII確認のキャンセル、追加のSurvey Editor slotを追加し、従来のadapterとhook名も維持しています。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.0.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.1.0) を参照してください。
 
 ### 編集・回答体験
 

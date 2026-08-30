@@ -1,7 +1,12 @@
 import type { FormSchema } from "@form-engine-ts/core";
 import { FormBuilder, useFormBuilder } from "@form-engine-ts/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SurveyEditorOperationState, SurveyEditorProps, SurveyEditorRenderProps } from "./types";
+import type {
+  SurveyEditorAdapterInput,
+  SurveyEditorOperationState,
+  SurveyEditorProps,
+  SurveyEditorRenderProps
+} from "./types";
 
 function normalizeError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
@@ -9,6 +14,21 @@ function normalizeError(cause: unknown): Error {
 
 function initialState(): SurveyEditorOperationState {
   return { status: "idle" };
+}
+
+function translateSurveyPreview(
+  adapter: SurveyEditorAdapterInput,
+  request: Parameters<NonNullable<SurveyEditorAdapterInput["translateSurveyPreview"]>>[0]
+): Promise<FormSchema> {
+  const translate = adapter.translateSurveyPreview ?? ("translate" in adapter ? adapter.translate : undefined);
+  if (translate === undefined) throw new TypeError("SurveyEditorAdapter requires translateSurveyPreview.");
+  return translate(request);
+}
+
+function updateSurveyDraft(adapter: SurveyEditorAdapterInput, schema: FormSchema): Promise<void> {
+  const update = adapter.updateSurveyDraft ?? ("save" in adapter ? adapter.save : undefined);
+  if (update === undefined) throw new TypeError("SurveyEditorAdapter requires updateSurveyDraft.");
+  return update(schema);
 }
 
 export interface UseSurveyEditorOptions
@@ -55,7 +75,7 @@ export function useSurveyEditor({
   const save = useCallback(async (): Promise<boolean> => {
     setState({ status: "loading" });
     try {
-      await adapter.save(draftSchema);
+      await updateSurveyDraft(adapter, draftSchema);
       setState({ status: "success" });
       return true;
     } catch (cause) {
@@ -71,7 +91,7 @@ export function useSurveyEditor({
     translationController.current = controller;
     setState({ status: "loading" });
     try {
-      const translatedSchema = await adapter.translate({
+      const translatedSchema = await translateSurveyPreview(adapter, {
         schema: draftSchema,
         sourceLocale,
         targetLocale,
@@ -91,6 +111,9 @@ export function useSurveyEditor({
 
   return { schema: draftSchema, sourceLocale, targetLocale, state, save, translate, builder, onChange: updateSchema };
 }
+
+/** Preferred explicit controller name; useSurveyEditor remains as a compatibility alias. */
+export const useSurveyEditorController = useSurveyEditor;
 
 function defaultToolbar(props: SurveyEditorRenderProps, saveLabel: string, translateLabel: string): React.JSX.Element {
   const { state, save, translate } = props;
@@ -144,12 +167,15 @@ export function SurveyEditor(props: SurveyEditorProps): React.JSX.Element {
       {slots?.toolbar?.(renderedProps) ?? defaultToolbar(renderedProps, saveLabel, translateLabel)}
       {slots?.status?.(editor.state)}
       {editor.state.error !== undefined ? <div role="alert">{editor.state.error.message}</div> : null}
+      {slots?.notifications?.(renderedProps)}
+      {slots?.cardSettings?.(renderedProps)}
       <FormBuilder
         {...builderOptions}
         schema={editor.schema}
         onChange={editor.onChange}
         {...(locale === undefined ? {} : { locale })}
       />
+      {slots?.submissionSettings?.(renderedProps)}
       {slots?.after?.(renderedProps)}
     </section>
   );

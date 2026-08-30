@@ -52,6 +52,22 @@ describe("custom survey client", () => {
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ title: "Translated survey" }));
   });
 
+  it("accepts the new editor adapter contract and controller alias", async () => {
+    const updateSurveyDraft = vi.fn().mockResolvedValue(undefined);
+    const translateSurveyPreview = vi.fn().mockResolvedValue({ ...schema, title: "Preview" });
+    const { result } = renderHook(() =>
+      useSurveyEditor({ adapter: { updateSurveyDraft, translateSurveyPreview }, schema })
+    );
+
+    await act(async () => {
+      expect(await result.current.translate()).toBe(true);
+      expect(await result.current.save()).toBe(true);
+    });
+
+    expect(translateSurveyPreview).toHaveBeenCalled();
+    expect(updateSurveyDraft).toHaveBeenCalledWith(expect.objectContaining({ title: "Customer survey" }));
+  });
+
   it("translates selected free-text answers in language groups and requires PII confirmation", async () => {
     const items: FreeTextAnswerItem[] = [
       { id: "a", responseId: "r1", fieldId: "comment", text: "hello", sourceLanguage: "en" },
@@ -92,6 +108,33 @@ describe("custom survey client", () => {
     expect(result.current.items.every((item) => item.status === "success")).toBe(true);
   });
 
+  it("normalizes string answers from FormResponse records and supports cancelling PII confirmation", async () => {
+    const adapter = { translateBatch: vi.fn().mockResolvedValue([{ id: "r1:comment", text: "translated" }]) };
+    const { result } = renderHook(() =>
+      useFreeTextAnswerTranslation({
+        items: [
+          {
+            responseId: "r1",
+            formId: schema.id,
+            formVersion: schema.version,
+            sourceLocale: "en",
+            answers: { comment: "hello", score: 3 },
+            submittedAt: "2026-01-01T00:00:00.000Z"
+          }
+        ],
+        adapter,
+        targetLanguage: "ja",
+        detectPii: () => [{ fieldId: "comment", type: "email" }]
+      })
+    );
+
+    act(() => result.current.selectAll());
+    await act(async () => expect((await result.current.translateSelected()).status).toBe("needs_confirmation"));
+    act(() => result.current.cancelPii());
+    expect(result.current.status).toBe("idle");
+    expect(adapter.translateBatch).not.toHaveBeenCalled();
+  });
+
   it("gates publishing behind a warning confirmation and tracks operation state", async () => {
     const adapter: SurveyVersionAdapter = {
       qualityCheck: vi
@@ -113,6 +156,32 @@ describe("custom survey client", () => {
     });
     expect(adapter.publish).toHaveBeenCalledWith(expect.objectContaining({ allowWarnings: true }));
     expect(result.current.operations.publish.status).toBe("success");
+  });
+
+  it("supports quality issue decisions and the new version action names", async () => {
+    const issue = { code: "missing", message: "Missing translation", severity: "warning" as const };
+    const adapter: SurveyVersionAdapter = {
+      runQualityCheck: vi.fn().mockResolvedValue({ issues: [issue] }),
+      publish: vi.fn().mockResolvedValue(undefined),
+      decideQualityIssue: vi.fn().mockResolvedValue(undefined),
+      cloneDraft: vi.fn().mockResolvedValue(undefined),
+      deleteDraft: vi.fn().mockResolvedValue(undefined),
+      setVisibility: vi.fn().mockResolvedValue(undefined)
+    };
+    const { result } = renderHook(() => useSurveyVersionOperations({ version: schema, adapter }));
+
+    await act(async () => {
+      expect(await result.current.runQualityCheck()).toEqual({ issues: [issue] });
+      expect(await result.current.decideQualityIssue(issue, "accept")).toBe(true);
+      expect(await result.current.publish()).toBe(true);
+      expect(await result.current.cloneDraft()).toBe(true);
+      expect(await result.current.deleteDraft()).toBe(true);
+      expect(await result.current.setVisibility("published")).toBe(true);
+    });
+
+    expect(result.current.qualityDecisions["missing:"]).toBe("accept");
+    expect(adapter.publish).toHaveBeenCalledWith(expect.objectContaining({ allowWarnings: false }));
+    expect(result.current.operations.setVisibility.status).toBe("success");
   });
 
   it("localizes question and option labels from version data", () => {

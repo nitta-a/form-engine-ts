@@ -45,9 +45,22 @@ export interface SurveyEditorTranslateRequest {
 }
 
 export interface SurveyEditorAdapter {
-  readonly translate: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
-  readonly save: (schema: FormSchema) => Promise<void>;
+  /** @deprecated Use SurveyEditorActionsAdapter. */
+  readonly translate?: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
+  /** @deprecated Use SurveyEditorActionsAdapter. */
+  readonly save?: (schema: FormSchema) => Promise<void>;
+  /** Translates the survey preview and returns the updated schema. */
+  readonly translateSurveyPreview?: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
+  /** Persists the current survey draft. */
+  readonly updateSurveyDraft?: (schema: FormSchema) => Promise<void>;
 }
+
+export interface SurveyEditorActionsAdapter {
+  readonly translateSurveyPreview: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
+  readonly updateSurveyDraft: (schema: FormSchema) => Promise<void>;
+}
+
+export type SurveyEditorAdapterInput = SurveyEditorAdapter | SurveyEditorActionsAdapter;
 
 export type SurveyEditorOperationStatus = "idle" | "loading" | "success" | "error";
 
@@ -70,6 +83,9 @@ export interface SurveyEditorSlots {
   readonly toolbar?: (props: SurveyEditorRenderProps) => ReactNode;
   readonly after?: (props: SurveyEditorRenderProps) => ReactNode;
   readonly status?: (props: SurveyEditorOperationState) => ReactNode;
+  readonly notifications?: (props: SurveyEditorRenderProps) => ReactNode;
+  readonly cardSettings?: (props: SurveyEditorRenderProps) => ReactNode;
+  readonly submissionSettings?: (props: SurveyEditorRenderProps) => ReactNode;
 }
 
 export interface SurveyEditorProps
@@ -97,7 +113,7 @@ export interface FreeTextAnswerItem {
 }
 
 export type FreeTextAnswerSource = FreeTextAnswerItem | FormResponse;
-export type FreeTextAnswerInput = FreeTextAnswerItem | TextAnswerItem;
+export type FreeTextAnswerInput = FreeTextAnswerItem | TextAnswerItem | FormResponse;
 
 export interface FreeTextTranslationRequest {
   readonly items: readonly FreeTextAnswerItem[];
@@ -149,6 +165,7 @@ export interface UseFreeTextAnswerTranslationResult extends FreeTextTranslationS
   readonly selectAll: () => void;
   readonly clearSelection: () => void;
   readonly confirmPii: () => Promise<FreeTextTranslationState>;
+  readonly cancelPii: () => void;
   readonly translateSelected: () => Promise<FreeTextTranslationState>;
   readonly reset: () => void;
 }
@@ -168,6 +185,8 @@ export interface FreeTextAnswerTranslationsProps extends UseFreeTextAnswerTransl
   readonly translateLabel?: string;
 }
 
+export type SurveyFreeTextTableProps = FreeTextAnswerTranslationsProps;
+
 export interface QualityIssue {
   readonly code: string;
   readonly message: string;
@@ -180,6 +199,8 @@ export interface QualityCheckResult {
   readonly issues: readonly QualityIssue[];
 }
 
+export type QualityIssueDecision = "accept" | "reject";
+
 export interface SurveyVersionOperationRequest {
   readonly version: FormVersionRecord | FormSchema;
   readonly state?: FormVersionState;
@@ -190,17 +211,52 @@ export interface SurveyVersionPublishRequest extends SurveyVersionOperationReque
   readonly allowWarnings: boolean;
 }
 
-export interface SurveyVersionAdapter {
-  readonly qualityCheck: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+export interface SurveyVersionQualityIssueDecisionRequest extends SurveyVersionOperationRequest {
+  readonly issue: QualityIssue;
+  readonly decision: QualityIssueDecision;
+}
+
+/** Transport-neutral lifecycle operations used by survey clients. */
+export interface SurveyVersionActionsAdapter {
   readonly publish: (request: SurveyVersionPublishRequest) => Promise<void>;
-  readonly duplicate: (request: SurveyVersionOperationRequest) => Promise<void>;
-  readonly delete: (request: SurveyVersionOperationRequest) => Promise<void>;
-  readonly setStatus: (
+  readonly runQualityCheck: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+  readonly decideQualityIssue: (request: SurveyVersionQualityIssueDecisionRequest) => Promise<void>;
+  readonly cloneDraft: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly deleteDraft: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly setVisibility: (
     request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
   ) => Promise<void>;
 }
 
-export type SurveyVersionOperationName = "qualityCheck" | "publish" | "duplicate" | "delete" | "setStatus";
+/** @deprecated Use SurveyVersionActionsAdapter. Kept as a structural compatibility contract. */
+export interface SurveyVersionAdapter {
+  readonly publish?: (request: SurveyVersionPublishRequest) => Promise<void>;
+  readonly runQualityCheck?: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+  readonly decideQualityIssue?: (request: SurveyVersionQualityIssueDecisionRequest) => Promise<void>;
+  readonly cloneDraft?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly deleteDraft?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly setVisibility?: (
+    request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
+  ) => Promise<void>;
+  readonly qualityCheck?: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+  readonly duplicate?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly delete?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly setStatus?: (
+    request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
+  ) => Promise<void>;
+}
+
+export type SurveyVersionOperationName =
+  | "runQualityCheck"
+  | "publish"
+  | "decideQualityIssue"
+  | "cloneDraft"
+  | "deleteDraft"
+  | "setVisibility"
+  | "qualityCheck"
+  | "duplicate"
+  | "delete"
+  | "setStatus";
 export type SurveyVersionOperationStatus = "idle" | "loading" | "success" | "error" | "needs_confirmation";
 
 export interface SurveyVersionOperationState {
@@ -216,13 +272,24 @@ export interface UseSurveyVersionOperationsOptions {
 
 export interface UseSurveyVersionOperationsResult {
   readonly quality: SurveyVersionOperationState & { readonly result?: QualityCheckResult };
+  readonly qualityDecisions: Readonly<Record<string, QualityIssueDecision>>;
   readonly operations: Readonly<Record<SurveyVersionOperationName, SurveyVersionOperationState>>;
   readonly runQualityCheck: () => Promise<QualityCheckResult | undefined>;
+  readonly decideQualityIssue: (issue: QualityIssue, decision: QualityIssueDecision) => Promise<boolean>;
   readonly publish: (options?: { readonly allowWarnings?: boolean }) => Promise<boolean>;
+  readonly cloneDraft: () => Promise<boolean>;
+  readonly deleteDraft: () => Promise<boolean>;
+  readonly setVisibility: (status: "draft" | "published" | "archived") => Promise<boolean>;
+  /** @deprecated Use cloneDraft. */
   readonly duplicate: () => Promise<boolean>;
+  /** @deprecated Use deleteDraft. */
   readonly delete: () => Promise<boolean>;
+  /** @deprecated Use setVisibility. */
   readonly setStatus: (status: "draft" | "published" | "archived") => Promise<boolean>;
 }
+
+export type UseSurveyVersionActionsOptions = UseSurveyVersionOperationsOptions;
+export type UseSurveyVersionActionsResult = UseSurveyVersionOperationsResult;
 
 export type SurveySummaryInput =
   | FormAnalytics

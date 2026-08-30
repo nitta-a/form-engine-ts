@@ -1,4 +1,4 @@
-import type { TextAnswerItem } from "@form-engine-ts/core";
+import type { FormResponse, TextAnswerItem } from "@form-engine-ts/core";
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -18,22 +18,56 @@ function normalizeError(cause: unknown): Error {
 
 /** Normalizes Core text-answer pages for the translation workflow. */
 export function toFreeTextAnswerItems(items: readonly FreeTextAnswerInput[]): readonly FreeTextAnswerItem[] {
-  return items.map((item) => {
+  const normalized = items.flatMap((item) => {
     if ("id" in item && "sourceLanguage" in item) return item;
-    const textAnswer: TextAnswerItem = item;
-    return {
-      id: `${textAnswer.responseId}:${textAnswer.fieldId}`,
-      responseId: textAnswer.responseId,
-      fieldId: textAnswer.fieldId,
-      text: textAnswer.text,
-      sourceLanguage: textAnswer.locale ?? "unknown",
-      ...(textAnswer.metadata === undefined ? {} : { metadata: textAnswer.metadata })
-    };
+    if ("fieldId" in item) {
+      const textAnswer: TextAnswerItem = item;
+      return {
+        id: `${textAnswer.responseId}:${textAnswer.fieldId}`,
+        responseId: textAnswer.responseId,
+        fieldId: textAnswer.fieldId,
+        text: textAnswer.text,
+        sourceLanguage: textAnswer.locale ?? "unknown",
+        ...(textAnswer.metadata === undefined ? {} : { metadata: textAnswer.metadata })
+      };
+    }
+    const response: FormResponse = item;
+    return Object.entries(response.answers).flatMap(([fieldId, value]) =>
+      typeof value === "string"
+        ? [
+            {
+              id: `${response.responseId}:${fieldId}`,
+              responseId: response.responseId,
+              fieldId,
+              text: value,
+              sourceLanguage: response.sourceLocale ?? "unknown",
+              ...(response.metadata === undefined ? {} : { metadata: response.metadata })
+            }
+          ]
+        : []
+    );
   });
+  const seen = new Set<string>();
+  for (const item of normalized) {
+    if (seen.has(item.id)) throw new TypeError(`Free-text answer IDs must be unique: ${item.id}.`);
+    seen.add(item.id);
+  }
+  return normalized;
 }
 
 function initialItems(items: readonly FreeTextAnswerItem[]): FreeTextTranslationItemState[] {
   return items.map((item) => ({ ...item, status: "idle" }));
+}
+
+function useStableFreeTextItems(inputItems: readonly FreeTextAnswerInput[]): readonly FreeTextAnswerItem[] {
+  const inputItemsKey = inputItems.map((item) => JSON.stringify(item)).join("\u0000");
+  const valueRef = useRef<{ readonly key: string; readonly items: readonly FreeTextAnswerItem[] } | undefined>(
+    undefined
+  );
+  if (valueRef.current === undefined || valueRef.current.key !== inputItemsKey) {
+    valueRef.current = { key: inputItemsKey, items: toFreeTextAnswerItems(inputItems) };
+  }
+  return valueRef.current.items;
 }
 
 function initialState(
@@ -67,7 +101,7 @@ export function useFreeTextAnswerTranslation({
   batchSize = 20,
   detectPii
 }: UseFreeTextAnswerTranslationOptions): UseFreeTextAnswerTranslationResult {
-  const items = useMemo(() => toFreeTextAnswerItems(inputItems), [inputItems]);
+  const items = useStableFreeTextItems(inputItems);
   const effectiveSourceLanguage = sourceLanguage ?? items[0]?.sourceLanguage ?? "";
   const [state, setState] = useState(() => initialState(items, targetLanguage, effectiveSourceLanguage));
   const [piiConfirmed, setPiiConfirmed] = useState(false);
@@ -186,6 +220,11 @@ export function useFreeTextAnswerTranslation({
     return executeTranslation(true);
   }, [executeTranslation]);
 
+  const cancelPii = useCallback(() => {
+    setPiiConfirmed(false);
+    setState((current) => ({ ...current, status: "idle", findings: [] }));
+  }, []);
+
   const translateSelected = useCallback(() => executeTranslation(false), [executeTranslation]);
 
   const reset = useCallback(() => {
@@ -194,7 +233,7 @@ export function useFreeTextAnswerTranslation({
     setState(initialState(items, targetLanguage, effectiveSourceLanguage));
   }, [effectiveSourceLanguage, items, targetLanguage]);
 
-  return { ...state, setSelected, selectAll, clearSelection, confirmPii, translateSelected, reset };
+  return { ...state, setSelected, selectAll, clearSelection, confirmPii, cancelPii, translateSelected, reset };
 }
 
 function defaultItem(item: FreeTextTranslationItemState): React.JSX.Element {
@@ -255,7 +294,7 @@ export function FreeTextAnswerTranslations({
         ? (slots?.renderPiiConfirmation?.(
             translation.findings,
             () => void translation.confirmPii(),
-            translation.clearSelection
+            translation.cancelPii
           ) ?? (
             <div role="alert">
               <p>Potential personal information was found. Confirm before translating.</p>
@@ -284,6 +323,11 @@ export function FreeTextAnswerTranslations({
       ))}
     </section>
   );
+}
+
+/** Survey-specific name for the free-text translation container. */
+export function SurveyFreeTextTable(props: FreeTextAnswerTranslationsProps): React.JSX.Element {
+  return <FreeTextAnswerTranslations {...props} />;
 }
 
 export type { FreeTextAnswerTranslationSlots };

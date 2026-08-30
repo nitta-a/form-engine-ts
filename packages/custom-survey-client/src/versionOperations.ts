@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   QualityCheckResult,
+  QualityIssue,
+  QualityIssueDecision,
   SurveyVersionOperationName,
   SurveyVersionOperationRequest,
   SurveyVersionOperationState,
   SurveyVersionPublishRequest,
+  SurveyVersionQualityIssueDecisionRequest,
   UseSurveyVersionOperationsOptions,
   UseSurveyVersionOperationsResult
 } from "./types";
@@ -15,8 +18,13 @@ function normalizeError(cause: unknown): Error {
 
 function operationStates(): Record<SurveyVersionOperationName, SurveyVersionOperationState> {
   return {
-    qualityCheck: { status: "idle" },
+    runQualityCheck: { status: "idle" },
     publish: { status: "idle" },
+    decideQualityIssue: { status: "idle" },
+    cloneDraft: { status: "idle" },
+    deleteDraft: { status: "idle" },
+    setVisibility: { status: "idle" },
+    qualityCheck: { status: "idle" },
     duplicate: { status: "idle" },
     delete: { status: "idle" },
     setStatus: { status: "idle" }
@@ -25,10 +33,28 @@ function operationStates(): Record<SurveyVersionOperationName, SurveyVersionOper
 
 function setOperation(
   current: Readonly<Record<SurveyVersionOperationName, SurveyVersionOperationState>>,
-  name: SurveyVersionOperationName,
+  names: readonly SurveyVersionOperationName[],
   state: SurveyVersionOperationState
 ): Readonly<Record<SurveyVersionOperationName, SurveyVersionOperationState>> {
-  return { ...current, [name]: state };
+  const next = { ...current };
+  for (const name of names) next[name] = state;
+  return next;
+}
+
+function issueKey(issue: QualityIssue): string {
+  return `${issue.code}:${issue.path ?? ""}`;
+}
+
+function actionRequest(
+  version: UseSurveyVersionOperationsOptions["version"],
+  versionState: UseSurveyVersionOperationsOptions["state"],
+  signal: AbortSignal
+): SurveyVersionOperationRequest {
+  return {
+    version,
+    ...(versionState === undefined ? {} : { state: versionState }),
+    signal
+  };
 }
 
 /** Manages quality checks and version lifecycle actions without choosing a transport or cache library. */
@@ -41,6 +67,8 @@ export function useSurveyVersionOperations({
   const [quality, setQuality] = useState<SurveyVersionOperationState & { readonly result?: QualityCheckResult }>({
     status: "idle"
   });
+  const [qualityDecisions, setQualityDecisions] = useState<Readonly<Record<string, QualityIssueDecision>>>({});
+  const qualityDecisionsRef = useRef<Readonly<Record<string, QualityIssueDecision>>>({});
   const qualityRef = useRef<QualityCheckResult | undefined>(undefined);
   const previousVersion = useRef<{
     readonly version: UseSurveyVersionOperationsOptions["version"];
@@ -58,32 +86,34 @@ export function useSurveyVersionOperations({
     };
     qualityRef.current = undefined;
     setQuality({ status: "idle" });
+    qualityDecisionsRef.current = {};
+    setQualityDecisions({});
     setOperations(operationStates());
   }, [version, versionState]);
 
   const request = useCallback(
-    (signal: AbortSignal): SurveyVersionOperationRequest => ({
-      version,
-      ...(versionState === undefined ? {} : { state: versionState }),
-      signal
-    }),
+    (signal: AbortSignal) => actionRequest(version, versionState, signal),
     [version, versionState]
   );
 
   const runQualityCheck = useCallback(async (): Promise<QualityCheckResult | undefined> => {
+    const qualityCheck = adapter.runQualityCheck ?? adapter.qualityCheck;
     const controller = new AbortController();
     setQuality({ status: "loading" });
-    setOperations((current) => setOperation(current, "qualityCheck", { status: "loading" }));
+    setOperations((current) => setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "loading" }));
     try {
-      const result = await adapter.qualityCheck(request(controller.signal));
+      if (qualityCheck === undefined) throw new TypeError("SurveyVersionActionsAdapter requires runQualityCheck.");
+      const result = await qualityCheck(request(controller.signal));
       qualityRef.current = result;
       setQuality({ status: "success", result });
-      setOperations((current) => setOperation(current, "qualityCheck", { status: "success" }));
+      setOperations((current) => setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "success" }));
       return result;
     } catch (cause) {
       const error = normalizeError(cause);
       setQuality({ status: "error", error });
-      setOperations((current) => setOperation(current, "qualityCheck", { status: "error", error }));
+      setOperations((current) =>
+        setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "error", error })
+      );
       return undefined;
     }
   }, [adapter, request]);
@@ -93,71 +123,129 @@ export function useSurveyVersionOperations({
       const allowWarnings = options.allowWarnings ?? false;
       const qualityResult = qualityRef.current ?? (await runQualityCheck());
       if (qualityResult === undefined) return false;
-      if (!allowWarnings && qualityResult.issues.length > 0) {
-        setOperations((current) => setOperation(current, "publish", { status: "needs_confirmation" }));
+      const unresolvedIssues = qualityResult.issues.filter(
+        (issue) => qualityDecisionsRef.current[issueKey(issue)] !== "accept"
+      );
+      if (!allowWarnings && unresolvedIssues.length > 0) {
+        setOperations((current) => setOperation(current, ["publish"], { status: "needs_confirmation" }));
         return false;
       }
+      const publishAction = adapter.publish;
       const controller = new AbortController();
-      setOperations((current) => setOperation(current, "publish", { status: "loading" }));
+      setOperations((current) => setOperation(current, ["publish"], { status: "loading" }));
       try {
+        if (publishAction === undefined) throw new TypeError("SurveyVersionActionsAdapter requires publish.");
         const publishRequest: SurveyVersionPublishRequest = {
           ...request(controller.signal),
           allowWarnings
         };
-        await adapter.publish(publishRequest);
-        setOperations((current) => setOperation(current, "publish", { status: "success" }));
+        await publishAction(publishRequest);
+        setOperations((current) => setOperation(current, ["publish"], { status: "success" }));
         return true;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, "publish", { status: "error", error }));
+        setOperations((current) => setOperation(current, ["publish"], { status: "error", error }));
         return false;
       }
     },
-    [adapter, request, runQualityCheck]
+    [adapter.publish, request, runQualityCheck]
   );
 
-  const runSimpleOperation = useCallback(
-    async (name: "duplicate" | "delete", operation: (request: SurveyVersionOperationRequest) => Promise<void>) => {
+  const decideQualityIssue = useCallback(
+    async (issue: QualityIssue, decision: QualityIssueDecision): Promise<boolean> => {
+      const decide = adapter.decideQualityIssue;
       const controller = new AbortController();
-      setOperations((current) => setOperation(current, name, { status: "loading" }));
+      setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "loading" }));
       try {
-        await operation(request(controller.signal));
-        setOperations((current) => setOperation(current, name, { status: "success" }));
+        if (decide === undefined) throw new TypeError("SurveyVersionActionsAdapter requires decideQualityIssue.");
+        const decisionRequest: SurveyVersionQualityIssueDecisionRequest = {
+          ...request(controller.signal),
+          issue,
+          decision
+        };
+        await decide(decisionRequest);
+        const key = issueKey(issue);
+        qualityDecisionsRef.current = { ...qualityDecisionsRef.current, [key]: decision };
+        setQualityDecisions((current) => ({ ...current, [key]: decision }));
+        setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "success" }));
         return true;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, name, { status: "error", error }));
+        setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "error", error }));
+        return false;
+      }
+    },
+    [adapter.decideQualityIssue, request]
+  );
+
+  const runSimpleOperation = useCallback(
+    async (
+      names: readonly SurveyVersionOperationName[],
+      operation: ((request: SurveyVersionOperationRequest) => Promise<void>) | undefined,
+      requiredName: string
+    ): Promise<boolean> => {
+      const controller = new AbortController();
+      setOperations((current) => setOperation(current, names, { status: "loading" }));
+      try {
+        if (operation === undefined) throw new TypeError(`SurveyVersionActionsAdapter requires ${requiredName}.`);
+        await operation(request(controller.signal));
+        setOperations((current) => setOperation(current, names, { status: "success" }));
+        return true;
+      } catch (cause) {
+        const error = normalizeError(cause);
+        setOperations((current) => setOperation(current, names, { status: "error", error }));
         return false;
       }
     },
     [request]
   );
 
-  const duplicate = useCallback(
-    () => runSimpleOperation("duplicate", adapter.duplicate),
-    [adapter.duplicate, runSimpleOperation]
+  const cloneDraft = useCallback(
+    () => runSimpleOperation(["cloneDraft", "duplicate"], adapter.cloneDraft ?? adapter.duplicate, "cloneDraft"),
+    [adapter.cloneDraft, adapter.duplicate, runSimpleOperation]
   );
-  const deleteVersion = useCallback(
-    () => runSimpleOperation("delete", adapter.delete),
-    [adapter.delete, runSimpleOperation]
+  const deleteDraft = useCallback(
+    () => runSimpleOperation(["deleteDraft", "delete"], adapter.deleteDraft ?? adapter.delete, "deleteDraft"),
+    [adapter.delete, adapter.deleteDraft, runSimpleOperation]
   );
-
-  const setStatus = useCallback(
+  const setVisibility = useCallback(
     async (status: "draft" | "published" | "archived"): Promise<boolean> => {
+      const setVisibilityAction = adapter.setVisibility ?? adapter.setStatus;
       const controller = new AbortController();
-      setOperations((current) => setOperation(current, "setStatus", { status: "loading" }));
+      setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "loading" }));
       try {
-        await adapter.setStatus({ ...request(controller.signal), status });
-        setOperations((current) => setOperation(current, "setStatus", { status: "success" }));
+        if (setVisibilityAction === undefined)
+          throw new TypeError("SurveyVersionActionsAdapter requires setVisibility.");
+        await setVisibilityAction({ ...request(controller.signal), status });
+        setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "success" }));
         return true;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, "setStatus", { status: "error", error }));
+        setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "error", error }));
         return false;
       }
     },
-    [adapter, request]
+    [adapter.setStatus, adapter.setVisibility, request]
   );
 
-  return { quality, operations, runQualityCheck, publish, duplicate, delete: deleteVersion, setStatus };
+  return {
+    quality,
+    qualityDecisions,
+    operations,
+    runQualityCheck,
+    decideQualityIssue,
+    publish,
+    cloneDraft,
+    deleteDraft,
+    setVisibility,
+    duplicate: cloneDraft,
+    delete: deleteDraft,
+    setStatus: setVisibility
+  };
 }
+
+/** Preferred action-oriented name for the version controller. */
+export const useSurveyVersionActions = useSurveyVersionOperations;
+
+/** Explicit controller alias for applications that standardize on controller naming. */
+export const useSurveyVersionActionsController = useSurveyVersionOperations;

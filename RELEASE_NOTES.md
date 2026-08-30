@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v7.1.0 — 2026-08-31
+
+- Expanded `@form-engine-ts/custom-survey-client` with action-oriented editor and version controller aliases while preserving the existing adapter and hook names.
+- Added quality-issue accept/reject decisions, draft clone/delete operations, visibility actions, and operation-state tracking for survey version workflows.
+- Added `FormResponse` normalization for free-text translation, duplicate-ID protection, cancellable PII confirmation, and the `SurveyFreeTextTable` alias.
+- Added survey translation adapter creation helpers, `SurveyProvider`, `useSurveyEditorController`, and additional editor slots for notifications, card settings, and submission settings.
+- Aligned all public packages to version 7.1.0.
+
+See the [GitHub release for v7.1.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.1.0).
+
 ### v7.0.0 — 2026-08-31
 
 - Removed the legacy Azure Table `answers` contract, codecs, and types from the standard packages; migration-only helpers now live in `@form-engine-ts/legacy`, while the standard Azure codec writes only the canonical submission payload.

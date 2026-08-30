@@ -1,7 +1,24 @@
 import type { FormEngineTranslator } from "@form-engine-ts/core";
 import { FormEngineI18nProvider } from "@form-engine-ts/react";
 import { type ReactNode, useMemo } from "react";
-import type { SurveyUiProviderProps } from "./types";
+import type { SurveyTranslationAdapter, SurveyUiProviderProps } from "./types";
+
+export interface CreateSurveyTranslationAdapterOptions {
+  readonly translate: SurveyTranslationAdapter["translate"];
+  readonly translateText?: SurveyTranslationAdapter["translateText"];
+  readonly translateBatch?: SurveyTranslationAdapter["translateBatch"];
+}
+
+/** Creates the package adapter shape without requiring an application-specific type assertion. */
+export function createSurveyTranslationAdapter(
+  options: CreateSurveyTranslationAdapterOptions
+): SurveyTranslationAdapter {
+  return {
+    translate: options.translate,
+    ...(options.translateText === undefined ? {} : { translateText: options.translateText }),
+    ...(options.translateBatch === undefined ? {} : { translateBatch: options.translateBatch })
+  };
+}
 
 function createAdapterTranslator(
   adapter: NonNullable<SurveyUiProviderProps["translationAdapter"]>,
@@ -41,3 +58,6 @@ export function SurveyUiProvider({
     </FormEngineI18nProvider>
   );
 }
+
+/** Short alias for applications that use Survey as their only Form Engine surface. */
+export const SurveyProvider = SurveyUiProvider;

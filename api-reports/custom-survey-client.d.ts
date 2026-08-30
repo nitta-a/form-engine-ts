@@ -1,4 +1,4 @@
-import { JsonValue, TextAnswerItem, FormResponse, FormSchema, TranslationReport, FormAnalytics, QuestionAggregate, FormVersionRecord, TranslationAdapter, FormVersionState } from '@form-engine-ts/core';
+import { TranslationAdapter, JsonValue, TextAnswerItem, FormResponse, FormSchema, TranslationReport, FormAnalytics, QuestionAggregate, FormVersionRecord, FormVersionState } from '@form-engine-ts/core';
 import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 import { FormBuilderProps, useFormBuilder } from '@form-engine-ts/react';
 import { ReactNode } from 'react';
@@ -21,9 +21,20 @@ interface SurveyEditorTranslateRequest {
     readonly signal: AbortSignal;
 }
 interface SurveyEditorAdapter {
-    readonly translate: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
-    readonly save: (schema: FormSchema) => Promise<void>;
+    /** @deprecated Use SurveyEditorActionsAdapter. */
+    readonly translate?: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
+    /** @deprecated Use SurveyEditorActionsAdapter. */
+    readonly save?: (schema: FormSchema) => Promise<void>;
+    /** Translates the survey preview and returns the updated schema. */
+    readonly translateSurveyPreview?: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
+    /** Persists the current survey draft. */
+    readonly updateSurveyDraft?: (schema: FormSchema) => Promise<void>;
 }
+interface SurveyEditorActionsAdapter {
+    readonly translateSurveyPreview: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
+    readonly updateSurveyDraft: (schema: FormSchema) => Promise<void>;
+}
+type SurveyEditorAdapterInput = SurveyEditorAdapter | SurveyEditorActionsAdapter;
 type SurveyEditorOperationStatus = "idle" | "loading" | "success" | "error";
 interface SurveyEditorOperationState {
     readonly status: SurveyEditorOperationStatus;
@@ -42,6 +53,9 @@ interface SurveyEditorSlots {
     readonly toolbar?: (props: SurveyEditorRenderProps) => ReactNode;
     readonly after?: (props: SurveyEditorRenderProps) => ReactNode;
     readonly status?: (props: SurveyEditorOperationState) => ReactNode;
+    readonly notifications?: (props: SurveyEditorRenderProps) => ReactNode;
+    readonly cardSettings?: (props: SurveyEditorRenderProps) => ReactNode;
+    readonly submissionSettings?: (props: SurveyEditorRenderProps) => ReactNode;
 }
 interface SurveyEditorProps extends Omit<FormBuilderProps, "schema" | "onChange" | "locale" | "translationAdapter" | "translator" | "slots"> {
     readonly schema: FormSchema;
@@ -65,7 +79,7 @@ interface FreeTextAnswerItem {
     readonly findings?: readonly SensitiveDataFinding[];
 }
 type FreeTextAnswerSource = FreeTextAnswerItem | FormResponse;
-type FreeTextAnswerInput = FreeTextAnswerItem | TextAnswerItem;
+type FreeTextAnswerInput = FreeTextAnswerItem | TextAnswerItem | FormResponse;
 interface FreeTextTranslationRequest {
     readonly items: readonly FreeTextAnswerItem[];
     readonly targetLanguage: string;
@@ -108,6 +122,7 @@ interface UseFreeTextAnswerTranslationResult extends FreeTextTranslationState {
     readonly selectAll: () => void;
     readonly clearSelection: () => void;
     readonly confirmPii: () => Promise<FreeTextTranslationState>;
+    readonly cancelPii: () => void;
     readonly translateSelected: () => Promise<FreeTextTranslationState>;
     readonly reset: () => void;
 }
@@ -120,6 +135,7 @@ interface FreeTextAnswerTranslationsProps extends UseFreeTextAnswerTranslationOp
     readonly title?: string;
     readonly translateLabel?: string;
 }
+type SurveyFreeTextTableProps = FreeTextAnswerTranslationsProps;
 interface QualityIssue {
     readonly code: string;
     readonly message: string;
@@ -130,6 +146,7 @@ interface QualityIssue {
 interface QualityCheckResult {
     readonly issues: readonly QualityIssue[];
 }
+type QualityIssueDecision = "accept" | "reject";
 interface SurveyVersionOperationRequest {
     readonly version: FormVersionRecord | FormSchema;
     readonly state?: FormVersionState;
@@ -138,16 +155,39 @@ interface SurveyVersionOperationRequest {
 interface SurveyVersionPublishRequest extends SurveyVersionOperationRequest {
     readonly allowWarnings: boolean;
 }
-interface SurveyVersionAdapter {
-    readonly qualityCheck: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+interface SurveyVersionQualityIssueDecisionRequest extends SurveyVersionOperationRequest {
+    readonly issue: QualityIssue;
+    readonly decision: QualityIssueDecision;
+}
+/** Transport-neutral lifecycle operations used by survey clients. */
+interface SurveyVersionActionsAdapter {
     readonly publish: (request: SurveyVersionPublishRequest) => Promise<void>;
-    readonly duplicate: (request: SurveyVersionOperationRequest) => Promise<void>;
-    readonly delete: (request: SurveyVersionOperationRequest) => Promise<void>;
-    readonly setStatus: (request: SurveyVersionOperationRequest & {
+    readonly runQualityCheck: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+    readonly decideQualityIssue: (request: SurveyVersionQualityIssueDecisionRequest) => Promise<void>;
+    readonly cloneDraft: (request: SurveyVersionOperationRequest) => Promise<void>;
+    readonly deleteDraft: (request: SurveyVersionOperationRequest) => Promise<void>;
+    readonly setVisibility: (request: SurveyVersionOperationRequest & {
         readonly status: "draft" | "published" | "archived";
     }) => Promise<void>;
 }
-type SurveyVersionOperationName = "qualityCheck" | "publish" | "duplicate" | "delete" | "setStatus";
+/** @deprecated Use SurveyVersionActionsAdapter. Kept as a structural compatibility contract. */
+interface SurveyVersionAdapter {
+    readonly publish?: (request: SurveyVersionPublishRequest) => Promise<void>;
+    readonly runQualityCheck?: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+    readonly decideQualityIssue?: (request: SurveyVersionQualityIssueDecisionRequest) => Promise<void>;
+    readonly cloneDraft?: (request: SurveyVersionOperationRequest) => Promise<void>;
+    readonly deleteDraft?: (request: SurveyVersionOperationRequest) => Promise<void>;
+    readonly setVisibility?: (request: SurveyVersionOperationRequest & {
+        readonly status: "draft" | "published" | "archived";
+    }) => Promise<void>;
+    readonly qualityCheck?: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
+    readonly duplicate?: (request: SurveyVersionOperationRequest) => Promise<void>;
+    readonly delete?: (request: SurveyVersionOperationRequest) => Promise<void>;
+    readonly setStatus?: (request: SurveyVersionOperationRequest & {
+        readonly status: "draft" | "published" | "archived";
+    }) => Promise<void>;
+}
+type SurveyVersionOperationName = "runQualityCheck" | "publish" | "decideQualityIssue" | "cloneDraft" | "deleteDraft" | "setVisibility" | "qualityCheck" | "duplicate" | "delete" | "setStatus";
 type SurveyVersionOperationStatus = "idle" | "loading" | "success" | "error" | "needs_confirmation";
 interface SurveyVersionOperationState {
     readonly status: SurveyVersionOperationStatus;
@@ -162,15 +202,25 @@ interface UseSurveyVersionOperationsResult {
     readonly quality: SurveyVersionOperationState & {
         readonly result?: QualityCheckResult;
     };
+    readonly qualityDecisions: Readonly<Record<string, QualityIssueDecision>>;
     readonly operations: Readonly<Record<SurveyVersionOperationName, SurveyVersionOperationState>>;
     readonly runQualityCheck: () => Promise<QualityCheckResult | undefined>;
+    readonly decideQualityIssue: (issue: QualityIssue, decision: QualityIssueDecision) => Promise<boolean>;
     readonly publish: (options?: {
         readonly allowWarnings?: boolean;
     }) => Promise<boolean>;
+    readonly cloneDraft: () => Promise<boolean>;
+    readonly deleteDraft: () => Promise<boolean>;
+    readonly setVisibility: (status: "draft" | "published" | "archived") => Promise<boolean>;
+    /** @deprecated Use cloneDraft. */
     readonly duplicate: () => Promise<boolean>;
+    /** @deprecated Use deleteDraft. */
     readonly delete: () => Promise<boolean>;
+    /** @deprecated Use setVisibility. */
     readonly setStatus: (status: "draft" | "published" | "archived") => Promise<boolean>;
 }
+type UseSurveyVersionActionsOptions = UseSurveyVersionOperationsOptions;
+type UseSurveyVersionActionsResult = UseSurveyVersionOperationsResult;
 type SurveySummaryInput = FormAnalytics | {
     readonly questions: readonly QuestionAggregate[];
     readonly formId?: string;
@@ -221,9 +271,20 @@ declare function toFreeTextAnswerItems(items: readonly FreeTextAnswerInput[]): r
 /** Manages selection, PII confirmation, batching, and per-answer translation state. */
 declare function useFreeTextAnswerTranslation({ items: inputItems, adapter, targetLanguage, sourceLanguage, batchSize, detectPii }: UseFreeTextAnswerTranslationOptions): UseFreeTextAnswerTranslationResult;
 declare function FreeTextAnswerTranslations({ items, adapter, targetLanguage, sourceLanguage, batchSize, detectPii, slots, title, translateLabel }: FreeTextAnswerTranslationsProps): React.JSX.Element;
+/** Survey-specific name for the free-text translation container. */
+declare function SurveyFreeTextTable(props: FreeTextAnswerTranslationsProps): React.JSX.Element;
 
+interface CreateSurveyTranslationAdapterOptions {
+    readonly translate: SurveyTranslationAdapter["translate"];
+    readonly translateText?: SurveyTranslationAdapter["translateText"];
+    readonly translateBatch?: SurveyTranslationAdapter["translateBatch"];
+}
+/** Creates the package adapter shape without requiring an application-specific type assertion. */
+declare function createSurveyTranslationAdapter(options: CreateSurveyTranslationAdapterOptions): SurveyTranslationAdapter;
 /** Provides one shared translation scope for all custom survey client components. */
 declare function SurveyUiProvider({ locale, fallbackLocale, translationAdapter, translator: explicitTranslator, children }: SurveyUiProviderProps): ReactNode;
+/** Short alias for applications that use Survey as their only Form Engine surface. */
+declare const SurveyProvider: typeof SurveyUiProvider;
 
 /** Converts analytics/domain data into a stable, localized shape for survey UI clients. */
 declare function toSurveyResponseSummary(summary: SurveySummaryInput, version: FormVersionRecord | FormSchema, sourceLanguage: string): SurveyResponseSummaryData;
@@ -237,10 +298,16 @@ interface UseSurveyEditorResult extends SurveyEditorRenderProps {
 }
 /** Combines the existing headless builder state with save and schema translation operations. */
 declare function useSurveyEditor({ schema, adapter, onChange, locale: _locale, sourceLocale, targetLocale, ...builderOptions }: UseSurveyEditorOptions): UseSurveyEditorResult;
+/** Preferred explicit controller name; useSurveyEditor remains as a compatibility alias. */
+declare const useSurveyEditorController: typeof useSurveyEditor;
 /** A ready-to-use survey editor with injectable persistence and translation operations. */
 declare function SurveyEditor(props: SurveyEditorProps): React.JSX.Element;
 
 /** Manages quality checks and version lifecycle actions without choosing a transport or cache library. */
 declare function useSurveyVersionOperations({ version, state: versionState, adapter }: UseSurveyVersionOperationsOptions): UseSurveyVersionOperationsResult;
+/** Preferred action-oriented name for the version controller. */
+declare const useSurveyVersionActions: typeof useSurveyVersionOperations;
+/** Explicit controller alias for applications that standardize on controller naming. */
+declare const useSurveyVersionActionsController: typeof useSurveyVersionOperations;
 
-export { type FreeTextAnswerInput, type FreeTextAnswerItem, type FreeTextAnswerSource, type FreeTextAnswerTranslationSlots, FreeTextAnswerTranslations, type FreeTextAnswerTranslationsProps, type FreeTextItemStatus, type FreeTextTranslationAdapter, type FreeTextTranslationItemState, type FreeTextTranslationRequest, type FreeTextTranslationResult, type FreeTextTranslationState, type FreeTextTranslationStatus, type QualityCheckResult, type QualityIssue, type SurveyClientAsyncState, SurveyEditor, type SurveyEditorAdapter, type SurveyEditorOperationState, type SurveyEditorOperationStatus, type SurveyEditorProps, type SurveyEditorRenderProps, type SurveyEditorSlots, type SurveyEditorTranslateRequest, SurveyResponseSummary, type SurveyResponseSummaryComponentProps, type SurveyResponseSummaryData, type SurveyResponseSummaryProps, type SurveyResponseSummaryQuestion, type SurveyResponseSummarySlots, type SurveySummaryInput, type SurveyTranslationAdapter, SurveyUiProvider, type SurveyUiProviderProps, type SurveyVersionAdapter, type SurveyVersionOperationName, type SurveyVersionOperationRequest, type SurveyVersionOperationState, type SurveyVersionOperationStatus, type SurveyVersionPublishRequest, type UseFreeTextAnswerTranslationOptions, type UseFreeTextAnswerTranslationResult, type UseSurveyEditorOptions, type UseSurveyEditorResult, type UseSurveyVersionOperationsOptions, type UseSurveyVersionOperationsResult, toFreeTextAnswerItems, toSurveyResponseSummary, useFreeTextAnswerTranslation, useSurveyEditor, useSurveyVersionOperations };
+export { type CreateSurveyTranslationAdapterOptions, type FreeTextAnswerInput, type FreeTextAnswerItem, type FreeTextAnswerSource, type FreeTextAnswerTranslationSlots, FreeTextAnswerTranslations, type FreeTextAnswerTranslationsProps, type FreeTextItemStatus, type FreeTextTranslationAdapter, type FreeTextTranslationItemState, type FreeTextTranslationRequest, type FreeTextTranslationResult, type FreeTextTranslationState, type FreeTextTranslationStatus, type QualityCheckResult, type QualityIssue, type QualityIssueDecision, type SurveyClientAsyncState, SurveyEditor, type SurveyEditorActionsAdapter, type SurveyEditorAdapter, type SurveyEditorAdapterInput, type SurveyEditorOperationState, type SurveyEditorOperationStatus, type SurveyEditorProps, type SurveyEditorRenderProps, type SurveyEditorSlots, type SurveyEditorTranslateRequest, SurveyFreeTextTable, type SurveyFreeTextTableProps, SurveyProvider, SurveyResponseSummary, type SurveyResponseSummaryComponentProps, type SurveyResponseSummaryData, type SurveyResponseSummaryProps, type SurveyResponseSummaryQuestion, type SurveyResponseSummarySlots, type SurveySummaryInput, type SurveyTranslationAdapter, SurveyUiProvider, type SurveyUiProviderProps, type SurveyVersionActionsAdapter, type SurveyVersionAdapter, type SurveyVersionOperationName, type SurveyVersionOperationRequest, type SurveyVersionOperationState, type SurveyVersionOperationStatus, type SurveyVersionPublishRequest, type SurveyVersionQualityIssueDecisionRequest, type UseFreeTextAnswerTranslationOptions, type UseFreeTextAnswerTranslationResult, type UseSurveyEditorOptions, type UseSurveyEditorResult, type UseSurveyVersionActionsOptions, type UseSurveyVersionActionsResult, type UseSurveyVersionOperationsOptions, type UseSurveyVersionOperationsResult, createSurveyTranslationAdapter, toFreeTextAnswerItems, toSurveyResponseSummary, useFreeTextAnswerTranslation, useSurveyEditor, useSurveyEditorController, useSurveyVersionActions, useSurveyVersionActionsController, useSurveyVersionOperations };
