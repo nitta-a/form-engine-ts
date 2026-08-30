@@ -1,12 +1,27 @@
+import type { TranslationStatus } from "../translation";
 import { EN_MESSAGES } from "./catalogs/en";
 import { JA_MESSAGES } from "./catalogs/ja";
 import type { FormEngineMessages, FormEngineTranslationKey } from "./keys";
+
+export type TranslationTargetKind = "title" | "completionMessage" | "question" | "option";
+
+export interface TranslationWorkspaceCustomDictionary {
+  readonly messages?: Partial<Record<FormEngineTranslationKey, string>>;
+  readonly localeNames?: Readonly<Record<string, string>>;
+  readonly statusLabels?: Partial<Record<TranslationStatus, string>>;
+  readonly placeholders?: Partial<Record<TranslationTargetKind, string>>;
+  readonly headers?: {
+    readonly sourceTitle?: string;
+    readonly targetTitle?: string;
+  };
+}
 
 export interface FormEngineTranslatorOptions {
   readonly locale?: string;
   readonly fallbackLocale?: string;
   readonly messages?: FormEngineMessages;
   readonly customCatalogs?: Record<string, FormEngineMessages>;
+  readonly customDictionary?: TranslationWorkspaceCustomDictionary;
   readonly fallbackTextResolver?: (key: FormEngineTranslationKey, locale: string) => string;
   readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
   readonly strict?: boolean;
@@ -42,11 +57,17 @@ export const createFormEngineTranslator = (options: FormEngineTranslatorOptions 
     fallbackLocale = "en",
     messages = {},
     customCatalogs = {},
+    customDictionary,
     fallbackTextResolver,
     onMissingKey,
     strict = false
   } = options;
-  const currentCatalog = { ...defaultCatalog(locale), ...customCatalogs[locale], ...messages };
+  const currentCatalog = {
+    ...defaultCatalog(locale),
+    ...customCatalogs[locale],
+    ...(customDictionary?.messages ?? {}),
+    ...messages
+  };
   const fallbackCatalog = { ...defaultCatalog(fallbackLocale), ...customCatalogs[fallbackLocale] };
 
   return (rawKey, params = {}) => {

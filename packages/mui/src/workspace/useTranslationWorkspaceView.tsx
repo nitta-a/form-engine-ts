@@ -57,7 +57,7 @@ export function useTranslationWorkspaceView(
   const [newLocale, setNewLocale] = useState("");
   const localizedAvailableLocales = availableLocales?.map((candidate) =>
     typeof candidate === "string"
-      ? { locale: candidate, label: getLocaleDisplayLabel(candidate, [], i18n?.getLocaleLabel) }
+      ? { locale: candidate, label: getLocaleDisplayLabel(candidate, [], i18n?.getLocaleLabel, i18n?.customDictionary) }
       : candidate
   );
   const workspace = useTranslationWorkspace({
@@ -79,7 +79,12 @@ export function useTranslationWorkspaceView(
       ((dialogProps) => (
         <TranslationWorkspaceDialog
           {...dialogProps}
-          localeLabel={getLocaleDisplayLabel(dialogProps.locale, localizedAvailableLocales, i18n?.getLocaleLabel)}
+          localeLabel={getLocaleDisplayLabel(
+            dialogProps.locale,
+            localizedAvailableLocales,
+            i18n?.getLocaleLabel,
+            i18n?.customDictionary
+          )}
           translate={translate}
         />
       )),
@@ -92,7 +97,7 @@ export function useTranslationWorkspaceView(
     ...(validateLocale === undefined ? {} : { validateLocale })
   });
   const localeLabel = (locale: string): string =>
-    getLocaleDisplayLabel(locale, workspace.localeOptions, i18n?.getLocaleLabel);
+    getLocaleDisplayLabel(locale, workspace.localeOptions, i18n?.getLocaleLabel, i18n?.customDictionary);
   const localizedLocaleOptions = localizeLocaleOptions(workspace.localeOptions, i18n?.getLocaleLabel);
   const headerProps: TranslationWorkspaceHeaderProps = {
     schema,

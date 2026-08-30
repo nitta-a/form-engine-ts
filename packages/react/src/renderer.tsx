@@ -37,6 +37,7 @@ import type {
   ChoiceGroupSlotProps,
   FieldError,
   FormRendererAppearance,
+  FormRendererFieldConfig,
   FormRendererMessages,
   FormRendererSlotProps,
   FormRendererSlots,
@@ -80,6 +81,7 @@ export interface FieldComponentProps {
   readonly errorId: string;
   readonly helpId: string;
   readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
+  readonly a11y?: FormRendererFieldConfig["a11y"];
 }
 
 export type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
@@ -114,9 +116,9 @@ function RequiredMark({
 function FieldMessage({ props }: { readonly props: FieldComponentProps }) {
   return (
     <>
-      {props.field.description === undefined ? null : (
+      {props.field.description === undefined && props.a11y?.customDescription === undefined ? null : (
         <div id={props.helpId} className="fe-help">
-          {props.field.description}
+          {props.a11y?.customDescription ?? props.field.description}
         </div>
       )}
       {props.error === undefined ? null : (
@@ -126,6 +128,12 @@ function FieldMessage({ props }: { readonly props: FieldComponentProps }) {
       )}
     </>
   );
+}
+
+function requiredIndicator(required: boolean, a11y: FieldComponentProps["a11y"]): ReactNode {
+  if (a11y?.requiredIndicator === false) return null;
+  if (typeof a11y?.requiredIndicator === "string") return <span className="fe-required">{a11y.requiredIndicator}</span>;
+  return <RequiredMark required={required} />;
 }
 
 function GroupedChoiceDescription({ props }: { readonly props: FieldComponentProps }) {
@@ -222,7 +230,8 @@ function DefaultField({
     .filter((item): item is string => item !== undefined && item.length > 0)
     .join(" ");
   const ariaProps = {
-    "aria-describedby": describedBy(field, error, props.helpId, props.errorId),
+    "aria-label": props.a11y?.ariaLabel,
+    "aria-describedby": props.a11y?.ariaDescribedBy ?? describedBy(field, error, props.helpId, props.errorId),
     "aria-invalid": error === undefined ? undefined : true
   } as const;
 
@@ -244,7 +253,7 @@ function DefaultField({
                 name={field.id}
                 type="checkbox"
                 checked={value === true}
-                aria-label={field.title}
+                aria-label={props.a11y?.ariaLabel ?? field.title}
                 disabled={disabled}
                 readOnly={readOnly}
                 onChange={(event) => setValue(event.currentTarget.checked)}
@@ -268,7 +277,7 @@ function DefaultField({
           />
           <span>
             {field.title}
-            <RequiredMark required={field.required} />
+            {requiredIndicator(field.required, props.a11y)}
           </span>
         </label>
         <FieldMessage props={props} />
@@ -301,6 +310,7 @@ function DefaultField({
                     type={isRadio ? "radio" : "checkbox"}
                     value={option.id}
                     checked={checked}
+                    aria-label={props.a11y?.optionAriaLabelGenerator?.(option.id, option.label)}
                     disabled={disabled}
                     readOnly={readOnly}
                     onKeyDown={
@@ -346,7 +356,7 @@ function DefaultField({
         <div className="fe-field fe-field--radio" data-field-id={field.id}>
           <div className="fe-label">
             {field.title}
-            <RequiredMark required={field.required} />
+            {requiredIndicator(field.required, props.a11y)}
           </div>
           {field.options.map((option, index) => {
             const optionId = `${inputId}-${index}`;
@@ -359,6 +369,7 @@ function DefaultField({
                   type="radio"
                   value={option.id}
                   checked={value === option.id}
+                  aria-label={props.a11y?.optionAriaLabelGenerator?.(option.id, option.label)}
                   onChange={() => setValue(option.id)}
                 />
                 <span>{option.label}</span>
@@ -373,7 +384,7 @@ function DefaultField({
       <fieldset className={`fe-field fe-field--${field.type}`} data-field-id={field.id} {...ariaProps}>
         <legend className="fe-label">
           {field.title}
-          <RequiredMark required={field.required} />
+          {requiredIndicator(field.required, props.a11y)}
         </legend>
         {field.options.map((option, index) => {
           const optionId = `${inputId}-${index}`;
@@ -386,6 +397,7 @@ function DefaultField({
                 type={field.type === "radio" ? "radio" : "checkbox"}
                 value={option.id}
                 checked={checked}
+                aria-label={props.a11y?.optionAriaLabelGenerator?.(option.id, option.label)}
                 onChange={(event) => {
                   if (field.type === "radio") setValue(option.id);
                   else
@@ -412,7 +424,7 @@ function DefaultField({
       <fieldset className="fe-field fe-field--rating" data-field-id={field.id} {...ariaProps}>
         <legend className="fe-label">
           {field.title}
-          <RequiredMark required={field.required} />
+          {requiredIndicator(field.required, props.a11y)}
         </legend>
         <div className="fe-rating-options">
           {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((rating) => {
@@ -440,7 +452,7 @@ function DefaultField({
   const label = (
     <label className="fe-label" htmlFor={inputId}>
       {field.title}
-      <RequiredMark required={field.required} />
+      {requiredIndicator(field.required, props.a11y)}
     </label>
   );
   let control: ReactNode;
@@ -575,6 +587,7 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly autoSaveKey?: string;
   readonly beforeSubmit?: BeforeSubmit;
   readonly onDraftSave?: (draft: FormValues) => void;
+  readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
   readonly slots?: FormRendererSlots;
 }
 
@@ -757,6 +770,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   autoSaveKey,
   beforeSubmit,
   onDraftSave,
+  fieldConfig,
   successRenderMode = "append",
   appearance,
   slotProps,
@@ -1429,7 +1443,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                 helpId: `${prefix}-${field.id}-help`,
                 ...(slots.renderCharacterCount === undefined
                   ? {}
-                  : { renderCharacterCount: slots.renderCharacterCount })
+                  : { renderCharacterCount: slots.renderCharacterCount }),
+                ...(fieldConfig?.[field.id]?.a11y === undefined ? {} : { a11y: fieldConfig[field.id]?.a11y })
               };
               if (slots.renderField !== undefined) {
                 return (

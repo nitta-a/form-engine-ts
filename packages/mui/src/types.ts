@@ -2,7 +2,8 @@ import type {
   FormEngineMessages,
   FormEngineTranslator,
   LocaleOption,
-  TranslationMissingKeyEvent
+  TranslationMissingKeyEvent,
+  TranslationWorkspaceCustomDictionary
 } from "@form-engine-ts/core";
 import type {
   BuilderActionIconType,
@@ -56,12 +57,21 @@ export interface MuiFormEngineI18nOptions {
   readonly fallbackLocale?: string;
   readonly messages?: FormEngineMessages;
   readonly customCatalogs?: Record<string, FormEngineMessages>;
+  readonly customDictionary?: TranslationWorkspaceCustomDictionary;
   readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
   readonly strict?: boolean;
   readonly translator?: FormEngineTranslator;
   readonly getLocaleLabel?: (locale: string) => string;
   readonly getActionLabel?: (actionType: string) => string;
 }
+
+export type {
+  InputBoxStyleOptions,
+  TargetSpecificLayoutConfig,
+  TranslationLayoutOptions,
+  TranslationTargetKind,
+  TranslationWorkspaceAppearance
+} from "@form-engine-ts/react";
 
 export type LocalizationSectionPlacement = "top" | "beforeQuestions" | "afterQuestions" | "bottom";
 

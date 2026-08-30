@@ -1,4 +1,5 @@
 import type {
+  BaseSubmissionMetadata,
   FormSchema,
   FormSubmission,
   FormValue,
@@ -58,6 +59,20 @@ export interface MongoDbStorageOptions {
 
 export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
   createIndexes(): Promise<void>;
+}
+
+export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata> extends MongoDbStorageAdapter {
+  readonly fetchPage: (
+    formId: string,
+    options?: {
+      readonly pageSize?: number;
+      readonly fromSubmittedAt?: string;
+      readonly toSubmittedAt?: string;
+      readonly locale?: string;
+      readonly metadataFilters?: Partial<TMeta>;
+      readonly cursor?: string;
+    }
+  ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
 }
 
 interface StoredSchemaDocument extends Document {
@@ -333,7 +348,10 @@ async function createConfiguredIndexes(
   }
 }
 
-export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter {
+export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter;
+export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+  options: MongoDbStorageOptions
+): TypedMongoDbStorageAdapter<TMeta> {
   if (options?.db === undefined) throw new TypeError("db is required.");
   const collectionNames = options.collectionNames;
   const schemasCollectionName = collectionName(
@@ -471,7 +489,7 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
     return { success: true, value: { success: true } };
   };
 
-  return {
+  const adapter: PagedSubmissionStorageAdapter & VersionedFormStorageAdapter & { createIndexes(): Promise<void> } = {
     async saveSchema(schema) {
       assertValidFormSchema(schema);
       const stored = cloneJson(schema);
@@ -780,6 +798,25 @@ export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbSto
         ]),
         createConfiguredIndexes(schemas, [], options.customIndexes?.forms)
       ]);
+    }
+  };
+  return {
+    ...adapter,
+    async fetchPage(formId, options) {
+      const page = await adapter.listSubmissionPage(formId, {
+        ...(options?.pageSize === undefined ? {} : { pageSize: options.pageSize }),
+        ...(options?.fromSubmittedAt === undefined ? {} : { since: options.fromSubmittedAt }),
+        ...(options?.toSubmittedAt === undefined ? {} : { until: options.toSubmittedAt }),
+        ...(options?.locale === undefined ? {} : { locale: options.locale }),
+        ...(options?.cursor === undefined ? {} : { cursor: options.cursor }),
+        ...(options?.metadataFilters === undefined
+          ? {}
+          : { metadataFilters: options.metadataFilters as Readonly<Record<string, JsonValue>> })
+      });
+      return {
+        items: page.items as unknown as readonly FormSubmission<TMeta>[],
+        ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor })
+      };
     }
   };
 }

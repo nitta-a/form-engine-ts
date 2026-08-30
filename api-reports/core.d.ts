@@ -698,6 +698,9 @@ interface CsvExportOptions<TMeta extends BaseSubmissionMetadata = BaseSubmission
     readonly includePiiStatus?: boolean;
     readonly includeLocale?: boolean;
 }
+interface MetadataCsvExportOptions<TMeta extends BaseSubmissionMetadata> extends CsvExportOptions<TMeta> {
+    readonly includeMetadataFields?: readonly Extract<keyof TMeta, string | number>[];
+}
 interface CsvColumnDef {
     readonly header: string;
     readonly getValue: (context: CsvColumnContext) => string | number | boolean | null | undefined | Promise<string | number | boolean | null | undefined>;
@@ -711,7 +714,13 @@ interface StreamCsvOptions extends CsvExportOptions {
     readonly columns?: readonly CsvColumnDef[];
     readonly includeDefaultColumns?: boolean;
 }
+interface TypedStreamCsvOptions<TMeta extends BaseSubmissionMetadata> extends Omit<StreamCsvOptions, "includeMetadataFields"> {
+    readonly includeMetadataFields?: readonly Extract<keyof TMeta, string | number>[];
+}
+type CsvStream = ReadableStream<Uint8Array> & AsyncIterable<string>;
 declare function exportResponsesToCsvStream(schema: FormSchema, submissions: AsyncIterable<AccumulatorResponse>, options?: StreamCsvOptions): AsyncIterable<string>;
+declare function exportResponsesToCsvStream<TMeta extends BaseSubmissionMetadata>(schema: FormSchema, submissions: Iterable<FormSubmission<TMeta>> | AsyncIterable<FormSubmission<TMeta>>, options?: TypedStreamCsvOptions<TMeta>): CsvStream;
+declare function exportResponsesToCsvStream(schema: FormSchema, submissions: Iterable<AccumulatorResponse> | AsyncIterable<AccumulatorResponse>, options?: StreamCsvOptions): CsvStream;
 interface NodeWritableStream {
     write(chunk: Uint8Array): boolean;
     once(event: "drain", listener: () => void): unknown;
@@ -722,6 +731,7 @@ interface NodeWritableStream {
 }
 declare function pipeResponsesToCsvStream(schema: FormSchema, submissions: AsyncIterable<AccumulatorResponse>, writable: WritableStream<Uint8Array> | NodeWritableStream, options?: StreamCsvOptions): Promise<void>;
 declare function exportResponsesToCsv(schema: FormSchema, responses: readonly FormSubmission[], options?: CsvExportOptions): string;
+declare function exportResponsesToCsv<TMeta extends BaseSubmissionMetadata>(schema: FormSchema, responses: readonly FormSubmission<TMeta>[], options?: MetadataCsvExportOptions<TMeta>): string;
 
 /** Submission shape used by pre-v4 clients and migration-only code. */
 interface LegacyFormSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
@@ -812,11 +822,161 @@ declare const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>>;
 declare const JA_COMPARISON_MESSAGES: Readonly<Record<string, string>>;
 declare const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>>;
 
+/**
+ * Normalizes a locale string to its BCP 47 canonical form.
+ *
+ * Underscore-separated locale tags are accepted for compatibility with common
+ * platform and user-input conventions. Invalid tags return null.
+ */
+declare const normalizeLocale: (rawLocale: string) => string | null;
+
+interface TranslationProviderError {
+    readonly code: "RATE_LIMIT" | "AUTH_FAILED" | "UNSUPPORTED_LANGUAGE" | "NETWORK_ERROR" | "UNKNOWN";
+    readonly message: string;
+    readonly retryable: boolean;
+    readonly rawError?: unknown;
+}
+interface TranslationSlot {
+    readonly kind: "form" | "page" | "field" | "option";
+    readonly nodeId: string;
+    readonly property: "title" | "description" | "label" | "completionMessage";
+    readonly locale: string;
+    readonly sourceText: string;
+    readonly existingText?: string;
+    readonly nodeMetadata?: Readonly<Record<string, JsonValue>>;
+    readonly existingTranslationMetadata?: Readonly<Record<string, JsonValue>>;
+    /** Canonical target information for workspace clients. */
+    readonly target?: {
+        readonly kind: "form" | "page" | "field" | "option";
+        readonly id?: string;
+        readonly property: "title" | "description" | "label" | "completionMessage";
+    };
+    readonly path?: string;
+    readonly sourceTextHash?: string;
+    readonly status?: TranslationStatus;
+    /** @deprecated Use nodeMetadata instead. */
+    readonly metadata?: Readonly<Record<string, JsonValue>>;
+}
+type TranslationStatus = "missing" | "translated" | "stale" | "manual" | "manual-stale";
+interface CanonicalTranslationMetadata {
+    readonly sourceLocale: string;
+    readonly sourceTextHash: string;
+    readonly translationSource: "automatic" | "manual";
+    readonly translatedAt?: string;
+    readonly editedAt?: string;
+}
+interface LegacyTranslationMetadata {
+    readonly isManuallyEdited?: boolean;
+    readonly translationSource?: "MANUAL" | "AUTOMATIC" | "manual" | "automatic" | string;
+    readonly sourceTextHash?: string;
+    readonly sourceText?: string;
+    readonly sourceLocale?: string;
+    readonly translatedAt?: string;
+    readonly editedAt?: string;
+    readonly isManual?: boolean;
+    readonly [key: string]: unknown;
+}
+interface TranslationMigrationContext {
+    /** Target locale code, for example "en" or "zh-Hans". */
+    readonly locale: string;
+    /** The schema's default locale. */
+    readonly defaultLocale: string;
+    /** JSON path of the translated property. */
+    readonly path: string;
+    /** Translated property name. */
+    readonly property: "title" | "description" | "label" | "completionMessage";
+    /** Kind of node that owns the translated property. */
+    readonly nodeKind: "form" | "page" | "field" | "option";
+    /** Identifier of the owning node. */
+    readonly nodeId?: string;
+    /** Identifier of the parent node, used for options. */
+    readonly parentId?: string;
+}
+type TranslationMetadataMigrator = (oldMeta: unknown, sourceText: string, context: TranslationMigrationContext) => CanonicalTranslationMetadata;
+interface MigrateSchemaTranslationMetadataOptions {
+    /** Custom migration function used instead of the built-in legacy normalizer. */
+    readonly migrator?: TranslationMetadataMigrator;
+}
+declare const isManualTranslationMetadata: (metadata?: LegacyTranslationMetadata | CanonicalTranslationMetadata) => boolean;
+interface PopulateTranslationOptions {
+    readonly overwrite?: "all" | "missing-only" | "stale-and-missing";
+    readonly preserveManualTranslations?: boolean;
+    readonly markStaleTranslations?: boolean;
+    readonly shouldOverwrite?: (slot: TranslationSlot) => boolean;
+    readonly createMetadata?: (slot: TranslationSlot, translatedText: string) => Readonly<Record<string, JsonValue>>;
+    readonly isManualTranslation?: (metadata: unknown, context: {
+        readonly path: string;
+        readonly locale: string;
+    }) => boolean;
+    readonly normalizeMetadata?: (metadata: unknown, sourceText: string) => CanonicalTranslationMetadata;
+    /** Applies locale admission and count limits before the adapter is called. */
+    readonly policy?: Pick<FormPolicy, "allowedLocales" | "maxLocales">;
+    /** Aborts an in-flight translation operation when requested. */
+    readonly signal?: AbortSignal;
+    /** Reports progress for the slots selected for translation. */
+    readonly onProgress?: (progress: TranslationProgress) => void;
+    /** Keeps successful slots when individual translation calls fail. */
+    readonly continueOnError?: boolean;
+}
+/** Compatibility alias for clients that used the pluralized options name. */
+type PopulateTranslationsOptions = PopulateTranslationOptions;
+interface TranslationReport {
+    readonly updatedSlots: readonly TranslationSlot[];
+    readonly skippedSlots: readonly TranslationSlot[];
+    readonly staleSlots?: readonly TranslationSlot[];
+    readonly skippedReasons?: Readonly<Record<string, "manual" | "unchanged" | "unsupported">>;
+    readonly totalSlots?: number;
+    readonly attemptedSlots?: number;
+    readonly succeeded?: number;
+    readonly failed?: number;
+    readonly cancelled?: boolean;
+    readonly failures?: readonly TranslationFailure[];
+}
+interface TranslationProgress {
+    readonly total: number;
+    readonly completed: number;
+    readonly succeeded: number;
+    readonly failed: number;
+    readonly percentage: number;
+}
+interface TranslationFailure {
+    readonly slot: TranslationSlot;
+    readonly cause: unknown;
+}
+declare const computeSourceTextHash: (text: string) => string;
+declare function getTranslationStatus(sourceText: string, translatedText: string | undefined, metadata: CanonicalTranslationMetadata | Readonly<Record<string, JsonValue>> | undefined): TranslationStatus;
+declare const migrateSchemaTranslationMetadata: (schema: FormSchema, migratorOrOptions?: ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata) | TranslationMetadataMigrator | MigrateSchemaTranslationMetadataOptions) => FormSchema;
+/** Removes a locale registration and every localized value and metadata entry for it. */
+declare const removeLocaleFromSchema: (schema: FormSchema, localeToRemove: string) => FormSchema;
+declare function collectTranslationSlots(schema: FormSchema, locale: string): readonly TranslationSlot[];
+declare function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string): FormSchema;
+declare function populateSchemaTranslations(schema: FormSchema, targetLocales: readonly string[], adapter: AsyncTranslationAdapter, options?: PopulateTranslationOptions): Promise<{
+    readonly schema: FormSchema;
+    readonly report: TranslationReport;
+}>;
+declare function populateSchemaTranslations(schema: FormSchema, targetLocales: readonly string[], adapter: TranslationAdapter, options?: PopulateTranslationOptions): Promise<{
+    readonly schema: FormSchema;
+    readonly report: TranslationReport;
+}>;
+declare function resolveFormTranslation(schema: FormSchema, adapter: AsyncTranslationAdapter, targetLocale: string, sourceLocale?: string): Promise<FormSchema>;
+
+type TranslationTargetKind = "title" | "completionMessage" | "question" | "option";
+interface TranslationWorkspaceCustomDictionary {
+    readonly messages?: Partial<Record<FormEngineTranslationKey, string>>;
+    readonly localeNames?: Readonly<Record<string, string>>;
+    readonly statusLabels?: Partial<Record<TranslationStatus, string>>;
+    readonly placeholders?: Partial<Record<TranslationTargetKind, string>>;
+    readonly headers?: {
+        readonly sourceTitle?: string;
+        readonly targetTitle?: string;
+    };
+}
 interface FormEngineTranslatorOptions {
     readonly locale?: string;
     readonly fallbackLocale?: string;
     readonly messages?: FormEngineMessages;
     readonly customCatalogs?: Record<string, FormEngineMessages>;
+    readonly customDictionary?: TranslationWorkspaceCustomDictionary;
     readonly fallbackTextResolver?: (key: FormEngineTranslationKey, locale: string) => string;
     readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
     readonly strict?: boolean;
@@ -979,144 +1139,6 @@ declare function createSubmission(schema: FormSchema, values: FormValues, option
 declare function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(schema: FormSchema, values: FormValues, options: CreateSubmissionOptions<TMeta>): FormSubmission<TMeta>;
 declare function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(input: CreateSubmissionInput<TMeta>): FormSubmission<TMeta>;
 
-/**
- * Normalizes a locale string to its BCP 47 canonical form.
- *
- * Underscore-separated locale tags are accepted for compatibility with common
- * platform and user-input conventions. Invalid tags return null.
- */
-declare const normalizeLocale: (rawLocale: string) => string | null;
-
-interface TranslationProviderError {
-    readonly code: "RATE_LIMIT" | "AUTH_FAILED" | "UNSUPPORTED_LANGUAGE" | "NETWORK_ERROR" | "UNKNOWN";
-    readonly message: string;
-    readonly retryable: boolean;
-    readonly rawError?: unknown;
-}
-interface TranslationSlot {
-    readonly kind: "form" | "page" | "field" | "option";
-    readonly nodeId: string;
-    readonly property: "title" | "description" | "label" | "completionMessage";
-    readonly locale: string;
-    readonly sourceText: string;
-    readonly existingText?: string;
-    readonly nodeMetadata?: Readonly<Record<string, JsonValue>>;
-    readonly existingTranslationMetadata?: Readonly<Record<string, JsonValue>>;
-    /** Canonical target information for workspace clients. */
-    readonly target?: {
-        readonly kind: "form" | "page" | "field" | "option";
-        readonly id?: string;
-        readonly property: "title" | "description" | "label" | "completionMessage";
-    };
-    readonly path?: string;
-    readonly sourceTextHash?: string;
-    readonly status?: TranslationStatus;
-    /** @deprecated Use nodeMetadata instead. */
-    readonly metadata?: Readonly<Record<string, JsonValue>>;
-}
-type TranslationStatus = "missing" | "translated" | "stale" | "manual" | "manual-stale";
-interface CanonicalTranslationMetadata {
-    readonly sourceLocale: string;
-    readonly sourceTextHash: string;
-    readonly translationSource: "automatic" | "manual";
-    readonly translatedAt?: string;
-    readonly editedAt?: string;
-}
-interface LegacyTranslationMetadata {
-    readonly isManuallyEdited?: boolean;
-    readonly translationSource?: "MANUAL" | "AUTOMATIC" | "manual" | "automatic" | string;
-    readonly sourceTextHash?: string;
-    readonly sourceText?: string;
-    readonly sourceLocale?: string;
-    readonly translatedAt?: string;
-    readonly editedAt?: string;
-    readonly isManual?: boolean;
-    readonly [key: string]: unknown;
-}
-interface TranslationMigrationContext {
-    /** Target locale code, for example "en" or "zh-Hans". */
-    readonly locale: string;
-    /** The schema's default locale. */
-    readonly defaultLocale: string;
-    /** JSON path of the translated property. */
-    readonly path: string;
-    /** Translated property name. */
-    readonly property: "title" | "description" | "label" | "completionMessage";
-    /** Kind of node that owns the translated property. */
-    readonly nodeKind: "form" | "page" | "field" | "option";
-    /** Identifier of the owning node. */
-    readonly nodeId?: string;
-    /** Identifier of the parent node, used for options. */
-    readonly parentId?: string;
-}
-type TranslationMetadataMigrator = (oldMeta: unknown, sourceText: string, context: TranslationMigrationContext) => CanonicalTranslationMetadata;
-interface MigrateSchemaTranslationMetadataOptions {
-    /** Custom migration function used instead of the built-in legacy normalizer. */
-    readonly migrator?: TranslationMetadataMigrator;
-}
-declare const isManualTranslationMetadata: (metadata?: LegacyTranslationMetadata | CanonicalTranslationMetadata) => boolean;
-interface PopulateTranslationOptions {
-    readonly overwrite?: "all" | "missing-only" | "stale-and-missing";
-    readonly preserveManualTranslations?: boolean;
-    readonly markStaleTranslations?: boolean;
-    readonly shouldOverwrite?: (slot: TranslationSlot) => boolean;
-    readonly createMetadata?: (slot: TranslationSlot, translatedText: string) => Readonly<Record<string, JsonValue>>;
-    readonly isManualTranslation?: (metadata: unknown, context: {
-        readonly path: string;
-        readonly locale: string;
-    }) => boolean;
-    readonly normalizeMetadata?: (metadata: unknown, sourceText: string) => CanonicalTranslationMetadata;
-    /** Applies locale admission and count limits before the adapter is called. */
-    readonly policy?: Pick<FormPolicy, "allowedLocales" | "maxLocales">;
-    /** Aborts an in-flight translation operation when requested. */
-    readonly signal?: AbortSignal;
-    /** Reports progress for the slots selected for translation. */
-    readonly onProgress?: (progress: TranslationProgress) => void;
-    /** Keeps successful slots when individual translation calls fail. */
-    readonly continueOnError?: boolean;
-}
-/** Compatibility alias for clients that used the pluralized options name. */
-type PopulateTranslationsOptions = PopulateTranslationOptions;
-interface TranslationReport {
-    readonly updatedSlots: readonly TranslationSlot[];
-    readonly skippedSlots: readonly TranslationSlot[];
-    readonly staleSlots?: readonly TranslationSlot[];
-    readonly skippedReasons?: Readonly<Record<string, "manual" | "unchanged" | "unsupported">>;
-    readonly totalSlots?: number;
-    readonly attemptedSlots?: number;
-    readonly succeeded?: number;
-    readonly failed?: number;
-    readonly cancelled?: boolean;
-    readonly failures?: readonly TranslationFailure[];
-}
-interface TranslationProgress {
-    readonly total: number;
-    readonly completed: number;
-    readonly succeeded: number;
-    readonly failed: number;
-    readonly percentage: number;
-}
-interface TranslationFailure {
-    readonly slot: TranslationSlot;
-    readonly cause: unknown;
-}
-declare const computeSourceTextHash: (text: string) => string;
-declare function getTranslationStatus(sourceText: string, translatedText: string | undefined, metadata: CanonicalTranslationMetadata | Readonly<Record<string, JsonValue>> | undefined): TranslationStatus;
-declare const migrateSchemaTranslationMetadata: (schema: FormSchema, migratorOrOptions?: ((oldMeta: unknown, sourceText: string) => CanonicalTranslationMetadata) | TranslationMetadataMigrator | MigrateSchemaTranslationMetadataOptions) => FormSchema;
-/** Removes a locale registration and every localized value and metadata entry for it. */
-declare const removeLocaleFromSchema: (schema: FormSchema, localeToRemove: string) => FormSchema;
-declare function collectTranslationSlots(schema: FormSchema, locale: string): readonly TranslationSlot[];
-declare function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string): FormSchema;
-declare function populateSchemaTranslations(schema: FormSchema, targetLocales: readonly string[], adapter: AsyncTranslationAdapter, options?: PopulateTranslationOptions): Promise<{
-    readonly schema: FormSchema;
-    readonly report: TranslationReport;
-}>;
-declare function populateSchemaTranslations(schema: FormSchema, targetLocales: readonly string[], adapter: TranslationAdapter, options?: PopulateTranslationOptions): Promise<{
-    readonly schema: FormSchema;
-    readonly report: TranslationReport;
-}>;
-declare function resolveFormTranslation(schema: FormSchema, adapter: AsyncTranslationAdapter, targetLocale: string, sourceLocale?: string): Promise<FormSchema>;
-
 declare function isDisplayConditionGroupSatisfied(group: DisplayConditionGroup, currentAnswers: Readonly<Record<string, unknown>>): boolean;
 declare function isQuestionVisible(question: FormField, currentAnswers: Readonly<Record<string, unknown>>): boolean;
 declare function isDisplayConditionSatisfied(condition: DisplayCondition | undefined, currentAnswers: Readonly<Record<string, unknown>>): boolean;
@@ -1124,4 +1146,4 @@ declare function calculatePageVisibility(schema: FormSchema, currentAnswers: Rea
 declare function calculateFieldVisibility(schema: FormSchema, currentAnswers: Readonly<Record<string, unknown>>): Readonly<Record<string, boolean>>;
 declare function selectVisibleAnswers(schema: FormSchema, currentAnswers: FormValues): FormValues;
 
-export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, DEFAULT_FIELD_TYPE_DEFINITIONS, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAnalytics, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormPage, type FormPolicy, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyFormSubmission, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type Result, type SanitizeSchemaOptions, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionQueryOptions, type SubmissionValidationResult, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateResponses, applyTransitionPlan, assertValidFormSchema, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeSourceTextHash, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createPublishTransitionPlan, createResponseAccumulator, createSubmission, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, dispatchWebhook, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, fromLegacyFormSubmission, getTranslationStatus, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isManualTranslationMetadata, isQuestionVisible, iterateSubmissionPages, jsonValuesEqual, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, removeLocaleFromSchema, resolveFormTranslation, resolveLocalizedSchema, sanitizeSchema, selectVisibleAnswers, serializeSubmissionError, toFormSubmissionWire, transformFieldType, validateAnswers, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };
+export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, DEFAULT_FIELD_TYPE_DEFINITIONS, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAnalytics, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormPage, type FormPolicy, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyFormSubmission, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type Result, type SanitizeSchemaOptions, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionQueryOptions, type SubmissionValidationResult, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateResponses, applyTransitionPlan, assertValidFormSchema, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeSourceTextHash, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createPublishTransitionPlan, createResponseAccumulator, createSubmission, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, dispatchWebhook, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, fromLegacyFormSubmission, getTranslationStatus, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isManualTranslationMetadata, isQuestionVisible, iterateSubmissionPages, jsonValuesEqual, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, removeLocaleFromSchema, resolveFormTranslation, resolveLocalizedSchema, sanitizeSchema, selectVisibleAnswers, serializeSubmissionError, toFormSubmissionWire, transformFieldType, validateAnswers, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };

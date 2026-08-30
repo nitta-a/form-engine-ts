@@ -1,4 +1,4 @@
-import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, SubmissionFilter } from '@form-engine-ts/core';
+import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, BaseSubmissionMetadata, FormSubmission, SubmissionFilter } from '@form-engine-ts/core';
 import { IndexSpecification, CreateIndexesOptions, Db, Document } from 'mongodb';
 
 interface MongoCustomIndexDefinition {
@@ -26,7 +26,20 @@ interface MongoDbStorageOptions {
 interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
     createIndexes(): Promise<void>;
 }
+interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata> extends MongoDbStorageAdapter {
+    readonly fetchPage: (formId: string, options?: {
+        readonly pageSize?: number;
+        readonly fromSubmittedAt?: string;
+        readonly toSubmittedAt?: string;
+        readonly locale?: string;
+        readonly metadataFilters?: Partial<TMeta>;
+        readonly cursor?: string;
+    }) => Promise<{
+        readonly items: readonly FormSubmission<TMeta>[];
+        readonly nextCursor?: string;
+    }>;
+}
 declare function submissionFilterToMongo(filter: SubmissionFilter): Document;
 declare function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter;
 
-export { type MongoCustomIndexDefinition, type MongoDbStorageAdapter, type MongoDbStorageOptions, createMongoDbStorage, submissionFilterToMongo };
+export { type MongoCustomIndexDefinition, type MongoDbStorageAdapter, type MongoDbStorageOptions, type TypedMongoDbStorageAdapter, createMongoDbStorage, submissionFilterToMongo };

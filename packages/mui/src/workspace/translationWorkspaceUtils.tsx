@@ -4,7 +4,8 @@ import type {
   JsonValue,
   LocaleOption,
   TranslationSlot,
-  TranslationStatus
+  TranslationStatus,
+  TranslationWorkspaceCustomDictionary
 } from "@form-engine-ts/core";
 import { normalizeLocale } from "@form-engine-ts/core";
 import type {
@@ -57,11 +58,16 @@ export function defaultTranslationSlotIcon({ item }: TranslationComparisonItemIc
 export function getLocaleDisplayLabel(
   locale: string,
   options: readonly LocaleOption[] = [],
-  getLocaleLabel?: (locale: string) => string
+  getLocaleLabel?: (locale: string) => string,
+  customDictionary?: TranslationWorkspaceCustomDictionary
 ): string {
   const normalizedLocale = localeKey(locale);
+  const dictionaryLabel = customDictionary?.localeNames?.[locale] ?? customDictionary?.localeNames?.[normalizedLocale];
   return (
-    getLocaleLabel?.(locale) ?? options.find((option) => localeKey(option.locale) === normalizedLocale)?.label ?? locale
+    getLocaleLabel?.(locale) ??
+    dictionaryLabel ??
+    options.find((option) => localeKey(option.locale) === normalizedLocale)?.label ??
+    locale
   );
 }
 

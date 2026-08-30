@@ -176,8 +176,9 @@ free-text bodies. In lenient mode, mismatched responses are skipped and exposed 
 being included silently. Independent accumulators for the same schema can be merged, and `finalize()` matches
 `aggregateResponses`.
 
-`exportResponsesToCsvStream` accepts an `AsyncIterable`, emits the BOM/header and one chunk per response, and supports
-custom `CsvColumnDef` columns. Custom getters may be asynchronous and receive the submission, form version, and schema. Use
+`exportResponsesToCsvStream` accepts synchronous or asynchronous submissions and returns a byte `ReadableStream` that
+also remains async-iterable for compatibility. It emits the BOM/header and one chunk per response, and supports
+metadata-typed `CsvColumnDefinition<TMeta>` columns. Custom getters may be asynchronous and receive the submission, form version, and schema. Use
 `pipeResponsesToCsvStream` to write to a Web `WritableStream` or Node-compatible writable while honoring backpressure.
 Formula-injection neutralization applies to both default and custom columns.
 

@@ -1,4 +1,4 @@
-import type { PaginatedResult, StorageCursor } from "./types";
+import type { BaseSubmissionMetadata, FormSubmission, PaginatedResult, StorageCursor } from "@form-engine-ts/core";
 
 export {
   decodeStorageSubmissionCursor,
@@ -7,6 +7,49 @@ export {
   encodeStorageTextAnswerCursor
 } from "@form-engine-ts/core";
 export type { CursorPagingOptions, PaginatedResult, StorageCursor } from "./types";
+
+export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMetadata> {
+  readonly pageSize?: number;
+  readonly fromSubmittedAt?: string;
+  readonly toSubmittedAt?: string;
+  readonly locale?: string;
+  readonly metadataFilters?: Partial<TMeta>;
+  readonly cursor?: string;
+}
+
+export interface TypedSubmissionPage<TMeta extends BaseSubmissionMetadata> {
+  readonly items: readonly FormSubmission<TMeta>[];
+  readonly nextCursor?: string;
+}
+
+export interface TypedPagedSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata> {
+  readonly fetchPage: (
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<TypedSubmissionPage<TMeta>>;
+}
+
+export async function* iterateTypedSubmissionPages<TMeta extends BaseSubmissionMetadata>(
+  adapter: TypedPagedSubmissionStorageAdapter<TMeta>,
+  formId: string,
+  options: TypedSubmissionPageQueryOptions<TMeta> = {}
+): AsyncIterable<readonly FormSubmission<TMeta>[]> {
+  let currentCursor = options.cursor;
+  const seenCursors = new Set<string>();
+  do {
+    if (currentCursor !== undefined) {
+      if (seenCursors.has(currentCursor)) throw new TypeError("Typed submission pagination cursor cycle detected.");
+      seenCursors.add(currentCursor);
+    }
+    const queryOptions = {
+      ...options,
+      ...(currentCursor === undefined ? {} : { cursor: currentCursor })
+    };
+    const page = await adapter.fetchPage(formId, queryOptions);
+    yield page.items;
+    currentCursor = page.nextCursor;
+  } while (currentCursor !== undefined && currentCursor.length > 0);
+}
 
 export async function paginateWithFilter<T>(params: {
   readonly pageSize: number;

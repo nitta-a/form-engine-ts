@@ -259,5 +259,9 @@ preserve optional `deckId` and `sessionId` scopes even when a custom store does 
 `createSubmissionController` and `useSubmissionController` provide a reusable lifecycle with idle, submitting, success,
 and error states, duplicate-request protection, retry, and reset. Receipt stores accept optional `deckId` and
 `sessionId` scopes; pass the same values as `submissionScope` to make completion state deck- or session-specific.
+For lower-level viewer flows, `useSubmissionController` also accepts a schema/scope configuration and creates
+UUID, ULID, or custom-ID `StrictFormSubmission` payloads with scoped duplicate protection and receipt state.
+`FormRendererFieldConfig.a11y` customizes field labels, descriptions, required indicators, error placement metadata,
+and option labels.
 `submissionConfirmation` can configure title, message, button labels, finding display (`full`, `masked`, `type`, or
 `hidden`), visibility, and recheck behavior (`always`, `on-change`, or `once`).

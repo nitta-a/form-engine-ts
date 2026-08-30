@@ -100,7 +100,8 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
   const layout = appearance.layout ?? {};
   const statusOptions = appearance.status ?? {};
   const responsiveMode = layout.responsive ?? "stack";
-  const comparisonColumns = `${layout.sourceWidth ?? "minmax(0, 1fr)"} ${layout.targetWidth ?? "minmax(0, 1fr)"}`;
+  const gridRatio = layout.gridRatio;
+  const comparisonColumns = `${layout.sourceWidth ?? (gridRatio === undefined ? "minmax(0, 1fr)" : `${gridRatio.source}fr`)} ${layout.targetWidth ?? (gridRatio === undefined ? "minmax(0, 1fr)" : `${gridRatio.target}fr`)}`;
   const rowGridTemplateColumns = responsiveMode === "stack" ? { xs: "1fr", md: comparisonColumns } : comparisonColumns;
   const rowOverflow = responsiveMode === "scroll" ? { overflowX: "auto" } : {};
   const { translator } = useFormEngineI18n();
@@ -125,7 +126,14 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
   return (
     <Box data-testid="translation-comparison-workspace">
       {slots?.renderHeader?.(headerProps) ?? (
-        <Box sx={{ display: "grid", gap: 1, mb: 2 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gap: 1,
+            mb: 2,
+            ...(layout.headerHeight === undefined ? {} : { minHeight: layout.headerHeight })
+          }}
+        >
           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center" }}>
             <Typography variant="h6">{translate("workspace.comparison.title")}</Typography>
             <Button
@@ -242,34 +250,50 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
               ))}
             </Box>
           ))}
-        <TextField
-          {...(availableLocales !== undefined ? { select: true } : {})}
-          size="small"
-          label={translate("workspace.header.addLocale")}
-          value={newLocale}
-          onChange={(event) => setNewLocale(event.target.value)}
-          disabled={readOnly || (availableLocales !== undefined && localeCandidates.length === 0)}
-          sx={{ minWidth: 180 }}
-        >
-          {availableLocales === undefined
-            ? null
-            : localeCandidates.map((option) => (
+        {availableLocales === undefined ? (
+          <>
+            <TextField
+              size="small"
+              label={translate("workspace.header.addLocale")}
+              value={newLocale}
+              onChange={(event) => setNewLocale(event.target.value)}
+              disabled={readOnly}
+              sx={{ minWidth: 180 }}
+            />
+            <Button onClick={handleAddLocale} disabled={readOnly || !comparison.isAddLocaleAllowed(newLocale)}>
+              {translate("workspace.header.addLocale")}
+            </Button>
+          </>
+        ) : (
+          <>
+            <TextField
+              select
+              size="small"
+              label={translate("workspace.header.addLocale")}
+              value={newLocale}
+              onChange={(event) => setNewLocale(event.target.value)}
+              disabled={readOnly || localeCandidates.length === 0}
+              sx={{ minWidth: 180 }}
+            >
+              {localeCandidates.map((option) => (
                 <MenuItem key={option.locale} value={option.locale}>
                   {localeLabel(option.locale)}
                 </MenuItem>
               ))}
-        </TextField>
-        <Button onClick={handleAddLocale} disabled={readOnly || !comparison.isAddLocaleAllowed(newLocale)}>
-          {translate("workspace.header.addLocale")}
-        </Button>
-        <Button
-          color="error"
-          variant="outlined"
-          onClick={() => void comparison.removeLocale(comparison.targetLocale)}
-          disabled={!canRemoveTargetLocale || selectedLocaleOption?.removable === false}
-        >
-          {translate("workspace.header.removeLocale")}
-        </Button>
+            </TextField>
+            <Button onClick={handleAddLocale} disabled={readOnly || !comparison.isAddLocaleAllowed(newLocale)}>
+              {translate("workspace.header.addLocale")}
+            </Button>
+            <Button
+              color="error"
+              variant="outlined"
+              onClick={() => void comparison.removeLocale(comparison.targetLocale)}
+              disabled={!canRemoveTargetLocale || selectedLocaleOption?.removable === false}
+            >
+              {translate("workspace.header.removeLocale")}
+            </Button>
+          </>
+        )}
       </Box>
       {errorMessage === undefined ? null : (
         <Typography role="alert" color="error">
@@ -325,7 +349,10 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             onTranslate: () => comparison.translateSingle(item.path)
           };
           const statusColor = statusOptions.colors?.[item.status];
-          const statusLabel = statusOptions.labels?.[item.status] ?? translate(translationStatusKey[item.status]);
+          const statusLabel =
+            statusOptions.labels?.[item.status] ??
+            props.i18n?.customDictionary?.statusLabels?.[item.status] ??
+            translate(translationStatusKey[item.status]);
           const statusIcon = statusOptions.icons?.[item.status];
           const statusBadge =
             statusOptions.visible === false
@@ -352,7 +379,8 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             inputBorderColors[item.status] ??
             (item.status === "manual" ? inputBorderColors.translated : undefined) ??
             (item.status === "manual-stale" ? inputBorderColors.stale : undefined);
-          const normalBorderColor = inputBorderColors.default ?? statusBorderColor;
+          const normalBorderColor =
+            appearance.targetInput?.borderColor ?? inputBorderColors.default ?? statusBorderColor;
           const hoverBorderColor = inputBorderColors.hover ?? statusBorderColor;
           const focusBorderColor = inputBorderColors.focus ?? statusBorderColor;
           const inputSx = {
@@ -365,20 +393,40 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             ...(focusBorderColor === undefined
               ? {}
               : { "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: focusBorderColor } }),
-            ...(appearance.input?.height === undefined && itemLayout.inputHeight === undefined
+            ...(appearance.targetInput?.height === undefined &&
+            appearance.input?.height === undefined &&
+            itemLayout.inputHeight === undefined
               ? {}
               : {
                   "& .MuiInputBase-root": {
-                    minHeight: appearance.input?.height ?? itemLayout.inputHeight
+                    minHeight:
+                      appearance.targetInput?.minHeight ??
+                      appearance.targetInput?.height ??
+                      appearance.input?.height ??
+                      itemLayout.inputHeight,
+                    height: appearance.targetInput?.height
                   }
-                })
+                }),
+            ...(appearance.targetInput?.backgroundColor === undefined
+              ? {}
+              : { backgroundColor: appearance.targetInput.backgroundColor }),
+            ...(appearance.targetInput?.borderWidth === undefined
+              ? {}
+              : { "& .MuiOutlinedInput-notchedOutline": { borderWidth: appearance.targetInput.borderWidth } }),
+            ...(appearance.targetInput?.borderRadius === undefined
+              ? {}
+              : { borderRadius: appearance.targetInput.borderRadius })
           };
           const targetLabel = `${targetHeader} · ${
             item.targetKind === "form"
               ? translate(translationPropertyKey[item.targetProperty])
               : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
           }`;
-          const labelPosition = itemLayout.labelPosition ?? "inside";
+          const labelPosition =
+            itemLayout.labelPosition ??
+            (itemLayout.labelPlacement === "inline" ? "inside" : itemLayout.labelPlacement) ??
+            "inside";
+          const showItemStatus = itemLayout.showStatusBadge ?? statusOptions.visible !== false;
           return (
             <Box
               key={item.id}
@@ -391,6 +439,8 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                 borderColor: "divider",
                 pb: 1.5,
                 mb: itemLayout.rowGap ?? 1.5,
+                alignItems:
+                  layout.alignInput === "center" ? "center" : layout.alignInput === "start" ? "start" : "stretch",
                 ...itemRowOverflow
               }}
             >
@@ -399,8 +449,18 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                   sx={{
                     display: "grid",
                     gridColumn: { xs: "1", md: "1 / -1" },
-                    gridTemplateColumns: itemRowGridTemplateColumns,
-                    gap: itemLayout.gap ?? 1.5
+                    gridTemplateColumns:
+                      itemLayout.gridRatio === undefined
+                        ? itemRowGridTemplateColumns
+                        : `${itemLayout.gridRatio.source}fr ${itemLayout.gridRatio.target}fr`,
+                    gap: itemLayout.gap ?? 1.5,
+                    alignItems:
+                      (itemLayout.alignInput ?? layout.alignInput) === "center"
+                        ? "center"
+                        : (itemLayout.alignInput ?? layout.alignInput) === "start"
+                          ? "start"
+                          : "stretch",
+                    ...(layout.equalInputHeight === false ? {} : { gridAutoRows: "auto" })
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75, minWidth: 0 }}>
@@ -425,7 +485,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       <Box component="span" aria-hidden="true" data-testid={`translation-item-icon-${item.id}-target`}>
                         {itemIcon}
                       </Box>
-                      {showHeaderStatus ? statusBadge : null}
+                      {showHeaderStatus && showItemStatus ? statusBadge : null}
                     </Box>
                     {item.translatable ? (
                       <IconButton
@@ -439,17 +499,30 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       </IconButton>
                     ) : null}
                   </Box>
-                  <Box aria-readonly="true">
-                    {showSourceStatus ? statusBadge : null}
+                  <Box aria-readonly="true" sx={{ ...(layout.equalInputHeight === false ? {} : { height: "100%" }) }}>
+                    {showSourceStatus && showItemStatus ? statusBadge : null}
                     <Paper
                       variant="outlined"
+                      data-testid={`translation-source-input-${item.id.replace(/[^a-zA-Z0-9_-]/gu, "-")}`}
                       sx={{
-                        bgcolor: "action.hover",
-                        minHeight: 56,
-                        p: 1.5,
-                        ...(item.status === "stale" || item.status === "manual-stale"
-                          ? { borderColor: "warning.main", borderWidth: 2 }
-                          : {})
+                        bgcolor: appearance.sourceInput?.backgroundColor ?? "action.hover",
+                        ...(layout.equalInputHeight === false ? {} : { height: "100%" }),
+                        ...(appearance.sourceInput?.minHeight === undefined
+                          ? {}
+                          : { minHeight: appearance.sourceInput.minHeight }),
+                        ...(appearance.sourceInput?.height === undefined
+                          ? {}
+                          : { height: appearance.sourceInput.height }),
+                        ...(appearance.sourceInput?.borderColor === undefined
+                          ? {}
+                          : { borderColor: appearance.sourceInput.borderColor }),
+                        ...(appearance.sourceInput?.borderWidth === undefined
+                          ? {}
+                          : { borderWidth: appearance.sourceInput.borderWidth }),
+                        ...(appearance.sourceInput?.borderRadius === undefined
+                          ? {}
+                          : { borderRadius: appearance.sourceInput.borderRadius }),
+                        p: 1.5
                       }}
                     >
                       <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }} aria-label={sourceHeader}>
@@ -457,13 +530,15 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       </Typography>
                     </Paper>
                   </Box>
-                  <Box>
-                    {showTargetStatus ? statusBadge : null}
+                  <Box sx={{ ...(layout.equalInputHeight === false ? {} : { height: "100%" }) }}>
+                    {showTargetStatus && showItemStatus ? statusBadge : null}
                     {labelPosition === "top" ? <Typography variant="caption">{targetLabel}</Typography> : null}
                     <TextField
+                      data-testid={`translation-target-input-${item.id.replace(/[^a-zA-Z0-9_-]/gu, "-")}`}
                       fullWidth
                       multiline
-                      minRows={2}
+                      minRows={itemLayout.minRows ?? 2}
+                      {...(itemLayout.maxRows === undefined ? {} : { maxRows: itemLayout.maxRows })}
                       label={labelPosition === "inside" ? targetLabel : undefined}
                       value={item.translatedText}
                       onChange={(event) => rowProps.onChange(event.target.value)}
@@ -471,8 +546,12 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       inputProps={{
                         "aria-label": targetLabel
                       }}
-                      placeholder={item.status === "missing" ? targetHeader : undefined}
-                      sx={inputSx}
+                      placeholder={
+                        item.status === "missing"
+                          ? (props.i18n?.customDictionary?.placeholders?.[comparisonLayoutTarget(item)] ?? targetHeader)
+                          : undefined
+                      }
+                      sx={{ ...inputSx, ...(layout.equalInputHeight === false ? {} : { height: "100%" }) }}
                     />
                     {statusOptions.visible !== false && (item.status === "stale" || item.status === "manual-stale") ? (
                       <Typography color="warning.main" variant="caption" role="status" aria-live="polite">
@@ -499,6 +578,7 @@ export function TranslationComparisonWorkspace(props: TranslationComparisonWorks
       {...(i18n.fallbackLocale === undefined ? {} : { fallbackLocale: i18n.fallbackLocale })}
       {...(i18n.messages === undefined ? {} : { messages: i18n.messages })}
       {...(i18n.customCatalogs === undefined ? {} : { customCatalogs: i18n.customCatalogs })}
+      {...(i18n.customDictionary === undefined ? {} : { customDictionary: i18n.customDictionary })}
       {...(i18n.onMissingKey === undefined ? {} : { onMissingKey: i18n.onMissingKey })}
       {...(i18n.strict === undefined ? {} : { strict: i18n.strict })}
       {...(i18n.translator === undefined ? {} : { translator: i18n.translator })}

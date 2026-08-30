@@ -1,4 +1,4 @@
-import { FormSubmission, SubmissionPageQueryOptions, BaseSubmissionMetadata, StrictFormSubmission, PagedSubmissionStorageAdapter, SubmissionFilter } from '@form-engine-ts/core';
+import { FormSubmission, BaseSubmissionMetadata, PagedSubmissionStorageAdapter, SubmissionPageQueryOptions, StrictFormSubmission, SubmissionFilter } from '@form-engine-ts/core';
 
 interface AzureTableListOptions {
     readonly queryOptions?: {
@@ -105,6 +105,19 @@ interface AzureTableStorageOptions<T = FormSubmission> {
     readonly fieldMapping?: AzureTableFieldMapping;
     readonly readOnly?: boolean;
 }
+interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> extends PagedSubmissionStorageAdapter {
+    readonly fetchPage: (formId: string, options?: {
+        readonly pageSize?: number;
+        readonly fromSubmittedAt?: string;
+        readonly toSubmittedAt?: string;
+        readonly locale?: string;
+        readonly metadataFilters?: Partial<TMeta>;
+        readonly cursor?: string;
+    }) => Promise<{
+        readonly items: readonly FormSubmission<TMeta>[];
+        readonly nextCursor?: string;
+    }>;
+}
 interface AzureTextAnswerCursorPayload {
     readonly formatVersion: 1;
     readonly formId: string;
@@ -120,4 +133,4 @@ declare function metadataFiltersToOData(options: SubmissionPageQueryOptions, map
 declare function submissionFilterToOData(filter: SubmissionFilter, mapping?: AzureTableFieldMapping): string | undefined;
 declare function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
 
-export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableLegacyCodec, type AzureTableLegacyEntity, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, type LegacyAnswerArrayEntity, type LegacyArrayAzureTableCodec, createAzureTableStorage, createLegacyArrayAzureTableCodec, createLegacyAzureTableCodec, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };
+export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableLegacyCodec, type AzureTableLegacyEntity, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageAdapter, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, type LegacyAnswerArrayEntity, type LegacyArrayAzureTableCodec, createAzureTableStorage, createLegacyArrayAzureTableCodec, createLegacyAzureTableCodec, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };

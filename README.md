@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.6.0** (2026-08-30). All public packages are currently published at version `6.6.0`.
-This release adds metadata-typed storage contracts, robust scoped receipt queries, and per-target translation comparison layout overrides. It builds on v6.5.0's typed submission metadata, configurable pre-submit confirmation behavior, comparison-workspace appearance controls, and richer MUI select controls.
+The latest release is **v6.7.0** (2026-08-30). All public packages are currently published at version `6.7.0`.
+This release adds metadata-aware CSV streaming and columns, typed storage pagination, custom translation workspace dictionaries, and richer target-specific comparison layout and input controls. It builds on v6.6.0's metadata-typed storage contracts, scoped receipt queries, and per-target layout overrides.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.6.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.7.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.6.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.6.0` で公開されています。
-本リリースでは、メタデータ型付きストレージ契約、スコープ付きレシート検索の強化、翻訳比較項目ごとのレイアウト上書きを追加しました。v6.5.0の型付き送信メタデータ、送信前確認設定、翻訳比較ワークスペースの外観設定、MUIセレクト拡張も引き継いでいます。
+最新版は **v6.7.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.7.0` で公開されています。
+本リリースでは、メタデータ対応CSVストリーミングと列指定、型付きストレージページング、翻訳ワークスペースのカスタム辞書、比較ワークスペースの項目別レイアウト・入力設定を追加しました。v6.6.0の型付きストレージ契約、スコープ付きレシート検索、項目別レイアウト上書きも引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.6.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.7.0) を参照してください。
 
 ### 編集・回答体験
 

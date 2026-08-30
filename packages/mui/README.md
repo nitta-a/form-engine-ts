@@ -45,6 +45,12 @@ gaps, input height, label position, and responsive mode. Use `appearance.layout.
 `title`, `completionMessage`, `question`, or `option` rows. `appearance.status` controls visibility, labels, colors, icons,
 and badge placement. The existing `i18n.messages`/`customCatalogs` options override FormEngine's built-in Japanese or
 English catalog, so application dictionaries can remove residual English UI text.
+`appearance.sourceInput` and `appearance.targetInput` control border, background, radius, and height independently;
+`appearance.layout.equalInputHeight` synchronizes both inputs (enabled by default), while `alignInput`, `headerHeight`,
+`gridRatio`, row bounds, and `layout.byTarget` provide per-kind layout control. `TargetLocaleHeaderToolbar` separates
+registered-language switching/removal from the independent `AddLocaleDropdown`; a single registered language is shown
+as a non-interactive chip. `i18n.customDictionary` supports locale names, status labels, placeholders, headers, and
+message overrides.
 
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";

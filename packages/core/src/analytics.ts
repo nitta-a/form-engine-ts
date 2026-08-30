@@ -492,6 +492,10 @@ export interface CsvExportOptions<TMeta extends BaseSubmissionMetadata = BaseSub
   readonly includeLocale?: boolean;
 }
 
+export interface MetadataCsvExportOptions<TMeta extends BaseSubmissionMetadata> extends CsvExportOptions<TMeta> {
+  readonly includeMetadataFields?: readonly Extract<keyof TMeta, string | number>[];
+}
+
 export interface CsvColumnDef {
   readonly header: string;
   readonly getValue: (
@@ -508,6 +512,15 @@ export interface CsvColumnContext extends FormResponse {
 export interface StreamCsvOptions extends CsvExportOptions {
   readonly columns?: readonly CsvColumnDef[];
   readonly includeDefaultColumns?: boolean;
+}
+
+export interface TypedStreamCsvOptions<TMeta extends BaseSubmissionMetadata>
+  extends Omit<StreamCsvOptions, "includeMetadataFields"> {
+  readonly includeMetadataFields?: readonly Extract<keyof TMeta, string | number>[];
+}
+
+interface InternalStreamCsvOptions extends StreamCsvOptions {
+  readonly includeMetadataFields?: readonly PropertyKey[];
 }
 
 function asFormResponse(submission: AccumulatorResponse): FormResponse {
@@ -540,10 +553,19 @@ function submissionWithMetadata(submission: FormSubmission): FormSubmission<Base
   return { ...submission, metadata: submission.metadata ?? {} };
 }
 
-export async function* exportResponsesToCsvStream(
+type CsvStream = ReadableStream<Uint8Array> & AsyncIterable<string>;
+
+function toAsyncIterable<T>(source: Iterable<T> | AsyncIterable<T>): AsyncIterable<T> {
+  if (Symbol.asyncIterator in source) return source as AsyncIterable<T>;
+  return (async function* () {
+    for (const item of source as Iterable<T>) yield item;
+  })();
+}
+
+async function* generateCsvChunks(
   schema: FormSchema,
-  submissions: AsyncIterable<AccumulatorResponse>,
-  options: StreamCsvOptions = {}
+  submissions: Iterable<AccumulatorResponse> | AsyncIterable<AccumulatorResponse>,
+  options: InternalStreamCsvOptions = {}
 ): AsyncIterable<string> {
   assertValidFormSchema(schema);
   const includeDefaultColumns = options.includeDefaultColumns ?? true;
@@ -567,20 +589,23 @@ export async function* exportResponsesToCsvStream(
   const neutralizeFormulas = options.preventFormulaInjection ?? options.neutralizeFormulas ?? true;
   const header = headers.map((value) => escapeCsvCell(value, neutralizeFormulas)).join(",");
   yield `${(options.withBom ?? true) ? "\uFEFF" : ""}${header}`;
-  for await (const submission of submissions) {
+  for await (const submission of toAsyncIterable(submissions)) {
     const problem = responseProblem(schema, submission);
     if (problem !== undefined) throw new TypeError(problem.error);
     const response = asFormResponse(submission);
     const answers = response.answers;
     const visible = selectVisibleAnswers(schema, answers as FormValues);
     const piiStatus = response.metadata?.piiConfirmed === true ? "confirmed" : "unconfirmed";
+    const metadataCells =
+      options.includeMetadataFields?.map((key) => serializeUnknown(response.metadata?.[String(key)])) ?? [];
     const defaultCells = includeDefaultColumns
       ? [
           response.responseId,
           response.submittedAt,
           ...(includeLocale ? [response.sourceLocale ?? ""] : []),
           ...(includePiiStatus ? [piiStatus] : []),
-          ...schema.fields.map((field) => serializeUnknown(visible[field.id]))
+          ...schema.fields.map((field) => serializeUnknown(visible[field.id])),
+          ...metadataCells
         ]
       : [];
     const context: CsvColumnContext = {
@@ -598,6 +623,51 @@ export async function* exportResponsesToCsvStream(
       .map((value) => escapeCsvCell(value, neutralizeFormulas))
       .join(",")}`;
   }
+}
+
+export function exportResponsesToCsvStream(
+  schema: FormSchema,
+  submissions: AsyncIterable<AccumulatorResponse>,
+  options?: StreamCsvOptions
+): AsyncIterable<string>;
+export function exportResponsesToCsvStream<TMeta extends BaseSubmissionMetadata>(
+  schema: FormSchema,
+  submissions: Iterable<FormSubmission<TMeta>> | AsyncIterable<FormSubmission<TMeta>>,
+  options?: TypedStreamCsvOptions<TMeta>
+): CsvStream;
+export function exportResponsesToCsvStream(
+  schema: FormSchema,
+  submissions: Iterable<AccumulatorResponse> | AsyncIterable<AccumulatorResponse>,
+  options?: StreamCsvOptions
+): CsvStream;
+export function exportResponsesToCsvStream<TMeta extends BaseSubmissionMetadata>(
+  schema: FormSchema,
+  submissions: Iterable<AccumulatorResponse> | AsyncIterable<AccumulatorResponse>,
+  options: StreamCsvOptions | TypedStreamCsvOptions<TMeta> = {}
+): CsvStream {
+  let streamIterator: AsyncIterator<string> | undefined;
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (streamIterator === undefined) {
+        streamIterator = generateCsvChunks(schema, submissions, options)[Symbol.asyncIterator]();
+      }
+      const iterator = streamIterator;
+      try {
+        const next = await iterator.next();
+        if (next.done === true) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(new TextEncoder().encode(next.value));
+      } catch (cause) {
+        controller.error(cause);
+      }
+    }
+  }) as CsvStream;
+  Object.defineProperty(stream, Symbol.asyncIterator, {
+    value: () => generateCsvChunks(schema, submissions, options)[Symbol.asyncIterator]()
+  });
+  return stream;
 }
 
 export interface NodeWritableStream {
@@ -637,6 +707,12 @@ export async function pipeResponsesToCsvStream(
   schema: FormSchema,
   submissions: AsyncIterable<AccumulatorResponse>,
   writable: WritableStream<Uint8Array> | NodeWritableStream,
+  options?: StreamCsvOptions
+): Promise<void>;
+export async function pipeResponsesToCsvStream(
+  schema: FormSchema,
+  submissions: Iterable<AccumulatorResponse> | AsyncIterable<AccumulatorResponse>,
+  writable: WritableStream<Uint8Array> | NodeWritableStream,
   options: StreamCsvOptions = {}
 ): Promise<void> {
   const encoder = new TextEncoder();
@@ -673,7 +749,17 @@ export async function pipeResponsesToCsvStream(
 export function exportResponsesToCsv(
   schema: FormSchema,
   responses: readonly FormSubmission[],
-  options: CsvExportOptions = {}
+  options?: CsvExportOptions
+): string;
+export function exportResponsesToCsv<TMeta extends BaseSubmissionMetadata>(
+  schema: FormSchema,
+  responses: readonly FormSubmission<TMeta>[],
+  options?: MetadataCsvExportOptions<TMeta>
+): string;
+export function exportResponsesToCsv<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+  schema: FormSchema,
+  responses: readonly FormSubmission<TMeta>[],
+  options: MetadataCsvExportOptions<TMeta> = {}
 ): string {
   assertValidFormSchema(schema);
   for (const response of responses) {
@@ -684,12 +770,14 @@ export function exportResponsesToCsv(
   const includeLocale = options.includeLocale ?? true;
   const includePiiStatus = options.includePiiStatus ?? false;
   const customColumns = options.customColumns ?? [];
+  const metadataHeaders = options.includeMetadataFields?.map((key) => String(key)) ?? [];
   const headers = [
     "submissionId",
     "submittedAt",
     ...(includeLocale ? ["locale"] : []),
     ...(includePiiStatus ? ["piiStatus"] : []),
     ...schema.fields.map((field) => field.id),
+    ...metadataHeaders,
     ...customColumns.map((column) => column.header)
   ];
   const rows = [
@@ -697,14 +785,14 @@ export function exportResponsesToCsv(
     ...responses.map((response) => {
       const visible = selectVisibleAnswers(schema, response.values);
       const piiStatus = response.metadata?.piiConfirmed === true ? "confirmed" : "unconfirmed";
-      const submissionForCustomColumns = submissionWithMetadata(response);
       return [
         response.id,
         response.submittedAt,
         ...(includeLocale ? [response.locale] : []),
         ...(includePiiStatus ? [piiStatus] : []),
         ...schema.fields.map((field) => serializeValue(visible[field.id] as FormValue)),
-        ...customColumns.map((column) => column.getValue(submissionForCustomColumns, schema))
+        ...(options.includeMetadataFields?.map((key) => serializeUnknown(response.metadata?.[String(key)])) ?? []),
+        ...customColumns.map((column) => column.getValue(response, schema))
       ];
     })
   ];

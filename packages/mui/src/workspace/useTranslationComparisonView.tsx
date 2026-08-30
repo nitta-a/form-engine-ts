@@ -67,13 +67,18 @@ export function useTranslationComparisonView(
   const [newLocale, setNewLocale] = useState("");
   const localizedAvailableLocales = availableLocales?.map((candidate) =>
     typeof candidate === "string"
-      ? { locale: candidate, label: getLocaleDisplayLabel(candidate, [], i18n?.getLocaleLabel) }
+      ? { locale: candidate, label: getLocaleDisplayLabel(candidate, [], i18n?.getLocaleLabel, i18n?.customDictionary) }
       : candidate
   );
   const defaultConfirmRemoveLocale = (dialogProps: ConfirmRemoveLocaleSlotProps) => (
     <TranslationWorkspaceDialog
       {...dialogProps}
-      localeLabel={getLocaleDisplayLabel(dialogProps.locale, localizedAvailableLocales, i18n?.getLocaleLabel)}
+      localeLabel={getLocaleDisplayLabel(
+        dialogProps.locale,
+        localizedAvailableLocales,
+        i18n?.getLocaleLabel,
+        i18n?.customDictionary
+      )}
       translate={translate}
     />
   );
@@ -101,11 +106,15 @@ export function useTranslationComparisonView(
     confirmRemoveLocale: slots?.confirmRemoveLocale ?? defaultConfirmRemoveLocale
   });
   const getLocaleLabel = (locale: string): string =>
-    getLocaleDisplayLabel(locale, comparison.localeOptions, i18n?.getLocaleLabel);
+    getLocaleDisplayLabel(locale, comparison.localeOptions, i18n?.getLocaleLabel, i18n?.customDictionary);
   const sourceLocaleLabel = getLocaleLabel(comparison.sourceLocale);
   const targetLocaleLabel = getLocaleLabel(comparison.targetLocale);
-  const sourceHeader = translate("workspace.comparison.sourceHeader", { locale: sourceLocaleLabel });
-  const targetHeader = translate("workspace.comparison.targetHeader", { locale: targetLocaleLabel });
+  const sourceHeader =
+    i18n?.customDictionary?.headers?.sourceTitle ??
+    translate("workspace.comparison.sourceHeader", { locale: sourceLocaleLabel });
+  const targetHeader =
+    i18n?.customDictionary?.headers?.targetTitle ??
+    translate("workspace.comparison.targetHeader", { locale: targetLocaleLabel });
   const localizedLocaleOptions = localizeLocaleOptions(comparison.localeOptions, i18n?.getLocaleLabel);
   const targetLocaleSet = new Set(comparison.targetLocales.map(localeKey));
   const localeCandidates = comparison.localeOptions.filter(

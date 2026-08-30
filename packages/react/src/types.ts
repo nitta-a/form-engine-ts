@@ -18,6 +18,7 @@ import type {
   TranslationReport,
   TranslationSlot,
   TranslationStatus,
+  TranslationWorkspaceCustomDictionary,
   ValidationError,
   ValidationIssue
 } from "@form-engine-ts/core";
@@ -646,6 +647,19 @@ export interface FormRendererMessages {
   readonly cancelButton?: string;
 }
 
+export interface FieldA11yOptions {
+  readonly ariaLabel?: string;
+  readonly ariaDescribedBy?: string;
+  readonly requiredIndicator?: boolean | string;
+  readonly errorMessagePlacement?: "bottom" | "top" | "tooltip";
+  readonly customDescription?: string;
+  readonly optionAriaLabelGenerator?: (optionValue: string, label: string) => string;
+}
+
+export interface FormRendererFieldConfig {
+  readonly a11y?: FieldA11yOptions;
+}
+
 export interface FormSubmittedAnswerItem {
   readonly fieldId: string;
   readonly title: string;
@@ -730,6 +744,15 @@ export interface TranslationComparisonInputAppearance {
   readonly height?: number | string;
 }
 
+export interface InputBoxStyleOptions {
+  readonly borderColor?: string;
+  readonly borderWidth?: number | string;
+  readonly backgroundColor?: string;
+  readonly minHeight?: number | string;
+  readonly height?: number | string;
+  readonly borderRadius?: number | string;
+}
+
 export type TranslationComparisonResponsiveMode = "stack" | "columns" | "scroll";
 
 export type TranslationComparisonLayoutTarget = "title" | "completionMessage" | "question" | "option";
@@ -741,8 +764,27 @@ export interface TranslationComparisonLayoutSettings {
   readonly rowGap?: number | string;
   readonly inputHeight?: number | string;
   readonly labelPosition?: "top" | "inside" | "hidden";
+  readonly labelPlacement?: "top" | "inline" | "hidden";
   readonly responsive?: TranslationComparisonResponsiveMode;
+  readonly gridRatio?: { readonly source: number; readonly target: number };
+  readonly minRows?: number;
+  readonly maxRows?: number;
+  readonly alignInput?: "start" | "stretch" | "center";
+  readonly showStatusBadge?: boolean;
 }
+
+export type TranslationTargetKind = TranslationComparisonLayoutTarget;
+
+export interface TargetSpecificLayoutConfig extends TranslationComparisonLayoutSettings {
+  readonly gridRatio?: { readonly source: number; readonly target: number };
+  readonly minRows?: number;
+  readonly maxRows?: number;
+  readonly inputHeight?: number | string;
+  readonly labelPlacement?: "top" | "inline" | "hidden";
+  readonly showStatusBadge?: boolean;
+}
+
+export type TranslationLayoutOptions = TranslationComparisonLayoutOptions;
 
 export interface TranslationComparisonLayoutOptions {
   readonly sourceWidth?: number | string;
@@ -751,7 +793,12 @@ export interface TranslationComparisonLayoutOptions {
   readonly rowGap?: number | string;
   readonly inputHeight?: number | string;
   readonly labelPosition?: "top" | "inside" | "hidden";
+  readonly labelPlacement?: "top" | "inline" | "hidden";
   readonly responsive?: TranslationComparisonResponsiveMode;
+  readonly equalInputHeight?: boolean;
+  readonly headerHeight?: number;
+  readonly alignInput?: "start" | "stretch" | "center";
+  readonly gridRatio?: { readonly source: number; readonly target: number };
   /** Per-item overrides. Unspecified values inherit from the base layout. */
   readonly byTarget?: Partial<Record<TranslationComparisonLayoutTarget, TranslationComparisonLayoutSettings>>;
 }
@@ -766,8 +813,17 @@ export interface TranslationComparisonStatusDisplayOptions {
 
 export interface TranslationComparisonAppearance {
   readonly input?: TranslationComparisonInputAppearance;
+  readonly sourceInput?: InputBoxStyleOptions;
+  readonly targetInput?: InputBoxStyleOptions;
   readonly layout?: TranslationComparisonLayoutOptions;
   readonly status?: TranslationComparisonStatusDisplayOptions;
+}
+
+export type { TranslationWorkspaceCustomDictionary };
+
+export interface TranslationWorkspaceAppearance extends TranslationComparisonAppearance {
+  readonly sourceInput?: InputBoxStyleOptions;
+  readonly targetInput?: InputBoxStyleOptions;
 }
 
 export type SubmissionConfirmationRenderMode = "inline" | "replace" | "dialog";

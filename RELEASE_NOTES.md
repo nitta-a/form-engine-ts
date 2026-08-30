@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v6.7.0 — 2026-08-30
+
+- Added metadata-aware CSV exports with selectable metadata columns and streaming support for iterable and web-stream consumers.
+- Added typed submission pagination helpers and typed `fetchPage` access for Azure Table and MongoDB storage adapters.
+- Added custom translation workspace dictionaries for status labels, locale names, placeholders, and headers.
+- Expanded comparison-workspace layout and input customization with target-specific settings, grid ratios, sizing, and alignment controls.
+- Aligned all public packages to version 6.7.0.
+
+See the [GitHub release for v6.7.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.7.0).
+
 ### v6.6.0 — 2026-08-30
 
 - Added metadata-typed storage and paged-storage contracts so application metadata remains typed through persistence and pagination.

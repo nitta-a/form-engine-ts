@@ -2,7 +2,8 @@ import {
   createFormEngineTranslator,
   type FormEngineMessages,
   type FormEngineTranslator,
-  type TranslationMissingKeyEvent
+  type TranslationMissingKeyEvent,
+  type TranslationWorkspaceCustomDictionary
 } from "@form-engine-ts/core";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 
@@ -26,6 +27,7 @@ export interface FormEngineI18nProviderProps {
   readonly fallbackLocale?: string;
   readonly messages?: FormEngineMessages;
   readonly customCatalogs?: Record<string, FormEngineMessages>;
+  readonly customDictionary?: TranslationWorkspaceCustomDictionary;
   readonly onMissingKey?: (event: TranslationMissingKeyEvent) => void;
   readonly strict?: boolean;
   readonly translator?: FormEngineTranslator;
@@ -37,6 +39,7 @@ export function FormEngineI18nProvider({
   fallbackLocale = "en",
   messages,
   customCatalogs,
+  customDictionary,
   onMissingKey,
   strict,
   translator: customTranslator,
@@ -49,10 +52,11 @@ export function FormEngineI18nProvider({
       fallbackLocale,
       ...(messages === undefined ? {} : { messages }),
       ...(customCatalogs === undefined ? {} : { customCatalogs }),
+      ...(customDictionary === undefined ? {} : { customDictionary }),
       ...(onMissingKey === undefined ? {} : { onMissingKey }),
       ...(strict === undefined ? {} : { strict })
     });
-  }, [customCatalogs, customTranslator, fallbackLocale, locale, messages, onMissingKey, strict]);
+  }, [customCatalogs, customDictionary, customTranslator, fallbackLocale, locale, messages, onMissingKey, strict]);
   const value = useMemo<FormEngineI18nContextValue>(() => ({ uiLocale: locale, translator }), [locale, translator]);
   return (
     <FormEngineI18nProviderScopeContext.Provider value>

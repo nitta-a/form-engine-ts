@@ -212,6 +212,21 @@ export interface AzureTableStorageOptions<T = FormSubmission> {
   readonly readOnly?: boolean;
 }
 
+export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends PagedSubmissionStorageAdapter {
+  readonly fetchPage: (
+    formId: string,
+    options?: {
+      readonly pageSize?: number;
+      readonly fromSubmittedAt?: string;
+      readonly toSubmittedAt?: string;
+      readonly locale?: string;
+      readonly metadataFilters?: Partial<TMeta>;
+      readonly cursor?: string;
+    }
+  ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
+}
+
 interface StoredSchemaEntity extends Record<string, unknown> {
   readonly partitionKey: string;
   readonly rowKey: string;
@@ -726,7 +741,10 @@ function requireClient(client: AzureTableClientLike | undefined, name: string): 
   return client;
 }
 
-export function createAzureTableStorage(options: AzureTableStorageOptions = {}): PagedSubmissionStorageAdapter {
+export function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
+export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+  options: AzureTableStorageOptions = {}
+): AzureTableStorageAdapter<TMeta> {
   const staticSchemas = options.schemasTableClient ?? options.client;
   const staticSubmissions = options.submissionsTableClient ?? options.client;
   const configuredCodec = options.codec;
@@ -783,7 +801,7 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
     );
   };
 
-  return {
+  const adapter: PagedSubmissionStorageAdapter = {
     async saveSchema(schema) {
       ensureWritable();
       assertValidFormSchema(schema);
@@ -1029,6 +1047,25 @@ export function createAzureTableStorage(options: AzureTableStorageOptions = {}):
           await submissions.deleteEntity(raw.partitionKey, raw.rowKey);
         }
       }
+    }
+  };
+  return {
+    ...adapter,
+    async fetchPage(formId, options) {
+      const page = await adapter.listSubmissionPage(formId, {
+        ...(options?.pageSize === undefined ? {} : { pageSize: options.pageSize }),
+        ...(options?.fromSubmittedAt === undefined ? {} : { since: options.fromSubmittedAt }),
+        ...(options?.toSubmittedAt === undefined ? {} : { until: options.toSubmittedAt }),
+        ...(options?.locale === undefined ? {} : { locale: options.locale }),
+        ...(options?.cursor === undefined ? {} : { cursor: options.cursor }),
+        ...(options?.metadataFilters === undefined
+          ? {}
+          : { metadataFilters: options.metadataFilters as Readonly<Record<string, JsonValue>> })
+      });
+      return {
+        items: page.items as unknown as readonly FormSubmission<TMeta>[],
+        ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor })
+      };
     }
   };
 }
