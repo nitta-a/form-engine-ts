@@ -3,6 +3,7 @@ import { SubmissionIdFormat, QuestionType, FormField, ChoiceOption, FormPage, Fo
 export { FormSubmissionError, FormSubmissionSerializedError, QuestionType, SubmissionIdFormat, TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
+import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 
 interface SubmissionAttempt {
     readonly attemptId: string;
@@ -329,17 +330,6 @@ interface UseTranslationWorkspaceResult {
 }
 declare const validateLocalePipeline: (locale: string, schema: FormSchema, policy?: FormPolicy, customValidator?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator, availableLocales?: readonly (string | LocaleOption)[], sourceLocale?: string) => LocaleValidationResult;
 declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, signal, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, slots: workspaceSlots, onTranslationStart, onTranslationSuccess, onTranslationReport, onTranslationError, onTranslationChange, validateLocale, createTranslationMetadata: metadataFactory }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
-
-interface SensitiveDataFinding {
-    readonly fieldId: string;
-    readonly fieldTitle?: string;
-    readonly type: "email" | "phone" | "url" | "postal_code" | string;
-    readonly typeLabel?: string;
-    readonly start?: number;
-    readonly end?: number;
-    readonly matchedText?: string;
-    readonly maskedText?: string;
-}
 
 interface ComponentBaseProps {
     readonly id?: string;

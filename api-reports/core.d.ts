@@ -849,10 +849,10 @@ type TrpcProcedureType = "query" | "mutation" | "subscription";
 /** Structural equivalent of tRPC's ErrorFormatter input; no `@trpc/server` dependency is required. */
 interface TrpcSubmissionErrorFormatterOptions<TShape extends Record<string, unknown> = Record<string, unknown>> {
     readonly error: unknown;
-    readonly type?: TrpcProcedureType;
-    readonly path?: string | undefined;
-    readonly input?: unknown;
-    readonly ctx?: unknown;
+    readonly type: TrpcProcedureType | undefined;
+    readonly path: string | undefined;
+    readonly input: unknown;
+    readonly ctx: unknown;
     readonly shape: TShape & {
         readonly data?: unknown;
     };
