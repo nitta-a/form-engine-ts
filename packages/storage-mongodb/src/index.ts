@@ -12,9 +12,12 @@ import type {
   SaveSubmissionOptions,
   StorageCommitError,
   SubmissionFilter,
+  SubmissionPageQueryOptions,
   SubmissionSaveResult,
   TextAnswerPage,
   TextAnswerPageQueryOptions,
+  TypedSubmissionPage,
+  TypedSubmissionPageQueryOptions,
   TypedTextAnswerPage,
   VersionedFormStorageAdapter,
   VersionTransitionPlan
@@ -84,6 +87,10 @@ export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, Ve
 
 export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
   extends MongoDbStorageAdapter {
+  readonly fetchSubmissionPage?: (
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<TypedSubmissionPage<TMeta>>;
   readonly fetchPage: (
     formId: string,
     options?: {
@@ -127,6 +134,10 @@ export type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
       readonly cursor?: string;
     }
   ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
+  readonly fetchSubmissionPage?: (
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<TypedSubmissionPage<TMeta>>;
 };
 
 interface StoredSchemaDocument extends Document {
@@ -907,6 +918,12 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
   };
   return {
     ...adapter,
+    async fetchSubmissionPage(formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) {
+      return (await adapter.listSubmissionPage(
+        formId,
+        options as SubmissionPageQueryOptions
+      )) as TypedSubmissionPage<TMeta>;
+    },
     async fetchPage(
       formId: string,
       options?: {

@@ -20,6 +20,7 @@ export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = 
   readonly id: string;
   readonly locale: string;
   readonly submittedAt: string;
+  readonly schemaRevision?: number;
   readonly metadata?: TMeta & Readonly<Record<string, JsonValue>>;
 }
 
@@ -117,7 +118,13 @@ function canonicalSubmissionValue(value: unknown): string {
 }
 
 /** Creates a stable SHA-256 hash for idempotent submission persistence. */
-export async function hashFormSubmissionPayload(submission: FormSubmission): Promise<string> {
+export function hashFormSubmissionPayload(submission: FormSubmission): Promise<string>;
+export function hashFormSubmissionPayload<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  submission: FormSubmission<TMeta>
+): Promise<string>;
+export async function hashFormSubmissionPayload<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  submission: FormSubmission<TMeta>
+): Promise<string> {
   const payload = {
     id: submission.id,
     formId: submission.formId,
@@ -283,6 +290,7 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
     locale: options.locale,
     values: Object.freeze(cloneValues(visibleValues)),
     submittedAt: options.submittedAt,
+    ...(options.schemaRevision === undefined ? {} : { schemaRevision: options.schemaRevision }),
     ...(options.metadata === undefined ? {} : { metadata: Object.freeze({ ...options.metadata }) }),
     ...(options.translationMetadata === undefined
       ? {}

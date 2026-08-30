@@ -16,6 +16,8 @@ import type {
   TextAnswerItem,
   TextAnswerPage,
   TextAnswerPageQueryOptions,
+  TypedSubmissionPage,
+  TypedSubmissionPageQueryOptions,
   TypedTextAnswerPage
 } from "@form-engine-ts/core";
 import {
@@ -241,6 +243,10 @@ export interface AzureTableStorageOptions<T = FormSubmission> {
 
 export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
   extends PagedSubmissionStorageAdapter {
+  readonly fetchSubmissionPage?: (
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<TypedSubmissionPage<TMeta>>;
   readonly fetchPage: (
     formId: string,
     options?: {
@@ -251,10 +257,7 @@ export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata =
       readonly metadataFilters?: Partial<TMeta>;
       readonly cursor?: string;
     }
-  ) => Promise<{
-    readonly items: readonly FormSubmission<TMeta>[];
-    readonly nextCursor?: string;
-  }>;
+  ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
 }
 
 export type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<
@@ -290,10 +293,11 @@ export type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata |
         : Readonly<Record<string, JsonValue>>;
       readonly cursor?: string;
     }
-  ) => Promise<{
-    readonly items: readonly FormSubmission<TMeta>[];
-    readonly nextCursor?: string;
-  }>;
+  ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
+  readonly fetchSubmissionPage?: (
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<TypedSubmissionPage<TMeta>>;
   readonly listTextAnswerPage: (
     formId: string,
     fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
@@ -1204,6 +1208,12 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
   };
   return {
     ...adapter,
+    async fetchSubmissionPage(formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) {
+      return (await adapter.listSubmissionPage(
+        formId,
+        options as SubmissionPageQueryOptions
+      )) as TypedSubmissionPage<TMeta>;
+    },
     async fetchPage(
       formId: string,
       options?: {

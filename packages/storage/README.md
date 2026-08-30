@@ -13,5 +13,6 @@ The package exports `StorageCursor`, cursor payload contracts, cursor encoders/d
 `maxScanPages` bounds low-density scans, and `totalScannedCount` reports the amount of source data inspected.
 
 `TypedPagedSubmissionStorageAdapter<TMeta>` and `iterateTypedSubmissionPages` preserve application metadata types
-through page fetching. The Azure Table and MongoDB factories expose a typed `fetchPage` when called as
-`createAzureTableStorage<TMeta>(...)` or `createMongoDbStorage<TMeta>(...)`.
+through page fetching. MongoDB and Azure Table expose the same typed `fetchSubmissionPage` arguments and the same
+`{ items, hasMore, nextCursor }` page result when called as `createMongoDbStorage<TMeta>(...)` or
+`createAzureTableStorage<TMeta>(...)`. The older `fetchPage` helper remains available for compatibility.

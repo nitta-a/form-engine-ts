@@ -612,6 +612,8 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
   readonly slots?: FormRendererSlots;
   /** Optional controller used directly for submission lifecycle, retry, and attempt identity. */
+  readonly controller?: SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>;
+  /** @deprecated Use controller instead. */
   readonly submissionController?:
     | SubmissionController<SubmitResponse>
     | ScopedSubmissionController<BaseSubmissionMetadata>;
@@ -1704,9 +1706,11 @@ export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     initialValues,
     resetOnSuccess,
     onSubmit,
+    controller,
     submissionController,
     ...rendererProps
   } = props;
+  const effectiveController = controller ?? submissionController;
   const translator =
     explicitTranslator ??
     (isProviderValue
@@ -1722,12 +1726,12 @@ export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       translator={translator}
       onSubmit={
         (onSubmit as TypedFormSubmitHandler<TMeta> | undefined) ??
-        (submissionController === undefined
+        (effectiveController === undefined
           ? async () => {
-              throw new Error("FormRenderer requires onSubmit or submissionController.");
+              throw new Error("FormRenderer requires onSubmit or controller.");
             }
           : createControllerSubmitHandler(
-              submissionController as SubmissionController<SubmitResponse, TMeta> | ScopedSubmissionController<TMeta>
+              effectiveController as SubmissionController<SubmitResponse, TMeta> | ScopedSubmissionController<TMeta>
             ))
       }
       {...(initialValues === undefined ? {} : { initialValues })}

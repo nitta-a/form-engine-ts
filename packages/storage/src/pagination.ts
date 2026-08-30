@@ -1,5 +1,13 @@
-import type { BaseSubmissionMetadata, FormSubmission, PaginatedResult, StorageCursor } from "@form-engine-ts/core";
+import type {
+  BaseSubmissionMetadata,
+  FormSubmission,
+  PaginatedResult,
+  StorageCursor,
+  TypedSubmissionPage,
+  TypedSubmissionPageQueryOptions
+} from "@form-engine-ts/core";
 
+export type { TypedSubmissionPage, TypedSubmissionPageQueryOptions } from "@form-engine-ts/core";
 export {
   decodeStorageSubmissionCursor,
   decodeStorageTextAnswerCursor,
@@ -7,20 +15,6 @@ export {
   encodeStorageTextAnswerCursor
 } from "@form-engine-ts/core";
 export type { CursorPagingOptions, PaginatedResult, StorageCursor } from "./types";
-
-export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMetadata> {
-  readonly pageSize?: number;
-  readonly fromSubmittedAt?: string;
-  readonly toSubmittedAt?: string;
-  readonly locale?: string;
-  readonly metadataFilters?: Partial<TMeta>;
-  readonly cursor?: string;
-}
-
-export interface TypedSubmissionPage<TMeta extends BaseSubmissionMetadata> {
-  readonly items: readonly FormSubmission<TMeta>[];
-  readonly nextCursor?: string;
-}
 
 export interface TypedPagedSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata> {
   readonly fetchPage: (

@@ -1,6 +1,7 @@
 import {
   assertValidFormSchema,
   calculateFieldVisibility,
+  type FormField,
   type FormSchema,
   type FormValues,
   type JsonValue,
@@ -28,19 +29,67 @@ export interface CreateZodFormSchemaOptions {
   readonly pageIndex?: number;
 }
 
+type ValueForField<TField extends FormField> = TField["type"] extends "number" | "rating"
+  ? number
+  : TField["type"] extends "checkbox"
+    ? boolean
+    : TField["type"] extends "multi-select"
+      ? readonly string[]
+      : string;
+
+type FieldsForSchema<TSchema extends FormSchema> = TSchema["fields"][number];
+type FieldIds<TSchema extends FormSchema> = FieldsForSchema<TSchema>["id"];
+type RequiredFieldIds<TSchema extends FormSchema> =
+  FieldsForSchema<TSchema> extends infer TField
+    ? TField extends FormField
+      ? TField["required"] extends true
+        ? TField["id"]
+        : never
+      : never
+    : never;
+type OptionalFieldIds<TSchema extends FormSchema> = Exclude<FieldIds<TSchema>, RequiredFieldIds<TSchema>>;
+type FieldById<TSchema extends FormSchema, TId extends string> = Extract<
+  FieldsForSchema<TSchema>,
+  { readonly id: TId }
+>;
+
+/** Values inferred from a schema's field IDs and field types. */
+export type FormValuesForSchema<TSchema extends FormSchema> =
+  string extends FieldIds<TSchema>
+    ? FormValues
+    : Readonly<
+        {
+          readonly [TId in RequiredFieldIds<TSchema>]: ValueForField<FieldById<TSchema, TId>>;
+        } & {
+          readonly [TId in OptionalFieldIds<TSchema>]?: ValueForField<FieldById<TSchema, TId>>;
+        }
+      > & {
+        readonly metadata?: Readonly<Record<string, JsonValue>>;
+        readonly translationMetadata?: Readonly<Record<string, JsonValue>>;
+      };
+
+export function createZodFormSchema<TSchema extends FormSchema>(
+  schema: TSchema,
+  options?: CreateZodFormSchemaOptions
+): z.ZodType<FormValuesForSchema<TSchema>>;
 export function createZodFormSchema(
   schema: FormSchema,
-  options: CreateZodFormSchemaOptions = {}
-): z.ZodType<Record<string, unknown>> {
+  options?: CreateZodFormSchemaOptions
+): z.ZodType<Record<string, unknown>>;
+export function createZodFormSchema<TSchema extends FormSchema>(
+  schema: TSchema,
+  options?: CreateZodFormSchemaOptions
+): z.ZodType<FormValuesForSchema<TSchema>> | z.ZodType<Record<string, unknown>> {
   assertValidFormSchema(schema);
+  const resolvedOptions = options ?? {};
   const stableSchema = cloneSchema(schema);
   const page =
-    options.pageIndex === undefined || stableSchema.pages === undefined
+    resolvedOptions.pageIndex === undefined || stableSchema.pages === undefined
       ? undefined
-      : stableSchema.pages[options.pageIndex];
+      : stableSchema.pages[resolvedOptions.pageIndex];
   const pageIds = page === undefined ? undefined : new Set(page.questionIds);
   const fields =
-    options.pageIndex === undefined || stableSchema.pages === undefined
+    resolvedOptions.pageIndex === undefined || stableSchema.pages === undefined
       ? stableSchema.fields
       : stableSchema.fields.filter((field) => pageIds?.has(field.id) === true);
   const allFieldIds = new Set(stableSchema.fields.map((field) => field.id));
@@ -52,7 +101,7 @@ export function createZodFormSchema(
     ...(acceptsTranslationMetadata ? { translationMetadata: z.record(z.string(), jsonValueSchema).optional() } : {})
   };
 
-  return z
+  const validator = z
     .object(shape)
     .passthrough()
     .superRefine((values, context) => {
@@ -63,9 +112,9 @@ export function createZodFormSchema(
         )
       ) as FormValues;
       const result =
-        options.pageIndex === undefined
+        resolvedOptions.pageIndex === undefined
           ? validateAnswers(stableSchema, answerValues)
-          : validatePageAnswers(stableSchema, options.pageIndex, answerValues);
+          : validatePageAnswers(stableSchema, resolvedOptions.pageIndex, answerValues);
       if (result.valid) return;
       for (const issue of result.issues) {
         context.addIssue({
@@ -80,6 +129,7 @@ export function createZodFormSchema(
         });
       }
     });
+  return validator as unknown as z.ZodType<FormValuesForSchema<TSchema>> | z.ZodType<Record<string, unknown>>;
 }
 
 export interface ZodTransformOptions {
@@ -99,20 +149,37 @@ function normalizeCodecValue(value: unknown): unknown {
   return value;
 }
 
-export function createZodFormCodec(schema: FormSchema, options: ZodTransformOptions = {}) {
+export function createZodFormCodec<TSchema extends FormSchema>(
+  schema: TSchema,
+  options?: ZodTransformOptions
+): z.ZodType<FormValuesForSchema<TSchema>>;
+export function createZodFormCodec(
+  schema: FormSchema,
+  options?: ZodTransformOptions
+): z.ZodPreprocess<
+  z.ZodType<Record<string, unknown>, unknown, z.core.$ZodTypeInternals<Record<string, unknown>, unknown>>
+>;
+export function createZodFormCodec<TSchema extends FormSchema>(
+  schema: TSchema,
+  options?: ZodTransformOptions
+): z.ZodType<FormValuesForSchema<TSchema>> | z.ZodPreprocess<z.ZodType<Record<string, unknown>>> {
   assertValidFormSchema(schema);
+  const resolvedOptions = options ?? {};
   const stableSchema = cloneSchema(schema);
   const fieldIds = new Set(stableSchema.fields.map((field) => field.id));
   const recognizedExtensionKeys = new Set(["metadata", "translationMetadata"]);
-  return z.preprocess((input) => {
+  const codec = z.preprocess((input) => {
     if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
     const entries = Object.entries(input);
     const normalized = Object.fromEntries(
       entries
-        .filter(([key]) => options.stripUnknownFields !== true || fieldIds.has(key) || recognizedExtensionKeys.has(key))
-        .map(([key, value]) => [key, options.trimStrings === true ? normalizeCodecValue(value) : value])
+        .filter(
+          ([key]) =>
+            resolvedOptions.stripUnknownFields !== true || fieldIds.has(key) || recognizedExtensionKeys.has(key)
+        )
+        .map(([key, value]) => [key, resolvedOptions.trimStrings === true ? normalizeCodecValue(value) : value])
     );
-    if (options.stripHiddenFields === true) {
+    if (resolvedOptions.stripHiddenFields === true) {
       const visibility = calculateFieldVisibility(stableSchema, normalized);
       for (const field of stableSchema.fields) {
         if (visibility[field.id] !== true) delete normalized[field.id];
@@ -120,4 +187,7 @@ export function createZodFormCodec(schema: FormSchema, options: ZodTransformOpti
     }
     return normalized;
   }, createZodFormSchema(stableSchema));
+  return codec as unknown as
+    | z.ZodType<FormValuesForSchema<TSchema>>
+    | z.ZodPreprocess<z.ZodType<Record<string, unknown>>>;
 }

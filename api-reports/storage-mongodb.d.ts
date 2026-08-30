@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, FormSubmissionValidationSource, FormSubmissionValidator, BaseSubmissionMetadata, FormSubmission, SaveSubmissionOptions, SubmissionSaveResult, TextAnswerPageQueryOptions, TypedTextAnswerPage, JsonValue, SubmissionFilter } from '@form-engine-ts/core';
+import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, FormSubmissionValidationSource, FormSubmissionValidator, BaseSubmissionMetadata, TypedSubmissionPageQueryOptions, TypedSubmissionPage, FormSubmission, SaveSubmissionOptions, SubmissionSaveResult, TextAnswerPageQueryOptions, TypedTextAnswerPage, JsonValue, SubmissionFilter } from '@form-engine-ts/core';
 import { IndexSpecification, CreateIndexesOptions, Db, Document } from 'mongodb';
 
 interface MongoCustomIndexDefinition {
@@ -41,6 +41,7 @@ interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, Versioned
     createIndexes(): Promise<void>;
 }
 interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> extends MongoDbStorageAdapter {
+    readonly fetchSubmissionPage?: (formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) => Promise<TypedSubmissionPage<TMeta>>;
     readonly fetchPage: (formId: string, options?: {
         readonly pageSize?: number;
         readonly fromSubmittedAt?: string;
@@ -68,6 +69,7 @@ type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata |
         readonly items: readonly FormSubmission<TMeta>[];
         readonly nextCursor?: string;
     }>;
+    readonly fetchSubmissionPage?: (formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) => Promise<TypedSubmissionPage<TMeta>>;
 };
 declare function submissionFilterToMongo(filter: SubmissionFilter): Document;
 declare function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter;

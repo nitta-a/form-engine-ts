@@ -1,6 +1,6 @@
 import { type FormSchema, type FormValues, validateAnswers, validatePageAnswers } from "@form-engine-ts/core";
 import type { ZodIssue, ZodSafeParseResult } from "zod";
-import { createZodFormCodec, createZodFormSchema } from "../src";
+import { createZodFormCodec, createZodFormSchema, type FormValuesForSchema } from "../src";
 
 const schema = {
   id: "survey",
@@ -238,6 +238,25 @@ describe("createZodFormSchema", () => {
 });
 
 describe("createZodFormCodec", () => {
+  const typedSchema = {
+    id: "typed-codec",
+    version: 1,
+    title: "Typed codec",
+    fields: [
+      { id: "name", type: "text", title: "Name", required: true },
+      { id: "age", type: "number", title: "Age", required: false },
+      { id: "accepted", type: "checkbox", title: "Accepted", required: false },
+      { id: "tags", type: "multi-select", title: "Tags", required: false, options: [{ id: "one", label: "One" }] }
+    ]
+  } as const satisfies FormSchema;
+
+  it("infers values from literal schema fields", () => {
+    const codec = createZodFormCodec(typedSchema);
+    expectTypeOf(codec.parse({ name: "Ada" })).toEqualTypeOf<FormValuesForSchema<typeof typedSchema>>();
+    expectTypeOf(codec.parse({ name: "Ada" }).age).toEqualTypeOf<number | undefined>();
+    expectTypeOf(codec.parse({ name: "Ada" }).accepted).toEqualTypeOf<boolean | undefined>();
+  });
+
   const conditional: FormSchema = {
     id: "codec",
     version: 1,

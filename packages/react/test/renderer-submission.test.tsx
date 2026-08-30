@@ -22,7 +22,7 @@ describe("FormRenderer submission presentation", () => {
     const user = userEvent.setup();
     const submit = vi.fn(async () => ({ submissionId: "controller-submission" }));
     const controller = createSubmissionController({ submit });
-    render(<FormRenderer schema={schema} submissionController={controller} />);
+    render(<FormRenderer schema={schema} controller={controller} />);
 
     await user.type(screen.getByLabelText(/Name/), "Ada");
     await user.click(screen.getByRole("button", { name: "Submit" }));

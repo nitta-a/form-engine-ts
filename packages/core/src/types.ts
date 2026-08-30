@@ -443,6 +443,10 @@ export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMet
   readonly pageSize?: number;
   readonly since?: string;
   readonly until?: string;
+  /** @deprecated Use `since`. */
+  readonly fromSubmittedAt?: string;
+  /** @deprecated Use `until`. */
+  readonly toSubmittedAt?: string;
   readonly locale?: string;
   readonly filter?: SubmissionFilter | ((submission: FormSubmission<TMeta>) => boolean);
   readonly metadataFilters?: Readonly<Record<string, JsonValue>>;
@@ -462,6 +466,27 @@ export interface TypedPagedSubmissionStorageAdapter<TMeta extends BaseSubmission
     formId: string,
     options?: TypedSubmissionPageQueryOptions<TMeta>
   ): Promise<TypedSubmissionPage<TMeta>>;
+}
+
+/**
+ * Common submission-only contract for storage adapters that support typed saves and cursor paging.
+ * MongoDB and Azure Table implementations expose this same surface so callers do not need an
+ * adapter-specific branch.
+ */
+export interface UnifiedSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> {
+  saveSubmission(
+    submission: FormSubmission<TMeta>,
+    options?: SaveSubmissionOptions
+  ): Promise<undefined | SubmissionSaveResult<TMeta>>;
+  listSubmissionPage(
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ): Promise<TypedSubmissionPage<TMeta>>;
+  listTextAnswerPage?(
+    formId: string,
+    fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
+    options?: TextAnswerPageQueryOptions
+  ): Promise<TypedTextAnswerPage<TMeta>>;
 }
 
 export interface TextAnswerItem {

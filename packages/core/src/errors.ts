@@ -21,6 +21,20 @@ export interface TrpcSubmissionErrorAdapter {
   readonly deserialize: (error: unknown) => FormSubmissionError | undefined;
 }
 
+/** The portion of a tRPC error formatter input used by the integration helper. */
+export interface TrpcSubmissionErrorFormatterOptions<TShape extends Record<string, unknown> = Record<string, unknown>> {
+  readonly error: unknown;
+  readonly shape: TShape & { readonly data?: unknown };
+}
+
+/** A ready-to-use server/client tRPC boundary for FormSubmissionError. */
+export interface TrpcSubmissionErrorIntegration {
+  readonly errorFormatter: <TShape extends Record<string, unknown>>(
+    options: TrpcSubmissionErrorFormatterOptions<TShape>
+  ) => TShape & { readonly data: TrpcFormSubmissionErrorData | Record<string, unknown> };
+  readonly deserialize: (error: unknown) => FormSubmissionError | undefined;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -86,6 +100,7 @@ export function serializeSubmissionErrorForTrpc(error: FormSubmissionError): Trp
 
 /** Restores a FormSubmissionError from a tRPC error, including `data` and `shape.data`. */
 export function deserializeSubmissionErrorFromTrpc(error: unknown): FormSubmissionError | undefined {
+  if (error instanceof FormSubmissionError) return error;
   const payload = findTrpcSubmissionErrorPayload(error);
   return payload === undefined ? undefined : new FormSubmissionError(payload);
 }
@@ -97,3 +112,26 @@ export const trpcSubmissionErrorAdapter: TrpcSubmissionErrorAdapter = {
 };
 
 export const createTrpcSubmissionErrorAdapter = (): TrpcSubmissionErrorAdapter => trpcSubmissionErrorAdapter;
+
+/**
+ * Creates the tRPC integration used by both a server `errorFormatter` and a client error boundary.
+ * The formatter preserves tRPC's existing `shape.data` values and adds the typed submission payload
+ * only when the thrown error is a FormSubmissionError.
+ */
+export function createTrpcSubmissionErrorIntegration(): TrpcSubmissionErrorIntegration {
+  return {
+    errorFormatter: ({ error, shape }) => {
+      const submissionError = deserializeSubmissionErrorFromTrpc(error);
+      const existingData = isRecord(shape.data) ? shape.data : {};
+      if (submissionError === undefined) return { ...shape, data: existingData };
+      return {
+        ...shape,
+        data: { ...existingData, ...serializeSubmissionErrorForTrpc(submissionError) }
+      };
+    },
+    deserialize: deserializeSubmissionErrorFromTrpc
+  };
+}
+
+/** Server-side convenience helper for tRPC's `errorFormatter` option. */
+export const createTrpcSubmissionErrorFormatter = () => createTrpcSubmissionErrorIntegration().errorFormatter;

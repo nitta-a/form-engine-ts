@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/translator-deepl",
-  "version": "6.9.0",
+  "version": "6.10.0",
   "publishConfig": {
     "access": "public"
   },

@@ -5,6 +5,18 @@ current release and usage information.
 
 ## Latest release
 
+### v6.10.0 — 2026-08-30
+
+- Added a combined tRPC error formatter/client restoration integration for typed submission errors.
+- Added the `controller` prop to `FormRenderer` and kept `submissionController` as a compatibility alias.
+- Added schema-derived `FormValuesForSchema` types to `createZodFormCodec`.
+- Unified typed `fetchPage` contracts and page results for MongoDB and Azure Table storage.
+- Added the Core submission pipeline for codec normalization, schema validation, PII confirmation, idempotent saving,
+  and typed errors.
+- Aligned all public packages to version 6.10.0.
+
+See the [GitHub release for v6.10.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.10.0).
+
 ### v6.9.0 — 2026-08-30
 
 - Added `createFormSubmissionSchema({ metadata })` for metadata-aware wire schemas.

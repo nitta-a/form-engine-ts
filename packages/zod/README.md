@@ -44,3 +44,6 @@ const codec = createZodFormCodec(schema, {
 });
 const normalized = codec.parse(values);
 ```
+
+When the schema retains literal field IDs (for example with `as const satisfies FormSchema`), the codec's parsed data
+is typed as `FormValuesForSchema<typeof schema>`, including number, checkbox, and multi-select field value types.

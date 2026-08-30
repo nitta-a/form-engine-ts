@@ -1,4 +1,5 @@
 import {
+  createTrpcSubmissionErrorIntegration,
   deserializeSubmissionError,
   deserializeSubmissionErrorFromTrpc,
   FormSubmissionError,
@@ -36,5 +37,22 @@ describe("submission error serialization", () => {
     expect(data.source).toBe("form-engine");
     expect(deserializeSubmissionErrorFromTrpc({ shape: { data } })?.payload).toMatchObject(error.payload);
     expect(trpcSubmissionErrorAdapter.deserialize({ data })?.payload).toMatchObject(error.payload);
+  });
+
+  it("provides a formatter and client restoration pair", () => {
+    const error = new FormSubmissionError({
+      code: "VALIDATION_FAILED",
+      messageKey: "validation.submission",
+      formErrors: ["Invalid submission."]
+    });
+    const integration = createTrpcSubmissionErrorIntegration();
+    const shape = integration.errorFormatter({
+      error,
+      shape: { message: "Bad request", data: { code: "BAD_REQUEST" } }
+    });
+
+    expect(shape.data).toMatchObject({ source: "form-engine", code: "VALIDATION_FAILED" });
+    expect(shape.data).toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(integration.deserialize({ shape })?.payload).toMatchObject(error.payload);
   });
 });

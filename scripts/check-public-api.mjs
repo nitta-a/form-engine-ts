@@ -318,6 +318,7 @@ function compareDeclaration(name, previous, current, previousFile, currentFile) 
     return compareSignatures(name, previous, current, previousFile, currentFile);
   }
   if (ts.isTypeAliasDeclaration(previous) && ts.isTypeAliasDeclaration(current)) {
+    if (isAdditiveObjectType(previous.type, current.type, previousFile, currentFile)) return [];
     const oldParts = unionParts(previous.type, previousFile);
     const newParts = unionParts(current.type, currentFile);
     return [...oldParts].every((part) => newParts.has(part))
@@ -345,7 +346,11 @@ export function findBreakingApiChanges(previousText, currentText, reportName = "
     if (oldDeclarations === undefined || newDeclarations === undefined) continue;
     for (let index = 0; index < oldDeclarations.length; index += 1) {
       const oldDeclaration = oldDeclarations[index];
-      const newDeclaration = newDeclarations[index];
+      const compatibleDeclaration = newDeclarations.find(
+        (candidate) =>
+          compareDeclaration(name, oldDeclaration, candidate, previous.sourceFile, current.sourceFile).length === 0
+      );
+      const newDeclaration = compatibleDeclaration ?? newDeclarations[index];
       if (newDeclaration === undefined) {
         changes.push(`${reportName}:${name}: overload was removed`);
         continue;

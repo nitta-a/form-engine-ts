@@ -1,4 +1,4 @@
-import { FormSubmission, BaseSubmissionMetadata, PagedSubmissionStorageAdapter, SubmissionPageQueryOptions, FormSubmissionValidationSource, FormSubmissionValidator, StrictFormSubmission, SaveSubmissionOptions, SubmissionSaveResult, SubmissionFilter, JsonValue, TextAnswerPageQueryOptions, TypedTextAnswerPage } from '@form-engine-ts/core';
+import { FormSubmission, BaseSubmissionMetadata, PagedSubmissionStorageAdapter, TypedSubmissionPageQueryOptions, TypedSubmissionPage, SubmissionPageQueryOptions, FormSubmissionValidationSource, FormSubmissionValidator, StrictFormSubmission, SaveSubmissionOptions, SubmissionSaveResult, SubmissionFilter, JsonValue, TextAnswerPageQueryOptions, TypedTextAnswerPage } from '@form-engine-ts/core';
 
 interface AzureTableListOptions {
     readonly queryOptions?: {
@@ -121,6 +121,7 @@ interface AzureTableStorageOptions<T = FormSubmission> {
     readonly schema?: FormSubmissionValidationSource;
 }
 interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> extends PagedSubmissionStorageAdapter {
+    readonly fetchSubmissionPage?: (formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) => Promise<TypedSubmissionPage<TMeta>>;
     readonly fetchPage: (formId: string, options?: {
         readonly pageSize?: number;
         readonly fromSubmittedAt?: string;
@@ -154,6 +155,7 @@ type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefi
         readonly items: readonly FormSubmission<TMeta>[];
         readonly nextCursor?: string;
     }>;
+    readonly fetchSubmissionPage?: (formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) => Promise<TypedSubmissionPage<TMeta>>;
     readonly listTextAnswerPage: (formId: string, fieldIdOrOptions?: string | TextAnswerPageQueryOptions, options?: TextAnswerPageQueryOptions) => Promise<TypedTextAnswerPage<TMeta>>;
 };
 interface AzureTextAnswerCursorPayload {

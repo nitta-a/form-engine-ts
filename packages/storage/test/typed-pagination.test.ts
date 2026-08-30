@@ -20,9 +20,10 @@ describe("typed submission pagination", () => {
     const adapter: TypedPagedSubmissionStorageAdapter<SurveyMetadata> = {
       fetchPage: async (_formId, options) =>
         pages[options?.cursor === "next" ? 1 : 0] === undefined
-          ? { items: [] }
+          ? { items: [], hasMore: false }
           : {
               items: pages[options?.cursor === "next" ? 1 : 0] ?? [],
+              hasMore: options?.cursor === undefined,
               ...(options?.cursor === undefined ? { nextCursor: "next" } : {})
             }
     };

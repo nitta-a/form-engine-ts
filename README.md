@@ -55,10 +55,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.9.0** (2026-08-30). All public packages are currently published at version `6.9.0`.
+The latest release is **v6.10.0** (2026-08-30). All public packages are currently published at version `6.10.0`.
 This release adds metadata-aware CSV streaming and columns, typed storage pagination, custom translation workspace dictionaries, and richer target-specific comparison layout and input controls. It builds on v6.6.0's metadata-typed storage contracts, scoped receipt queries, and per-target layout overrides.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.9.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.10.0).
 
 ### Authoring and respondent experience
 
@@ -368,10 +368,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.9.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.9.0` で公開されています。
+最新版は **v6.10.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.10.0` で公開されています。
 本リリースでは、メタデータ対応CSVストリーミングと列指定、型付きストレージページング、翻訳ワークスペースのカスタム辞書、比較ワークスペースの項目別レイアウト・入力設定を追加しました。v6.6.0の型付きストレージ契約、スコープ付きレシート検索、項目別レイアウト上書きも引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.9.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.10.0) を参照してください。
 
 ### 編集・回答体験
 

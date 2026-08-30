@@ -1330,6 +1330,8 @@ interface FormRendererPresentationProps extends SubmissionProtectionProps {
     readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
     readonly slots?: FormRendererSlots;
     /** Optional controller used directly for submission lifecycle, retry, and attempt identity. */
+    readonly controller?: SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>;
+    /** @deprecated Use controller instead. */
     readonly submissionController?: SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>;
 }
 interface StandaloneFormRendererProps extends FormRendererPresentationProps {

@@ -66,6 +66,10 @@ and `TypedPagedSubmissionStorageAdapter<TMeta>` to retain that type through pers
 payloads with `answers` are provided by the separate `@form-engine-ts/legacy` package.
 `serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`, while
 `trpcSubmissionErrorAdapter` handles tRPC `data` and `shape.data` boundaries.
+Use `createTrpcSubmissionErrorIntegration()` to obtain a server `errorFormatter` and matching client `deserialize`
+function without manually spreading a payload into tRPC data. `runSubmissionPipeline` and
+`createSubmissionPipeline` combine codec normalization, schema validation, PII confirmation, idempotent saving, and
+typed `FormSubmissionError` results.
 
 Fields can use a `displayRule` with nested `all`/`any` condition groups and `show` or `hide` actions. Supported
 operators include equality, containment, emptiness, and numeric comparisons; the legacy `displayCondition` and
