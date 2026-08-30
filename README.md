@@ -54,10 +54,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v6.5.0** (2026-08-30). All public packages are currently published at version `6.5.0`.
-This release adds typed submission metadata, scoped receipt storage, configurable pre-submit confirmation behavior, comparison-workspace appearance controls, and richer MUI select controls. It builds on v6.4.0's configurable locale controls, localized labels, and customizable translation comparison item icons.
+The latest release is **v6.6.0** (2026-08-30). All public packages are currently published at version `6.6.0`.
+This release adds metadata-typed storage contracts, robust scoped receipt queries, and per-target translation comparison layout overrides. It builds on v6.5.0's typed submission metadata, configurable pre-submit confirmation behavior, comparison-workspace appearance controls, and richer MUI select controls.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.5.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.6.0).
 
 ### Authoring and respondent experience
 
@@ -366,10 +366,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v6.5.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.5.0` で公開されています。
-本リリースでは、型付き送信メタデータ、スコープ付きレシート保存、送信前確認の表示・再確認設定、翻訳比較ワークスペースの外観設定、MUIセレクトの表示拡張を追加しました。v6.4.0のロケール操作、ローカライズされたラベル、翻訳比較項目のアイコンカスタマイズも引き継いでいます。
+最新版は **v6.6.0**（2026-08-30）です。公開パッケージはすべてバージョン `6.6.0` で公開されています。
+本リリースでは、メタデータ型付きストレージ契約、スコープ付きレシート検索の強化、翻訳比較項目ごとのレイアウト上書きを追加しました。v6.5.0の型付き送信メタデータ、送信前確認設定、翻訳比較ワークスペースの外観設定、MUIセレクト拡張も引き継いでいます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.5.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.6.0) を参照してください。
 
 ### 編集・回答体験
 

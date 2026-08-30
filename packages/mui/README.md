@@ -41,7 +41,8 @@ receives the item, `nodeKind`, `targetProperty`, and field/option position metad
 
 `TranslationComparisonWorkspace` accepts `appearance` for Maker-specific customization. `appearance.input.borderColor`
 supports default, hover, focus, missing, translated, and stale states; `appearance.layout` controls source/target widths,
-gaps, input height, label position, and responsive mode; `appearance.status` controls visibility, labels, colors, icons,
+gaps, input height, label position, and responsive mode. Use `appearance.layout.byTarget` to override those settings for
+`title`, `completionMessage`, `question`, or `option` rows. `appearance.status` controls visibility, labels, colors, icons,
 and badge placement. The existing `i18n.messages`/`customCatalogs` options override FormEngine's built-in Japanese or
 English catalog, so application dictionaries can remove residual English UI text.
 

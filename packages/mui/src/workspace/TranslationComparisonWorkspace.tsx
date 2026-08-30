@@ -14,6 +14,8 @@ import {
   type TranslationComparisonHeaderProps,
   type TranslationComparisonItemIconProps,
   type TranslationComparisonItemRowProps,
+  type TranslationComparisonLayoutSettings,
+  type TranslationComparisonLayoutTarget,
   type TranslationComparisonLocaleSelectorProps,
   type UseTranslationComparisonOptions,
   useFormEngineI18n
@@ -31,6 +33,21 @@ import {
   translationStatusKey
 } from "./translationWorkspaceUtils";
 import { useTranslationComparisonView } from "./useTranslationComparisonView";
+
+function comparisonLayoutTarget(item: TranslationComparisonItemRowProps["item"]): TranslationComparisonLayoutTarget {
+  if (item.targetKind === "option") return "option";
+  if (item.targetProperty === "completionMessage") return "completionMessage";
+  if (item.targetKind === "field") return "question";
+  return "title";
+}
+
+function resolveComparisonLayout(
+  layout: TranslationComparisonAppearance["layout"],
+  target: TranslationComparisonLayoutTarget
+): TranslationComparisonLayoutSettings {
+  const base = layout ?? {};
+  return { ...base, ...(base.byTarget?.[target] ?? {}) };
+}
 
 export interface TranslationComparisonWorkspaceProps {
   readonly schema: FormSchema;
@@ -277,8 +294,14 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
           {targetHeader}
         </Typography>
       </Box>
-      <Box sx={{ display: "grid", gap: layout.rowGap ?? 1.5, ...rowOverflow }}>
+      <Box sx={{ display: "grid", gap: 0, ...rowOverflow }}>
         {comparison.items.map((item) => {
+          const itemLayout = resolveComparisonLayout(appearance.layout, comparisonLayoutTarget(item));
+          const itemResponsiveMode = itemLayout.responsive ?? "stack";
+          const itemComparisonColumns = `${itemLayout.sourceWidth ?? "minmax(0, 1fr)"} ${itemLayout.targetWidth ?? "minmax(0, 1fr)"}`;
+          const itemRowGridTemplateColumns =
+            itemResponsiveMode === "stack" ? { xs: "1fr", md: itemComparisonColumns } : itemComparisonColumns;
+          const itemRowOverflow = itemResponsiveMode === "scroll" ? { overflowX: "auto" } : {};
           const context = translationComparisonContext(schema, item);
           const itemIconProps: TranslationComparisonItemIconProps = {
             item,
@@ -342,11 +365,11 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             ...(focusBorderColor === undefined
               ? {}
               : { "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: focusBorderColor } }),
-            ...(appearance.input?.height === undefined && layout.inputHeight === undefined
+            ...(appearance.input?.height === undefined && itemLayout.inputHeight === undefined
               ? {}
               : {
                   "& .MuiInputBase-root": {
-                    minHeight: appearance.input?.height ?? layout.inputHeight
+                    minHeight: appearance.input?.height ?? itemLayout.inputHeight
                   }
                 })
           };
@@ -355,18 +378,20 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
               ? translate(translationPropertyKey[item.targetProperty])
               : (item.nodeTitle ?? translate(translationPropertyKey[item.targetProperty]))
           }`;
-          const labelPosition = layout.labelPosition ?? "inside";
+          const labelPosition = itemLayout.labelPosition ?? "inside";
           return (
             <Box
               key={item.id}
               data-testid={`translation-comparison-row-${item.id.replace(/[^a-zA-Z0-9_-]/gu, "-")}`}
               sx={{
                 display: "grid",
-                gridTemplateColumns: rowGridTemplateColumns,
-                gap: layout.gap ?? 1.5,
+                gridTemplateColumns: itemRowGridTemplateColumns,
+                gap: itemLayout.gap ?? 1.5,
                 borderBottom: 1,
                 borderColor: "divider",
-                pb: 1.5
+                pb: 1.5,
+                mb: itemLayout.rowGap ?? 1.5,
+                ...itemRowOverflow
               }}
             >
               {slots?.renderItemRow?.(rowProps) ?? (
@@ -374,8 +399,8 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                   sx={{
                     display: "grid",
                     gridColumn: { xs: "1", md: "1 / -1" },
-                    gridTemplateColumns: rowGridTemplateColumns,
-                    gap: layout.gap ?? 1.5
+                    gridTemplateColumns: itemRowGridTemplateColumns,
+                    gap: itemLayout.gap ?? 1.5
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.75, minWidth: 0 }}>
@@ -449,7 +474,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       placeholder={item.status === "missing" ? targetHeader : undefined}
                       sx={inputSx}
                     />
-                    {item.status === "stale" || item.status === "manual-stale" ? (
+                    {statusOptions.visible !== false && (item.status === "stale" || item.status === "manual-stale") ? (
                       <Typography color="warning.main" variant="caption" role="status" aria-live="polite">
                         {translate("workspace.comparison.staleWarning")}
                       </Typography>

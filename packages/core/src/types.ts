@@ -383,6 +383,55 @@ export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
   ): Promise<TextAnswerPage>;
 }
 
+/** Metadata-typed submission contract for application-owned storage adapters. */
+export interface TypedStorageAdapter<TMeta extends BaseSubmissionMetadata> {
+  saveSubmission(submission: FormSubmission<TMeta>): Promise<void>;
+  listSubmissions(
+    formId: string,
+    formVersion?: number,
+    options?: SubmissionQueryOptions
+  ): Promise<readonly FormSubmission<TMeta>[]>;
+  clearResponses?(formId: string): Promise<void>;
+  clear(): Promise<void>;
+}
+
+/** Metadata-typed form storage contract. */
+export interface TypedFormStorageAdapter<TMeta extends BaseSubmissionMetadata> extends TypedStorageAdapter<TMeta> {
+  saveSchema(schema: FormSchema): Promise<void>;
+  getSchema(formId: string, formVersion: number): Promise<FormSchema | null>;
+  listSchemas(): Promise<readonly FormSchema[]>;
+  deleteSchema(formId: string, formVersion: number): Promise<void>;
+  deleteSubmission(submissionId: string): Promise<void>;
+}
+
+/** Metadata-typed query options for paged storage. */
+export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMetadata> {
+  readonly version?: number;
+  readonly cursor?: string;
+  readonly pageSize?: number;
+  readonly since?: string;
+  readonly until?: string;
+  readonly locale?: string;
+  readonly filter?: SubmissionFilter | ((submission: FormSubmission<TMeta>) => boolean);
+  readonly metadataFilters?: Readonly<Record<string, JsonValue>>;
+}
+
+/** Metadata-typed page returned by application-owned paged storage. */
+export interface TypedSubmissionPage<TMeta extends BaseSubmissionMetadata> {
+  readonly items: readonly FormSubmission<TMeta>[];
+  readonly nextCursor?: string;
+  readonly hasMore: boolean;
+}
+
+/** Metadata-typed paged form storage contract. */
+export interface TypedPagedSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata>
+  extends TypedFormStorageAdapter<TMeta> {
+  listSubmissionPage(
+    formId: string,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ): Promise<TypedSubmissionPage<TMeta>>;
+}
+
 export interface TextAnswerItem {
   readonly responseId: string;
   readonly formId: string;

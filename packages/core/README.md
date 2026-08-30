@@ -58,7 +58,9 @@ translation adapter runs.
 `ja_JP`, and returns `null` for invalid tags. Schema validation, sanitization, locale policy checks, and translation
 slot lookup use this same normalization so equivalent locale spellings cannot bypass constraints.
 
-Submissions use `values` as their canonical answer property. `toFormSubmissionWire` and
+Submissions use `values` as their canonical answer property. `FormSubmission<TMeta>` carries application metadata types
+through creation and wire conversion. Applications that own storage contracts can use `TypedFormStorageAdapter<TMeta>`
+and `TypedPagedSubmissionStorageAdapter<TMeta>` to retain that type through persistence and pagination. `toFormSubmissionWire` and
 `fromFormSubmissionWire` preserve the optional submission `locale` across validated wire payloads. Legacy payloads with
 `answers` are isolated under `LegacyFormSubmission` and `fromLegacyFormSubmission` in the compatibility namespace.
 `serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`.

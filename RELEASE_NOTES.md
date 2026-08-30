@@ -5,6 +5,16 @@ current release and usage information.
 
 ## Latest release
 
+### v6.6.0 — 2026-08-30
+
+- Added metadata-typed storage and paged-storage contracts so application metadata remains typed through persistence and pagination.
+- Improved scoped submission receipt queries for custom stores without `getBatch`, preserving `deckId` and `sessionId` scope values.
+- Added per-target comparison layout overrides for title, completion-message, question, and option rows.
+- Refactored the preview app navigation and panels into focused modules with expanded builder and submission coverage.
+- Aligned all public packages to version 6.6.0.
+
+See the [GitHub release for v6.6.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.6.0).
+
 ### v6.5.0 — 2026-08-30
 
 - Added typed submission metadata across the React provider and renderer, including reusable submission helpers and scoped receipt storage.

@@ -191,7 +191,7 @@ export function useSubmissionReceipts(
     setState((current) => ({ ...current, isLoading: true, error: null }));
     const load =
       store.getBatch?.(stableQueries) ??
-      Promise.all(stableQueries.map((query) => store.get(query.formId, query.formVersion))).then(
+      Promise.all(stableQueries.map((query) => store.get(query.formId, query.formVersion, query))).then(
         (receipts) =>
           new Map(
             receipts.flatMap((receipt) =>

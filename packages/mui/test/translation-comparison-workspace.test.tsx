@@ -171,4 +171,27 @@ describe("TranslationComparisonWorkspace", () => {
 
     expect(screen.queryByTestId("translation-status-badge-form.title")).not.toBeInTheDocument();
   });
+
+  it("supports layout overrides for titles and questions", () => {
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        appearance={{
+          layout: {
+            labelPosition: "hidden",
+            byTarget: {
+              title: { labelPosition: "top" },
+              question: { labelPosition: "hidden" }
+            }
+          }
+        }}
+        i18n={{ locale: "ja" }}
+      />
+    );
+
+    expect(screen.getByText("訳文 (ja) · タイトル")).toBeInTheDocument();
+    expect(screen.queryByText("訳文 (ja) · Name")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "訳文 (ja) · Name" })).toBeInTheDocument();
+  });
 });

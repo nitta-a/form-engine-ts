@@ -732,6 +732,18 @@ export interface TranslationComparisonInputAppearance {
 
 export type TranslationComparisonResponsiveMode = "stack" | "columns" | "scroll";
 
+export type TranslationComparisonLayoutTarget = "title" | "completionMessage" | "question" | "option";
+
+export interface TranslationComparisonLayoutSettings {
+  readonly sourceWidth?: number | string;
+  readonly targetWidth?: number | string;
+  readonly gap?: number | string;
+  readonly rowGap?: number | string;
+  readonly inputHeight?: number | string;
+  readonly labelPosition?: "top" | "inside" | "hidden";
+  readonly responsive?: TranslationComparisonResponsiveMode;
+}
+
 export interface TranslationComparisonLayoutOptions {
   readonly sourceWidth?: number | string;
   readonly targetWidth?: number | string;
@@ -740,6 +752,8 @@ export interface TranslationComparisonLayoutOptions {
   readonly inputHeight?: number | string;
   readonly labelPosition?: "top" | "inside" | "hidden";
   readonly responsive?: TranslationComparisonResponsiveMode;
+  /** Per-item overrides. Unspecified values inherit from the base layout. */
+  readonly byTarget?: Partial<Record<TranslationComparisonLayoutTarget, TranslationComparisonLayoutSettings>>;
 }
 
 export interface TranslationComparisonStatusDisplayOptions {

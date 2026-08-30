@@ -254,7 +254,8 @@ by throwing `FormSubmissionError` or a payload with `fieldErrors` and `formError
 form, scrolled into view, and focused. Use `submissionConfirmationRenderMode="replace"` or `"dialog"` for alternate
 confirmation presentations, and `fieldsClassName` or `renderFields` to control the fields wrapper.
 
-`FormRenderer` accepts typed `submissionMetadata`, which is passed to `onSubmit` as `context.metadata`. The exported
+`FormRenderer` accepts typed `submissionMetadata`, which is passed to `onSubmit` as `context.metadata`. Receipt queries
+preserve optional `deckId` and `sessionId` scopes even when a custom store does not implement `getBatch`. The exported
 `createSubmissionController` and `useSubmissionController` provide a reusable lifecycle with idle, submitting, success,
 and error states, duplicate-request protection, retry, and reset. Receipt stores accept optional `deckId` and
 `sessionId` scopes; pass the same values as `submissionScope` to make completion state deck- or session-specific.
