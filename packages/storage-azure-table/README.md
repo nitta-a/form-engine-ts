@@ -20,7 +20,11 @@ const submissionsTableClient = TableClient.fromConnectionString(
   process.env.AZURE_STORAGE_CONNECTION_STRING!,
   "responses"
 );
-const storage = createAzureTableStorage({ schemasTableClient, submissionsTableClient });
+interface SubmissionMeta {
+  readonly tenantId: string;
+}
+
+const storage = createAzureTableStorage<SubmissionMeta>({ schemasTableClient, submissionsTableClient });
 
 const page = await storage.listSubmissionPage("contact", { pageSize: 500, locale: "ja" });
 ```
@@ -36,6 +40,11 @@ to fill the requested logical page after client-side filtering. `buildSubmission
 The deprecated `client`, `submissionCodec`, and `toODataFilter` options remain available for compatibility. The caller
 owns table creation, credentials, retries, and client lifecycle.
 
+The default codec persists the canonical `FormSubmission.values` payload and never creates an `answers` property. Set
+`rejectLegacyAnswers: true` to fail explicitly when a legacy entity is encountered; no legacy decoding or migration is
+performed. `idempotentSubmissions: true` enables typed `created`, `duplicate`, and `conflict` results from
+`saveSubmission(submission)`. Pass `validateAgainstSchema: true` to re-validate against the stored schema.
+
 `listTextAnswerPage` accepts either the legacy single field ID or `TextAnswerPageQueryOptions.fieldIds`. Page size counts
 emitted text items rather than entities. Its opaque Base64 JSON cursor retains the Azure continuation token plus entity
 and field indexes, so a page can resume inside a multi-answer entity without gaps or duplicates. Empty answers do not
@@ -43,6 +52,5 @@ consume the item limit, and scanning remains bounded by `maxScanPages`. Cursor f
 version, sorted fields, and a SHA-256 filter fingerprint. Reusing a cursor with different query context throws
 `invalid_cursor_context`.
 
-`createLegacyAzureTableCodec()` decodes older entities using `PartitionKey`, `RowKey`, `answers`, `answeredAt`, and
-`surveyVersion` into the canonical `FormSubmission` shape. Custom partition- and row-key generators can be supplied
-for migration tooling.
+The legacy codec APIs are retained only as deprecated source symbols for existing applications; the standard factory does
+not use them.

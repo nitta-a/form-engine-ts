@@ -27,7 +27,7 @@ import {
   useRef,
   useState
 } from "react";
-import type { SubmissionAttempt } from "./attempt";
+import { createLocalStorageSubmissionAttemptStore, type SubmissionAttempt } from "./attempt";
 import { FormProvider, useForm } from "./context";
 import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "./i18n/provider";
 import type { SubmissionReceipt } from "./receipt";
@@ -96,6 +96,13 @@ function describedBy(
     Boolean
   );
   return ids.length === 0 ? undefined : ids.join(" ");
+}
+
+function optionAccessibleName(
+  option: { readonly id: string; readonly label: string },
+  a11y: FieldComponentProps["a11y"]
+): string {
+  return a11y?.optionAriaLabelGenerator?.(option.id, option.label) ?? option.label;
 }
 
 function RequiredMark({
@@ -231,8 +238,12 @@ function DefaultField({
     .join(" ");
   const ariaProps = {
     "aria-label": props.a11y?.ariaLabel,
-    "aria-describedby": props.a11y?.ariaDescribedBy ?? describedBy(field, error, props.helpId, props.errorId),
-    "aria-invalid": error === undefined ? undefined : true
+    "aria-describedby":
+      [props.a11y?.ariaDescribedBy, describedBy(field, error, props.helpId, props.errorId)]
+        .filter((value): value is string => value !== undefined)
+        .join(" ") || undefined,
+    "aria-invalid": error === undefined ? undefined : true,
+    "aria-required": field.required === true ? true : undefined
   } as const;
 
   if (field.type === "checkbox") {
@@ -254,6 +265,7 @@ function DefaultField({
                 type="checkbox"
                 checked={value === true}
                 aria-label={props.a11y?.ariaLabel ?? field.title}
+                required={field.required}
                 disabled={disabled}
                 readOnly={readOnly}
                 onChange={(event) => setValue(event.currentTarget.checked)}
@@ -310,7 +322,8 @@ function DefaultField({
                     type={isRadio ? "radio" : "checkbox"}
                     value={option.id}
                     checked={checked}
-                    aria-label={props.a11y?.optionAriaLabelGenerator?.(option.id, option.label)}
+                    aria-label={optionAccessibleName(option, props.a11y)}
+                    required={field.required}
                     disabled={disabled}
                     readOnly={readOnly}
                     onKeyDown={
@@ -369,7 +382,8 @@ function DefaultField({
                   type="radio"
                   value={option.id}
                   checked={value === option.id}
-                  aria-label={props.a11y?.optionAriaLabelGenerator?.(option.id, option.label)}
+                  aria-label={optionAccessibleName(option, props.a11y)}
+                  required={field.required}
                   onChange={() => setValue(option.id)}
                 />
                 <span>{option.label}</span>
@@ -397,7 +411,8 @@ function DefaultField({
                 type={field.type === "radio" ? "radio" : "checkbox"}
                 value={option.id}
                 checked={checked}
-                aria-label={props.a11y?.optionAriaLabelGenerator?.(option.id, option.label)}
+                aria-label={optionAccessibleName(option, props.a11y)}
+                required={field.required}
                 onChange={(event) => {
                   if (field.type === "radio") setValue(option.id);
                   else
@@ -437,6 +452,7 @@ function DefaultField({
                   type="radio"
                   value={rating}
                   checked={value === rating}
+                  required={field.required}
                   onChange={() => setValue(rating)}
                 />
                 <span>{rating}</span>
@@ -471,6 +487,7 @@ function DefaultField({
         {...textConstraints}
         id={inputId}
         name={field.id}
+        required={field.required}
         placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
         value={typeof value === "string" ? value : ""}
         onChange={(event) => setValue(event.currentTarget.value)}
@@ -484,6 +501,7 @@ function DefaultField({
         id={inputId}
         name={field.id}
         type="number"
+        required={field.required}
         min={field.min}
         max={field.max}
         step={field.step}
@@ -498,13 +516,14 @@ function DefaultField({
         {...ariaProps}
         id={inputId}
         name={field.id}
+        required={field.required}
         disabled={disabled}
         value={typeof value === "string" ? value : ""}
         onChange={(event) => setValue(event.currentTarget.value || undefined)}
       >
         <option value="">—</option>
         {field.options.map((option) => (
-          <option value={option.id} key={option.id}>
+          <option value={option.id} key={option.id} aria-label={optionAccessibleName(option, props.a11y)}>
             {option.label}
           </option>
         ))}
@@ -518,6 +537,7 @@ function DefaultField({
         id={inputId}
         name={field.id}
         type="text"
+        required={field.required}
         placeholder={placeholderKey === undefined ? undefined : translate(placeholderKey)}
         value={typeof value === "string" ? value : ""}
         onChange={(event) => setValue(event.currentTarget.value)}
@@ -764,6 +784,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   successMessageKey,
   errorMessageKey,
   attemptIdFactory,
+  idFormat = "uuid",
   submissionMetadata,
   messages = {},
   messageResolver,
@@ -816,6 +837,10 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   const piiWarningAcknowledged = useRef(false);
   const completionRef = useRef<HTMLDivElement>(null);
   const confirmationRef = useRef<HTMLDivElement>(null);
+  const effectiveAttemptStore = useMemo(
+    () => attemptStore ?? createLocalStorageSubmissionAttemptStore({ idFormat }),
+    [attemptStore, idFormat]
+  );
   const pages = form.schema.pages;
   const visiblePageIndexes = useMemo(
     () =>
@@ -1088,8 +1113,12 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     try {
       let submissionAttempt: SubmissionAttempt | undefined;
       let attemptId = fallbackAttemptId.current;
-      if (attemptStore !== undefined) {
-        submissionAttempt = await attemptStore.getOrCreate(form.schema.id, form.schema.version, attemptIdFactory);
+      if (effectiveAttemptStore !== undefined) {
+        const scope = { formId: form.schema.id, formVersion: form.schema.version, ...(submissionScope ?? {}) };
+        submissionAttempt =
+          effectiveAttemptStore.getOrCreateForScope === undefined
+            ? await effectiveAttemptStore.getOrCreate(form.schema.id, form.schema.version, attemptIdFactory)
+            : await effectiveAttemptStore.getOrCreateForScope(scope, idFormat, attemptIdFactory);
         attemptId = submissionAttempt.attemptId;
       } else if (attemptId === null) {
         attemptId = attemptIdFactory?.() ?? createRendererAttemptId();
@@ -1172,9 +1201,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           }
         }
       }
-      if (attemptStore !== undefined && submissionAttempt !== undefined) {
+      if (submissionAttempt !== undefined) {
         try {
-          await attemptStore.clear(form.schema.id, form.schema.version);
+          const scope = { formId: form.schema.id, formVersion: form.schema.version, ...(submissionScope ?? {}) };
+          if (effectiveAttemptStore.clearForScope !== undefined) await effectiveAttemptStore.clearForScope(scope);
+          else await effectiveAttemptStore.clear(form.schema.id, form.schema.version);
         } catch {
           // Attempt cleanup must not change a successful server submission result.
         }

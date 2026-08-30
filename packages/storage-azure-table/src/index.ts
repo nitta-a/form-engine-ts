@@ -5,15 +5,24 @@ import type {
   FormValue,
   JsonValue,
   PagedSubmissionStorageAdapter,
+  SaveSubmissionOptions,
   StrictFormSubmission,
   SubmissionFilter,
   SubmissionPageQueryOptions,
   SubmissionQueryOptions,
+  SubmissionSaveResult,
   TextAnswerItem,
   TextAnswerPage,
-  TextAnswerPageQueryOptions
+  TextAnswerPageQueryOptions,
+  TypedTextAnswerPage
 } from "@form-engine-ts/core";
-import { assertValidFormSchema, matchesSubmissionPageFilters, normalizeSubmissionPageSize } from "@form-engine-ts/core";
+import {
+  assertValidFormSchema,
+  assertValidFormSubmission,
+  hashFormSubmissionPayload,
+  matchesSubmissionPageFilters,
+  normalizeSubmissionPageSize
+} from "@form-engine-ts/core";
 
 export interface AzureTableListOptions {
   readonly queryOptions?: { readonly filter?: string };
@@ -210,6 +219,14 @@ export interface AzureTableStorageOptions<T = FormSubmission> {
   readonly maxScanPages?: number;
   readonly fieldMapping?: AzureTableFieldMapping;
   readonly readOnly?: boolean;
+  /** Detect legacy entities that expose an `answers` column and fail explicitly. */
+  readonly rejectLegacyAnswers?: boolean;
+  /** Enable typed duplicate/conflict results for submission IDs. */
+  readonly idempotentSubmissions?: boolean;
+  /** Alias for idempotentSubmissions. */
+  readonly idempotency?: boolean;
+  /** Re-validate a submission against the stored FormSchema before saving. */
+  readonly validateSubmissions?: boolean;
 }
 
 export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
@@ -224,8 +241,55 @@ export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata =
       readonly metadataFilters?: Partial<TMeta>;
       readonly cursor?: string;
     }
-  ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
+  ) => Promise<{
+    readonly items: readonly FormSubmission<TMeta>[];
+    readonly nextCursor?: string;
+  }>;
 }
+
+export type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<
+  PagedSubmissionStorageAdapter,
+  "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage"
+> & {
+  readonly saveSubmission: (
+    submission: FormSubmission<TMeta>,
+    options?: SaveSubmissionOptions
+  ) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+  readonly listSubmissionPage: (
+    formId: string,
+    options?: SubmissionPageQueryOptions & {
+      readonly filter?: SubmissionFilter | ((submission: FormSubmission<TMeta>) => boolean);
+      readonly metadataFilters?: TMeta extends BaseSubmissionMetadata
+        ? Partial<TMeta>
+        : Readonly<Record<string, JsonValue>>;
+    }
+  ) => Promise<{
+    readonly items: readonly FormSubmission<TMeta>[];
+    readonly nextCursor?: string;
+    readonly hasMore: boolean;
+  }>;
+  readonly fetchPage: (
+    formId: string,
+    options?: {
+      readonly pageSize?: number;
+      readonly fromSubmittedAt?: string;
+      readonly toSubmittedAt?: string;
+      readonly locale?: string;
+      readonly metadataFilters?: TMeta extends BaseSubmissionMetadata
+        ? Partial<TMeta>
+        : Readonly<Record<string, JsonValue>>;
+      readonly cursor?: string;
+    }
+  ) => Promise<{
+    readonly items: readonly FormSubmission<TMeta>[];
+    readonly nextCursor?: string;
+  }>;
+  readonly listTextAnswerPage: (
+    formId: string,
+    fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
+    options?: TextAnswerPageQueryOptions
+  ) => Promise<TypedTextAnswerPage<TMeta>>;
+};
 
 interface StoredSchemaEntity extends Record<string, unknown> {
   readonly partitionKey: string;
@@ -548,22 +612,29 @@ function scalarMetadata(metadata: FormSubmission["metadata"]): Record<string, un
   );
 }
 
-export const defaultAzureTableSubmissionCodec: AzureTableSubmissionCodec<FormSubmission> = {
-  createEntity: (submission) => ({
-    ...scalarMetadata(submission.metadata),
-    kind: "submission",
-    formVersion: submission.formVersion,
-    locale: submission.locale,
-    submittedAt: submission.submittedAt,
-    responseId: submission.id,
-    payload: JSON.stringify(submission)
-  }),
-  deserialize: (entity) => parseSubmission(entity.payload, "submission entity"),
-  matchesEntity: (entity) => entity.kind === "submission",
-  createPartitionKey: (submission) => submission.formId,
-  createPartitionKeyFromQuery: (formId) => formId,
-  createRowKey: defaultSubmissionRowKey
-};
+export function createAzureTableSubmissionCodec<
+  TMeta extends BaseSubmissionMetadata | undefined = undefined
+>(): AzureTableSubmissionCodec<FormSubmission<TMeta>> {
+  return {
+    createEntity: (submission) => ({
+      ...scalarMetadata(submission.metadata),
+      kind: "submission",
+      formVersion: submission.formVersion,
+      locale: submission.locale,
+      submittedAt: submission.submittedAt,
+      responseId: submission.id,
+      payload: JSON.stringify(submission)
+    }),
+    deserialize: (entity) => parseSubmission(entity.payload, "submission entity") as FormSubmission<TMeta>,
+    matchesEntity: (entity) => entity.kind === "submission",
+    createPartitionKey: (submission) => submission.formId,
+    createPartitionKeyFromQuery: (formId) => formId,
+    createRowKey: defaultSubmissionRowKey
+  };
+}
+
+export const defaultAzureTableSubmissionCodec: AzureTableSubmissionCodec<FormSubmission> =
+  createAzureTableSubmissionCodec();
 
 function legacyCodec(codec: AzureTableEntityCodec<FormSubmission>): AzureTableSubmissionCodec<FormSubmission> {
   return {
@@ -689,7 +760,8 @@ function defaultSubmissionFilter(
   formId: string,
   options: SubmissionPageQueryOptions,
   legacyExtension: string,
-  mapping?: AzureTableFieldMapping
+  mapping?: AzureTableFieldMapping,
+  rejectLegacyAnswers = false
 ): string {
   const partitionKey = codec.createPartitionKeyFromQuery(formId, options);
   const ast =
@@ -699,7 +771,7 @@ function defaultSubmissionFilter(
   const keys = physicalKeyNames(mapping);
   return [
     ...(partitionKey === undefined ? [] : [`${keys.partitionKey} eq '${escapeOData(partitionKey)}'`]),
-    ...(codec === defaultAzureTableSubmissionCodec ? ["kind eq 'submission'"] : []),
+    ...(codec === defaultAzureTableSubmissionCodec && !rejectLegacyAnswers ? ["kind eq 'submission'"] : []),
     ...(options.version === undefined
       ? []
       : [`${propertyName(mapping, "formVersion", "formVersion")} eq ${options.version}`]),
@@ -719,6 +791,14 @@ function isNotFound(error: unknown): boolean {
   return (
     isRecord(error) &&
     (error.statusCode === 404 || error.code === "ResourceNotFound" || error.code === "EntityNotFound")
+  );
+}
+
+function isDuplicateEntityError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : isRecord(error) ? String(error.message ?? "") : "";
+  return (
+    (isRecord(error) && (error.statusCode === 409 || error.code === "EntityAlreadyExists")) ||
+    /alreadyexists|duplicate/iu.test(message)
   );
 }
 
@@ -742,9 +822,12 @@ function requireClient(client: AzureTableClientLike | undefined, name: string): 
 }
 
 export function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
-export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  options?: AzureTableStorageOptions
+): TypedAzureTableStorageAdapter<TMeta>;
+export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
   options: AzureTableStorageOptions = {}
-): AzureTableStorageAdapter<TMeta> {
+): unknown {
   const staticSchemas = options.schemasTableClient ?? options.client;
   const staticSubmissions = options.submissionsTableClient ?? options.client;
   const configuredCodec = options.codec;
@@ -776,13 +859,25 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = B
       formId,
       query,
       options.toODataFilter?.(query) ?? metadataFiltersToOData(query, options.fieldMapping),
-      options.fieldMapping
+      options.fieldMapping,
+      options.rejectLegacyAnswers
     );
   };
-  const deserializeIfMatching = (entity: Record<string, unknown>): FormSubmission | undefined =>
-    codec.matchesEntity(entity) ? parseSubmissionEntity(entity, codec, options.fieldMapping, valueCodec) : undefined;
   const ensureWritable = (): void => {
     if (options.readOnly === true) throw new Error("Azure Table storage is read-only.");
+  };
+
+  const rejectLegacyEntity = (entity: Record<string, unknown>): void => {
+    if (options.rejectLegacyAnswers === true && Object.hasOwn(entity, "answers")) {
+      throw new Error("Azure Table legacy answers column is not supported by the standard submission storage.");
+    }
+  };
+
+  const deserializeIfMatching = (entity: Record<string, unknown>): FormSubmission | undefined => {
+    rejectLegacyEntity(entity);
+    return codec.matchesEntity(entity)
+      ? parseSubmissionEntity(entity, codec, options.fieldMapping, valueCodec)
+      : undefined;
   };
 
   const listSubmissionCandidates = async (
@@ -801,7 +896,12 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = B
     );
   };
 
-  const adapter: PagedSubmissionStorageAdapter = {
+  const adapter: Omit<PagedSubmissionStorageAdapter, "saveSubmission"> & {
+    saveSubmission(
+      submission: FormSubmission,
+      saveOptions?: SaveSubmissionOptions
+    ): Promise<undefined | SubmissionSaveResult>;
+  } = {
     async saveSchema(schema) {
       ensureWritable();
       assertValidFormSchema(schema);
@@ -833,18 +933,50 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = B
       ensureWritable();
       await (await schemaClient(formId)).deleteEntity(formId, schemaRowKey(formVersion));
     },
-    async saveSubmission(submission) {
+    async saveSubmission(
+      submission: FormSubmission,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult> {
       ensureWritable();
       const stored = parseSubmission(submission, `input ${String(submission?.id)}`);
+      if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
+        const schema = parseSchemaEntity(
+          await (await schemaClient(stored.formId)).getEntity(stored.formId, schemaRowKey(stored.formVersion))
+        );
+        assertValidFormSubmission(schema, stored);
+      }
+      const payloadHash = await hashFormSubmissionPayload(stored);
       const mappedEntity = mappedSubmissionEntity(codec.createEntity(stored), stored, options.fieldMapping, valueCodec);
       const keys = physicalKeyNames(options.fieldMapping);
-      await (await submissionClient(stored.formId)).createEntity({
+      const partitionKey = codec.createPartitionKey(stored);
+      const rowKey = codec.createRowKey(stored);
+      const entity = {
         ...mappedEntity,
-        partitionKey: codec.createPartitionKey(stored),
-        rowKey: codec.createRowKey(stored),
-        [keys.partitionKey]: codec.createPartitionKey(stored),
-        [keys.rowKey]: codec.createRowKey(stored)
-      });
+        payloadHash,
+        partitionKey,
+        rowKey,
+        [keys.partitionKey]: partitionKey,
+        [keys.rowKey]: rowKey
+      };
+      try {
+        await (await submissionClient(stored.formId)).createEntity(entity);
+      } catch (error) {
+        const idempotent = saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false;
+        if (!idempotent || !isDuplicateEntityError(error)) throw error;
+        const existingEntity = await (await submissionClient(stored.formId)).getEntity(partitionKey, rowKey);
+        const existing = parseSubmissionEntity(existingEntity, codec, options.fieldMapping, valueCodec);
+        const existingPayloadHash =
+          typeof existingEntity.payloadHash === "string"
+            ? existingEntity.payloadHash
+            : await hashFormSubmissionPayload(existing);
+        if (existingPayloadHash === payloadHash) {
+          return { status: "duplicate", submission: existing, payloadHash };
+        }
+        return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+      }
+      if (saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false) {
+        return { status: "created", submission: stored, payloadHash };
+      }
     },
     async listSubmissions(formId, formVersion, queryOptions: SubmissionQueryOptions = {}) {
       return listSubmissionCandidates(formId, {
@@ -1051,7 +1183,19 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = B
   };
   return {
     ...adapter,
-    async fetchPage(formId, options) {
+    async fetchPage(
+      formId: string,
+      options?: {
+        readonly pageSize?: number;
+        readonly fromSubmittedAt?: string;
+        readonly toSubmittedAt?: string;
+        readonly locale?: string;
+        readonly metadataFilters?: TMeta extends BaseSubmissionMetadata
+          ? Partial<TMeta>
+          : Readonly<Record<string, JsonValue>>;
+        readonly cursor?: string;
+      }
+    ) {
       const page = await adapter.listSubmissionPage(formId, {
         ...(options?.pageSize === undefined ? {} : { pageSize: options.pageSize }),
         ...(options?.fromSubmittedAt === undefined ? {} : { since: options.fromSubmittedAt }),
@@ -1067,5 +1211,5 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata = B
         ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor })
       };
     }
-  };
+  } as unknown as TypedAzureTableStorageAdapter<TMeta>;
 }

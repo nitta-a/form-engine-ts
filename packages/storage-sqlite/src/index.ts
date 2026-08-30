@@ -183,7 +183,7 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
       await ensureReady();
       await options.db.run(`DELETE FROM ${schemasTable} WHERE form_id = ? AND form_version = ?`, [formId, formVersion]);
     },
-    async saveSubmission(submission) {
+    async saveSubmission(submission: FormSubmission) {
       await ensureReady();
       const stored = parseSubmission(submission, `input "${String(submission?.id)}"`);
       await options.db.run(

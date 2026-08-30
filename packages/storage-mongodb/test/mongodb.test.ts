@@ -155,7 +155,9 @@ function createDbStub(options: { readonly transactionSupported?: boolean } = {})
         }
       },
       async insertOne(document: TestDocument) {
-        if (documents.has(document._id)) throw new Error(`E11000 duplicate key: ${document._id}`);
+        if (documents.has(document._id)) {
+          throw Object.assign(new Error(`E11000 duplicate key: ${document._id}`), { code: 11000 });
+        }
         assertUnique(document);
         documents.set(document._id, clone(document));
       },
@@ -255,6 +257,27 @@ describe("createMongoDbStorage", () => {
     expect((await adapter.listSubmissions("form", 1))[0]?.values.answer).toBe("yes");
     await adapter.deleteSubmission("earlier");
     expect((await adapter.listSubmissions("form", 1)).map(({ id }) => id)).toEqual(["later"]);
+  });
+
+  it("returns the same typed idempotency results as Azure Table storage", async () => {
+    const { db, collections } = createDbStub();
+    const storage = createMongoDbStorage<{ channel: string }>({ db, idempotentSubmissions: true });
+    const value = { ...submission("idempotent"), metadata: { channel: "ARGS" } };
+
+    const created = await storage.saveSubmission(value);
+    const duplicate = await storage.saveSubmission(value);
+    const conflict = await storage.saveSubmission({ ...value, values: { answer: "changed" } });
+
+    expect(created?.status).toBe("created");
+    expect(duplicate?.status).toBe("duplicate");
+    expect(conflict).toEqual(
+      expect.objectContaining({
+        status: "conflict",
+        submissionId: "idempotent",
+        existingPayloadHash: expect.any(String)
+      })
+    );
+    expect([...(collections.get("form_responses")?.values() ?? [])][0]).toHaveProperty("payloadHash");
   });
 
   it("filters inclusive submittedAt ranges in MongoDB and composes them with versions", async () => {

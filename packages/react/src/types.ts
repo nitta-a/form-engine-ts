@@ -746,6 +746,7 @@ export interface TranslationComparisonInputAppearance {
 
 export interface InputBoxStyleOptions {
   readonly borderColor?: string;
+  readonly focusBorderColor?: string;
   readonly borderWidth?: number | string;
   readonly backgroundColor?: string;
   readonly minHeight?: number | string;
@@ -809,6 +810,8 @@ export interface TranslationComparisonStatusDisplayOptions {
   readonly colors?: Partial<Record<TranslationStatus, string>>;
   readonly icons?: Partial<Record<TranslationStatus, ReactNode>>;
   readonly position?: "header" | "source" | "target";
+  readonly variant?: "filled" | "outlined";
+  readonly borderRadius?: number | string;
 }
 
 export interface TranslationComparisonAppearance {
@@ -938,6 +941,8 @@ export interface SubmissionProtectionProps {
   readonly receiptStore?: SubmissionReceiptStore;
   readonly submissionScope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">;
   readonly attemptStore?: SubmissionAttemptStore;
+  /** Submission identity format shared by Controller and Renderer. Defaults to UUID. */
+  readonly idFormat?: "uuid" | "ulid" | "custom";
   readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
 }
 

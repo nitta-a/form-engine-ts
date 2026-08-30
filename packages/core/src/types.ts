@@ -269,6 +269,31 @@ interface FormSubmissionBase extends Pick<ExtensibleNode, "translationMetadata">
 export type FormSubmission<TMeta extends BaseSubmissionMetadata | undefined = undefined> = FormSubmissionBase &
   ([TMeta] extends [undefined] ? { readonly metadata?: BaseSubmissionMetadata } : { readonly metadata: TMeta });
 
+export type SubmissionSaveResult<TMeta extends BaseSubmissionMetadata | undefined = undefined> =
+  | {
+      readonly status: "created";
+      readonly submission: FormSubmission<TMeta>;
+      readonly payloadHash: string;
+    }
+  | {
+      readonly status: "duplicate";
+      readonly submission: FormSubmission<TMeta>;
+      readonly payloadHash: string;
+    }
+  | {
+      readonly status: "conflict";
+      readonly submissionId: string;
+      readonly payloadHash: string;
+      readonly existingPayloadHash: string;
+    };
+
+export interface SaveSubmissionOptions {
+  /** Return a typed duplicate/conflict result instead of propagating a duplicate-key error. */
+  readonly idempotent?: boolean;
+  /** Re-fetch and validate the stored FormSchema before persisting. */
+  readonly validateAgainstSchema?: boolean;
+}
+
 /** A submission whose persisted or transport representation always includes a locale. */
 export interface StrictFormSubmission<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
   extends Omit<FormSubmissionBase, "locale" | "values"> {
@@ -405,7 +430,7 @@ export interface TypedFormStorageAdapter<TMeta extends BaseSubmissionMetadata> e
 }
 
 /** Metadata-typed query options for paged storage. */
-export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMetadata> {
+export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMetadata | undefined> {
   readonly version?: number;
   readonly cursor?: string;
   readonly pageSize?: number;
@@ -417,7 +442,7 @@ export interface TypedSubmissionPageQueryOptions<TMeta extends BaseSubmissionMet
 }
 
 /** Metadata-typed page returned by application-owned paged storage. */
-export interface TypedSubmissionPage<TMeta extends BaseSubmissionMetadata> {
+export interface TypedSubmissionPage<TMeta extends BaseSubmissionMetadata | undefined> {
   readonly items: readonly FormSubmission<TMeta>[];
   readonly nextCursor?: string;
   readonly hasMore: boolean;
@@ -445,6 +470,18 @@ export interface TextAnswerItem {
 
 export interface TextAnswerPage {
   readonly items: readonly TextAnswerItem[];
+  readonly nextCursor?: string;
+  readonly hasMore: boolean;
+}
+
+/** Text-answer page retaining the metadata type of the source submission. */
+export interface TypedTextAnswerItem<TMeta extends BaseSubmissionMetadata | undefined>
+  extends Omit<TextAnswerItem, "metadata"> {
+  readonly metadata?: [TMeta] extends [undefined] ? Readonly<Record<string, JsonValue>> : TMeta;
+}
+
+export interface TypedTextAnswerPage<TMeta extends BaseSubmissionMetadata | undefined> {
+  readonly items: readonly TypedTextAnswerItem<TMeta>[];
   readonly nextCursor?: string;
   readonly hasMore: boolean;
 }

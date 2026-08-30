@@ -5,6 +5,17 @@ current release and usage information.
 
 ## Latest release
 
+### v6.8.0 — 2026-08-30
+
+- Added the canonical Azure Table submission codec, which persists `FormSubmission.values` and never writes legacy `answers` columns; optional strict detection reports legacy entities explicitly.
+- Added metadata-typed Azure Table and MongoDB factories with typed page, text-answer, fetch, and save APIs.
+- Added payload-hash idempotency results (`created`, `duplicate`, and `conflict`) and optional schema re-validation for both storage adapters.
+- Unified scoped submission attempts with UUID/ULID identity formats, retry ID reuse, and receipt association.
+- Added standard Japanese translation placeholders with source/target locale interpolation, comparison input sizing, status styling, and accessibility defaults for fields.
+- Aligned all public packages to version 6.8.0.
+
+See the [GitHub release for v6.8.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.8.0).
+
 ### v6.7.0 — 2026-08-30
 
 - Added metadata-aware CSV exports with selectable metadata columns and streaming support for iterable and web-stream consumers.

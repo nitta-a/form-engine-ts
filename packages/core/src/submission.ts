@@ -103,6 +103,60 @@ export function fromFormSubmissionWire(wire: FormSubmissionWire | FormSubmission
   };
 }
 
+function canonicalSubmissionValue(value: unknown): string {
+  if (value === undefined) return "undefined";
+  if (value === null || typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
+  if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : JSON.stringify(String(value));
+  if (Array.isArray(value)) return `[${value.map(canonicalSubmissionValue).join(",")}]`;
+  if (typeof value !== "object") return JSON.stringify(String(value));
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalSubmissionValue(record[key])}`)
+    .join(",")}}`;
+}
+
+/** Creates a stable SHA-256 hash for idempotent submission persistence. */
+export async function hashFormSubmissionPayload(submission: FormSubmission): Promise<string> {
+  const payload = {
+    id: submission.id,
+    formId: submission.formId,
+    formVersion: submission.formVersion,
+    locale: submission.locale,
+    values: submission.values,
+    metadata: submission.metadata,
+    submittedAt: submission.submittedAt,
+    schemaRevision: submission.schemaRevision,
+    translationMetadata: submission.translationMetadata
+  };
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(canonicalSubmissionValue(payload))
+  );
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** Alias kept intentionally descriptive for storage integrations. */
+export const createSubmissionPayloadHash = hashFormSubmissionPayload;
+
+/** Re-validates a submission against the exact schema version used to create it. */
+export function assertValidFormSubmission(schema: FormSchema, submission: FormSubmission): void {
+  assertValidFormSchema(schema);
+  if (submission.formId !== schema.id || submission.formVersion !== schema.version) {
+    throw new TypeError("Submission form identity does not match the schema.");
+  }
+  const locale = submission.locale ?? schema.defaultLocale ?? schema.supportedLocales?.[0] ?? "und";
+  if (locale.trim().length === 0 || !Number.isFinite(Date.parse(submission.submittedAt))) {
+    throw new TypeError("Submission locale and submittedAt must be valid.");
+  }
+  const result = validateAnswers(schema, submission.values);
+  if (!result.valid) {
+    throw new TypeError(
+      `Invalid form answers: ${result.issues.map((item) => `${item.fieldId}:${item.code}`).join(", ")}`
+    );
+  }
+}
+
 export function createSubmission(
   schema: FormSchema,
   values: FormValues,

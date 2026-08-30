@@ -1,4 +1,4 @@
-import { FormSubmission, BaseSubmissionMetadata, PagedSubmissionStorageAdapter, SubmissionPageQueryOptions, StrictFormSubmission, SubmissionFilter } from '@form-engine-ts/core';
+import { FormSubmission, BaseSubmissionMetadata, PagedSubmissionStorageAdapter, SubmissionPageQueryOptions, StrictFormSubmission, SaveSubmissionOptions, SubmissionSaveResult, SubmissionFilter, JsonValue, TextAnswerPageQueryOptions, TypedTextAnswerPage } from '@form-engine-ts/core';
 
 interface AzureTableListOptions {
     readonly queryOptions?: {
@@ -104,6 +104,14 @@ interface AzureTableStorageOptions<T = FormSubmission> {
     readonly maxScanPages?: number;
     readonly fieldMapping?: AzureTableFieldMapping;
     readonly readOnly?: boolean;
+    /** Detect legacy entities that expose an `answers` column and fail explicitly. */
+    readonly rejectLegacyAnswers?: boolean;
+    /** Enable typed duplicate/conflict results for submission IDs. */
+    readonly idempotentSubmissions?: boolean;
+    /** Alias for idempotentSubmissions. */
+    readonly idempotency?: boolean;
+    /** Re-validate a submission against the stored FormSchema before saving. */
+    readonly validateSubmissions?: boolean;
 }
 interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> extends PagedSubmissionStorageAdapter {
     readonly fetchPage: (formId: string, options?: {
@@ -118,6 +126,29 @@ interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSu
         readonly nextCursor?: string;
     }>;
 }
+type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<PagedSubmissionStorageAdapter, "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage"> & {
+    readonly saveSubmission: (submission: FormSubmission<TMeta>, options?: SaveSubmissionOptions) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+    readonly listSubmissionPage: (formId: string, options?: SubmissionPageQueryOptions & {
+        readonly filter?: SubmissionFilter | ((submission: FormSubmission<TMeta>) => boolean);
+        readonly metadataFilters?: TMeta extends BaseSubmissionMetadata ? Partial<TMeta> : Readonly<Record<string, JsonValue>>;
+    }) => Promise<{
+        readonly items: readonly FormSubmission<TMeta>[];
+        readonly nextCursor?: string;
+        readonly hasMore: boolean;
+    }>;
+    readonly fetchPage: (formId: string, options?: {
+        readonly pageSize?: number;
+        readonly fromSubmittedAt?: string;
+        readonly toSubmittedAt?: string;
+        readonly locale?: string;
+        readonly metadataFilters?: TMeta extends BaseSubmissionMetadata ? Partial<TMeta> : Readonly<Record<string, JsonValue>>;
+        readonly cursor?: string;
+    }) => Promise<{
+        readonly items: readonly FormSubmission<TMeta>[];
+        readonly nextCursor?: string;
+    }>;
+    readonly listTextAnswerPage: (formId: string, fieldIdOrOptions?: string | TextAnswerPageQueryOptions, options?: TextAnswerPageQueryOptions) => Promise<TypedTextAnswerPage<TMeta>>;
+};
 interface AzureTextAnswerCursorPayload {
     readonly formatVersion: 1;
     readonly formId: string;
@@ -128,9 +159,11 @@ interface AzureTextAnswerCursorPayload {
     readonly entityIndex: number;
     readonly fieldIndex: number;
 }
+declare function createAzureTableSubmissionCodec<TMeta extends BaseSubmissionMetadata | undefined = undefined>(): AzureTableSubmissionCodec<FormSubmission<TMeta>>;
 declare const defaultAzureTableSubmissionCodec: AzureTableSubmissionCodec<FormSubmission>;
 declare function metadataFiltersToOData(options: SubmissionPageQueryOptions, mapping?: AzureTableFieldMapping): string;
 declare function submissionFilterToOData(filter: SubmissionFilter, mapping?: AzureTableFieldMapping): string | undefined;
 declare function createAzureTableStorage(options?: AzureTableStorageOptions): PagedSubmissionStorageAdapter;
+declare function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | undefined = undefined>(options?: AzureTableStorageOptions): TypedAzureTableStorageAdapter<TMeta>;
 
-export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableLegacyCodec, type AzureTableLegacyEntity, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageAdapter, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, type LegacyAnswerArrayEntity, type LegacyArrayAzureTableCodec, createAzureTableStorage, createLegacyArrayAzureTableCodec, createLegacyAzureTableCodec, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };
+export { type AzureTableClientLike, type AzureTableEntityCodec, type AzureTableEntityIterator, type AzureTableEntityPage, type AzureTableFieldMapping, type AzureTableLegacyCodec, type AzureTableLegacyEntity, type AzureTableListOptions, type AzureTablePageSettings, type AzureTableStorageAdapter, type AzureTableStorageOptions, type AzureTableSubmissionCodec, type AzureTableValueCodec, type AzureTextAnswerCursorPayload, type LegacyAnswerArrayEntity, type LegacyArrayAzureTableCodec, type TypedAzureTableStorageAdapter, createAzureTableStorage, createAzureTableSubmissionCodec, createLegacyArrayAzureTableCodec, createLegacyAzureTableCodec, defaultAzureTableSubmissionCodec, metadataFiltersToOData, submissionFilterToOData };

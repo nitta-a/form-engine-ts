@@ -26,6 +26,7 @@ import type { ReactNode } from "react";
 import type { MuiFormEngineI18nOptions } from "../types";
 import {
   defaultTranslationSlotIcon,
+  formatTranslationWorkspaceTemplate,
   translationComparisonContext,
   translationNodeKindKey,
   translationPropertyKey,
@@ -113,6 +114,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
     handleAddLocale,
     localeLabel,
     sourceLocaleLabel,
+    targetLocaleLabel,
     sourceHeader,
     targetHeader,
     headerProps,
@@ -360,6 +362,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
               : (slots?.renderStatusBadge?.({ status: item.status }) ?? (
                   <Chip
                     size="small"
+                    variant={statusOptions.variant ?? "filled"}
                     label={
                       <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
                         {statusIcon}
@@ -367,7 +370,10 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       </Box>
                     }
                     color={statusColor === undefined ? translationStatusColor(item.status) : undefined}
-                    sx={statusColor === undefined ? undefined : { backgroundColor: statusColor }}
+                    sx={{
+                      ...(statusColor === undefined ? {} : { backgroundColor: statusColor }),
+                      ...(statusOptions.borderRadius === undefined ? {} : { borderRadius: statusOptions.borderRadius })
+                    }}
                     data-testid={`translation-status-badge-${item.id}`}
                   />
                 ));
@@ -383,6 +389,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             appearance.targetInput?.borderColor ?? inputBorderColors.default ?? statusBorderColor;
           const hoverBorderColor = inputBorderColors.hover ?? statusBorderColor;
           const focusBorderColor = inputBorderColors.focus ?? statusBorderColor;
+          const configuredFocusBorderColor = appearance.targetInput?.focusBorderColor ?? focusBorderColor;
           const inputSx = {
             ...(normalBorderColor === undefined
               ? {}
@@ -390,9 +397,9 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             ...(hoverBorderColor === undefined
               ? {}
               : { "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: hoverBorderColor } }),
-            ...(focusBorderColor === undefined
+            ...(configuredFocusBorderColor === undefined
               ? {}
-              : { "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: focusBorderColor } }),
+              : { "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: configuredFocusBorderColor } }),
             ...(appearance.targetInput?.height === undefined &&
             appearance.input?.height === undefined &&
             itemLayout.inputHeight === undefined
@@ -417,6 +424,12 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
               ? {}
               : { borderRadius: appearance.targetInput.borderRadius })
           };
+          const equalInputHeight = layout.equalInputHeight !== false;
+          const configuredInputHeight =
+            appearance.targetInput?.height ??
+            appearance.sourceInput?.height ??
+            appearance.input?.height ??
+            itemLayout.inputHeight;
           const targetLabel = `${targetHeader} · ${
             item.targetKind === "form"
               ? translate(translationPropertyKey[item.targetProperty])
@@ -510,9 +523,11 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                         ...(appearance.sourceInput?.minHeight === undefined
                           ? {}
                           : { minHeight: appearance.sourceInput.minHeight }),
-                        ...(appearance.sourceInput?.height === undefined
-                          ? {}
-                          : { height: appearance.sourceInput.height }),
+                        ...(equalInputHeight && configuredInputHeight !== undefined
+                          ? { height: configuredInputHeight }
+                          : appearance.sourceInput?.height === undefined
+                            ? {}
+                            : { height: appearance.sourceInput.height }),
                         ...(appearance.sourceInput?.borderColor === undefined
                           ? {}
                           : { borderColor: appearance.sourceInput.borderColor }),
@@ -548,10 +563,20 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                       }}
                       placeholder={
                         item.status === "missing"
-                          ? (props.i18n?.customDictionary?.placeholders?.[comparisonLayoutTarget(item)] ?? targetHeader)
+                          ? formatTranslationWorkspaceTemplate(
+                              props.i18n?.customDictionary?.placeholders?.[comparisonLayoutTarget(item)] ??
+                                translate(`workspace.comparison.placeholder.${comparisonLayoutTarget(item)}`, {
+                                  sourceLocale: sourceLocaleLabel,
+                                  targetLocale: targetLocaleLabel
+                                }),
+                              { sourceLocale: sourceLocaleLabel, targetLocale: targetLocaleLabel }
+                            )
                           : undefined
                       }
-                      sx={{ ...inputSx, ...(layout.equalInputHeight === false ? {} : { height: "100%" }) }}
+                      sx={{
+                        ...inputSx,
+                        ...(equalInputHeight ? { height: configuredInputHeight ?? "100%" } : {})
+                      }}
                     />
                     {statusOptions.visible !== false && (item.status === "stale" || item.status === "manual-stale") ? (
                       <Typography color="warning.main" variant="caption" role="status" aria-live="polite">

@@ -9,6 +9,7 @@ import { useState } from "react";
 import type { TranslationComparisonWorkspaceProps } from "./TranslationComparisonWorkspace";
 import { TranslationWorkspaceDialog } from "./TranslationWorkspaceDialog";
 import {
+  formatTranslationWorkspaceTemplate,
   getLocaleDisplayLabel,
   localeKey,
   localizeLocaleOptions,
@@ -109,12 +110,16 @@ export function useTranslationComparisonView(
     getLocaleDisplayLabel(locale, comparison.localeOptions, i18n?.getLocaleLabel, i18n?.customDictionary);
   const sourceLocaleLabel = getLocaleLabel(comparison.sourceLocale);
   const targetLocaleLabel = getLocaleLabel(comparison.targetLocale);
-  const sourceHeader =
+  const sourceHeader = formatTranslationWorkspaceTemplate(
     i18n?.customDictionary?.headers?.sourceTitle ??
-    translate("workspace.comparison.sourceHeader", { locale: sourceLocaleLabel });
-  const targetHeader =
+      translate("workspace.comparison.sourceHeader", { locale: sourceLocaleLabel }),
+    { sourceLocale: sourceLocaleLabel, targetLocale: targetLocaleLabel }
+  );
+  const targetHeader = formatTranslationWorkspaceTemplate(
     i18n?.customDictionary?.headers?.targetTitle ??
-    translate("workspace.comparison.targetHeader", { locale: targetLocaleLabel });
+      translate("workspace.comparison.targetHeader", { locale: targetLocaleLabel }),
+    { sourceLocale: sourceLocaleLabel, targetLocale: targetLocaleLabel }
+  );
   const localizedLocaleOptions = localizeLocaleOptions(comparison.localeOptions, i18n?.getLocaleLabel);
   const targetLocaleSet = new Set(comparison.targetLocales.map(localeKey));
   const localeCandidates = comparison.localeOptions.filter(

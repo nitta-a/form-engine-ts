@@ -75,6 +75,16 @@ export function localeKey(locale: string): string {
   return normalizeLocale(locale) ?? locale;
 }
 
+export function formatTranslationWorkspaceTemplate(
+  template: string,
+  values: { readonly sourceLocale: string; readonly targetLocale: string }
+): string {
+  return template.replace(
+    /\{\{?(sourceLocale|targetLocale)\}\}?/gu,
+    (_token, name: "sourceLocale" | "targetLocale") => values[name]
+  );
+}
+
 export function localizeLocaleOptions(
   options: readonly LocaleOption[],
   getLocaleLabel?: (locale: string) => string

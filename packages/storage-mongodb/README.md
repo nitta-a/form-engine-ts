@@ -25,6 +25,12 @@ const submissions = await storage.listSubmissions(schema.id, schema.version, {
 });
 ```
 
+Pass a metadata type to `createMongoDbStorage<SubmissionMeta>(...)` to keep `metadata` typed through
+`fetchPage`, `listSubmissionPage`, `listTextAnswerPage`, and `saveSubmission`. Set `idempotentSubmissions: true` for
+typed `created`, `duplicate`, and `conflict` results based on the submission ID and payload hash. Set
+`validateSubmissions: true` (or pass `validateAgainstSchema` to `saveSubmission`) to re-validate against the stored
+`FormSchema`.
+
 The caller owns the MongoDB connection lifecycle. Collection names can be customized with the legacy flat options or
 with `collectionNames`. `customIndexes` adds application-owned indexes to the configured forms, versions, or response
 collections; `createIndexes()` creates the built-in indexes first and then the custom definitions. Range boundaries are

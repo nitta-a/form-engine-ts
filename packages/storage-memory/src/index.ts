@@ -65,7 +65,7 @@ export function createMemoryStorageAdapter(): PagedSubmissionStorageAdapter {
     async deleteSchema(formId, formVersion) {
       schemas.delete(schemaKey(formId, formVersion));
     },
-    async saveSubmission(submission) {
+    async saveSubmission(submission: FormSubmission) {
       if (submissions.has(submission.id)) throw new Error(`A submission with ID "${submission.id}" already exists.`);
       submissions.set(submission.id, cloneSubmission(submission));
     },

@@ -7,19 +7,24 @@ import type {
   FormVersionState,
   JsonValue,
   PagedSubmissionStorageAdapter,
+  SaveSubmissionOptions,
   StorageCommitError,
   SubmissionFilter,
+  SubmissionSaveResult,
   TextAnswerPage,
   TextAnswerPageQueryOptions,
+  TypedTextAnswerPage,
   VersionedFormStorageAdapter,
   VersionTransitionPlan
 } from "@form-engine-ts/core";
 import {
   assertValidFormSchema,
+  assertValidFormSubmission,
   decodeSubmissionCursor,
   decodeTextAnswerCursor,
   encodeSubmissionCursor,
   encodeTextAnswerCursor,
+  hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
 } from "@form-engine-ts/core";
@@ -55,13 +60,20 @@ export interface MongoDbStorageOptions {
     readonly formVersions?: readonly MongoCustomIndexDefinition[];
     readonly formResponses?: readonly MongoCustomIndexDefinition[];
   };
+  /** Enable typed duplicate/conflict results for submission IDs. */
+  readonly idempotentSubmissions?: boolean;
+  /** Alias for idempotentSubmissions. */
+  readonly idempotency?: boolean;
+  /** Re-validate a submission against the stored FormSchema before saving. */
+  readonly validateSubmissions?: boolean;
 }
 
 export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
   createIndexes(): Promise<void>;
 }
 
-export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata> extends MongoDbStorageAdapter {
+export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
+  extends MongoDbStorageAdapter {
   readonly fetchPage: (
     formId: string,
     options?: {
@@ -74,6 +86,38 @@ export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata
     }
   ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
 }
+
+export type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<
+  MongoDbStorageAdapter,
+  "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage"
+> & {
+  readonly saveSubmission: (
+    submission: FormSubmission<TMeta>,
+    options?: SaveSubmissionOptions
+  ) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+  readonly listSubmissionPage: (
+    formId: string,
+    options?: import("@form-engine-ts/core").TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<import("@form-engine-ts/core").TypedSubmissionPage<TMeta>>;
+  readonly listTextAnswerPage: (
+    formId: string,
+    fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
+    options?: TextAnswerPageQueryOptions
+  ) => Promise<TypedTextAnswerPage<TMeta>>;
+  readonly fetchPage: (
+    formId: string,
+    options?: {
+      readonly pageSize?: number;
+      readonly fromSubmittedAt?: string;
+      readonly toSubmittedAt?: string;
+      readonly locale?: string;
+      readonly metadataFilters?: TMeta extends BaseSubmissionMetadata
+        ? Partial<TMeta>
+        : Readonly<Record<string, JsonValue>>;
+      readonly cursor?: string;
+    }
+  ) => Promise<{ readonly items: readonly FormSubmission<TMeta>[]; readonly nextCursor?: string }>;
+};
 
 interface StoredSchemaDocument extends Document {
   readonly _id: string;
@@ -88,6 +132,7 @@ interface StoredSubmissionDocument extends Document {
   readonly formVersion: number;
   readonly submittedAt: string;
   readonly submission: FormSubmission;
+  readonly payloadHash?: string;
 }
 
 interface StoredVersionDocument extends Document {
@@ -349,9 +394,12 @@ async function createConfiguredIndexes(
 }
 
 export function createMongoDbStorage(options: MongoDbStorageOptions): MongoDbStorageAdapter;
-export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
+export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
   options: MongoDbStorageOptions
-): TypedMongoDbStorageAdapter<TMeta> {
+): TypedMongoDbSubmissionStorageAdapter<TMeta>;
+export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
+  options: MongoDbStorageOptions
+): unknown {
   if (options?.db === undefined) throw new TypeError("db is required.");
   const collectionNames = options.collectionNames;
   const schemasCollectionName = collectionName(
@@ -489,7 +537,14 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata = Base
     return { success: true, value: { success: true } };
   };
 
-  const adapter: PagedSubmissionStorageAdapter & VersionedFormStorageAdapter & { createIndexes(): Promise<void> } = {
+  const adapter: Omit<PagedSubmissionStorageAdapter, "saveSubmission"> &
+    Omit<VersionedFormStorageAdapter, "saveSubmission"> & {
+      saveSubmission(
+        submission: FormSubmission,
+        saveOptions?: SaveSubmissionOptions
+      ): Promise<undefined | SubmissionSaveResult>;
+      createIndexes(): Promise<void>;
+    } = {
     async saveSchema(schema) {
       assertValidFormSchema(schema);
       const stored = cloneJson(schema);
@@ -512,15 +567,44 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata = Base
     async deleteSchema(formId, formVersion) {
       await schemas.deleteOne({ _id: schemaDocumentId(formId, formVersion) });
     },
-    async saveSubmission(submission) {
+    async saveSubmission(
+      submission: FormSubmission,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult> {
       const stored = cloneJson(parseSubmission(submission, `input "${String(submission?.id)}"`));
-      await submissions.insertOne({
-        _id: stored.id,
-        formId: stored.formId,
-        formVersion: stored.formVersion,
-        submittedAt: stored.submittedAt,
-        submission: stored
-      });
+      if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
+        const schema = await schemas.findOne({ _id: schemaDocumentId(stored.formId, stored.formVersion) });
+        if (schema === null) throw new Error("MongoDB submission schema was not found.");
+        assertValidFormSubmission(parseSchemaDocument(schema), stored);
+      }
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      try {
+        await submissions.insertOne({
+          _id: stored.id,
+          formId: stored.formId,
+          formVersion: stored.formVersion,
+          submittedAt: stored.submittedAt,
+          payloadHash,
+          submission: stored
+        });
+      } catch (error) {
+        const idempotent = saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false;
+        if (!idempotent || !isDuplicateKeyError(error)) throw error;
+        const existingDocument = await submissions.findOne({ _id: stored.id });
+        if (existingDocument === null) throw error;
+        const existing = parseSubmissionDocument(existingDocument);
+        const existingPayloadHash =
+          typeof existingDocument.payloadHash === "string"
+            ? existingDocument.payloadHash
+            : await hashFormSubmissionPayload(existing);
+        if (existingPayloadHash === payloadHash) {
+          return { status: "duplicate", submission: existing, payloadHash };
+        }
+        return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+      }
+      if (saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false) {
+        return { status: "created", submission: stored, payloadHash };
+      }
     },
     async listSubmissions(formId, formVersion, options) {
       const submittedAt =
@@ -802,7 +886,19 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata = Base
   };
   return {
     ...adapter,
-    async fetchPage(formId, options) {
+    async fetchPage(
+      formId: string,
+      options?: {
+        readonly pageSize?: number;
+        readonly fromSubmittedAt?: string;
+        readonly toSubmittedAt?: string;
+        readonly locale?: string;
+        readonly metadataFilters?: TMeta extends BaseSubmissionMetadata
+          ? Partial<TMeta>
+          : Readonly<Record<string, JsonValue>>;
+        readonly cursor?: string;
+      }
+    ) {
       const page = await adapter.listSubmissionPage(formId, {
         ...(options?.pageSize === undefined ? {} : { pageSize: options.pageSize }),
         ...(options?.fromSubmittedAt === undefined ? {} : { since: options.fromSubmittedAt }),
@@ -818,5 +914,5 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata = Base
         ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor })
       };
     }
-  };
+  } as unknown as TypedMongoDbSubmissionStorageAdapter<TMeta>;
 }

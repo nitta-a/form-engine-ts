@@ -99,7 +99,7 @@ export function createLocalStorageAdapter(storagePrefix = "pf_", injectedStorage
     async deleteSchema(formId, formVersion) {
       storage.removeItem(schemaKey(formId, formVersion));
     },
-    async saveSubmission(submission) {
+    async saveSubmission(submission: FormSubmission) {
       const key = submissionKey(submission.id);
       if (storage.getItem(key) !== null) throw new Error(`A submission with ID "${submission.id}" already exists.`);
       storage.setItem(key, JSON.stringify(submission));

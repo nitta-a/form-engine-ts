@@ -216,7 +216,11 @@ export type TranslationComparisonTranslationKey =
   | "workspace.comparison.nodeKind.field"
   | "workspace.comparison.nodeKind.option"
   | "workspace.comparison.emptySource"
-  | "workspace.comparison.staleWarning";
+  | "workspace.comparison.staleWarning"
+  | "workspace.comparison.placeholder.title"
+  | "workspace.comparison.placeholder.completionMessage"
+  | "workspace.comparison.placeholder.question"
+  | "workspace.comparison.placeholder.option";
 
 export type FormEngineTranslationKey =
   | KnownBuilderTranslationKey

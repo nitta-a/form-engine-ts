@@ -207,6 +207,11 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.comparison.property.completionMessage": "Completion message",
   "workspace.comparison.emptySource": "(No source text)",
   "workspace.comparison.staleWarning": "The source text has changed",
+  "workspace.comparison.placeholder.title": "Enter the translation for the title ({{targetLocale}})",
+  "workspace.comparison.placeholder.completionMessage":
+    "Enter the translation for the completion message ({{targetLocale}})",
+  "workspace.comparison.placeholder.question": "Enter the translation for the question ({{targetLocale}})",
+  "workspace.comparison.placeholder.option": "Enter the translation for the option ({{targetLocale}})",
   "workspace.comparison.nodeKind.form": "Form",
   "workspace.comparison.nodeKind.page": "Page",
   "workspace.comparison.nodeKind.field": "Field",

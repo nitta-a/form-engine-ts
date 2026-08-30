@@ -108,6 +108,41 @@ describe("createAzureTableStorage", () => {
     await expect(storage.saveSubmission(submission("response"))).rejects.toThrow(/AlreadyExists/);
   });
 
+  it("uses canonical values without answers and returns typed idempotency results", async () => {
+    const { client, entities } = createClientStub();
+    const storage = createAzureTableStorage<{ channel: string }>({ client, idempotentSubmissions: true });
+    const value = { ...submission("idempotent"), metadata: { channel: "ARGS" } };
+
+    const created = await storage.saveSubmission(value);
+    const duplicate = await storage.saveSubmission(value);
+    const conflict = await storage.saveSubmission({ ...value, values: { answer: "changed" } });
+
+    expect(created?.status).toBe("created");
+    expect(duplicate?.status).toBe("duplicate");
+    expect(conflict).toEqual(
+      expect.objectContaining({
+        status: "conflict",
+        submissionId: "idempotent",
+        existingPayloadHash: expect.any(String)
+      })
+    );
+    expect([...entities.values()].find((entity) => entity.kind === "submission")).not.toHaveProperty("answers");
+  });
+
+  it("can reject legacy answers entities explicitly", async () => {
+    const { client, entities } = createClientStub();
+    entities.set("form\u0000legacy", {
+      partitionKey: "form",
+      rowKey: "legacy",
+      answers: "[]",
+      answeredAt: "2026-08-24T00:00:00.000Z",
+      surveyVersion: 2
+    });
+    const storage = createAzureTableStorage({ client, rejectLegacyAnswers: true });
+
+    await expect(storage.listSubmissionPage("form")).rejects.toThrow(/legacy answers column is not supported/);
+  });
+
   it("pages equal timestamps without gaps and injects OData filters", async () => {
     const { client, filters, pageRequests } = createClientStub();
     const storage = createAzureTableStorage({ client });

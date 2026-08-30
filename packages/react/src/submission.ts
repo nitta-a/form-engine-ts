@@ -7,6 +7,7 @@ import type {
 } from "@form-engine-ts/core";
 import { createSubmission } from "@form-engine-ts/core";
 import { useMemo, useSyncExternalStore } from "react";
+import { createLocalStorageSubmissionAttemptStore, type SubmissionAttemptStore } from "./attempt";
 import type { SubmitResponse, TypedSubmitContext } from "./types";
 
 export type SubmissionControllerStatus = "idle" | "submitting" | "success" | "error";
@@ -64,6 +65,8 @@ export interface CreateSubmissionControllerOptions<TMeta extends BaseSubmissionM
   readonly schema: FormSchema;
   readonly scope: SubmissionControllerScope;
   readonly idFormat?: "uuid" | "ulid" | "custom";
+  /** Shared scope-aware attempt store used by the Controller and FormRenderer. */
+  readonly attemptStore?: SubmissionAttemptStore;
   readonly attemptIdFactory?: () => string;
   readonly metadata?: TMeta;
   readonly onSubmit: (submission: StrictFormSubmission<TMeta>) => Promise<{ readonly receiptId?: string }>;
@@ -76,6 +79,7 @@ export interface ScopedSubmissionControllerState<TMeta extends BaseSubmissionMet
   readonly receiptId?: string;
   readonly submission?: StrictFormSubmission<TMeta>;
   readonly scope: SubmissionControllerScope;
+  readonly retry?: () => Promise<SubmissionControllerResult<{ readonly receiptId?: string }>>;
 }
 
 export interface ScopedSubmissionController<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
@@ -85,6 +89,7 @@ export interface ScopedSubmissionController<TMeta extends BaseSubmissionMetadata
     values: Readonly<Record<string, unknown>>,
     locale?: string
   ) => Promise<SubmissionControllerResult<{ readonly receiptId?: string }>>;
+  readonly retry?: () => Promise<SubmissionControllerResult<{ readonly receiptId?: string }>>;
   readonly reset: () => void;
 }
 
@@ -145,6 +150,12 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
     scope
   };
   let inFlight: Promise<SubmissionControllerResult<{ readonly receiptId?: string }>> | null = null;
+  let lastSubmissionId: string | undefined;
+  const attemptStore =
+    options.attemptStore ??
+    createLocalStorageSubmissionAttemptStore({
+      ...(options.idFormat === undefined ? {} : { idFormat: options.idFormat })
+    });
 
   const publish = (next: ScopedSubmissionControllerState<TMeta>): void => {
     state = next;
@@ -155,7 +166,14 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
     locale = options.schema.defaultLocale ?? options.schema.supportedLocales?.[0] ?? "und"
   ): Promise<SubmissionControllerResult<{ readonly receiptId?: string }>> => {
     if (inFlight !== null || state.status === "success") return { status: "cancelled" };
-    const attemptId = createScopedSubmissionId<TMeta>(options);
+    const attempt =
+      lastSubmissionId === undefined
+        ? attemptStore.getOrCreateForScope === undefined
+          ? await attemptStore.getOrCreate(options.scope.formId, options.scope.formVersion, options.attemptIdFactory)
+          : await attemptStore.getOrCreateForScope(options.scope, options.idFormat, options.attemptIdFactory)
+        : undefined;
+    const attemptId = lastSubmissionId ?? attempt?.attemptId ?? createScopedSubmissionId<TMeta>(options);
+    lastSubmissionId = attemptId;
     const metadata = options.metadata ?? ({} as TMeta);
     let submission: StrictFormSubmission<TMeta>;
     try {
@@ -181,7 +199,7 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
     });
     const request = Promise.resolve()
       .then(() => options.onSubmit(submission))
-      .then((response) => {
+      .then(async (response) => {
         const result = { status: "success", response } as const;
         publish({
           ...state,
@@ -191,6 +209,7 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
           canRetry: false,
           isSubmitted: true
         });
+        if (response.receiptId !== undefined) await attemptStore.setReceiptForScope?.(scope, response.receiptId);
         return result;
       })
       .catch((cause: unknown) => {
@@ -211,8 +230,14 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
       return () => listeners.delete(listener);
     },
     submit,
+    retry: () => {
+      if (!state.canRetry || state.submission === undefined) return Promise.resolve({ status: "cancelled" });
+      return submit(state.submission.values);
+    },
     reset: () => {
       if (inFlight !== null) return;
+      void attemptStore.clearForScope?.(scope);
+      lastSubmissionId = undefined;
       publish({ status: "idle", error: null, attemptCount: 0, canRetry: false, isSubmitted: false, scope });
     }
   };
@@ -330,6 +355,7 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
   const scopedTenantId = scopedOptions?.scope.tenantId;
   const scopedIdFormat = scopedOptions?.idFormat;
   const scopedAttemptIdFactory = scopedOptions?.attemptIdFactory;
+  const scopedAttemptStore = scopedOptions?.attemptStore;
   const scopedMetadata = scopedOptions?.metadata;
   const scopedOnSubmit = scopedOptions?.onSubmit;
   const scopedController = useMemo(() => {
@@ -353,6 +379,7 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
       },
       ...(scopedIdFormat === undefined ? {} : { idFormat: scopedIdFormat }),
       ...(scopedAttemptIdFactory === undefined ? {} : { attemptIdFactory: scopedAttemptIdFactory }),
+      ...(scopedAttemptStore === undefined ? {} : { attemptStore: scopedAttemptStore }),
       ...(scopedMetadata === undefined ? {} : { metadata: scopedMetadata }),
       onSubmit: scopedOnSubmit
     });
@@ -366,6 +393,7 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
     scopedTenantId,
     scopedIdFormat,
     scopedAttemptIdFactory,
+    scopedAttemptStore,
     scopedMetadata,
     scopedOnSubmit
   ]);
@@ -380,8 +408,9 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
     return {
       ...(state as ScopedSubmissionControllerState<TMeta>),
       submit: scopedController.submit,
+      retry: scopedController.retry,
       reset: scopedController.reset
-    };
+    } as ScopedSubmissionControllerState<TMeta> & Pick<ScopedSubmissionController<TMeta>, "submit" | "reset">;
   }
   const legacyController = controllerOrOptions as SubmissionController<TResponse, TMeta>;
   return {
@@ -389,5 +418,6 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
     submit: legacyController.submit,
     retry: legacyController.retry,
     reset: legacyController.reset
-  };
+  } as SubmissionControllerState<TResponse> &
+    Pick<SubmissionController<TResponse, TMeta>, "submit" | "retry" | "reset">;
 }
