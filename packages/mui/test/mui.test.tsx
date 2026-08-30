@@ -1,6 +1,12 @@
 import { FormBuilder, type FormBuilderComponents } from "@form-engine-ts/react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { createMuiBuilderComponents, muiBuilderComponents, muiDefaultIconResolver } from "../src";
+import {
+  createMuiBuilderComponents,
+  mergeMuiAdapterOptions,
+  muiBuilderComponents,
+  muiDefaultIconResolver,
+  resolveMuiAdapterOptions
+} from "../src";
 
 const schema = {
   id: "mui-form",
@@ -46,5 +52,51 @@ describe("@form-engine-ts/mui", () => {
     expect(resolver).toHaveBeenCalledWith("moveUp");
     expect(screen.getAllByTestId("custom-icon").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Delete Name" })).toBeInTheDocument();
+  });
+
+  it("merges nested adapter options and applies defaults without mutating inputs", () => {
+    const base = {
+      buttonVariant: "outlined" as const,
+      buttonVariants: { primary: "text" as const },
+      layoutOptions: { sectionOrder: ["questions" as const] },
+      fieldEditorOptions: { byType: { text: { title: "readOnly" as const } } },
+      localizationOptions: { collapsible: true },
+      localization: { workspaceOptions: { sourceLocale: "en" } }
+    };
+    const overrides = {
+      buttonVariants: { danger: "text" as const },
+      fieldEditorOptions: { byType: { number: { description: "hidden" as const } } },
+      localizationOptions: { defaultExpanded: "always" as const },
+      localization: { workspaceOptions: { targetLocale: "ja" } }
+    };
+
+    const merged = mergeMuiAdapterOptions(base, overrides);
+    expect(merged).toEqual({
+      buttonVariant: "outlined",
+      buttonVariants: { primary: "text", danger: "text" },
+      layoutOptions: { sectionOrder: ["questions"] },
+      fieldEditorOptions: { byType: { text: { title: "readOnly" }, number: { description: "hidden" } } },
+      localizationOptions: { collapsible: true, defaultExpanded: "always" },
+      localization: { workspaceOptions: { sourceLocale: "en", targetLocale: "ja" } }
+    });
+    expect(base).toEqual({
+      buttonVariant: "outlined",
+      buttonVariants: { primary: "text" },
+      layoutOptions: { sectionOrder: ["questions"] },
+      fieldEditorOptions: { byType: { text: { title: "readOnly" } } },
+      localizationOptions: { collapsible: true },
+      localization: { workspaceOptions: { sourceLocale: "en" } }
+    });
+    expect(resolveMuiAdapterOptions(merged)).toMatchObject({
+      size: "medium",
+      variant: "outlined",
+      buttonVariant: "outlined",
+      buttonVariants: { primary: "text", secondary: "outlined", danger: "text" },
+      fullWidth: true,
+      inputFullWidth: true,
+      buttonFullWidth: false,
+      fieldEditorOptions: { byType: { text: { title: "readOnly" }, number: { description: "hidden" } } },
+      localizationOptions: { collapsible: true, defaultExpanded: "always" }
+    });
   });
 });

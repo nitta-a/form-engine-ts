@@ -32,9 +32,10 @@ describe("useTranslationWorkspace cancellation", () => {
     );
 
     let operation: Promise<unknown> | undefined;
-    act(() => {
+    await act(async () => {
       operation = result.current.translateAll();
       controller.abort();
+      await operation;
     });
 
     await expect(operation).resolves.toEqual(expect.objectContaining({ success: false, error: { type: "cancelled" } }));

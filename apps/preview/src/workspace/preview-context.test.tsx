@@ -34,6 +34,9 @@ describe("preview context hooks", () => {
   it("exposes workspace state and updates shared settings", async () => {
     const { result } = renderHook(() => usePreviewWorkspace(), { wrapper: PreviewWorkspaceProvider });
 
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
     await waitFor(() => expect(result.current.workspaceReady).toBe(true));
     expect(result.current.schema.id).toBe("customer-feedback");
     expect(result.current.storageKind).toBe("memory");
@@ -43,26 +46,39 @@ describe("preview context hooks", () => {
       result.current.setStorageKind("local");
     });
 
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(result.current.workspaceReady).toBe(true));
     expect(result.current.locale).toBe("ja");
     expect(result.current.storageKind).toBe("local");
   });
 
-  it("shares builder settings through the builder provider", () => {
-    const { result } = renderHook(() => useBuilderPreview(), { wrapper: BuilderContextWrapper });
+  it("shares builder settings through the builder provider", async () => {
+    const { result } = renderHook(
+      () => {
+        const workspace = usePreviewWorkspace();
+        const builder = useBuilderPreview();
+        return { workspace, builder };
+      },
+      { wrapper: BuilderContextWrapper }
+    );
+
+    await waitFor(() => expect(result.current.workspace.workspaceReady).toBe(true));
 
     act(() => {
-      result.current.setBuilderReadOnly(true);
-      result.current.setPagesEnabled(false);
-      result.current.setLocalizationEnabled(false);
-      result.current.setConditionsEnabled(false);
-      result.current.setUseCustomBuilderUi(true);
+      result.current.builder.setBuilderReadOnly(true);
+      result.current.builder.setPagesEnabled(false);
+      result.current.builder.setLocalizationEnabled(false);
+      result.current.builder.setConditionsEnabled(false);
+      result.current.builder.setUseCustomBuilderUi(true);
     });
 
-    expect(result.current.builderReadOnly).toBe(true);
-    expect(result.current.pagesEnabled).toBe(false);
-    expect(result.current.localizationEnabled).toBe(false);
-    expect(result.current.conditionsEnabled).toBe(false);
-    expect(result.current.useCustomBuilderUi).toBe(true);
+    expect(result.current.builder.builderReadOnly).toBe(true);
+    expect(result.current.builder.pagesEnabled).toBe(false);
+    expect(result.current.builder.localizationEnabled).toBe(false);
+    expect(result.current.builder.conditionsEnabled).toBe(false);
+    expect(result.current.builder.useCustomBuilderUi).toBe(true);
   });
 
   it("shares respondent demo settings through the respondent provider", () => {

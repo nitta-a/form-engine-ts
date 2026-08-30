@@ -39,7 +39,11 @@ describe("useTranslationWorkspace locale policy", () => {
       useTranslationWorkspace({ schema: current, onChange, policy: { maxLocales: 2 }, targetLocale: "ja" })
     );
 
-    expect(result.current.addLocale("fr")).toEqual({
+    let addResult: ReturnType<typeof result.current.addLocale> | undefined;
+    act(() => {
+      addResult = result.current.addLocale("fr");
+    });
+    expect(addResult).toEqual({
       success: false,
       error: { type: "max_locales_exceeded", max: 2, current: 2 }
     });
@@ -58,11 +62,17 @@ describe("useTranslationWorkspace locale policy", () => {
         : { valid: false, error: { type: "locale_not_allowed" as const, message: "Custom rejection" } }
     );
     const { result } = renderHook(() => useTranslationWorkspace({ schema, validateLocale }));
-    expect(result.current.addLocale("fr")).toEqual({
+    let rejectedResult: ReturnType<typeof result.current.addLocale> | undefined;
+    let addedResult: ReturnType<typeof result.current.addLocale> | undefined;
+    act(() => {
+      rejectedResult = result.current.addLocale("fr");
+      addedResult = result.current.addLocale("ja");
+    });
+    expect(rejectedResult).toEqual({
       success: false,
       error: { type: "locale_not_allowed", locale: "fr" }
     });
-    expect(result.current.addLocale("ja")).toEqual({ success: true });
+    expect(addedResult).toEqual({ success: true });
     expect(validateLocale).toHaveBeenCalledWith(
       "fr",
       expect.objectContaining({ locale: "fr", defaultLocale: "en", currentLocales: ["en"] })

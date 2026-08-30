@@ -31,9 +31,11 @@ describe("typed translation workspace errors", () => {
   it("returns an adapter error instead of throwing", async () => {
     const { result } = renderHook(() => useTranslationWorkspace({ schema, targetLocale: "ja" }));
 
-    await expect(result.current.translateAll()).resolves.toEqual({
-      success: false,
-      error: { type: "adapter_not_configured" }
+    await act(async () => {
+      await expect(result.current.translateAll()).resolves.toEqual({
+        success: false,
+        error: { type: "adapter_not_configured" }
+      });
     });
   });
 });

@@ -1,5 +1,5 @@
 import type { FormSchema } from "@form-engine-ts/core";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { useTranslationWorkspace } from "../src";
 
 const schema: FormSchema = {
@@ -21,7 +21,9 @@ describe("useTranslationWorkspace beforeRemoveLocale", () => {
     });
     const { result } = renderHook(() => useTranslationWorkspace({ schema, onChange, beforeRemoveLocale }));
 
-    await result.current.removeLocale("ja");
+    await act(async () => {
+      await result.current.removeLocale("ja");
+    });
 
     expect(beforeRemoveLocale).toHaveBeenCalledWith("ja", { slotCount: 2 });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ supportedLocales: ["en"] }));
@@ -31,7 +33,10 @@ describe("useTranslationWorkspace beforeRemoveLocale", () => {
     const onChange = vi.fn();
     const { result } = renderHook(() => useTranslationWorkspace({ schema, onChange, beforeRemoveLocale: () => false }));
 
-    const removed = await result.current.removeLocale("ja");
+    let removed: boolean | undefined;
+    await act(async () => {
+      removed = await result.current.removeLocale("ja");
+    });
 
     expect(removed).toBe(false);
     expect(onChange).not.toHaveBeenCalled();

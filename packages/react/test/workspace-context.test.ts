@@ -53,10 +53,18 @@ describe("useTranslationWorkspace locale context", () => {
         policy: { allowedLocales: ["en-US", "ja"] }
       })
     );
-    expect(allowed.result.current.addLocale("en-us")).toEqual({ success: true });
+    let allowedResult: ReturnType<typeof allowed.result.current.addLocale> | undefined;
+    act(() => {
+      allowedResult = allowed.result.current.addLocale("en-us");
+    });
+    expect(allowedResult).toEqual({ success: true });
 
     const duplicate = renderHook(() => useTranslationWorkspace({ schema: { ...schema, supportedLocales: ["en-US"] } }));
-    expect(duplicate.result.current.addLocale("EN-US")).toEqual({
+    let duplicateResult: ReturnType<typeof duplicate.result.current.addLocale> | undefined;
+    act(() => {
+      duplicateResult = duplicate.result.current.addLocale("EN-US");
+    });
+    expect(duplicateResult).toEqual({
       success: false,
       error: { type: "locale_already_exists", locale: "en-US" }
     });
