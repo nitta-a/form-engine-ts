@@ -4,6 +4,7 @@ import {
   type BaseSubmissionMetadata,
   calculateFieldVisibility,
   calculatePageVisibility,
+  createSubmissionId,
   deserializeSubmissionErrorFromTrpc,
   type FormField,
   type FormSchema,
@@ -66,9 +67,7 @@ function issuesByField(issues: readonly ValidationIssue[]): Record<string, Valid
 }
 
 function defaultAttemptId(): string {
-  const randomUuid = globalThis.crypto?.randomUUID;
-  if (typeof randomUuid === "function") return randomUuid.call(globalThis.crypto);
-  return `attempt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return createSubmissionId();
 }
 
 function isServerErrorPayload(value: unknown): value is FormServerErrorPayload {
@@ -221,8 +220,10 @@ export function FormProvider<TMeta extends BaseSubmissionMetadata>({
           setSubmitStatus("idle");
           return { status: "cancelled" };
         }
+        const generatedAttemptId = defaultAttemptId();
         const context = submitContext ?? {
-          attemptId: defaultAttemptId(),
+          attemptId: generatedAttemptId,
+          submissionId: generatedAttemptId,
           formId: validSchema.id,
           formVersion: validSchema.version,
           locale,

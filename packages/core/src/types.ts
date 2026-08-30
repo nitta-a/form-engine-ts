@@ -1,3 +1,4 @@
+import type { MetadataCsvExportOptions } from "./analytics";
 import type { BuilderTranslationKey } from "./i18n/keys";
 import type { FormSubmissionValidationSource } from "./validation";
 import type { FormVersionRecord, FormVersionState, Result, VersionTransitionEvent } from "./versioning";
@@ -329,6 +330,7 @@ export interface StrictFormSubmissionWire<TMeta extends BaseSubmissionMetadata =
 
 export interface CreateSubmissionInput<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
   readonly id?: string;
+  readonly idFormat?: "uuid" | "ulid" | "custom";
   readonly formId: string;
   readonly formVersion: number;
   readonly answers: Record<string, unknown>;
@@ -482,11 +484,25 @@ export interface UnifiedSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
     formId: string,
     options?: TypedSubmissionPageQueryOptions<TMeta>
   ): Promise<TypedSubmissionPage<TMeta>>;
-  listTextAnswerPage?(
+  listTextAnswerPage(
     formId: string,
     fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
     options?: TextAnswerPageQueryOptions
   ): Promise<TypedTextAnswerPage<TMeta>>;
+  aggregateResponses(schema: FormSchema, options?: TypedSubmissionPageQueryOptions<TMeta>): Promise<FormAnalytics>;
+  exportResponsesToCsv(schema: FormSchema, options?: StorageSubmissionExportOptions<TMeta>): Promise<string>;
+  validateSubmission(submission: FormSubmission<TMeta>, source?: FormSubmissionValidationSource<TMeta>): Promise<void>;
+}
+
+export interface StorageSubmissionExportOptions<TMeta extends BaseSubmissionMetadata | undefined = undefined>
+  extends Omit<MetadataCsvExportOptions<BaseSubmissionMetadata>, "customColumns" | "includeMetadataFields"> {
+  readonly query?: TypedSubmissionPageQueryOptions<TMeta>;
+  readonly customColumns?: TMeta extends BaseSubmissionMetadata
+    ? MetadataCsvExportOptions<TMeta>["customColumns"]
+    : MetadataCsvExportOptions<BaseSubmissionMetadata>["customColumns"];
+  readonly includeMetadataFields?: TMeta extends BaseSubmissionMetadata
+    ? MetadataCsvExportOptions<TMeta>["includeMetadataFields"]
+    : MetadataCsvExportOptions<BaseSubmissionMetadata>["includeMetadataFields"];
 }
 
 export interface TextAnswerItem {

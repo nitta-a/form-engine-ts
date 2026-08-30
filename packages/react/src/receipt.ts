@@ -6,6 +6,8 @@ export interface SubmissionReceipt {
   /** Optional application scope. Omit both values for the legacy form scope. */
   readonly deckId?: string;
   readonly sessionId?: string;
+  readonly userId?: string;
+  readonly tenantId?: string;
   readonly submissionId?: string;
   readonly submittedAt: string;
 }
@@ -15,20 +17,22 @@ export interface SubmissionReceiptQuery {
   readonly formVersion: number;
   readonly deckId?: string;
   readonly sessionId?: string;
+  readonly userId?: string;
+  readonly tenantId?: string;
 }
 
 export interface SubmissionReceiptStore {
   get(
     formId: string,
     formVersion: number,
-    scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">
+    scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId">
   ): Promise<SubmissionReceipt | null>;
   getBatch?(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
   save(receipt: SubmissionReceipt): Promise<void>;
   remove(
     formId: string,
     formVersion: number,
-    scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">
+    scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId">
   ): Promise<void>;
 }
 
@@ -41,10 +45,16 @@ export interface UseSubmissionReceiptsResult {
 export function submissionReceiptQueryKey(
   formId: string,
   formVersion: number,
-  scope: Pick<SubmissionReceiptQuery, "deckId" | "sessionId"> = {}
+  scope: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId"> = {}
 ): string {
-  if (scope.deckId === undefined && scope.sessionId === undefined) return `${formId}:v${formVersion}`;
-  return `${formId}:v${formVersion}:d${scope.deckId ?? ""}:s${scope.sessionId ?? ""}`;
+  if (
+    scope.deckId === undefined &&
+    scope.sessionId === undefined &&
+    scope.userId === undefined &&
+    scope.tenantId === undefined
+  )
+    return `${formId}:v${formVersion}`;
+  return `${formId}:v${formVersion}:d${scope.deckId ?? ""}:s${scope.sessionId ?? ""}:u${scope.userId ?? ""}:t${scope.tenantId ?? ""}`;
 }
 
 function receiptKey(namespace: string, query: SubmissionReceiptQuery): string {
@@ -73,6 +83,8 @@ function parseReceipt(serialized: string): SubmissionReceipt | null {
       !Number.isSafeInteger(value.formVersion) ||
       ("deckId" in value && value.deckId !== undefined && typeof value.deckId !== "string") ||
       ("sessionId" in value && value.sessionId !== undefined && typeof value.sessionId !== "string") ||
+      ("userId" in value && value.userId !== undefined && typeof value.userId !== "string") ||
+      ("tenantId" in value && value.tenantId !== undefined && typeof value.tenantId !== "string") ||
       !("submittedAt" in value) ||
       typeof value.submittedAt !== "string" ||
       !Number.isFinite(Date.parse(value.submittedAt)) ||
@@ -88,6 +100,8 @@ function parseReceipt(serialized: string): SubmissionReceipt | null {
       formVersion: value.formVersion,
       ...(typeof record.deckId === "string" ? { deckId: record.deckId } : {}),
       ...(typeof record.sessionId === "string" ? { sessionId: record.sessionId } : {}),
+      ...(typeof record.userId === "string" ? { userId: record.userId } : {}),
+      ...(typeof record.tenantId === "string" ? { tenantId: record.tenantId } : {}),
       submittedAt: value.submittedAt,
       ...(submissionId === undefined ? {} : { submissionId })
     };
@@ -104,7 +118,7 @@ export function createLocalStorageSubmissionReceiptStore(
   const get = async (
     formId: string,
     formVersion: number,
-    scope: Pick<SubmissionReceiptQuery, "deckId" | "sessionId"> = {}
+    scope: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId"> = {}
   ): Promise<SubmissionReceipt | null> => {
     const storage = browserStorage();
     if (storage === null) return null;
@@ -115,7 +129,9 @@ export function createLocalStorageSubmissionReceiptStore(
       return receipt?.formId === formId &&
         receipt.formVersion === formVersion &&
         receipt.deckId === scope.deckId &&
-        receipt.sessionId === scope.sessionId
+        receipt.sessionId === scope.sessionId &&
+        receipt.userId === scope.userId &&
+        receipt.tenantId === scope.tenantId
         ? receipt
         : null;
     } catch {

@@ -17,7 +17,8 @@ import { selectVisibleAnswers } from "./visibility";
 
 export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
   extends ExtensibleNode {
-  readonly id: string;
+  readonly id?: string;
+  readonly idFormat?: SubmissionIdFormat;
   readonly locale: string;
   readonly submittedAt: string;
   readonly schemaRevision?: number;
@@ -30,8 +31,40 @@ function cloneValues(values: FormValues): FormValues {
   );
 }
 
-function generatedSubmissionId(): string {
+export type SubmissionIdFormat = "uuid" | "ulid" | "custom";
+
+function generatedUuid(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function generatedUlid(): string {
+  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  let timestamp = Date.now();
+  let timePart = "";
+  for (let index = 0; index < 10; index += 1) {
+    timePart = alphabet[timestamp % 32] + timePart;
+    timestamp = Math.floor(timestamp / 32);
+  }
+  const bytes = new Uint8Array(16);
+  const getRandomValues = globalThis.crypto?.getRandomValues;
+  if (typeof getRandomValues === "function") getRandomValues.call(globalThis.crypto, bytes);
+  else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+  return `${timePart}${Array.from(bytes, (value) => alphabet[value % 32]).join("")}`;
+}
+
+/** Generates a submission identity shared by Core, Controller, and Renderer integrations. */
+export function createSubmissionId(format: SubmissionIdFormat = "uuid", factory?: () => string): string {
+  if (factory !== undefined) {
+    const value = factory();
+    if (value.trim().length === 0) throw new TypeError("Submission ID factory must return a non-empty string.");
+    return value;
+  }
+  if (format === "custom") throw new TypeError("Submission ID factory is required when idFormat is custom.");
+  return format === "ulid" ? generatedUlid() : generatedUuid();
+}
+
+export function isSubmissionUlid(value: string): boolean {
+  return /^[0-7][0-9ABCDEFGHJKMNPQRSTVWXYZ]{25}$/u.test(value);
 }
 
 function toFormValues(answers: Readonly<Record<string, unknown>>): FormValues {
@@ -246,7 +279,7 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
 ): FormSubmission<TMeta> {
   if ("answers" in schemaOrInput) {
     const input = schemaOrInput;
-    const id = input.id ?? generatedSubmissionId();
+    const id = input.id ?? createSubmissionId(input.idFormat);
     if (input.formId.trim().length === 0) throw new TypeError("formId must not be empty.");
     if (!Number.isSafeInteger(input.formVersion) || input.formVersion < 1) {
       throw new TypeError("formVersion must be a positive safe integer.");
@@ -271,7 +304,7 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
   const schema = schemaOrInput;
   if (values === undefined || options === undefined) throw new TypeError("values and options are required.");
   assertValidFormSchema(schema);
-  if (options.id.trim().length === 0) throw new TypeError("Submission ID must not be empty.");
+  const id = options.id ?? createSubmissionId(options.idFormat ?? "uuid");
   if (options.locale.trim().length === 0) throw new TypeError("Submission locale must not be empty.");
   const result = validateAnswers(schema, values);
   if (!result.valid) {
@@ -284,7 +317,7 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
   }
   const visibleValues = selectVisibleAnswers(schema, values);
   return Object.freeze({
-    id: options.id,
+    id,
     formId: schema.id,
     formVersion: schema.version,
     locale: options.locale,

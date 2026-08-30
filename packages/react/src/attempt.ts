@@ -1,3 +1,7 @@
+import { createSubmissionId, type SubmissionIdFormat } from "@form-engine-ts/core";
+
+export type { SubmissionIdFormat } from "@form-engine-ts/core";
+
 export interface SubmissionAttempt {
   readonly attemptId: string;
   readonly formId: string;
@@ -5,10 +9,10 @@ export interface SubmissionAttempt {
   readonly createdAt: string;
   readonly deckId?: string;
   readonly sessionId?: string;
+  readonly userId?: string;
+  readonly tenantId?: string;
   readonly receiptId?: string;
 }
-
-export type SubmissionIdFormat = "uuid" | "ulid" | "custom";
 
 export interface SubmissionAttemptScope {
   readonly formId: string;
@@ -65,6 +69,8 @@ function parseAttempt(serialized: string): SubmissionAttempt | null {
       !Number.isFinite(Date.parse(value.createdAt)) ||
       ("deckId" in value && value.deckId !== undefined && typeof value.deckId !== "string") ||
       ("sessionId" in value && value.sessionId !== undefined && typeof value.sessionId !== "string") ||
+      ("userId" in value && value.userId !== undefined && typeof value.userId !== "string") ||
+      ("tenantId" in value && value.tenantId !== undefined && typeof value.tenantId !== "string") ||
       ("receiptId" in value && value.receiptId !== undefined && typeof value.receiptId !== "string")
     ) {
       return null;
@@ -77,6 +83,8 @@ function parseAttempt(serialized: string): SubmissionAttempt | null {
       createdAt: record.createdAt as string,
       ...(typeof record.deckId === "string" ? { deckId: record.deckId } : {}),
       ...(typeof record.sessionId === "string" ? { sessionId: record.sessionId } : {}),
+      ...(typeof record.userId === "string" ? { userId: record.userId } : {}),
+      ...(typeof record.tenantId === "string" ? { tenantId: record.tenantId } : {}),
       ...(typeof record.receiptId === "string" ? { receiptId: record.receiptId } : {})
     };
   } catch {
@@ -84,31 +92,8 @@ function parseAttempt(serialized: string): SubmissionAttempt | null {
   }
 }
 
-function defaultUuid(): string {
-  const randomUuid = globalThis.crypto?.randomUUID;
-  if (typeof randomUuid === "function") return randomUuid.call(globalThis.crypto);
-  return `attempt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function defaultUlid(): string {
-  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  let timestamp = Date.now();
-  let timePart = "";
-  for (let index = 0; index < 10; index += 1) {
-    timePart = alphabet[timestamp % 32] + timePart;
-    timestamp = Math.floor(timestamp / 32);
-  }
-  const bytes = new Uint8Array(16);
-  const getRandomValues = globalThis.crypto?.getRandomValues;
-  if (typeof getRandomValues === "function") getRandomValues.call(globalThis.crypto, bytes);
-  else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
-  return `${timePart}${Array.from(bytes, (value) => alphabet[value % 32]).join("")}`;
-}
-
 function createAttemptId(format: SubmissionIdFormat, idFactory?: () => string): string {
-  if (idFactory !== undefined) return idFactory();
-  if (format === "custom") throw new TypeError("attempt idFactory is required when idFormat is custom.");
-  return format === "ulid" ? defaultUlid() : defaultUuid();
+  return createSubmissionId(format, idFactory);
 }
 
 export function createLocalStorageSubmissionAttemptStore(
@@ -208,7 +193,9 @@ export function createLocalStorageSubmissionAttemptStore(
         formVersion: scope.formVersion,
         createdAt: new Date().toISOString(),
         ...(scope.deckId === undefined ? {} : { deckId: scope.deckId }),
-        ...(scope.sessionId === undefined ? {} : { sessionId: scope.sessionId })
+        ...(scope.sessionId === undefined ? {} : { sessionId: scope.sessionId }),
+        ...(scope.userId === undefined ? {} : { userId: scope.userId }),
+        ...(scope.tenantId === undefined ? {} : { tenantId: scope.tenantId })
       };
       memory.set(key, attempt);
       try {

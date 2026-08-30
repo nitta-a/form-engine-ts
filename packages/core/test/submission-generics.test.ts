@@ -1,7 +1,15 @@
 import type { BaseSubmissionMetadata, TypedPagedSubmissionStorageAdapter } from "../src";
-import { createSubmission } from "../src";
+import { createSubmission, createSubmissionId, isSubmissionUlid } from "../src";
 
 describe("generic submission metadata", () => {
+  it("uses the requested ULID format for generated submission IDs", () => {
+    const id = createSubmissionId("ulid");
+    expect(isSubmissionUlid(id)).toBe(true);
+    expect(
+      createSubmission({ formId: "survey", formVersion: 1, idFormat: "ulid", answers: {}, metadata: {} }).id
+    ).toMatch(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u);
+  });
+
   it("propagates the metadata type through the input factory", () => {
     const submission = createSubmission<{ deckId: string; piiConfirmed: boolean }>({
       formId: "guide",

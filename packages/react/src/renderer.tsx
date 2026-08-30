@@ -1,5 +1,6 @@
 import {
   type BaseSubmissionMetadata,
+  createSubmissionId,
   deserializeSubmissionErrorFromTrpc,
   type FieldType,
   type FormField,
@@ -33,6 +34,7 @@ import { FormProvider, useForm } from "./context";
 import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "./i18n/provider";
 import type { SubmissionReceipt } from "./receipt";
 import type { ScopedSubmissionController, SubmissionController } from "./submission";
+import type { SubmissionIdentity } from "./submissionIdentity";
 import type {
   BeforeSubmit,
   ChoiceFieldTypeLayoutMap,
@@ -629,8 +631,9 @@ export interface StandaloneFormRendererProps extends FormRendererPresentationPro
 }
 
 export interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>
-  extends Omit<FormRendererPresentationProps, "submissionMetadata"> {
+  extends Omit<FormRendererPresentationProps, "submissionMetadata" | "submissionIdentity"> {
   readonly submissionMetadata?: TMeta;
+  readonly submissionIdentity?: SubmissionIdentity<TMeta>;
 }
 
 export interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>
@@ -794,12 +797,6 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
   }
 };
 
-function createRendererAttemptId(): string {
-  const randomUuid = globalThis.crypto?.randomUUID;
-  if (typeof randomUuid === "function") return randomUuid.call(globalThis.crypto);
-  return `attempt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
 function maskSensitiveValue(finding: SensitiveDataFinding): string | undefined {
   if (finding.maskedText !== undefined) return finding.maskedText;
   const value = finding.matchedText;
@@ -826,7 +823,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   successMessageKey,
   errorMessageKey,
   attemptIdFactory,
-  idFormat = "uuid",
+  idFormat: providedIdFormat = "uuid",
   submissionMetadata,
   messages = {},
   messageResolver,
@@ -844,13 +841,28 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   fieldsClassName,
   hideFormOnSuccess = false,
   submissionGuards = [],
-  receiptStore,
-  submissionScope,
-  attemptStore,
+  receiptStore: providedReceiptStore,
+  submissionScope: providedSubmissionScope,
+  attemptStore: providedAttemptStore,
+  submissionIdentity,
   onReceiptError,
   slots = {}
 }: TypedFormRendererPresentationProps<TMeta>) {
   const form = useForm<TMeta>();
+  const idFormat = submissionIdentity?.idFormat ?? providedIdFormat;
+  const receiptStore = submissionIdentity?.receiptStore ?? providedReceiptStore;
+  const submissionScope =
+    submissionIdentity === undefined
+      ? providedSubmissionScope
+      : {
+          ...(submissionIdentity.scope.deckId === undefined ? {} : { deckId: submissionIdentity.scope.deckId }),
+          ...(submissionIdentity.scope.sessionId === undefined
+            ? {}
+            : { sessionId: submissionIdentity.scope.sessionId }),
+          ...(submissionIdentity.scope.userId === undefined ? {} : { userId: submissionIdentity.scope.userId }),
+          ...(submissionIdentity.scope.tenantId === undefined ? {} : { tenantId: submissionIdentity.scope.tenantId })
+        };
+  const attemptStore = submissionIdentity?.attemptStore ?? providedAttemptStore;
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const prefix = useId().replace(/:/g, "");
@@ -1158,18 +1170,21 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       if (effectiveAttemptStore !== undefined) {
         const scope = { formId: form.schema.id, formVersion: form.schema.version, ...(submissionScope ?? {}) };
         submissionAttempt =
-          effectiveAttemptStore.getOrCreateForScope === undefined
-            ? await effectiveAttemptStore.getOrCreate(form.schema.id, form.schema.version, attemptIdFactory)
-            : await effectiveAttemptStore.getOrCreateForScope(scope, idFormat, attemptIdFactory);
+          submissionIdentity !== undefined
+            ? await submissionIdentity.getOrCreateAttempt()
+            : effectiveAttemptStore.getOrCreateForScope === undefined
+              ? await effectiveAttemptStore.getOrCreate(form.schema.id, form.schema.version, attemptIdFactory)
+              : await effectiveAttemptStore.getOrCreateForScope(scope, idFormat, attemptIdFactory);
         attemptId = submissionAttempt.attemptId;
       } else if (attemptId === null) {
-        attemptId = attemptIdFactory?.() ?? createRendererAttemptId();
+        attemptId = createSubmissionId(idFormat, attemptIdFactory);
         fallbackAttemptId.current = attemptId;
       }
       if (attemptId === null) throw new Error("Unable to create a submission attempt id.");
       const submittedAt = new Date().toISOString();
       const submitContext = {
         attemptId,
+        submissionId: attemptId,
         formId: form.schema.id,
         formVersion: form.schema.version,
         locale: form.locale,
@@ -1232,7 +1247,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           ...(submissionId === undefined ? {} : { submissionId })
         };
         try {
-          await receiptStore.save({ ...storedReceipt, ...submissionScope });
+          if (submissionIdentity !== undefined) await submissionIdentity.saveReceipt(storedReceipt);
+          else await receiptStore.save({ ...storedReceipt, ...submissionScope });
         } catch (cause) {
           const error = cause instanceof Error ? cause : new Error(String(cause));
           try {
@@ -1245,7 +1261,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       if (submissionAttempt !== undefined) {
         try {
           const scope = { formId: form.schema.id, formVersion: form.schema.version, ...(submissionScope ?? {}) };
-          if (effectiveAttemptStore.clearForScope !== undefined) await effectiveAttemptStore.clearForScope(scope);
+          if (submissionIdentity !== undefined) await submissionIdentity.clear();
+          else if (effectiveAttemptStore.clearForScope !== undefined) await effectiveAttemptStore.clearForScope(scope);
           else await effectiveAttemptStore.clear(form.schema.id, form.schema.version);
         } catch {
           // Attempt cleanup must not change a successful server submission result.

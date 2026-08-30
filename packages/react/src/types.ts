@@ -621,6 +621,8 @@ export type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseS
 
 export interface SubmitContext {
   readonly attemptId: string;
+  /** Canonical submission ID; equals attemptId for the shared identity flow. */
+  readonly submissionId?: string;
   readonly formId: string;
   readonly formVersion: number;
   readonly locale?: string;
@@ -937,13 +939,15 @@ export interface FormRendererSlots {
   readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
 
-export interface SubmissionProtectionProps {
+export interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
   readonly submissionGuards?: readonly SubmissionGuard[];
   readonly receiptStore?: SubmissionReceiptStore;
   readonly submissionScope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">;
   readonly attemptStore?: SubmissionAttemptStore;
   /** Submission identity format shared by Controller and Renderer. Defaults to UUID. */
   readonly idFormat?: "uuid" | "ulid" | "custom";
+  /** Shared identity configuration used by Controller, Renderer, attempt storage, and receipts. */
+  readonly submissionIdentity?: import("./submissionIdentity").SubmissionIdentity<TMeta>;
   readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
 }
 

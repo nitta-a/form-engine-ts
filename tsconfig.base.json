@@ -16,6 +16,7 @@
     "noUnusedParameters": true,
     "paths": {
       "@form-engine-ts/core": ["./packages/core/src/index.ts"],
+      "@form-engine-ts/custom-survey-client": ["./packages/custom-survey-client/src/index.ts"],
       "@form-engine-ts/privacy": ["./packages/privacy/src/index.ts"],
       "@form-engine-ts/react": ["./packages/react/src/index.ts"],
       "@form-engine-ts/mui": ["./packages/mui/src/index.ts"],

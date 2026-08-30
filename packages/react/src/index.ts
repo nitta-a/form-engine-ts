@@ -16,4 +16,5 @@ export {
 export * from "./receipt";
 export * from "./renderer";
 export * from "./submission";
+export * from "./submissionIdentity";
 export * from "./types";

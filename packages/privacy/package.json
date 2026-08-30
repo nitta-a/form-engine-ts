@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/privacy",
-  "version": "6.10.0",
+  "version": "7.0.0",
   "publishConfig": {
     "access": "public"
   },

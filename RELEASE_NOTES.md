@@ -5,6 +5,24 @@ current release and usage information.
 
 ## Latest release
 
+### v7.0.0 — 2026-08-31
+
+- Removed the legacy Azure Table `answers` contract, codecs, and types from the standard packages; migration-only helpers now live in `@form-engine-ts/legacy`, while the standard Azure codec writes only the canonical submission payload.
+- Added `createSubmissionIdentity` to manage `idFormat`, scope, attempt storage, receipt storage, and Submission ID generation across Controller, Renderer, and Submission APIs, including end-to-end ULID support.
+- Added a structurally tRPC-compatible typed error formatter and `getTrpcSubmissionErrorData` for direct restoration of field errors, form errors, and PII findings without application casts.
+- Made typed paging/filtering, free-text listing, aggregation, CSV export, idempotent saving, and typed validation required parts of the shared MongoDB and Azure Table storage contract.
+- Aligned all public packages to version 7.0.0.
+
+See the [GitHub release for v7.0.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.0.0).
+
+### v6.11.0 — 2026-08-31
+
+- Added `@form-engine-ts/custom-survey-client` with a shared `SurveyUiProvider`, adapter-driven `SurveyEditor`, free-text answer translation workflow, quality/version operations, and localized response summary components.
+- Added transport-neutral adapters and slot/render-prop extension points so consuming applications can keep their own persistence, authentication, notifications, and UI.
+- Aligned all public packages to version 6.11.0.
+
+See the [GitHub release for v6.11.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v6.11.0).
+
 ### v6.10.0 — 2026-08-30
 
 - Added a combined tRPC error formatter/client restoration integration for typed submission errors.

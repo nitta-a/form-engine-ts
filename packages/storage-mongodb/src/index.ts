@@ -1,5 +1,6 @@
 import type {
   BaseSubmissionMetadata,
+  FormAnalytics,
   FormSchema,
   FormSubmission,
   FormSubmissionValidationSource,
@@ -11,6 +12,7 @@ import type {
   PagedSubmissionStorageAdapter,
   SaveSubmissionOptions,
   StorageCommitError,
+  StorageSubmissionExportOptions,
   SubmissionFilter,
   SubmissionPageQueryOptions,
   SubmissionSaveResult,
@@ -23,6 +25,7 @@ import type {
   VersionTransitionPlan
 } from "@form-engine-ts/core";
 import {
+  aggregateResponses,
   assertValidFormSchema,
   assertValidFormSubmission,
   assertValidFormSubmissionWith,
@@ -30,6 +33,7 @@ import {
   decodeTextAnswerCursor,
   encodeSubmissionCursor,
   encodeTextAnswerCursor,
+  exportResponsesToCsv,
   hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize
@@ -83,6 +87,9 @@ export interface MongoDbStorageOptions {
 
 export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
   createIndexes(): Promise<void>;
+  aggregateResponses(schema: FormSchema, options?: SubmissionPageQueryOptions): Promise<FormAnalytics>;
+  exportResponsesToCsv(schema: FormSchema, options?: StorageSubmissionExportOptions): Promise<string>;
+  validateSubmission(submission: FormSubmission, source?: FormSubmissionValidationSource): Promise<void>;
 }
 
 export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
@@ -106,7 +113,12 @@ export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata
 
 export type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<
   MongoDbStorageAdapter,
-  "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage"
+  | "saveSubmission"
+  | "listSubmissionPage"
+  | "listTextAnswerPage"
+  | "aggregateResponses"
+  | "exportResponsesToCsv"
+  | "validateSubmission"
 > & {
   readonly saveSubmission: (
     submission: FormSubmission<TMeta>,
@@ -138,6 +150,18 @@ export type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
     formId: string,
     options?: TypedSubmissionPageQueryOptions<TMeta>
   ) => Promise<TypedSubmissionPage<TMeta>>;
+  readonly aggregateResponses: (
+    schema: FormSchema,
+    options?: TypedSubmissionPageQueryOptions<TMeta>
+  ) => Promise<FormAnalytics>;
+  readonly exportResponsesToCsv: (
+    schema: FormSchema,
+    options?: StorageSubmissionExportOptions<TMeta>
+  ) => Promise<string>;
+  readonly validateSubmission: (
+    submission: FormSubmission<TMeta>,
+    source?: FormSubmissionValidationSource<TMeta>
+  ) => Promise<void>;
 };
 
 interface StoredSchemaDocument extends Document {
@@ -368,6 +392,30 @@ function parseSubmissionDocument(document: StoredSubmissionDocument): FormSubmis
   return cloneJson(submission);
 }
 
+async function collectSubmissionPages(
+  fetchPage: (
+    formId: string,
+    options: import("@form-engine-ts/core").SubmissionPageQueryOptions
+  ) => Promise<import("@form-engine-ts/core").SubmissionPage>,
+  formId: string,
+  options: import("@form-engine-ts/core").SubmissionPageQueryOptions
+): Promise<readonly FormSubmission[]> {
+  const submissions: FormSubmission[] = [];
+  const seen = new Set<string>();
+  let cursor = options.cursor;
+  do {
+    if (cursor !== undefined) {
+      if (seen.has(cursor)) throw new TypeError("Submission pagination cursor cycle detected.");
+      seen.add(cursor);
+    }
+    const page = await fetchPage(formId, { ...options, ...(cursor === undefined ? {} : { cursor }) });
+    submissions.push(...page.items);
+    if (!page.hasMore || page.nextCursor === undefined || page.nextCursor.length === 0) break;
+    cursor = page.nextCursor;
+  } while (cursor !== undefined);
+  return submissions;
+}
+
 function collectionName(value: string | undefined, fallback: string, optionName: string): string {
   if (value === undefined) return fallback;
   if (value.trim().length === 0) throw new TypeError(`${optionName} must be a non-empty string.`);
@@ -564,6 +612,9 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
         submission: FormSubmission,
         saveOptions?: SaveSubmissionOptions
       ): Promise<undefined | SubmissionSaveResult>;
+      aggregateResponses(schema: FormSchema, options?: SubmissionPageQueryOptions): Promise<FormAnalytics>;
+      exportResponsesToCsv(schema: FormSchema, options?: StorageSubmissionExportOptions): Promise<string>;
+      validateSubmission(submission: FormSubmission, source?: FormSubmissionValidationSource): Promise<void>;
       createIndexes(): Promise<void>;
     } = {
     async saveSchema(schema) {
@@ -799,6 +850,48 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
           ? { nextCursor: encodeTextAnswerCursor({ responseId: last.responseId, fieldId: last.fieldId }) }
           : {})
       };
+    },
+    async aggregateResponses(schema: FormSchema, options: SubmissionPageQueryOptions = {}): Promise<FormAnalytics> {
+      const query = { ...options, version: options.version ?? schema.version };
+      const items = await collectSubmissionPages(
+        (formId, pageOptions) => adapter.listSubmissionPage(formId, pageOptions),
+        schema.id,
+        query
+      );
+      return aggregateResponses(schema, items);
+    },
+    async exportResponsesToCsv(schema: FormSchema, options: StorageSubmissionExportOptions = {}): Promise<string> {
+      const { query, ...csvOptions } = options;
+      const items = await collectSubmissionPages(
+        (formId, pageOptions) => adapter.listSubmissionPage(formId, pageOptions),
+        schema.id,
+        { ...(query ?? {}), version: query?.version ?? schema.version }
+      );
+      const exportOptions = {
+        ...(csvOptions.withBom === undefined ? {} : { withBom: csvOptions.withBom }),
+        ...(csvOptions.useBom === undefined ? {} : { useBom: csvOptions.useBom }),
+        ...(csvOptions.neutralizeFormulas === undefined ? {} : { neutralizeFormulas: csvOptions.neutralizeFormulas }),
+        ...(csvOptions.preventFormulaInjection === undefined
+          ? {}
+          : { preventFormulaInjection: csvOptions.preventFormulaInjection }),
+        ...(csvOptions.includeLocale === undefined ? {} : { includeLocale: csvOptions.includeLocale }),
+        ...(csvOptions.includePiiStatus === undefined ? {} : { includePiiStatus: csvOptions.includePiiStatus }),
+        ...(csvOptions.customColumns === undefined ? {} : { customColumns: csvOptions.customColumns }),
+        ...(csvOptions.includeMetadataFields === undefined
+          ? {}
+          : { includeMetadataFields: csvOptions.includeMetadataFields })
+      };
+      const exportItems = items.map((item) => ({ ...item, metadata: item.metadata ?? {} }));
+      return exportResponsesToCsv(schema, exportItems, exportOptions);
+    },
+    async validateSubmission(submission: FormSubmission, source?: FormSubmissionValidationSource): Promise<void> {
+      if (source !== undefined) {
+        await assertValidFormSubmissionWith(source, submission);
+        return;
+      }
+      const document = await schemas.findOne({ _id: schemaDocumentId(submission.formId, submission.formVersion) });
+      if (document === null) throw new Error("MongoDB submission schema was not found.");
+      assertValidFormSubmission(parseSchemaDocument(document), submission);
     },
     async deleteSubmission(submissionId) {
       await submissions.deleteOne({ _id: submissionId });

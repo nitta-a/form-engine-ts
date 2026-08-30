@@ -1,0 +1,65 @@
+{
+  "name": "@form-engine-ts/custom-survey-client",
+  "version": "7.0.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nitta-a/form-engine-ts.git",
+    "directory": "packages/custom-survey-client"
+  },
+  "bugs": {
+    "url": "https://github.com/nitta-a/form-engine-ts/issues"
+  },
+  "homepage": "https://github.com/nitta-a/form-engine-ts#readme",
+  "keywords": [
+    "form",
+    "survey",
+    "client",
+    "react",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external react --external react/jsx-runtime --external @form-engine-ts/core --external @form-engine-ts/privacy --external @form-engine-ts/react",
+    "check": "biome check . && tsc --noEmit",
+    "test": "vitest run --globals",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@form-engine-ts/core": "workspace:*",
+    "@form-engine-ts/privacy": "workspace:*",
+    "@form-engine-ts/react": "workspace:*",
+    "react": ">=18.2 <20",
+    "react-dom": ">=18.2 <20"
+  },
+  "devDependencies": {
+    "@form-engine-ts/core": "workspace:*",
+    "@form-engine-ts/privacy": "workspace:*",
+    "@form-engine-ts/react": "workspace:*",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

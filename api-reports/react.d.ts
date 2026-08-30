@@ -1,9 +1,8 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, Question, FieldOption, ValidationIssue, ValidationError, BaseSubmissionMetadata, FormValues, TranslationStatus, CanonicalTranslationMetadata, FormValue, AnswerValidationResult, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, StrictFormSubmission, FieldType } from '@form-engine-ts/core';
-export { FormSubmissionError, FormSubmissionSerializedError, QuestionType, TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
+import { SubmissionIdFormat, QuestionType, FormField, ChoiceOption, FormPage, FormSchema, DisplayCondition, JsonValue, SchemaIssue, FormPolicy, BaseSubmissionMetadata, FormValues, StrictFormSubmission, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, Question, FieldOption, ValidationIssue, ValidationError, TranslationStatus, CanonicalTranslationMetadata, FormValue, AnswerValidationResult, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FieldType } from '@form-engine-ts/core';
+export { FormSubmissionError, FormSubmissionSerializedError, QuestionType, SubmissionIdFormat, TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
-import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 
 interface SubmissionAttempt {
     readonly attemptId: string;
@@ -12,9 +11,10 @@ interface SubmissionAttempt {
     readonly createdAt: string;
     readonly deckId?: string;
     readonly sessionId?: string;
+    readonly userId?: string;
+    readonly tenantId?: string;
     readonly receiptId?: string;
 }
-type SubmissionIdFormat = "uuid" | "ulid" | "custom";
 interface SubmissionAttemptScope {
     readonly formId: string;
     readonly formVersion: number;
@@ -141,6 +141,65 @@ interface UseFormBuilderResult extends FormBuilderResult {
     readonly getFieldEditorProps: NonNullable<FormBuilderResult["getFieldEditorProps"]>;
 }
 declare function useFormBuilder({ schema, onChange, policy, idFactory, factories, fieldEditorMode, activeFieldId: controlledActiveFieldId, defaultActiveFieldId, onActiveFieldChange }: FormBuilderOptions): FormBuilderResult;
+
+interface SubmissionReceipt {
+    readonly formId: string;
+    readonly formVersion: number;
+    /** Optional application scope. Omit both values for the legacy form scope. */
+    readonly deckId?: string;
+    readonly sessionId?: string;
+    readonly userId?: string;
+    readonly tenantId?: string;
+    readonly submissionId?: string;
+    readonly submittedAt: string;
+}
+interface SubmissionReceiptQuery {
+    readonly formId: string;
+    readonly formVersion: number;
+    readonly deckId?: string;
+    readonly sessionId?: string;
+    readonly userId?: string;
+    readonly tenantId?: string;
+}
+interface SubmissionReceiptStore {
+    get(formId: string, formVersion: number, scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId">): Promise<SubmissionReceipt | null>;
+    getBatch?(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
+    save(receipt: SubmissionReceipt): Promise<void>;
+    remove(formId: string, formVersion: number, scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId">): Promise<void>;
+}
+interface UseSubmissionReceiptsResult {
+    readonly receipts: ReadonlyMap<string, SubmissionReceipt>;
+    readonly isLoading: boolean;
+    readonly error: Error | null;
+}
+declare function submissionReceiptQueryKey(formId: string, formVersion: number, scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId" | "userId" | "tenantId">): string;
+declare function createLocalStorageSubmissionReceiptStore(options?: {
+    readonly namespace?: string;
+}): SubmissionReceiptStore;
+declare function useSubmissionReceipts(store: SubmissionReceiptStore, queries: readonly SubmissionReceiptQuery[]): UseSubmissionReceiptsResult;
+
+interface SubmissionIdentityOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+    readonly schema: FormSchema;
+    readonly scope: SubmissionAttemptScope;
+    readonly idFormat?: SubmissionIdFormat;
+    readonly attemptStore?: SubmissionAttemptStore;
+    readonly receiptStore?: SubmissionReceiptStore;
+    readonly attemptIdFactory?: () => string;
+    readonly metadata?: TMeta;
+}
+interface SubmissionIdentity<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+    readonly schema: FormSchema;
+    readonly scope: SubmissionAttemptScope;
+    readonly idFormat: SubmissionIdFormat;
+    readonly attemptStore: SubmissionAttemptStore;
+    readonly receiptStore?: SubmissionReceiptStore;
+    getOrCreateAttempt(): Promise<SubmissionAttempt>;
+    createSubmission(values: FormValues, locale?: string, submittedAt?: string): Promise<StrictFormSubmission<TMeta>>;
+    getReceipt(): Promise<SubmissionReceipt | null>;
+    saveReceipt(receipt: SubmissionReceipt): Promise<void>;
+    clear(): Promise<void>;
+}
+declare function createSubmissionIdentity<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(options: SubmissionIdentityOptions<TMeta>): SubmissionIdentity<TMeta>;
 
 interface UseTranslationWorkspaceOptions {
     readonly schema: FormSchema;
@@ -271,37 +330,16 @@ interface UseTranslationWorkspaceResult {
 declare const validateLocalePipeline: (locale: string, schema: FormSchema, policy?: FormPolicy, customValidator?: ((locale: string, currentLocales: readonly string[]) => LocaleValidationResult) | CustomLocaleValidator, availableLocales?: readonly (string | LocaleOption)[], sourceLocale?: string) => LocaleValidationResult;
 declare function useTranslationWorkspace({ schema, onChange, sourceLocale, targetLocale, translationAdapter, signal, readOnly, policy, availableLocales, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, slots: workspaceSlots, onTranslationStart, onTranslationSuccess, onTranslationReport, onTranslationError, onTranslationChange, validateLocale, createTranslationMetadata: metadataFactory }: UseTranslationWorkspaceOptions): UseTranslationWorkspaceResult;
 
-interface SubmissionReceipt {
-    readonly formId: string;
-    readonly formVersion: number;
-    /** Optional application scope. Omit both values for the legacy form scope. */
-    readonly deckId?: string;
-    readonly sessionId?: string;
-    readonly submissionId?: string;
-    readonly submittedAt: string;
+interface SensitiveDataFinding {
+    readonly fieldId: string;
+    readonly fieldTitle?: string;
+    readonly type: "email" | "phone" | "url" | "postal_code" | string;
+    readonly typeLabel?: string;
+    readonly start?: number;
+    readonly end?: number;
+    readonly matchedText?: string;
+    readonly maskedText?: string;
 }
-interface SubmissionReceiptQuery {
-    readonly formId: string;
-    readonly formVersion: number;
-    readonly deckId?: string;
-    readonly sessionId?: string;
-}
-interface SubmissionReceiptStore {
-    get(formId: string, formVersion: number, scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">): Promise<SubmissionReceipt | null>;
-    getBatch?(queries: readonly SubmissionReceiptQuery[]): Promise<Map<string, SubmissionReceipt>>;
-    save(receipt: SubmissionReceipt): Promise<void>;
-    remove(formId: string, formVersion: number, scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">): Promise<void>;
-}
-interface UseSubmissionReceiptsResult {
-    readonly receipts: ReadonlyMap<string, SubmissionReceipt>;
-    readonly isLoading: boolean;
-    readonly error: Error | null;
-}
-declare function submissionReceiptQueryKey(formId: string, formVersion: number, scope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">): string;
-declare function createLocalStorageSubmissionReceiptStore(options?: {
-    readonly namespace?: string;
-}): SubmissionReceiptStore;
-declare function useSubmissionReceipts(store: SubmissionReceiptStore, queries: readonly SubmissionReceiptQuery[]): UseSubmissionReceiptsResult;
 
 interface ComponentBaseProps {
     readonly id?: string;
@@ -790,6 +828,8 @@ interface SubmitResponse {
 type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseSubmissionMetadata> = BaseSubmissionMetadata & TExtra;
 interface SubmitContext {
     readonly attemptId: string;
+    /** Canonical submission ID; equals attemptId for the shared identity flow. */
+    readonly submissionId?: string;
     readonly formId: string;
     readonly formVersion: number;
     readonly locale?: string;
@@ -1071,13 +1111,15 @@ interface FormRendererSlots {
     }) => ReactNode;
     readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
-interface SubmissionProtectionProps {
+interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
     readonly submissionGuards?: readonly SubmissionGuard[];
     readonly receiptStore?: SubmissionReceiptStore;
     readonly submissionScope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">;
     readonly attemptStore?: SubmissionAttemptStore;
     /** Submission identity format shared by Controller and Renderer. Defaults to UUID. */
     readonly idFormat?: "uuid" | "ulid" | "custom";
+    /** Shared identity configuration used by Controller, Renderer, attempt storage, and receipts. */
+    readonly submissionIdentity?: SubmissionIdentity<TMeta>;
     readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
 }
 type BeforeSubmit = (values: Readonly<Record<string, unknown>>) => "continue" | "cancel" | Promise<"continue" | "cancel">;
@@ -1247,9 +1289,11 @@ interface SubmissionControllerScope {
     readonly tenantId?: string;
 }
 interface CreateSubmissionControllerOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
-    readonly schema: FormSchema;
-    readonly scope: SubmissionControllerScope;
-    readonly idFormat?: "uuid" | "ulid" | "custom";
+    /** A single identity object shared with FormRenderer. */
+    readonly identity?: SubmissionIdentity<TMeta>;
+    readonly schema?: FormSchema;
+    readonly scope?: SubmissionControllerScope;
+    readonly idFormat?: SubmissionIdFormat;
     /** Shared scope-aware attempt store used by the Controller and FormRenderer. */
     readonly attemptStore?: SubmissionAttemptStore;
     readonly attemptIdFactory?: () => string;
@@ -1342,8 +1386,9 @@ interface StandaloneFormRendererProps extends FormRendererPresentationProps {
     readonly resetOnSuccess?: boolean;
     readonly onSubmit?: FormSubmitHandler;
 }
-interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends Omit<FormRendererPresentationProps, "submissionMetadata"> {
+interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends Omit<FormRendererPresentationProps, "submissionMetadata" | "submissionIdentity"> {
     readonly submissionMetadata?: TMeta;
+    readonly submissionIdentity?: SubmissionIdentity<TMeta>;
 }
 interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends TypedFormRendererPresentationProps<TMeta> {
     readonly schema: FormSchema;
@@ -1358,4 +1403,4 @@ type FormRendererProps = FormRendererPresentationProps | StandaloneFormRendererP
 declare function FormRenderer(props: FormRendererProps): react.JSX.Element;
 declare function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(props: TypedFormRendererProps<TMeta>): react.JSX.Element;
 
-export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, validateLocalePipeline };
+export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdentity, type SubmissionIdentityOptions, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, createSubmissionIdentity, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, validateLocalePipeline };

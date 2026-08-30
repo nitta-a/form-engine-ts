@@ -21,28 +21,64 @@ export interface TrpcSubmissionErrorAdapter {
   readonly deserialize: (error: unknown) => FormSubmissionError | undefined;
 }
 
-/** The portion of a tRPC error formatter input used by the integration helper. */
+export type TrpcProcedureType = "query" | "mutation" | "subscription";
+
+/** Structural equivalent of tRPC's ErrorFormatter input; no `@trpc/server` dependency is required. */
 export interface TrpcSubmissionErrorFormatterOptions<TShape extends Record<string, unknown> = Record<string, unknown>> {
   readonly error: unknown;
+  readonly type: TrpcProcedureType | undefined;
+  readonly path: string | undefined;
+  readonly input: unknown;
+  readonly ctx: unknown;
   readonly shape: TShape & { readonly data?: unknown };
 }
 
+export type TrpcSubmissionErrorShape<TShape extends Record<string, unknown>> = Omit<TShape, "data"> & {
+  readonly data: Partial<TrpcFormSubmissionErrorData> &
+    Omit<
+      TShape extends { readonly data?: infer TData }
+        ? TData extends object
+          ? TData
+          : Record<string, unknown>
+        : Record<string, unknown>,
+      keyof TrpcFormSubmissionErrorData
+    >;
+};
+
+export type TrpcSubmissionErrorFormatter<TShape extends Record<string, unknown> = Record<string, unknown>> = (
+  options: TrpcSubmissionErrorFormatterOptions<TShape>
+) => TrpcSubmissionErrorShape<TShape>;
+
 /** A ready-to-use server/client tRPC boundary for FormSubmissionError. */
 export interface TrpcSubmissionErrorIntegration {
-  readonly errorFormatter: <TShape extends Record<string, unknown>>(
-    options: TrpcSubmissionErrorFormatterOptions<TShape>
-  ) => TShape & { readonly data: TrpcFormSubmissionErrorData | Record<string, unknown> };
+  readonly errorFormatter: TrpcSubmissionErrorFormatter;
   readonly deserialize: (error: unknown) => FormSubmissionError | undefined;
+  readonly getData: (error: unknown) => TrpcFormSubmissionErrorData | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isSensitiveDataFinding(value: unknown): value is SensitiveDataFinding {
+  return (
+    isRecord(value) &&
+    typeof value.fieldId === "string" &&
+    typeof value.type === "string" &&
+    (value.fieldTitle === undefined || typeof value.fieldTitle === "string") &&
+    (value.typeLabel === undefined || typeof value.typeLabel === "string") &&
+    (value.start === undefined || typeof value.start === "number") &&
+    (value.end === undefined || typeof value.end === "number") &&
+    (value.matchedText === undefined || typeof value.matchedText === "string") &&
+    (value.maskedText === undefined || typeof value.maskedText === "string")
+  );
+}
+
 export function isFormSubmissionSerializedError(value: unknown): value is FormSubmissionSerializedError {
   if (!isRecord(value)) return false;
   const fieldErrors = value.fieldErrors;
   const formErrors = value.formErrors;
+  const piiFindings = value.piiFindings;
   return (
     (value.code === "VALIDATION_FAILED" ||
       value.code === "PII_CONFIRMATION_REQUIRED" ||
@@ -53,7 +89,9 @@ export function isFormSubmissionSerializedError(value: unknown): value is FormSu
     (fieldErrors === undefined ||
       (isRecord(fieldErrors) && Object.values(fieldErrors).every((message) => typeof message === "string"))) &&
     (formErrors === undefined ||
-      (Array.isArray(formErrors) && formErrors.every((message) => typeof message === "string")))
+      (Array.isArray(formErrors) && formErrors.every((message) => typeof message === "string"))) &&
+    (piiFindings === undefined || (Array.isArray(piiFindings) && piiFindings.every(isSensitiveDataFinding))) &&
+    (value.piiWarningAcknowledged === undefined || typeof value.piiWarningAcknowledged === "boolean")
   );
 }
 
@@ -85,7 +123,7 @@ function findTrpcSubmissionErrorPayload(
   if (seen.has(value)) return undefined;
   seen.add(value);
   if (isFormSubmissionSerializedError(value)) return value;
-  const candidates = [value.data, value.shape, value.cause];
+  const candidates = [value.payload, value.data, value.shape, value.cause];
   for (const candidate of candidates) {
     const payload = findTrpcSubmissionErrorPayload(candidate, seen);
     if (payload !== undefined) return payload;
@@ -103,6 +141,12 @@ export function deserializeSubmissionErrorFromTrpc(error: unknown): FormSubmissi
   if (error instanceof FormSubmissionError) return error;
   const payload = findTrpcSubmissionErrorPayload(error);
   return payload === undefined ? undefined : new FormSubmissionError(payload);
+}
+
+/** Returns the typed Form Engine payload from a tRPC error shape without an application cast. */
+export function getTrpcSubmissionErrorData(error: unknown): TrpcFormSubmissionErrorData | undefined {
+  const payload = findTrpcSubmissionErrorPayload(error);
+  return payload === undefined ? undefined : { ...payload, source: "form-engine" };
 }
 
 /** Standard transport adapter for tRPC server/client boundaries. */
@@ -129,7 +173,8 @@ export function createTrpcSubmissionErrorIntegration(): TrpcSubmissionErrorInteg
         data: { ...existingData, ...serializeSubmissionErrorForTrpc(submissionError) }
       };
     },
-    deserialize: deserializeSubmissionErrorFromTrpc
+    deserialize: deserializeSubmissionErrorFromTrpc,
+    getData: getTrpcSubmissionErrorData
   };
 }
 

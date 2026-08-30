@@ -3,8 +3,10 @@ export type {
   PaginatedResult,
   StorageCursor,
   StorageFilterCriteria,
+  StorageSubmissionExportOptions,
   SubmissionCursorPayload,
-  TextAnswerCursorPayload
+  TextAnswerCursorPayload,
+  UnifiedSubmissionStorageAdapter
 } from "@form-engine-ts/core";
 
 import type { StorageFilterCriteria } from "@form-engine-ts/core";

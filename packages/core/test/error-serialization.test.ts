@@ -4,6 +4,7 @@ import {
   deserializeSubmissionErrorFromTrpc,
   FormSubmissionError,
   type FormSubmissionSerializedError,
+  getTrpcSubmissionErrorData,
   serializeSubmissionError,
   serializeSubmissionErrorForTrpc,
   trpcSubmissionErrorAdapter
@@ -37,6 +38,7 @@ describe("submission error serialization", () => {
     expect(data.source).toBe("form-engine");
     expect(deserializeSubmissionErrorFromTrpc({ shape: { data } })?.payload).toMatchObject(error.payload);
     expect(trpcSubmissionErrorAdapter.deserialize({ data })?.payload).toMatchObject(error.payload);
+    expect(getTrpcSubmissionErrorData({ shape: { data } })).toMatchObject(error.payload);
   });
 
   it("provides a formatter and client restoration pair", () => {
@@ -48,6 +50,10 @@ describe("submission error serialization", () => {
     const integration = createTrpcSubmissionErrorIntegration();
     const shape = integration.errorFormatter({
       error,
+      type: "mutation",
+      path: "submission.create",
+      input: { name: "Ada" },
+      ctx: {},
       shape: { message: "Bad request", data: { code: "BAD_REQUEST" } }
     });
 

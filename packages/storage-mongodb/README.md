@@ -48,6 +48,9 @@ Metadata filters and the generic submission-filter AST are translated to MongoDB
 Legacy predicate filters remain supported and are applied client-side. `listTextAnswerPage` returns stable cursor pages
 of individual text/textarea answers without loading every answer body at once.
 
+The adapter also exposes the common required storage operations `aggregateResponses`, `exportResponsesToCsv`, and
+`validateSubmission`, using the same core aggregation, CSV, and validation contracts as the Azure Table adapter.
+
 Version records are stored in `form_versions`, with a unique `(formId, version)` index. Partial unique indexes allow at
 most one Draft and one Published record per form, while any number of Archived records remain available. Transition state
 lives in `form_version_states`. `commitVersionTransition(plan)` compares `expectedRevision` atomically and returns

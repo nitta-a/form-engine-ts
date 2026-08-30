@@ -2,12 +2,13 @@ import type {
   BaseSubmissionMetadata,
   FormSchema,
   FormValues,
-  JsonValue,
-  StrictFormSubmission
+  StrictFormSubmission,
+  SubmissionIdFormat
 } from "@form-engine-ts/core";
-import { createSubmission } from "@form-engine-ts/core";
+import { createSubmissionId } from "@form-engine-ts/core";
 import { useMemo, useSyncExternalStore } from "react";
-import { createLocalStorageSubmissionAttemptStore, type SubmissionAttemptStore } from "./attempt";
+import type { SubmissionAttemptStore } from "./attempt";
+import { createSubmissionIdentity, type SubmissionIdentity } from "./submissionIdentity";
 import type { SubmitResponse, TypedSubmitContext } from "./types";
 
 export type SubmissionControllerStatus = "idle" | "submitting" | "success" | "error";
@@ -62,9 +63,11 @@ export interface SubmissionControllerScope {
 }
 
 export interface CreateSubmissionControllerOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
-  readonly schema: FormSchema;
-  readonly scope: SubmissionControllerScope;
-  readonly idFormat?: "uuid" | "ulid" | "custom";
+  /** A single identity object shared with FormRenderer. */
+  readonly identity?: SubmissionIdentity<TMeta>;
+  readonly schema?: FormSchema;
+  readonly scope?: SubmissionControllerScope;
+  readonly idFormat?: SubmissionIdFormat;
   /** Shared scope-aware attempt store used by the Controller and FormRenderer. */
   readonly attemptStore?: SubmissionAttemptStore;
   readonly attemptIdFactory?: () => string;
@@ -97,65 +100,37 @@ function normalizeError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
 }
 
-function randomUuid(): string {
-  const generated = globalThis.crypto?.randomUUID?.();
-  if (generated !== undefined) return generated;
-  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
-}
-
-function randomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
-  const getRandomValues = globalThis.crypto?.getRandomValues;
-  if (typeof getRandomValues === "function") {
-    getRandomValues.call(globalThis.crypto, bytes);
-    return bytes;
-  }
-  for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
-  return bytes;
-}
-
-function createUlid(): string {
-  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  let timestamp = Date.now();
-  let timePart = "";
-  for (let index = 0; index < 10; index += 1) {
-    timePart = alphabet[timestamp % 32] + timePart;
-    timestamp = Math.floor(timestamp / 32);
-  }
-  return `${timePart}${Array.from(randomBytes(16), (value) => alphabet[value % 32]).join("")}`;
-}
-
-function createScopedSubmissionId<TMeta extends BaseSubmissionMetadata>(
-  options: CreateSubmissionControllerOptions<TMeta>
-): string {
-  if (options.attemptIdFactory !== undefined) return options.attemptIdFactory();
-  if (options.idFormat === "custom") throw new TypeError("attemptIdFactory is required when idFormat is custom.");
-  return options.idFormat === "ulid" ? createUlid() : randomUuid();
-}
-
 export function createScopedSubmissionController<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>(
   options: CreateSubmissionControllerOptions<TMeta>
 ): ScopedSubmissionController<TMeta> {
-  if (options.scope.formId !== options.schema.id || options.scope.formVersion !== options.schema.version) {
-    throw new TypeError("Submission controller scope must match the schema.");
-  }
+  const identity =
+    options.identity ??
+    (options.schema !== undefined && options.scope !== undefined
+      ? createSubmissionIdentity({
+          schema: options.schema,
+          scope: options.scope,
+          ...(options.idFormat === undefined ? {} : { idFormat: options.idFormat }),
+          ...(options.attemptStore === undefined ? {} : { attemptStore: options.attemptStore }),
+          ...(options.attemptIdFactory === undefined ? {} : { attemptIdFactory: options.attemptIdFactory }),
+          ...(options.metadata === undefined ? {} : { metadata: options.metadata })
+        })
+      : undefined);
+  if (identity === undefined) throw new TypeError("Submission controller requires an identity, schema, and scope.");
+  const schema = identity.schema;
+  const scope = identity.scope;
   const listeners = new Set<() => void>();
-  const scope = { ...options.scope };
+  const stableScope = { ...scope };
   let state: ScopedSubmissionControllerState<TMeta> = {
     status: "idle",
     error: null,
     attemptCount: 0,
     canRetry: false,
     isSubmitted: false,
-    scope
+    scope: stableScope
   };
   let inFlight: Promise<SubmissionControllerResult<{ readonly receiptId?: string }>> | null = null;
   let lastSubmissionId: string | undefined;
-  const attemptStore =
-    options.attemptStore ??
-    createLocalStorageSubmissionAttemptStore({
-      ...(options.idFormat === undefined ? {} : { idFormat: options.idFormat })
-    });
+  const attemptStore = identity.attemptStore;
 
   const publish = (next: ScopedSubmissionControllerState<TMeta>): void => {
     state = next;
@@ -163,26 +138,15 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
   };
   const submit = async (
     values: Readonly<Record<string, unknown>>,
-    locale = options.schema.defaultLocale ?? options.schema.supportedLocales?.[0] ?? "und"
+    locale = schema.defaultLocale ?? schema.supportedLocales?.[0] ?? "und"
   ): Promise<SubmissionControllerResult<{ readonly receiptId?: string }>> => {
     if (inFlight !== null || state.status === "success") return { status: "cancelled" };
-    const attempt =
-      lastSubmissionId === undefined
-        ? attemptStore.getOrCreateForScope === undefined
-          ? await attemptStore.getOrCreate(options.scope.formId, options.scope.formVersion, options.attemptIdFactory)
-          : await attemptStore.getOrCreateForScope(options.scope, options.idFormat, options.attemptIdFactory)
-        : undefined;
-    const attemptId = lastSubmissionId ?? attempt?.attemptId ?? createScopedSubmissionId<TMeta>(options);
+    const attempt = lastSubmissionId === undefined ? await identity.getOrCreateAttempt() : undefined;
+    const attemptId = lastSubmissionId ?? attempt?.attemptId ?? createSubmissionId(identity.idFormat);
     lastSubmissionId = attemptId;
-    const metadata = options.metadata ?? ({} as TMeta);
     let submission: StrictFormSubmission<TMeta>;
     try {
-      submission = createSubmission(options.schema, values as FormValues, {
-        id: attemptId,
-        locale,
-        submittedAt: new Date().toISOString(),
-        metadata: metadata as TMeta & Readonly<Record<string, JsonValue>>
-      }) as unknown as StrictFormSubmission<TMeta>;
+      submission = await identity.createSubmission(values as FormValues, locale, new Date().toISOString());
     } catch (cause) {
       const error = normalizeError(cause);
       publish({ ...state, status: "error", error, attemptId, canRetry: false });
@@ -209,7 +173,15 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
           canRetry: false,
           isSubmitted: true
         });
-        if (response.receiptId !== undefined) await attemptStore.setReceiptForScope?.(scope, response.receiptId);
+        if (response.receiptId !== undefined) {
+          await attemptStore.setReceiptForScope?.(stableScope, response.receiptId);
+          await identity.saveReceipt({
+            formId: schema.id,
+            formVersion: schema.version,
+            submissionId: attemptId,
+            submittedAt: new Date().toISOString()
+          });
+        }
         return result;
       })
       .catch((cause: unknown) => {
@@ -236,9 +208,16 @@ export function createScopedSubmissionController<TMeta extends BaseSubmissionMet
     },
     reset: () => {
       if (inFlight !== null) return;
-      void attemptStore.clearForScope?.(scope);
+      void identity.clear();
       lastSubmissionId = undefined;
-      publish({ status: "idle", error: null, attemptCount: 0, canRetry: false, isSubmitted: false, scope });
+      publish({
+        status: "idle",
+        error: null,
+        attemptCount: 0,
+        canRetry: false,
+        isSubmitted: false,
+        scope: stableScope
+      });
     }
   };
 }
@@ -249,8 +228,7 @@ function isCreateSubmissionControllerOptions<TMeta extends BaseSubmissionMetadat
   return (
     typeof value === "object" &&
     value !== null &&
-    "schema" in value &&
-    "scope" in value &&
+    ("identity" in value || ("schema" in value && "scope" in value)) &&
     "onSubmit" in value &&
     typeof value.onSubmit === "function"
   );
@@ -346,19 +324,23 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
   | (SubmissionControllerState<TResponse> & Pick<SubmissionController<TResponse, TMeta>, "submit" | "retry" | "reset">)
   | (ScopedSubmissionControllerState<TMeta> & Pick<ScopedSubmissionController<TMeta>, "submit" | "reset">) {
   const scopedOptions = isCreateSubmissionControllerOptions<TMeta>(controllerOrOptions) ? controllerOrOptions : null;
+  const scopedIdentity = scopedOptions?.identity;
   const scopedSchema = scopedOptions?.schema;
-  const scopedFormId = scopedOptions?.scope.formId;
-  const scopedFormVersion = scopedOptions?.scope.formVersion;
-  const scopedDeckId = scopedOptions?.scope.deckId;
-  const scopedSessionId = scopedOptions?.scope.sessionId;
-  const scopedUserId = scopedOptions?.scope.userId;
-  const scopedTenantId = scopedOptions?.scope.tenantId;
+  const scopedFormId = scopedOptions?.scope?.formId;
+  const scopedFormVersion = scopedOptions?.scope?.formVersion;
+  const scopedDeckId = scopedOptions?.scope?.deckId;
+  const scopedSessionId = scopedOptions?.scope?.sessionId;
+  const scopedUserId = scopedOptions?.scope?.userId;
+  const scopedTenantId = scopedOptions?.scope?.tenantId;
   const scopedIdFormat = scopedOptions?.idFormat;
   const scopedAttemptIdFactory = scopedOptions?.attemptIdFactory;
   const scopedAttemptStore = scopedOptions?.attemptStore;
   const scopedMetadata = scopedOptions?.metadata;
   const scopedOnSubmit = scopedOptions?.onSubmit;
   const scopedController = useMemo(() => {
+    if (scopedIdentity !== undefined && scopedOnSubmit !== undefined) {
+      return createScopedSubmissionController<TMeta>({ identity: scopedIdentity, onSubmit: scopedOnSubmit });
+    }
     if (
       scopedSchema === undefined ||
       scopedFormId === undefined ||
@@ -385,6 +367,7 @@ export function useSubmissionController<TResponse, TMeta extends BaseSubmissionM
     });
   }, [
     scopedSchema,
+    scopedIdentity,
     scopedFormId,
     scopedFormVersion,
     scopedDeckId,

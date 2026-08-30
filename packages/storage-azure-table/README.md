@@ -37,12 +37,11 @@ unsupported expressions remain client-filtered with identical semantics.
 
 `listSubmissionPage` follows opaque Azure continuation tokens and scans at most `maxScanPages` native pages (default 5)
 to fill the requested logical page after client-side filtering. `buildSubmissionFilter` can replace filter generation.
-The deprecated `client`, `submissionCodec`, and `toODataFilter` options remain available for compatibility. The caller
-owns table creation, credentials, retries, and client lifecycle.
+The caller owns table creation, credentials, retries, and client lifecycle.
 
-The default codec persists the canonical `FormSubmission.values` payload and never creates an `answers` property. Set
-`rejectLegacyAnswers: true` to fail explicitly when a legacy entity is encountered; no legacy decoding or migration is
-performed. `idempotentSubmissions: true` enables typed `created`, `duplicate`, and `conflict` results from
+The default codec persists the canonical `FormSubmission.values` payload and never creates an `answers` property. The
+standard adapter rejects entities containing the legacy `answers` column; it does not decode or migrate them. Legacy
+codecs are available only from `@form-engine-ts/legacy`. `idempotentSubmissions: true` enables typed `created`, `duplicate`, and `conflict` results from
 `saveSubmission(submission)`. Pass `validateAgainstSchema: true` to re-validate against the stored schema. Pass
 `submissionSchema`, `submissionValidator`, or `validation` to validate every submission before it is written; the same
 source can be supplied per call as `saveSubmission(submission, { validation })`. A source can be a FormSchema, a
@@ -55,5 +54,7 @@ consume the item limit, and scanning remains bounded by `maxScanPages`. Cursor f
 version, sorted fields, and a SHA-256 filter fingerprint. Reusing a cursor with different query context throws
 `invalid_cursor_context`.
 
-The legacy codec APIs are retained only as deprecated source symbols for existing applications; the standard factory does
-not use them.
+The Azure adapter exposes the same required typed submission surface as MongoDB: `listSubmissionPage`,
+`listTextAnswerPage`, `aggregateResponses`, `exportResponsesToCsv`, `validateSubmission`, and idempotent
+`saveSubmission`. Aggregation and CSV options accept the same submission filter query, so applications do not need an
+Azure-specific reporting branch.

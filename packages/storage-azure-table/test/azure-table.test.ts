@@ -2,12 +2,9 @@ import type { TableClient } from "@azure/data-tables";
 import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
 import {
   type AzureTableClientLike,
-  type AzureTableEntityCodec,
   type AzureTableEntityPage,
   type AzureTableSubmissionCodec,
-  createAzureTableStorage,
-  createLegacyArrayAzureTableCodec,
-  createLegacyAzureTableCodec
+  createAzureTableStorage
 } from "../src";
 
 function clone<T>(value: T): T {
@@ -108,6 +105,23 @@ describe("createAzureTableStorage", () => {
     await expect(storage.saveSubmission(submission("response"))).rejects.toThrow(/AlreadyExists/);
   });
 
+  it("exposes the common typed validation, aggregation, and CSV contract", async () => {
+    const { client } = createClientStub();
+    const storage = createAzureTableStorage({ client });
+    await storage.saveSchema(schema);
+    await storage.saveSubmission(submission("response"));
+
+    await expect(storage.validateSubmission(submission("validated"))).resolves.toBeUndefined();
+    await expect(storage.aggregateResponses(schema)).resolves.toMatchObject({
+      formId: "form",
+      formVersion: 2,
+      submissionCount: 1
+    });
+    await expect(
+      storage.exportResponsesToCsv(schema, { query: { filter: { op: "eq", path: "id", value: "response" } } })
+    ).resolves.toContain("response");
+  });
+
   it("uses canonical values without answers and returns typed idempotency results", async () => {
     const { client, entities } = createClientStub();
     const storage = createAzureTableStorage<{ channel: string }>({ client, idempotentSubmissions: true });
@@ -141,7 +155,7 @@ describe("createAzureTableStorage", () => {
     expect([...entities.values()].filter((entity) => entity.kind === "submission")).toHaveLength(0);
   });
 
-  it("can reject legacy answers entities explicitly", async () => {
+  it("rejects entities containing the legacy answers column", async () => {
     const { client, entities } = createClientStub();
     entities.set("form\u0000legacy", {
       partitionKey: "form",
@@ -150,7 +164,7 @@ describe("createAzureTableStorage", () => {
       answeredAt: "2026-08-24T00:00:00.000Z",
       surveyVersion: 2
     });
-    const storage = createAzureTableStorage({ client, rejectLegacyAnswers: true });
+    const storage = createAzureTableStorage({ client });
 
     await expect(storage.listSubmissionPage("form")).rejects.toThrow(/legacy answers column is not supported/);
   });
@@ -197,22 +211,23 @@ describe("createAzureTableStorage", () => {
   it("supports separate table clients, custom codecs, and custom OData conversion", async () => {
     const schemas = createClientStub();
     const submissions = createClientStub();
-    const codec: AzureTableEntityCodec<FormSubmission> = {
+    const codec: AzureTableSubmissionCodec<FormSubmission> = {
+      createEntity: (item) => ({ kind: "submission", customPayload: JSON.stringify(item) }),
+      matchesEntity: (entity) => entity.kind === "submission",
       createPartitionKey: (item) => `custom:${item.formId}`,
-      createPartitionKeyFromFormId: (formId) => `custom:${formId}`,
+      createPartitionKeyFromQuery: (formId) => `custom:${formId}`,
       createRowKey: (item) => `response:${item.id}`,
-      serialize: (item) => ({ customPayload: JSON.stringify(item) }),
       deserialize: (entity) => {
         if (typeof entity.customPayload !== "string") throw new Error("Missing custom payload");
         return JSON.parse(entity.customPayload) as FormSubmission;
       }
     };
-    const toODataFilter = vi.fn(() => "deckId eq 'xyz' and isPii eq false");
+    const buildSubmissionFilter = vi.fn(() => "deckId eq 'xyz' and isPii eq false");
     const storage = createAzureTableStorage({
       schemasTableClient: schemas.client,
       submissionsTableClient: submissions.client,
-      submissionCodec: codec,
-      toODataFilter
+      codec,
+      buildSubmissionFilter
     });
     await storage.saveSchema(schema);
     const customSubmission = { ...submission("custom"), metadata: { deckId: "xyz", isPii: false } };
@@ -223,9 +238,8 @@ describe("createAzureTableStorage", () => {
     );
     const page = await storage.listSubmissionPage("form", { metadataFilters: { deckId: "xyz", isPii: false } });
     expect(page.items.map((item) => item.id)).toEqual(["custom"]);
-    expect(submissions.filters.at(-1)).toContain("PartitionKey eq 'custom:form'");
     expect(submissions.filters.at(-1)).toContain("deckId eq 'xyz' and isPii eq false");
-    expect(toODataFilter).toHaveBeenCalledWith({ metadataFilters: { deckId: "xyz", isPii: false } });
+    expect(buildSubmissionFilter).toHaveBeenCalledWith("form", { metadataFilters: { deckId: "xyz", isPii: false } });
   });
 
   it("round-trips legacy partition/ULID layouts through a resolver and performs a bounded filtered scan", async () => {
@@ -426,49 +440,5 @@ describe("createAzureTableStorage", () => {
     expect(page.items).toEqual([submission("mapped")]);
     expect(filters.at(-1)).toContain("surveyVersion eq 2");
     expect(filters.at(-1)).toContain("answeredAt ge '2026-08-24T00:00:00.000Z'");
-  });
-});
-
-describe("createLegacyArrayAzureTableCodec", () => {
-  it("round-trips legacy answers arrays", () => {
-    const codec = createLegacyArrayAzureTableCodec<{ readonly tenantId: string }>({
-      metadataExtractor: (entity) => ({ tenantId: String(entity.tenantId) })
-    });
-    const submission = {
-      id: "response-1",
-      formId: "form",
-      formVersion: 2,
-      values: { first: "Ada", score: 5 },
-      locale: "en-US",
-      metadata: { tenantId: "tenant-1" },
-      submittedAt: "2026-08-29T00:00:00.000Z"
-    } as const;
-
-    const entity = codec.encode(submission);
-    expect(entity).toMatchObject({ PartitionKey: "form", RowKey: "response-1", surveyVersion: 2, locale: "en-US" });
-    expect(codec.decode(entity)).toEqual(submission);
-  });
-});
-
-describe("createLegacyAzureTableCodec", () => {
-  it("decodes legacy answers and timestamp properties into canonical values", () => {
-    const codec = createLegacyAzureTableCodec();
-
-    expect(
-      codec.decode({
-        PartitionKey: "form",
-        RowKey: "submission",
-        answers: JSON.stringify({ name: "Ada" }),
-        answeredAt: "2026-08-29T00:00:00.000Z",
-        surveyVersion: 3
-      })
-    ).toEqual({
-      id: "submission",
-      formId: "form",
-      formVersion: 3,
-      values: { name: "Ada" },
-      metadata: {},
-      submittedAt: "2026-08-29T00:00:00.000Z"
-    });
   });
 });

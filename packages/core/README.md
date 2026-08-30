@@ -66,10 +66,16 @@ and `TypedPagedSubmissionStorageAdapter<TMeta>` to retain that type through pers
 payloads with `answers` are provided by the separate `@form-engine-ts/legacy` package.
 `serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`, while
 `trpcSubmissionErrorAdapter` handles tRPC `data` and `shape.data` boundaries.
-Use `createTrpcSubmissionErrorIntegration()` to obtain a server `errorFormatter` and matching client `deserialize`
-function without manually spreading a payload into tRPC data. `runSubmissionPipeline` and
+`TrpcSubmissionErrorFormatter` is structurally compatible with tRPC's standard formatter input;
+`getTrpcSubmissionErrorData` restores typed `fieldErrors`, `formErrors`, and PII payloads without an application cast.
+Use `createTrpcSubmissionErrorIntegration()` to obtain a server `errorFormatter` and matching client `deserialize` and
+`getData` functions without manually spreading a payload into tRPC data. `runSubmissionPipeline` and
 `createSubmissionPipeline` combine codec normalization, schema validation, PII confirmation, idempotent saving, and
 typed `FormSubmissionError` results.
+
+`createSubmissionId("ulid")` and `createSubmission`'s `idFormat` option use the same generator used by React's
+`createSubmissionIdentity`. Pass one identity object to a Controller and Renderer to share `idFormat`, scope,
+attemptStore, receiptStore, and the generated submission/attempt ID.
 
 Fields can use a `displayRule` with nested `all`/`any` condition groups and `show` or `hide` actions. Supported
 operators include equality, containment, emptiness, and numeric comparisons; the legacy `displayCondition` and
