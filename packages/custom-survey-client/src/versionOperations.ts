@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  DomainSurveyVersionOperationRequest,
+  DomainSurveyVersionPublishRequest,
+  DomainSurveyVersionQualityIssueDecisionRequest,
   QualityCheckResult,
   QualityIssue,
   QualityIssueDecision,
+  SurveyVersionActionAdapter,
   SurveyVersionOperationName,
-  SurveyVersionOperationRequest,
   SurveyVersionOperationState,
-  SurveyVersionPublishRequest,
-  SurveyVersionQualityIssueDecisionRequest,
+  UseSurveyVersionDomainActionsOptions,
   UseSurveyVersionOperationsOptions,
   UseSurveyVersionOperationsResult
 } from "./types";
@@ -45,11 +47,11 @@ function issueKey(issue: QualityIssue): string {
   return `${issue.code}:${issue.path ?? ""}`;
 }
 
-function actionRequest(
-  version: UseSurveyVersionOperationsOptions["version"],
-  versionState: UseSurveyVersionOperationsOptions["state"],
+function actionRequest<TVersion, TState>(
+  version: TVersion,
+  versionState: TState | undefined,
   signal: AbortSignal
-): SurveyVersionOperationRequest {
+): DomainSurveyVersionOperationRequest<TVersion, TState> {
   return {
     version,
     ...(versionState === undefined ? {} : { state: versionState }),
@@ -57,12 +59,24 @@ function actionRequest(
   };
 }
 
+/** Combines independently implemented version action adapters into one optional adapter. */
+export function composeSurveyVersionActions<TVersion, TState>(
+  ...adapters: readonly SurveyVersionActionAdapter<TVersion, TState>[]
+): SurveyVersionActionAdapter<TVersion, TState> {
+  const result: SurveyVersionActionAdapter<TVersion, TState> = {};
+  for (let index = adapters.length - 1; index >= 0; index -= 1) {
+    const adapter = adapters[index];
+    if (adapter !== undefined) Object.assign(result, adapter);
+  }
+  return result;
+}
+
 /** Manages quality checks and version lifecycle actions without choosing a transport or cache library. */
-export function useSurveyVersionOperations({
+function useSurveyVersionOperationsInternal<TVersion, TState>({
   version,
   state: versionState,
   adapter
-}: UseSurveyVersionOperationsOptions): UseSurveyVersionOperationsResult {
+}: UseSurveyVersionDomainActionsOptions<TVersion, TState>): UseSurveyVersionOperationsResult {
   const [operations, setOperations] = useState(operationStates);
   const [quality, setQuality] = useState<SurveyVersionOperationState & { readonly result?: QualityCheckResult }>({
     status: "idle"
@@ -71,8 +85,8 @@ export function useSurveyVersionOperations({
   const qualityDecisionsRef = useRef<Readonly<Record<string, QualityIssueDecision>>>({});
   const qualityRef = useRef<QualityCheckResult | undefined>(undefined);
   const previousVersion = useRef<{
-    readonly version: UseSurveyVersionOperationsOptions["version"];
-    readonly state?: UseSurveyVersionOperationsOptions["state"];
+    readonly version: TVersion;
+    readonly state?: TState;
   }>({
     version,
     ...(versionState === undefined ? {} : { state: versionState })
@@ -92,7 +106,8 @@ export function useSurveyVersionOperations({
   }, [version, versionState]);
 
   const request = useCallback(
-    (signal: AbortSignal) => actionRequest(version, versionState, signal),
+    (signal: AbortSignal): DomainSurveyVersionOperationRequest<TVersion, TState> =>
+      actionRequest(version, versionState, signal),
     [version, versionState]
   );
 
@@ -121,9 +136,10 @@ export function useSurveyVersionOperations({
   const publish = useCallback(
     async (options: { readonly allowWarnings?: boolean } = {}): Promise<boolean> => {
       const allowWarnings = options.allowWarnings ?? false;
-      const qualityResult = qualityRef.current ?? (await runQualityCheck());
-      if (qualityResult === undefined) return false;
-      const unresolvedIssues = qualityResult.issues.filter(
+      const qualityCheck = adapter.runQualityCheck ?? adapter.qualityCheck;
+      const qualityResult = qualityCheck === undefined ? undefined : (qualityRef.current ?? (await runQualityCheck()));
+      if (qualityCheck !== undefined && qualityResult === undefined) return false;
+      const unresolvedIssues = (qualityResult?.issues ?? []).filter(
         (issue) => qualityDecisionsRef.current[issueKey(issue)] !== "accept"
       );
       if (!allowWarnings && unresolvedIssues.length > 0) {
@@ -135,7 +151,7 @@ export function useSurveyVersionOperations({
       setOperations((current) => setOperation(current, ["publish"], { status: "loading" }));
       try {
         if (publishAction === undefined) throw new TypeError("SurveyVersionActionsAdapter requires publish.");
-        const publishRequest: SurveyVersionPublishRequest = {
+        const publishRequest: DomainSurveyVersionPublishRequest<TVersion, TState> = {
           ...request(controller.signal),
           allowWarnings
         };
@@ -148,7 +164,7 @@ export function useSurveyVersionOperations({
         return false;
       }
     },
-    [adapter.publish, request, runQualityCheck]
+    [adapter.publish, adapter.qualityCheck, adapter.runQualityCheck, request, runQualityCheck]
   );
 
   const decideQualityIssue = useCallback(
@@ -158,7 +174,7 @@ export function useSurveyVersionOperations({
       setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "loading" }));
       try {
         if (decide === undefined) throw new TypeError("SurveyVersionActionsAdapter requires decideQualityIssue.");
-        const decisionRequest: SurveyVersionQualityIssueDecisionRequest = {
+        const decisionRequest: DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState> = {
           ...request(controller.signal),
           issue,
           decision
@@ -181,7 +197,7 @@ export function useSurveyVersionOperations({
   const runSimpleOperation = useCallback(
     async (
       names: readonly SurveyVersionOperationName[],
-      operation: ((request: SurveyVersionOperationRequest) => Promise<void>) | undefined,
+      operation: ((request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>) | undefined,
       requiredName: string
     ): Promise<boolean> => {
       const controller = new AbortController();
@@ -242,6 +258,20 @@ export function useSurveyVersionOperations({
     delete: deleteDraft,
     setStatus: setVisibility
   };
+}
+
+/** Backward-compatible controller for Form Engine schemas and version records. */
+export function useSurveyVersionOperations(
+  options: UseSurveyVersionOperationsOptions
+): UseSurveyVersionOperationsResult {
+  return useSurveyVersionOperationsInternal(options);
+}
+
+/** Generic controller for application-owned version records and state. */
+export function useSurveyVersionDomainActions<TVersion, TState = unknown>(
+  options: UseSurveyVersionDomainActionsOptions<TVersion, TState>
+): UseSurveyVersionOperationsResult {
+  return useSurveyVersionOperationsInternal(options);
 }
 
 /** Preferred action-oriented name for the version controller. */

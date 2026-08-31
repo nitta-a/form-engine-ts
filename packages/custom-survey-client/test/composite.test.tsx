@@ -1,14 +1,20 @@
 import type { FormAnalytics, FormSchema } from "@form-engine-ts/core";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import {
+  composeSurveyVersionActions,
+  createFreeTextTranslationController,
   type FreeTextAnswerItem,
+  hasPiiCandidate,
   SurveyEditor,
   type SurveyEditorAdapter,
   SurveyResponseSummary,
+  type SurveyVersionActionAdapter,
   type SurveyVersionAdapter,
   toSurveyResponseSummary,
+  translateFreeTextAnswers,
   useFreeTextAnswerTranslation,
   useSurveyEditor,
+  useSurveyVersionDomainActions,
   useSurveyVersionOperations
 } from "../src";
 
@@ -135,6 +141,51 @@ describe("custom survey client", () => {
     expect(adapter.translateBatch).not.toHaveBeenCalled();
   });
 
+  it("translates arbitrary answer arrays directly and returns per-answer failures", async () => {
+    const items: FreeTextAnswerItem[] = [
+      { id: "en-1", responseId: "r1", fieldId: "comment", text: "hello", sourceLanguage: "en" },
+      { id: "ja-1", responseId: "r2", fieldId: "comment", text: "こんにちは", sourceLanguage: "ja" }
+    ];
+    const adapter = {
+      translateBatch: vi.fn(async ({ items: batch }: { items: readonly FreeTextAnswerItem[] }) => {
+        if (batch[0]?.id === "ja-1") throw new Error("provider unavailable");
+        return batch.map((item) => ({ id: item.id, text: `${item.text}!` }));
+      })
+    };
+
+    const result = await translateFreeTextAnswers(items, adapter, { targetLanguage: "fr", batchSize: 1 });
+
+    expect(result.status).toBe("partial");
+    expect(result.succeeded).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.items).toEqual([
+      expect.objectContaining({ id: "en-1", status: "success", translatedText: "hello!" }),
+      expect.objectContaining({ id: "ja-1", status: "error" })
+    ]);
+    expect(adapter.translateBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("supports a selection-free controller and explicit PII confirmation", async () => {
+    const item: FreeTextAnswerItem = {
+      id: "email-answer",
+      responseId: "r1",
+      fieldId: "comment",
+      text: "person@example.com",
+      sourceLanguage: "en",
+      findings: [{ fieldId: "comment", type: "email" }]
+    };
+    const adapter = { translateBatch: vi.fn().mockResolvedValue([{ id: item.id, text: "translated" }]) };
+    const controller = createFreeTextTranslationController({ adapter, targetLanguage: "ja" });
+
+    expect(hasPiiCandidate([item])).toBe(true);
+    await expect(controller.translate([item])).resolves.toMatchObject({ status: "needs_confirmation" });
+    await expect(controller.translate([item], { piiConfirmed: true })).resolves.toMatchObject({
+      status: "success",
+      succeeded: 1,
+      items: [expect.objectContaining({ translatedText: "translated" })]
+    });
+  });
+
   it("gates publishing behind a warning confirmation and tracks operation state", async () => {
     const adapter: SurveyVersionAdapter = {
       qualityCheck: vi
@@ -182,6 +233,35 @@ describe("custom survey client", () => {
     expect(result.current.qualityDecisions["missing:"]).toBe("accept");
     expect(adapter.publish).toHaveBeenCalledWith(expect.objectContaining({ allowWarnings: false }));
     expect(result.current.operations.setVisibility.status).toBe("success");
+  });
+
+  it("composes optional version actions and publishes without a quality adapter", async () => {
+    const publish = vi.fn().mockResolvedValue(undefined);
+    const cloneDraft = vi.fn().mockResolvedValue(undefined);
+    const adapter = composeSurveyVersionActions({ publish }, { cloneDraft });
+    const { result } = renderHook(() => useSurveyVersionOperations({ version: schema, adapter }));
+
+    await act(async () => {
+      expect(await result.current.publish()).toBe(true);
+      expect(await result.current.cloneDraft()).toBe(true);
+    });
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ allowWarnings: false, version: schema }));
+    expect(cloneDraft).toHaveBeenCalledWith(expect.objectContaining({ version: schema }));
+  });
+
+  it("passes application-owned version records through the domain controller", async () => {
+    type MakerVersion = { readonly id: string; readonly revision: number };
+    type MakerState = { readonly formId: string; readonly revision: number };
+    const version: MakerVersion = { id: "maker-version", revision: 4 };
+    const state: MakerState = { formId: "customer-survey", revision: 8 };
+    const publish = vi.fn().mockResolvedValue(undefined);
+    const adapter: SurveyVersionActionAdapter<MakerVersion, MakerState> = { publish };
+    const { result } = renderHook(() => useSurveyVersionDomainActions({ version, state, adapter }));
+
+    await act(async () => expect(await result.current.publish()).toBe(true));
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({ version, state, allowWarnings: false }));
   });
 
   it("localizes question and option labels from version data", () => {

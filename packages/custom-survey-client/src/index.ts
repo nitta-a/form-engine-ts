@@ -1,4 +1,5 @@
 export * from "./freeText";
+export * from "./freeTextTranslation";
 export * from "./provider";
 export * from "./responseSummary";
 export * from "./SurveyEditor";

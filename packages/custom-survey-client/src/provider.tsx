@@ -1,5 +1,5 @@
 import type { FormEngineTranslator } from "@form-engine-ts/core";
-import { FormEngineI18nProvider } from "@form-engine-ts/react";
+import { FormEngineI18nProvider, useFormEngineI18n } from "@form-engine-ts/react";
 import { type ReactNode, useMemo } from "react";
 import type { SurveyTranslationAdapter, SurveyUiProviderProps } from "./types";
 
@@ -34,24 +34,42 @@ function createAdapterTranslator(
   };
 }
 
+/** Adapts an application's typed translation function to the Form Engine translator contract. */
+export function createSurveyTranslator(
+  adapter: NonNullable<SurveyUiProviderProps["translationAdapter"]>,
+  locale: string
+): FormEngineTranslator {
+  return createAdapterTranslator(adapter, locale);
+}
+
 /** Provides one shared translation scope for all custom survey client components. */
 export function SurveyUiProvider({
-  locale = "ja",
-  fallbackLocale = "en",
+  locale,
+  fallbackLocale,
   translationAdapter,
   translator: explicitTranslator,
   children
 }: SurveyUiProviderProps): ReactNode {
+  const parentI18n = useFormEngineI18n();
+  const shouldInheritParent =
+    explicitTranslator === undefined &&
+    translationAdapter === undefined &&
+    locale === undefined &&
+    fallbackLocale === undefined;
+  const effectiveLocale = locale ?? parentI18n.uiLocale;
+  const effectiveFallbackLocale = fallbackLocale ?? "en";
   const translator = useMemo(() => {
     if (explicitTranslator !== undefined) return explicitTranslator;
-    if (translationAdapter !== undefined) return createAdapterTranslator(translationAdapter, locale);
+    if (translationAdapter !== undefined) return createSurveyTranslator(translationAdapter, effectiveLocale);
     return undefined;
-  }, [explicitTranslator, locale, translationAdapter]);
+  }, [effectiveLocale, explicitTranslator, translationAdapter]);
+
+  if (shouldInheritParent) return children;
 
   return (
     <FormEngineI18nProvider
-      locale={locale}
-      fallbackLocale={fallbackLocale}
+      locale={effectiveLocale}
+      fallbackLocale={effectiveFallbackLocale}
       {...(translator === undefined ? {} : { translator })}
     >
       {children}

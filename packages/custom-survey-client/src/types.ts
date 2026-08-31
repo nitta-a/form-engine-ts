@@ -131,6 +131,52 @@ export interface FreeTextTranslationAdapter {
   readonly translateBatch: (request: FreeTextTranslationRequest) => Promise<readonly FreeTextTranslationResult[]>;
 }
 
+export interface TranslateFreeTextAnswersOptions {
+  readonly targetLanguage: string;
+  readonly sourceLanguage?: string;
+  readonly batchSize?: number;
+  readonly piiConfirmed?: boolean;
+  readonly detectPii?: (item: FreeTextAnswerItem) => readonly SensitiveDataFinding[];
+  readonly signal?: AbortSignal;
+}
+
+export interface FreeTextTranslationOutcomeItem extends FreeTextAnswerItem {
+  readonly status: "pending" | "success" | "error";
+  readonly translatedText?: string;
+  readonly error?: Error;
+}
+
+export type FreeTextTranslationOutcomeStatus = "success" | "partial" | "error" | "cancelled" | "needs_confirmation";
+
+export interface FreeTextTranslationOutcome {
+  readonly status: FreeTextTranslationOutcomeStatus;
+  readonly items: readonly FreeTextTranslationOutcomeItem[];
+  readonly findings: readonly SensitiveDataFinding[];
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly failures: readonly { readonly item: FreeTextAnswerItem; readonly cause: unknown }[];
+  readonly error?: Error;
+}
+
+export type DirectFreeTextTranslationOptions = Omit<TranslateFreeTextAnswersOptions, "targetLanguage"> & {
+  readonly targetLanguage?: string;
+};
+
+export interface FreeTextTranslationController {
+  readonly translate: (
+    items: readonly FreeTextAnswerInput[],
+    options?: DirectFreeTextTranslationOptions
+  ) => Promise<FreeTextTranslationOutcome>;
+}
+
+export interface CreateFreeTextTranslationControllerOptions {
+  readonly adapter: FreeTextTranslationAdapter;
+  readonly targetLanguage: string;
+  readonly sourceLanguage?: string;
+  readonly batchSize?: number;
+  readonly detectPii?: (item: FreeTextAnswerItem) => readonly SensitiveDataFinding[];
+}
+
 export type FreeTextItemStatus = "idle" | "translating" | "success" | "error";
 
 export interface FreeTextTranslationItemState extends FreeTextAnswerItem {
@@ -167,6 +213,11 @@ export interface UseFreeTextAnswerTranslationResult extends FreeTextTranslationS
   readonly confirmPii: () => Promise<FreeTextTranslationState>;
   readonly cancelPii: () => void;
   readonly translateSelected: () => Promise<FreeTextTranslationState>;
+  /** Translates any answer array without changing the current selection. */
+  readonly translate: (
+    items: readonly FreeTextAnswerInput[],
+    options?: DirectFreeTextTranslationOptions
+  ) => Promise<FreeTextTranslationOutcome>;
   readonly reset: () => void;
 }
 
@@ -228,6 +279,26 @@ export interface SurveyVersionActionsAdapter {
   ) => Promise<void>;
 }
 
+export interface SurveyVersionQualityActions<TVersion = FormVersionRecord | FormSchema, TState = FormVersionState> {
+  readonly publish?: (request: DomainSurveyVersionPublishRequest<TVersion, TState>) => Promise<void>;
+  readonly runQualityCheck?: (
+    request: DomainSurveyVersionOperationRequest<TVersion, TState>
+  ) => Promise<QualityCheckResult>;
+  readonly decideQualityIssue?: (
+    request: DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState>
+  ) => Promise<void>;
+}
+
+export interface SurveyVersionLifecycleActions<TVersion = FormVersionRecord | FormSchema, TState = FormVersionState> {
+  readonly cloneDraft?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+  readonly deleteDraft?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+  readonly setVisibility?: (
+    request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
+      readonly status: "draft" | "published" | "archived";
+    }
+  ) => Promise<void>;
+}
+
 /** @deprecated Use SurveyVersionActionsAdapter. Kept as a structural compatibility contract. */
 export interface SurveyVersionAdapter {
   readonly publish?: (request: SurveyVersionPublishRequest) => Promise<void>;
@@ -245,6 +316,41 @@ export interface SurveyVersionAdapter {
     request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
   ) => Promise<void>;
 }
+
+export interface DomainSurveyVersionOperationRequest<TVersion, TState = unknown> {
+  readonly version: TVersion;
+  readonly state?: TState;
+  readonly signal: AbortSignal;
+}
+
+export interface DomainSurveyVersionPublishRequest<TVersion, TState = unknown>
+  extends DomainSurveyVersionOperationRequest<TVersion, TState> {
+  readonly allowWarnings: boolean;
+}
+
+export interface DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState = unknown>
+  extends DomainSurveyVersionOperationRequest<TVersion, TState> {
+  readonly issue: QualityIssue;
+  readonly decision: QualityIssueDecision;
+}
+
+/** Optional action units for applications that only implement part of the lifecycle. */
+export type SurveyVersionActionAdapter<
+  TVersion = FormVersionRecord | FormSchema,
+  TState = FormVersionState
+> = SurveyVersionQualityActions<TVersion, TState> &
+  SurveyVersionLifecycleActions<TVersion, TState> & {
+    readonly qualityCheck?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState>
+    ) => Promise<QualityCheckResult>;
+    readonly duplicate?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+    readonly delete?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+    readonly setStatus?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
+        readonly status: "draft" | "published" | "archived";
+      }
+    ) => Promise<void>;
+  };
 
 export type SurveyVersionOperationName =
   | "runQualityCheck"
@@ -289,6 +395,11 @@ export interface UseSurveyVersionOperationsResult {
 }
 
 export type UseSurveyVersionActionsOptions = UseSurveyVersionOperationsOptions;
+export interface UseSurveyVersionDomainActionsOptions<TVersion, TState = unknown> {
+  readonly version: TVersion;
+  readonly state?: TState;
+  readonly adapter: SurveyVersionActionAdapter<TVersion, TState>;
+}
 export type UseSurveyVersionActionsResult = UseSurveyVersionOperationsResult;
 
 export type SurveySummaryInput =

@@ -56,10 +56,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.1.0** (2026-08-31). All public packages are currently published at version `7.1.0`.
-This release expands `@form-engine-ts/custom-survey-client` with action-oriented editor and version controllers, quality-issue decisions, `FormResponse` free-text normalization, cancellable PII confirmation, and additional survey editor slots while preserving the previous adapter and hook names.
+The latest release is **v7.2.0** (2026-08-31). All public packages are currently published at version `7.2.0`.
+This release expands `@form-engine-ts/custom-survey-client` with selection-free direct free-text translation results, per-answer failures and PII findings, composable version actions with generic domain records, and typed/composable i18n provider integration while preserving the previous adapter and hook names.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.1.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.2.0).
 
 ### Authoring and respondent experience
 
@@ -370,10 +370,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.1.0**（2026-08-31）です。公開パッケージはすべてバージョン `7.1.0` で公開されています。
-本リリースでは、`@form-engine-ts/custom-survey-client`にaction指向のEditor／version controller、品質問題の判定、`FormResponse`の自由記述正規化、PII確認のキャンセル、追加のSurvey Editor slotを追加し、従来のadapterとhook名も維持しています。
+最新版は **v7.2.0**（2026-08-31）です。公開パッケージはすべてバージョン `7.2.0` で公開されています。
+本リリースでは、`@form-engine-ts/custom-survey-client`に選択状態を介さない自由記述の直接翻訳、回答単位の結果とPII情報、Composableなversion action、ドメインVersionをそのまま扱える型、typed／合成可能なi18n Provider連携を追加し、従来のadapterとhook名も維持しています。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.1.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.2.0) を参照してください。
 
 ### 編集・回答体験
 
