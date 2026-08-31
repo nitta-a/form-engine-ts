@@ -5,6 +5,7 @@ import {
   createFreeTextTranslationController,
   type FreeTextAnswerItem,
   hasPiiCandidate,
+  mapSurveyQualityIssue,
   mapSurveyResponseSummary,
   SurveyEditor,
   type SurveyEditorAdapter,
@@ -20,6 +21,7 @@ import {
   surveyQualityIssueKey,
   toSurveyResponseSummary,
   translateFreeTextAnswers,
+  translateSurveySchema,
   useFreeTextAnswerTranslation,
   useFreeTextDomainAnswerTranslation,
   useSurveyEditor,
@@ -714,11 +716,39 @@ describe("custom survey client", () => {
     expect(invalidate).toHaveBeenCalledTimes(3);
   });
 
+  it("persists a complete mapping order through one bulk operation", async () => {
+    const first = { id: "m1" };
+    const second = { id: "m2" };
+    const reorderMany = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useSurveyMappingCrud({
+        domain: { id: "survey" },
+        mappings: [first, second],
+        adapter: {
+          create: vi.fn().mockResolvedValue(first),
+          remove: vi.fn().mockResolvedValue(undefined),
+          reorderMany
+        }
+      })
+    );
+
+    await act(async () => {
+      expect(await result.current.reorderMany([second, first])).toBe(true);
+    });
+
+    expect(reorderMany).toHaveBeenCalledWith({
+      domain: { id: "survey" },
+      mappings: [second, first],
+      signal: expect.any(AbortSignal)
+    });
+    expect(result.current.mappings).toEqual([second, first]);
+  });
+
   it("provides one translation scope to headless consumers and Form Engine UI", () => {
     const translation = { common: vi.fn(() => "Common label"), customSurvey: vi.fn(() => "Survey label") };
     function Consumer(): React.JSX.Element {
       const scope = useSurveyTranslation();
-      return <span>{`${scope.common("save")}|${scope.customSurvey("title")}`}</span>;
+      return <span>{`${scope.locale}|${scope.common("save")}|${scope.customSurvey("title")}`}</span>;
     }
 
     render(
@@ -726,7 +756,7 @@ describe("custom survey client", () => {
         <Consumer />
       </SurveyProvider>
     );
-    expect(screen.getByText("Common label|Survey label")).toBeInTheDocument();
+    expect(screen.getByText("ja|Common label|Survey label")).toBeInTheDocument();
   });
 
   it("renders controlled workflow state without imposing a package state shape", () => {
@@ -816,6 +846,121 @@ describe("custom survey client", () => {
     expect(transition).toHaveBeenCalledWith(
       expect.objectContaining({ workflowState: expect.objectContaining(workflowState) })
     );
+  });
+
+  it("fully controls workflow expansion, toggle rendering, and step context", () => {
+    const onToggle = vi.fn();
+    const renderStep = vi.fn((step: unknown, context: { index: number; total: number; state: { ready: boolean } }) => (
+      <span>{`${String(step)}:${context.index}/${context.total}:${context.state.ready}`}</span>
+    ));
+    const { rerender } = render(
+      <SurveyWorkflowControlled
+        state={{ ready: true }}
+        expanded={false}
+        onToggle={onToggle}
+        showToggle={false}
+        steps={["review"]}
+        slots={{ step: renderStep }}
+      />
+    );
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByText("review:0/1:true")).not.toBeInTheDocument();
+
+    rerender(
+      <SurveyWorkflowControlled
+        state={{ ready: true }}
+        expanded
+        onToggle={onToggle}
+        showToggle={false}
+        steps={["review"]}
+        slots={{ step: renderStep }}
+      />
+    );
+    expect(screen.getByText("review:0/1:true")).toBeInTheDocument();
+    expect(renderStep).toHaveBeenCalledWith("review", expect.objectContaining({ index: 0, total: 1 }));
+  });
+
+  it("supports Domain summary language tabs and localized labels", () => {
+    const languageTabs = vi.fn(() => null);
+    const summary = { aggregate: "maker-summary" };
+    const adapter = {
+      toSummaryInput: () => ({
+        questions: [
+          { fieldId: "satisfaction", kind: "radio" as const, answeredCount: 2, unansweredCount: 1, options: [] }
+        ]
+      }),
+      toFormSchema: () => schema,
+      sourceLanguage: () => "ja",
+      mapLanguages: () => [
+        {
+          language: "ja",
+          submissionCount: 3,
+          summary: {
+            questions: [
+              { fieldId: "satisfaction", kind: "radio" as const, answeredCount: 2, unansweredCount: 1, options: [] }
+            ]
+          }
+        }
+      ]
+    };
+
+    render(
+      <SurveyResponseSummaryDomain
+        summary={summary}
+        version={{ id: "version" }}
+        domainAdapter={adapter}
+        labels={{ languages: "言語", answered: "回答済み", unanswered: "未回答" }}
+        languageLabel={(language) => `表示:${language}`}
+        slots={{ languageTabs }}
+      />
+    );
+
+    expect(languageTabs).toHaveBeenCalledWith(
+      expect.objectContaining({ activeLanguage: "ja", languages: expect.any(Array) })
+    );
+    expect(screen.getByText("回答済み: 2 · 未回答: 1")).toBeInTheDocument();
+  });
+
+  it("translates a complete schema through the shared schema translator", async () => {
+    const result = await translateSurveySchema({
+      schema: { ...schema, translationMetadata: { ja: { title: { makerId: "maker" } } } },
+      sourceLocale: "en",
+      targetLocale: "ja",
+      signal: new AbortController().signal,
+      translationAdapter: {
+        translate: (text) => `sync:${text}`,
+        translateBatch: async (texts) => texts.map((text) => `translated:${text}`)
+      },
+      preserveMetadata: true
+    });
+
+    expect(result.schema.translations?.ja?.title).toBe("translated:Customer survey");
+    expect(result.schema.fields[0]?.translations?.ja?.title).toBe("translated:Satisfaction");
+    expect(result.schema.fields[0]?.translationMetadata?.ja?.title).toEqual(
+      expect.objectContaining({ sourceLocale: "en", translationSource: "automatic" })
+    );
+    expect(result.schema.translationMetadata?.ja?.title).toEqual(expect.objectContaining({ makerId: "maker" }));
+    expect(result.report.updatedSlots.length).toBeGreaterThan(0);
+  });
+
+  it("maps domain quality issue fields into the Form Engine contract", () => {
+    expect(
+      mapSurveyQualityIssue({
+        issueId: "missing_translation",
+        message: "Missing translation",
+        severity: "ERROR",
+        category: "translation",
+        language: "ja",
+        path: "fields.0.title"
+      })
+    ).toEqual({
+      code: "missing_translation",
+      message: "Missing translation",
+      severity: "error",
+      path: "fields.0.title",
+      metadata: { category: "translation", language: "ja" }
+    });
   });
 
   it("exposes mapping CRUD operations independently", async () => {

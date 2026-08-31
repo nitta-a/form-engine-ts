@@ -40,16 +40,20 @@ export interface SurveyUiProviderProps {
   readonly i18n?: SurveyI18n;
   readonly translationAdapter?: SurveyTranslationAdapter;
   readonly translator?: (key: string, params?: Record<string, unknown>) => string;
-  readonly translation?: SurveyTranslationScope;
+  readonly translation?: SurveyTranslationInput;
   readonly children: ReactNode;
 }
 
 export interface SurveyProviderProps extends SurveyUiProviderProps {}
 
 export interface SurveyTranslationScope {
+  readonly locale: string;
   readonly common: (key: string, options?: Record<string, unknown>) => string;
   readonly customSurvey: (key: string, options?: Record<string, unknown>) => string;
 }
+
+/** Input form kept compatible with v7.4 scopes; providers fill locale from their active UI locale. */
+export type SurveyTranslationInput = Omit<SurveyTranslationScope, "locale"> & { readonly locale?: string };
 
 /** Minimal i18next-compatible surface; the full i18next instance can be supplied structurally. */
 export interface SurveyI18n {
@@ -832,6 +836,14 @@ export interface SurveyResponseSummaryProps {
 export interface SurveyResponseSummaryDomainProps<TDomain> extends Omit<SurveyResponseSummaryProps, "version"> {
   readonly version: TDomain;
   readonly domainAdapter: SurveySchemaDomainAdapter<TDomain>;
+  readonly labels?: SurveyResponseSummaryDomainLabels;
+  readonly languageLabel?: (language: string) => ReactNode;
+}
+
+export interface SurveyResponseSummaryDomainLabels {
+  readonly languages?: string;
+  readonly answered?: string;
+  readonly unanswered?: string;
 }
 
 export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
@@ -842,6 +854,8 @@ export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
   readonly selectedLanguage?: string | null;
   readonly onLanguageChange?: (language: string | null) => void;
   readonly slots?: SurveyResponseSummaryDomainSlots;
+  readonly labels?: SurveyResponseSummaryDomainLabels;
+  readonly languageLabel?: (language: string) => ReactNode;
   readonly className?: string;
 }
 
@@ -859,19 +873,18 @@ export interface SurveyResponseSummaryLegacyCustomDomainProps<TDomain, TDomainSu
   readonly domainAdapter: SurveyResponseSummaryMapperAdapter<TDomain, TDomainSummary>;
 }
 
-export interface SurveyResponseSummarySlots {
+export interface SurveyResponseSummarySlots<TSkipReason = SurveyResponseSummarySkipReason> {
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-  readonly renderHeader?: (data: SurveyResponseSummaryData) => ReactNode;
+  readonly renderHeader?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
   readonly renderLanguageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
-  readonly header?: (data: SurveyResponseSummaryData) => ReactNode;
+  readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
+  readonly header?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
   readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-  readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
+  readonly skipReasons?: (reasons: readonly TSkipReason[]) => ReactNode;
 }
 
-export interface SurveyResponseSummaryDomainSlots {
-  readonly header?: (data: SurveyResponseSummaryData<unknown, unknown>) => ReactNode;
-  readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-  readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
+export interface SurveyResponseSummaryDomainSlots extends SurveyResponseSummarySlots<unknown> {
+  readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
 }
 
 export interface SurveyResponseSummaryLanguageTabsProps {

@@ -19,6 +19,28 @@ The package has no dependency on Maker authentication, tRPC, Jotai, or URL state
 
 Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt application translation functions without an unsafe cast. `SurveyProvider` is the unified provider for Form Engine and survey translations; it accepts a typed `translation` scope, a structural i18next-compatible `i18n` instance, or a transport-neutral translation adapter. When no local i18n props are passed it composes with the surrounding Form Engine provider instead of replacing it. `@form-engine-ts/custom-survey-client` is publishable with ESM, CommonJS, and declaration outputs; React and Form Engine packages are peer dependencies.
 
+## v7.5 APIs
+
+`SurveyWorkflowControlled` now treats `expanded` as the source of truth for step
+visibility. Set `showToggle={false}` when the host renders its own header control,
+or use the toggle slot for a custom package control. Domain response summaries
+support the `languageTabs` slot, localized default labels, and `languageLabel`.
+
+```tsx
+<SurveyResponseSummaryDomain
+  {...props}
+  labels={{ languages: "言語", answered: "回答済み", unanswered: "未回答" }}
+  languageLabel={(language) => languageNames[language] ?? language}
+  slots={{ languageTabs: renderLanguageTabs }}
+/>
+```
+
+Use `translateSurveySchema` for one package-owned translation operation covering
+form, page, question, choice, and translation metadata slots. Mapping CRUD also
+exposes `reorderMany`, and `mapSurveyQualityIssue` converts domain fields such as
+`issueId`, `severity`, `category`, and `language` into the package quality shape.
+`useSurveyTranslation().locale` returns the active UI locale.
+
 ## v7.3 migration guide
 
 This package has two layers. Controllers and hooks are transport-neutral: they cover

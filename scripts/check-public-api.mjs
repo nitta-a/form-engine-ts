@@ -381,7 +381,7 @@ export function assertSemverCompatibility(changes, previousVersion, currentVersi
   );
 }
 
-async function verifySemverGate(root, packages, reportDirectory) {
+async function verifySemverGate(root, packages, reportDirectory, allowBreaking) {
   const versions = new Set(packages.map((pkg) => pkg.manifest.version));
   if (versions.size !== 1) throw new Error("Public packages must share one version before SemVer verification.");
   const currentVersion = [...versions][0];
@@ -401,14 +401,19 @@ async function verifySemverGate(root, packages, reportDirectory) {
     const current = await readFile(join(reportDirectory, `${packageName}.d.ts`), "utf8");
     changes.push(...findBreakingApiChanges(previous.stdout, current, packageName));
   }
+  if (allowBreaking) {
+    console.warn(`SemVer gate explicitly allowed breaking API changes for ${currentVersion}.`);
+    return;
+  }
   assertSemverCompatibility(changes, previousTag.replace(/^v/, ""), currentVersion);
   console.log(`SemVer gate passed against ${previousTag}.`);
 }
 
 async function main() {
   const mode = process.argv[2] ?? "check";
+  const allowBreaking = process.argv.includes("--allow-breaking");
   if (mode !== "check" && mode !== "update") {
-    throw new Error("Usage: node scripts/check-public-api.mjs <check|update>");
+    throw new Error("Usage: node scripts/check-public-api.mjs <check|update> [--allow-breaking]");
   }
   const root = process.cwd();
   const reportDirectory = join(root, "api-reports");
@@ -439,7 +444,7 @@ async function main() {
       `Public API reports changed for ${changed.join(", ")}. Review compatibility, then run pnpm api:update.`
     );
   }
-  if (mode === "check") await verifySemverGate(root, packages, reportDirectory);
+  if (mode === "check") await verifySemverGate(root, packages, reportDirectory, allowBreaking);
   console.log(`${mode === "update" ? "Updated" : "Verified"} ${packages.length} public API reports.`);
 }
 

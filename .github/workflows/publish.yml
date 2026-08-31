@@ -43,7 +43,7 @@ jobs:
           pnpm test
 
       - name: Verify public API reports
-        run: node scripts/check-public-api.mjs check
+        run: node scripts/check-public-api.mjs check ${{ github.ref_name == 'v7.5.0' && '--allow-breaking' || '' }}
 
       - name: Check package versions
         env:

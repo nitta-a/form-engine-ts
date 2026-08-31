@@ -47,6 +47,7 @@ export function createSurveyTranslator(
 }
 
 const defaultTranslationScope: SurveyTranslationScope = {
+  locale: "ja",
   common: (key) => key,
   customSurvey: (key) => key
 };
@@ -67,7 +68,7 @@ function createTranslationScope(
   commonNamespace: string,
   customSurveyNamespace: string
 ): SurveyTranslationScope {
-  if (props.translation !== undefined) return props.translation;
+  if (props.translation !== undefined) return { ...props.translation, locale: props.translation.locale ?? locale };
   const translate = (namespace: string, key: string, options?: Record<string, unknown>): string => {
     if (props.i18n !== undefined && isSurveyI18n(props.i18n)) {
       const value = props.i18n.t(key, { ...(options ?? {}), ns: namespace });
@@ -80,6 +81,7 @@ function createTranslationScope(
     return `${namespace}:${key}`;
   };
   return {
+    locale,
     common: (key, options) => translate(commonNamespace, key, options),
     customSurvey: (key, options) => translate(customSurveyNamespace, key, options)
   };

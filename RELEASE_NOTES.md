@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v7.5.0 — 2026-09-01
+
+- Completed controlled Workflow expansion: `showToggle`, toggle/step slots, contextual step rendering, and `expanded`-driven visibility. This release intentionally prioritizes the new controlled I/F over v7.4 callback/type compatibility.
+- Added Domain Response Summary language-tab slots, localized labels, and language label resolvers.
+- Added `translateSurveySchema` for form/page/question/choice translation with translation metadata preservation.
+- Added bulk Mapping CRUD reorder APIs and a Quality issue mapper for domain issue fields.
+- Exposed `SurveyTranslationScope.locale`, aligned all public packages to version 7.5.0, and recorded the intentional breaking API upgrade in the release validation workflow.
+
 ### v7.4.0 — 2026-08-31
 
 - Added domain-first Editor and Response Summary APIs with adapters, controlled state, custom aggregates, and replaceable slots.

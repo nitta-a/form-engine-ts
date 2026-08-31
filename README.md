@@ -56,10 +56,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.4.0** (2026-08-31). All public packages are currently published at version `7.4.0`.
-This release adds domain-first Editor and Response Summary APIs, typed Quality/Version results, controlled Workflow state, generic Mapping CRUD, and a unified translation Provider for `@form-engine-ts/custom-survey-client` while preserving the previous adapter and hook names.
+The latest release is **v7.5.0** (2026-09-01). All public packages are currently published at version `7.5.0`.
+This release completes controlled Workflow expansion, adds Domain Summary language slots and labels, centralizes schema translation and quality mapping, adds bulk Mapping reorder, and exposes the active survey translation locale.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.4.0).
+[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.5.0).
 
 ### Authoring and respondent experience
 
@@ -370,10 +370,10 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.4.0**（2026-08-31）です。公開パッケージはすべてバージョン `7.4.0` で公開されています。
-本リリースでは、`@form-engine-ts/custom-survey-client`にdomain-first Editor／Response Summary、型付きQuality／Version結果、controlled Workflow、Mapping CRUD、統合翻訳Providerを追加し、従来のadapterとhook名も維持しています。
+最新版は **v7.5.0**（2026-09-01）です。公開パッケージはすべてバージョン `7.5.0` で公開されています。
+本リリースでは、Workflowの開閉制御を完全化し、Domain Summaryの言語slot／ラベル、スキーマ翻訳とQuality変換mapper、Mapping一括並び替え、アクティブな翻訳locale取得を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.4.0) を参照してください。
+[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.5.0) を参照してください。
 
 ### 編集・回答体験
 

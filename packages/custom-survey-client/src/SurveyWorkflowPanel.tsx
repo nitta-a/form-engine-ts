@@ -80,13 +80,22 @@ export interface SurveyWorkflowControlledProps<TState> {
   readonly state: TState;
   readonly expanded: boolean;
   readonly onToggle: () => void;
+  readonly showToggle?: boolean;
   readonly progress?: { readonly value: number; readonly label?: ReactNode };
   readonly onNavigate?: (tab: number) => void;
   readonly steps?: readonly unknown[];
   readonly renderStep?: (step: unknown, state: TState) => ReactNode;
   readonly slots?: {
     readonly header?: (state: TState) => ReactNode;
-    readonly step?: (step: unknown, state: TState) => ReactNode;
+    readonly toggle?: (props: { readonly expanded: boolean; readonly onToggle: () => void }) => ReactNode;
+    readonly step?: (
+      step: unknown,
+      context: {
+        readonly index: number;
+        readonly total: number;
+        readonly state: TState;
+      }
+    ) => ReactNode;
     readonly notifications?: (state: TState) => ReactNode;
   };
 }
@@ -116,24 +125,32 @@ export function useSurveyWorkflowControlled<TState>(
 
 export function SurveyWorkflowControlled<TState>(props: SurveyWorkflowControlledProps<TState>): React.JSX.Element {
   const workflow = useSurveyWorkflowControlled(props);
+  const showToggle = props.showToggle ?? true;
   return (
     <section className="fe-survey-workflow-controlled">
       {props.slots?.header?.(workflow.state)}
-      <button type="button" aria-expanded={workflow.expanded} onClick={workflow.toggle}>
-        {workflow.expanded ? "Collapse" : "Expand"}
-      </button>
+      {showToggle
+        ? (props.slots?.toggle?.({ expanded: workflow.expanded, onToggle: workflow.toggle }) ?? (
+            <button type="button" aria-expanded={workflow.expanded} onClick={workflow.toggle}>
+              {workflow.expanded ? "Collapse" : "Expand"}
+            </button>
+          ))
+        : null}
       {props.progress === undefined ? null : (
         <div role="progressbar" aria-valuenow={props.progress.value}>
           {props.progress.label ?? `${props.progress.value}%`}
         </div>
       )}
-      <div>
-        {props.steps?.map((step) => (
-          <div key={typeof step === "string" || typeof step === "number" ? step : JSON.stringify(step)}>
-            {props.slots?.step?.(step, workflow.state) ?? props.renderStep?.(step, workflow.state)}
-          </div>
-        ))}
-      </div>
+      {workflow.expanded ? (
+        <div>
+          {props.steps?.map((step, index) => (
+            <div key={typeof step === "string" || typeof step === "number" ? step : JSON.stringify(step)}>
+              {props.slots?.step?.(step, { index, total: props.steps?.length ?? 0, state: workflow.state }) ??
+                props.renderStep?.(step, workflow.state)}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {props.slots?.notifications?.(workflow.state)}
     </section>
   );

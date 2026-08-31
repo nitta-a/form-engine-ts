@@ -11,10 +11,28 @@ export interface SurveyMappingCrudAdapter<TDomain, TMapping, TSelection> {
     readonly mapping: TMapping;
     readonly signal: AbortSignal;
   }) => Promise<void>;
-  readonly reorder: (request: {
+  readonly reorder?: (request: {
     readonly domain: TDomain;
     readonly mapping: TMapping;
     readonly displayOrder: number;
+    readonly signal: AbortSignal;
+  }) => Promise<void>;
+  /** Persists the complete order in one request. */
+  readonly reorderMany?: (request: {
+    readonly domain: TDomain;
+    readonly mappings: readonly TMapping[];
+    readonly signal: AbortSignal;
+  }) => Promise<void>;
+  /** Alias for reorderMany for hosts that use "all" terminology. */
+  readonly reorderAll?: (request: {
+    readonly domain: TDomain;
+    readonly mappings: readonly TMapping[];
+    readonly signal: AbortSignal;
+  }) => Promise<void>;
+  /** Compatibility alias for adapters that name the bulk operation after the resource. */
+  readonly reorderMappings?: (request: {
+    readonly domain: TDomain;
+    readonly mappings: readonly TMapping[];
     readonly signal: AbortSignal;
   }) => Promise<void>;
   readonly list?: (request: { readonly domain: TDomain; readonly signal: AbortSignal }) => Promise<readonly TMapping[]>;
@@ -29,6 +47,9 @@ export interface UseSurveyMappingCrudResult<TMapping> {
   readonly create: (selection: unknown) => Promise<boolean>;
   readonly remove: (mapping: TMapping) => Promise<boolean>;
   readonly reorder: (mapping: TMapping, displayOrder: number) => Promise<boolean>;
+  readonly reorderMany: (mappings: readonly TMapping[]) => Promise<boolean>;
+  readonly reorderAll: (mappings: readonly TMapping[]) => Promise<boolean>;
+  readonly reorderMappings: (mappings: readonly TMapping[]) => Promise<boolean>;
   readonly refresh: () => Promise<boolean>;
 }
 
@@ -132,6 +153,10 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown>(
 
   const reorder = useCallback(
     async (mapping: TMapping, displayOrder: number): Promise<boolean> => {
+      if (options.adapter.reorder === undefined) {
+        setState({ operation: "error", error: new TypeError("SurveyMappingCrudAdapter requires reorder.") });
+        return false;
+      }
       setState({ operation: "reordering" });
       try {
         await options.adapter.reorder({
@@ -152,6 +177,40 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown>(
     [mappings, options.adapter, setMappings]
   );
 
+  const reorderMany = useCallback(
+    async (nextMappings: readonly TMapping[]): Promise<boolean> => {
+      const bulkReorder = options.adapter.reorderMany ?? options.adapter.reorderAll ?? options.adapter.reorderMappings;
+      if (bulkReorder === undefined && options.adapter.reorder === undefined) {
+        setState({ operation: "error", error: new TypeError("SurveyMappingCrudAdapter requires reorderMany.") });
+        return false;
+      }
+      setState({ operation: "reordering" });
+      try {
+        const controller = new AbortController();
+        if (bulkReorder !== undefined) {
+          await bulkReorder({ domain: domainRef.current, mappings: nextMappings, signal: controller.signal });
+        } else {
+          for (const [displayOrder, mapping] of nextMappings.entries()) {
+            await options.adapter.reorder?.({
+              domain: domainRef.current,
+              mapping,
+              displayOrder,
+              signal: controller.signal
+            });
+          }
+        }
+        setMappings(nextMappings);
+        setState({ operation: "idle" });
+        await options.adapter.invalidate?.();
+        return true;
+      } catch (cause) {
+        setState({ operation: "error", error: normalizeError(cause) });
+        return false;
+      }
+    },
+    [options.adapter, setMappings]
+  );
+
   const refresh = useCallback(async (): Promise<boolean> => {
     if (options.adapter.list === undefined) return false;
     try {
@@ -164,5 +223,15 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown>(
     }
   }, [options.adapter.list, setMappings]);
 
-  return { mappings, state, create, remove, reorder, refresh };
+  return {
+    mappings,
+    state,
+    create,
+    remove,
+    reorder,
+    reorderMany,
+    reorderAll: reorderMany,
+    reorderMappings: reorderMany,
+    refresh
+  };
 }

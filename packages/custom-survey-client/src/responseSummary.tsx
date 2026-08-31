@@ -1,5 +1,5 @@
 import { type FormField, type FormSchema, type FormVersionRecord, resolveLocalizedSchema } from "@form-engine-ts/core";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { mapSurveyResponseSummary } from "./response/summaryMapper";
 import type {
   SurveyResponseSummaryComponentProps,
@@ -7,6 +7,7 @@ import type {
   SurveyResponseSummaryData,
   SurveyResponseSummaryDomainComponentProps,
   SurveyResponseSummaryDomainInputProps,
+  SurveyResponseSummaryDomainLabels,
   SurveyResponseSummaryDomainSlots,
   SurveyResponseSummaryQuestion,
   SurveySummaryInput,
@@ -99,12 +100,21 @@ export function toSurveyResponseSummary(
   };
 }
 
-function defaultQuestion(question: SurveyResponseSummaryQuestion): React.JSX.Element {
+const defaultSummaryLabels: Required<SurveyResponseSummaryDomainLabels> = {
+  languages: "Languages",
+  answered: "Answered",
+  unanswered: "Unanswered"
+};
+
+function defaultQuestion(
+  question: SurveyResponseSummaryQuestion,
+  labels: Pick<Required<SurveyResponseSummaryDomainLabels>, "answered" | "unanswered"> = defaultSummaryLabels
+): React.JSX.Element {
   return (
     <article>
       <h3>{question.label}</h3>
       <p>
-        Answered: {question.answeredCount} · Unanswered: {question.unansweredCount}
+        {labels.answered}: {question.answeredCount} · {labels.unanswered}: {question.unansweredCount}
       </p>
       {question.options === undefined ? null : (
         <ul>
@@ -147,22 +157,26 @@ function renderSummaryData(
   renderQuestion: SurveyResponseSummaryComponentProps["renderQuestion"],
   slots: SurveyResponseSummaryComponentProps["slots"],
   className: string | undefined,
-  onSourceLanguageChange: SurveyResponseSummaryComponentProps["onSourceLanguageChange"]
+  onSourceLanguageChange: SurveyResponseSummaryComponentProps["onSourceLanguageChange"],
+  labels?: SurveyResponseSummaryDomainLabels,
+  _languageLabel?: (language: string) => ReactNode
 ): React.JSX.Element {
   const questionRenderer = renderQuestion ?? slots?.renderQuestion;
+  const resolvedLabels = { ...defaultSummaryLabels, ...labels };
+  const languageTabs = slots?.renderLanguageTabs ?? slots?.languageTabs;
   return (
     <section className={className} data-form-id={data.formId} data-version={data.version}>
-      {slots?.renderHeader?.(data) ?? <h2>{data.title}</h2>}
-      {data.languages === undefined || data.languages.length === 0 || slots?.renderLanguageTabs === undefined
+      {slots?.renderHeader?.(data) ?? slots?.header?.(data) ?? <h2>{data.title}</h2>}
+      {data.languages === undefined || data.languages.length === 0 || languageTabs === undefined
         ? null
-        : slots.renderLanguageTabs({
+        : languageTabs({
             languages: data.languages,
             activeLanguage: data.sourceLanguage,
             onChange: onSourceLanguageChange ?? (() => undefined)
           })}
       <div>
         {data.questions.map((question) => (
-          <div key={question.fieldId}>{questionRenderer?.(question) ?? defaultQuestion(question)}</div>
+          <div key={question.fieldId}>{questionRenderer?.(question) ?? defaultQuestion(question, resolvedLabels)}</div>
         ))}
       </div>
     </section>
@@ -232,33 +246,45 @@ function renderDomainSummaryData(
   selectedLanguage: string | null,
   onLanguageChange: (language: string | null) => void,
   slots: SurveyResponseSummaryDomainSlots,
-  className: string | undefined
+  className: string | undefined,
+  labels: SurveyResponseSummaryDomainLabels | undefined,
+  languageLabel: ((language: string) => ReactNode) | undefined
 ): React.JSX.Element {
+  const resolvedLabels = { ...defaultSummaryLabels, ...labels };
+  const languageAggregates =
+    data.languages ??
+    languageOptions.map(({ language, count }) => ({ language, submissionCount: count, summary: { questions: [] } }));
   return (
     <section className={className} data-form-id={data.formId} data-version={data.version}>
-      {slots.header?.(data) ?? <h2>{data.title}</h2>}
-      {languageOptions.length === 0 ? null : (
-        <div role="tablist" aria-label="Languages">
-          {languageOptions.map(({ language, count }) => {
-            const active = (selectedLanguage ?? data.sourceLanguage) === language;
-            return (
-              <button
-                key={language}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => onLanguageChange(language)}
-              >
-                {language} ({count})
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {slots.header?.(data) ?? slots.renderHeader?.(data) ?? <h2>{data.title}</h2>}
+      {languageOptions.length === 0
+        ? null
+        : ((slots.languageTabs ?? slots.renderLanguageTabs)?.({
+            languages: languageAggregates,
+            activeLanguage: selectedLanguage ?? data.sourceLanguage,
+            onChange: (language) => onLanguageChange(language)
+          }) ?? (
+            <div role="tablist" aria-label={resolvedLabels.languages}>
+              {languageOptions.map(({ language, count }) => {
+                const active = (selectedLanguage ?? data.sourceLanguage) === language;
+                return (
+                  <button
+                    key={language}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => onLanguageChange(language)}
+                  >
+                    {languageLabel?.(language) ?? language} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          ))}
       {slots.skipReasons?.(data.skipReasons ?? [])}
       <div>
         {data.questions.map((question) => (
-          <div key={question.fieldId}>{slots.question?.(question) ?? defaultQuestion(question)}</div>
+          <div key={question.fieldId}>{slots.question?.(question) ?? defaultQuestion(question, resolvedLabels)}</div>
         ))}
       </div>
     </section>
@@ -299,17 +325,29 @@ function SurveyResponseSummaryDomainView<TSummary, TVersion>(
     controller.selectedLanguage,
     controller.setLanguage,
     props.slots ?? {},
-    props.className
+    props.className,
+    props.labels,
+    props.languageLabel
   );
 }
 
 function SurveyResponseSummaryLegacyDomainView<TDomain>(
   props: SurveyResponseSummaryDomainComponentProps<TDomain>
 ): React.JSX.Element {
-  const { summary, version, domainAdapter, sourceLanguage, onSourceLanguageChange, renderQuestion, slots, className } =
-    props;
+  const {
+    summary,
+    version,
+    domainAdapter,
+    sourceLanguage,
+    onSourceLanguageChange,
+    renderQuestion,
+    slots,
+    className,
+    labels,
+    languageLabel
+  } = props;
   const data = toSurveyResponseSummary(summary, domainAdapter.toFormSchema(version), sourceLanguage);
-  return renderSummaryData(data, renderQuestion, slots, className, onSourceLanguageChange);
+  return renderSummaryData(data, renderQuestion, slots, className, onSourceLanguageChange, labels, languageLabel);
 }
 
 function isDomainSummaryProps<TSummary, TVersion>(
