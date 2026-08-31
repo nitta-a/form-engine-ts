@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v7.6.0 — 2026-09-01
+
+- Moved Response Summary language state, labels, tab inputs, and language-specific aggregate conversion into `useSurveyResponseSummaryDomain`; its result can be spread directly into `SurveyResponseSummaryDomain`.
+- Added package-owned translation metadata policy, source-text hash generation, report callbacks, and the async-only `AsyncTranslationAdapter` contract while preserving v7.5 migration inputs.
+- Made Mapping `reorderMany` an atomic request with selection and expected revision, committed mappings/revision results, validation, and rollback hooks.
+- Aligned all public packages to version 7.6.0.
+- This release intentionally prioritizes the proposed v7.6 interfaces: migrate schema translation to `AsyncTranslationAdapter` and Mapping callers to `reorderMany({ mappings, selection, signal })`.
+
 ### v7.5.0 — 2026-09-01
 
 - Completed controlled Workflow expansion: `showToggle`, toggle/step slots, contextual step rendering, and `expanded`-driven visibility. This release intentionally prioritizes the new controlled I/F over v7.4 callback/type compatibility.

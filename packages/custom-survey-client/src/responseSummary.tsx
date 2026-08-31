@@ -9,6 +9,7 @@ import type {
   SurveyResponseSummaryDomainInputProps,
   SurveyResponseSummaryDomainLabels,
   SurveyResponseSummaryDomainSlots,
+  SurveyResponseSummaryLanguageOption,
   SurveyResponseSummaryQuestion,
   SurveySummaryInput,
   UseSurveyResponseSummaryDomainOptions,
@@ -187,21 +188,34 @@ function domainSummaryData<TSummary, TVersion>(
   selectedLanguage: string | null
 ): {
   readonly data: SurveyResponseSummaryData<TSummary, unknown>;
-  readonly languageOptions: readonly { language: string; count: number }[];
+  readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
 } {
   const { domainAdapter, summary, version } = options;
   const languages = domainAdapter.mapLanguages?.({ domain: version, summary });
   const sourceLanguage = selectedLanguage ?? domainAdapter.sourceLanguage(version);
   const selectedAggregate = languages?.find((language) => language.language === sourceLanguage);
-  const baseData = toSurveyResponseSummary(
-    selectedAggregate === undefined ? domainAdapter.toSummaryInput(summary) : selectedAggregate.summary,
-    domainAdapter.toFormSchema(version),
-    sourceLanguage
-  );
-  const languageOptions =
+  const summaryInput =
+    selectedAggregate?.summary ??
+    domainAdapter.toLanguageSummaryInput?.({ domain: version, summary, language: sourceLanguage }) ??
+    domainAdapter.toSummaryInput(summary);
+  const baseData = toSurveyResponseSummary(summaryInput, domainAdapter.toFormSchema(version), sourceLanguage);
+  const rawLanguageOptions =
     options.languageOptions ??
     languages?.map(({ language, submissionCount }) => ({ language, count: submissionCount })) ??
     [];
+  const resolvedLanguages =
+    languages ??
+    rawLanguageOptions.map(({ language, count }) => ({
+      language,
+      submissionCount: count,
+      summary:
+        domainAdapter.toLanguageSummaryInput?.({ domain: version, summary, language }) ??
+        (language === sourceLanguage ? summaryInput : { questions: [] })
+    }));
+  const languageOptions: readonly SurveyResponseSummaryLanguageOption[] = rawLanguageOptions.map((option) => ({
+    ...option,
+    ...(options.languageLabel === undefined ? {} : { label: options.languageLabel(option.language) })
+  }));
   const questions = baseData.questions.map((question) => {
     const label = domainAdapter.resolveLabel?.({ domain: version, fieldId: question.fieldId, sourceLanguage });
     const definition = domainAdapter.getQuestionDefinition?.({ domain: version, fieldId: question.fieldId });
@@ -227,7 +241,7 @@ function domainSummaryData<TSummary, TVersion>(
       ...baseData,
       customData: summary,
       questions,
-      ...(languages === undefined ? {} : { languages }),
+      ...(resolvedLanguages.length === 0 ? {} : { languages: resolvedLanguages }),
       ...(domainAdapter.mapSkipReasons === undefined
         ? {}
         : (() => {
@@ -241,7 +255,7 @@ function domainSummaryData<TSummary, TVersion>(
 
 function renderDomainSummaryData(
   data: SurveyResponseSummaryData<unknown, unknown>,
-  languageOptions: readonly { readonly language: string; readonly count: number }[],
+  languageOptions: readonly SurveyResponseSummaryLanguageOption[],
   selectedLanguage: string | null,
   onLanguageChange: (language: string | null) => void,
   slots: SurveyResponseSummaryDomainSlots,
@@ -264,7 +278,7 @@ function renderDomainSummaryData(
             onChange: (language) => onLanguageChange(language)
           }) ?? (
             <div role="tablist" aria-label={resolvedLabels.languages}>
-              {languageOptions.map(({ language, count }) => {
+              {languageOptions.map(({ language, count, label }) => {
                 const active = (selectedLanguage ?? data.sourceLanguage) === language;
                 return (
                   <button
@@ -274,7 +288,7 @@ function renderDomainSummaryData(
                     aria-selected={active}
                     onClick={() => onLanguageChange(language)}
                   >
-                    {languageLabel?.(language) ?? language} ({count})
+                    {languageLabel?.(language) ?? label ?? language} ({count})
                   </button>
                 );
               })}
@@ -293,7 +307,7 @@ function renderDomainSummaryData(
 export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
   options: UseSurveyResponseSummaryDomainOptions<TSummary, TVersion>
 ): UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
-  const [internalLanguage, setInternalLanguage] = useState<string | null>(null);
+  const [internalLanguage, setInternalLanguage] = useState<string | null>(() => options.defaultLanguage ?? null);
   const selectedLanguage = options.selectedLanguage === undefined ? internalLanguage : options.selectedLanguage;
   const setLanguage = useCallback(
     (language: string | null) => {
@@ -307,8 +321,14 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
     data: mapped.data,
     summary: options.summary,
     version: options.version,
+    domainAdapter: options.domainAdapter,
     selectedLanguage,
     languageOptions: mapped.languageOptions,
+    ...(options.slots === undefined ? {} : { slots: options.slots }),
+    ...(options.labels === undefined ? {} : { labels: options.labels }),
+    ...(options.languageLabel === undefined ? {} : { languageLabel: options.languageLabel }),
+    ...(options.className === undefined ? {} : { className: options.className }),
+    onLanguageChange: setLanguage,
     setLanguage
   };
 }

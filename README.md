@@ -56,10 +56,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.5.0** (2026-09-01). All public packages are currently published at version `7.5.0`.
-This release completes controlled Workflow expansion, adds Domain Summary language slots and labels, centralizes schema translation and quality mapping, adds bulk Mapping reorder, and exposes the active survey translation locale.
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history and the
-[GitHub release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.5.0).
+The latest release is **v7.6.0** (2026-09-01). All public packages are currently aligned to version `7.6.0`.
+This release moves Response Summary language state and aggregate conversion, translation metadata policy/reporting, and atomic Mapping reorder results into the package.
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history. Publication is performed separately from this local
+v7.6.0 implementation.
 
 ### Authoring and respondent experience
 
@@ -370,10 +370,9 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.5.0**（2026-09-01）です。公開パッケージはすべてバージョン `7.5.0` で公開されています。
-本リリースでは、Workflowの開閉制御を完全化し、Domain Summaryの言語slot／ラベル、スキーマ翻訳とQuality変換mapper、Mapping一括並び替え、アクティブな翻訳locale取得を追加しました。
-全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md) と
-[GitHub Release](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.5.0) を参照してください。
+最新版は **v7.6.0**（2026-09-01）です。公開パッケージはすべてバージョン `7.6.0` に揃えています。
+本リリースでは、Response Summaryの言語状態・集計変換、翻訳metadataとreport、Mappingの原子的な一括並び替え結果をパッケージへ移管しました。
+全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。公開作業は、このローカルv7.6.0実装とは別に行います。
 
 ### 編集・回答体験
 

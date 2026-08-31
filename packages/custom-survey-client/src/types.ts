@@ -15,6 +15,22 @@ import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
 import type { FormBuilderProps } from "@form-engine-ts/react";
 import type { ReactNode } from "react";
 
+/** Translation service contract for schema operations; unlike SurveyTranslationAdapter it has no sync fallback. */
+export interface AsyncTranslationAdapter {
+  readonly translateText: (
+    text: string,
+    targetLocale: string,
+    sourceLocale?: string,
+    signal?: AbortSignal
+  ) => Promise<string>;
+  readonly translateBatch: (
+    texts: readonly string[],
+    targetLocale: string,
+    sourceLocale?: string,
+    signal?: AbortSignal
+  ) => Promise<readonly string[]>;
+}
+
 export interface SurveyTranslationAdapter extends TranslationAdapter {
   readonly translateText?: (
     text: string,
@@ -747,6 +763,12 @@ export interface SurveyResponseSummaryDomainAdapter<TSummary, TVersion> {
   readonly toSummaryInput: (summary: TSummary) => SurveySummaryInput;
   readonly toFormSchema: (version: TVersion) => FormSchema;
   readonly sourceLanguage: (version: TVersion) => string;
+  /** Converts an application-owned language aggregate when it is not already a Form Engine summary. */
+  readonly toLanguageSummaryInput?: (request: {
+    readonly domain: TVersion;
+    readonly summary: TSummary;
+    readonly language: string;
+  }) => SurveySummaryInput | undefined;
   readonly resolveLabel?: (request: {
     readonly domain: TVersion;
     readonly fieldId: string;
@@ -824,6 +846,13 @@ export interface SurveyResponseSummaryData<TCustomData = unknown, TSkipReason = 
   readonly customData?: TCustomData;
 }
 
+export interface SurveyResponseSummaryLanguageOption {
+  readonly language: string;
+  readonly count: number;
+  /** Optional package-resolved label for a default or custom language tab. */
+  readonly label?: ReactNode;
+}
+
 export interface SurveyResponseSummaryProps {
   readonly summary: SurveySummaryInput;
   readonly version: FormVersionRecord | FormSchema;
@@ -850,7 +879,9 @@ export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
   readonly summary: TSummary;
   readonly version: TVersion;
   readonly domainAdapter: SurveyResponseSummaryDomainAdapter<TSummary, TVersion>;
-  readonly languageOptions?: readonly { readonly language: string; readonly count: number }[];
+  readonly languageOptions?: readonly SurveyResponseSummaryLanguageOption[];
+  /** Initial uncontrolled language. `null` uses the adapter's source language. */
+  readonly defaultLanguage?: string | null;
   readonly selectedLanguage?: string | null;
   readonly onLanguageChange?: (language: string | null) => void;
   readonly slots?: SurveyResponseSummaryDomainSlots;
@@ -916,8 +947,15 @@ export interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
   readonly data: SurveyResponseSummaryData<TSummary, unknown>;
   readonly summary: TSummary;
   readonly version: TVersion;
+  readonly domainAdapter: SurveyResponseSummaryDomainAdapter<TSummary, TVersion>;
   readonly selectedLanguage: string | null;
-  readonly languageOptions: readonly { readonly language: string; readonly count: number }[];
+  readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
+  readonly slots?: SurveyResponseSummaryDomainSlots;
+  readonly labels?: SurveyResponseSummaryDomainLabels;
+  readonly languageLabel?: (language: string) => ReactNode;
+  readonly className?: string;
+  /** Alias suitable for spreading the hook result into SurveyResponseSummaryDomain. */
+  readonly onLanguageChange: (language: string | null) => void;
   readonly setLanguage: (language: string | null) => void;
 }
 

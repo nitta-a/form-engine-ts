@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/core",
-  "version": "7.5.0",
+  "version": "7.6.0",
   "publishConfig": {
     "access": "public"
   },

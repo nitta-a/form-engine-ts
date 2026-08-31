@@ -685,6 +685,57 @@ describe("custom survey client", () => {
     expect(header).toHaveBeenCalledWith(expect.objectContaining({ customData: summary }));
   });
 
+  it("keeps response summary language state and domain aggregation inside the hook", async () => {
+    const summary = { aggregate: "maker-summary" };
+    const adapter = {
+      toSummaryInput: vi.fn(() => ({ questions: [] })),
+      toLanguageSummaryInput: vi.fn(({ language }) => ({
+        questions: [
+          {
+            fieldId: "satisfaction",
+            kind: "radio" as const,
+            answeredCount: language === "ja" ? 2 : 1,
+            unansweredCount: language === "ja" ? 1 : 0,
+            options: []
+          }
+        ]
+      })),
+      toFormSchema: vi.fn(() => schema),
+      sourceLanguage: vi.fn(() => "en")
+    };
+    const { result } = renderHook(() =>
+      useSurveyResponseSummaryDomain({
+        summary,
+        version: { id: "version" },
+        domainAdapter: adapter,
+        defaultLanguage: null,
+        languageOptions: [
+          { language: "en", count: 1 },
+          { language: "ja", count: 3 }
+        ],
+        languageLabel: (language) => `表示:${language}`
+      })
+    );
+
+    expect(result.current.selectedLanguage).toBeNull();
+    expect(result.current.languageOptions).toEqual([
+      { language: "en", count: 1, label: "表示:en" },
+      { language: "ja", count: 3, label: "表示:ja" }
+    ]);
+    expect(result.current.data.sourceLanguage).toBe("en");
+    expect(result.current.data.languages?.find(({ language }) => language === "ja")?.summary.questions[0]).toEqual(
+      expect.objectContaining({ answeredCount: 2, unansweredCount: 1 })
+    );
+    const spreadSummary = <SurveyResponseSummaryDomain {...result.current} />;
+    expect(spreadSummary).toBeTruthy();
+
+    await act(async () => result.current.setLanguage("ja"));
+
+    expect(result.current.selectedLanguage).toBe("ja");
+    expect(result.current.data.questions[0]?.answeredCount).toBe(2);
+    expect(result.current.onLanguageChange).toBe(result.current.setLanguage);
+  });
+
   it("supports generic mapping CRUD with operation state and invalidation", async () => {
     const first = { id: "m1" };
     const second = { id: "m2" };
@@ -693,6 +744,7 @@ describe("custom survey client", () => {
       create: vi.fn().mockResolvedValue(second),
       remove: vi.fn().mockResolvedValue(undefined),
       reorder: vi.fn().mockResolvedValue(undefined),
+      reorderMany: vi.fn().mockResolvedValue({ mappings: [], revision: "r1" }),
       list: vi.fn().mockResolvedValue([first]),
       invalidate
     };
@@ -719,7 +771,7 @@ describe("custom survey client", () => {
   it("persists a complete mapping order through one bulk operation", async () => {
     const first = { id: "m1" };
     const second = { id: "m2" };
-    const reorderMany = vi.fn().mockResolvedValue(undefined);
+    const reorderMany = vi.fn().mockResolvedValue({ mappings: [second, first], revision: "r2" });
     const { result } = renderHook(() =>
       useSurveyMappingCrud({
         domain: { id: "survey" },
@@ -733,15 +785,135 @@ describe("custom survey client", () => {
     );
 
     await act(async () => {
-      expect(await result.current.reorderMany([second, first])).toBe(true);
+      const committed = await result.current.reorderMany({
+        mappings: [second, first],
+        selection: { deckId: "deck" },
+        signal: new AbortController().signal
+      });
+      expect(committed).toEqual({ mappings: [second, first], revision: "r2" });
     });
 
-    expect(reorderMany).toHaveBeenCalledWith({
-      domain: { id: "survey" },
-      mappings: [second, first],
-      signal: expect.any(AbortSignal)
-    });
+    expect(reorderMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: { id: "survey" },
+        mappings: [second, first],
+        selection: { deckId: "deck" },
+        signal: expect.any(AbortSignal)
+      })
+    );
     expect(result.current.mappings).toEqual([second, first]);
+  });
+
+  it("commits atomic mapping reorder and returns the server order and revision", async () => {
+    const first = { id: "m1" };
+    const second = { id: "m2" };
+    const invalidate = vi.fn().mockResolvedValue(undefined);
+    const onRevisionChange = vi.fn();
+    const adapter = {
+      create: vi.fn().mockResolvedValue(first),
+      remove: vi.fn().mockResolvedValue(undefined),
+      reorderMany: vi.fn().mockResolvedValue({ mappings: [second, first], revision: "r2" }),
+      invalidate
+    };
+    const { result } = renderHook(() =>
+      useSurveyMappingCrud<{ readonly id: string }, { readonly id: string }, { readonly deckId: string }>({
+        domain: { id: "survey" },
+        mappings: [first, second],
+        revision: "r1",
+        adapter,
+        onRevisionChange
+      })
+    );
+
+    let reorderResult: unknown;
+    await act(async () => {
+      reorderResult = await result.current.reorderMany({
+        mappings: [second, first],
+        selection: { deckId: "deck" },
+        expectedRevision: "r1",
+        signal: new AbortController().signal
+      });
+    });
+
+    expect(reorderResult).toEqual({ mappings: [second, first], revision: "r2" });
+    expect(result.current.mappings).toEqual([second, first]);
+    expect(result.current.revision).toBe("r2");
+    expect(adapter.reorderMany).toHaveBeenCalledWith(
+      expect.objectContaining({ mappings: [second, first], selection: { deckId: "deck" }, expectedRevision: "r1" })
+    );
+    expect(onRevisionChange).toHaveBeenCalledWith("r2");
+    expect(invalidate).toHaveBeenCalled();
+  });
+
+  it("uses the current revision for atomic reorder and rejects stale callers before transport", async () => {
+    const first = { id: "m1" };
+    const second = { id: "m2" };
+    const reorderMany = vi.fn().mockResolvedValue({ mappings: [second, first], revision: "r2" });
+    const { result } = renderHook(() =>
+      useSurveyMappingCrud({
+        domain: { id: "survey" },
+        mappings: [first, second],
+        revision: "r1",
+        adapter: { create: vi.fn(), remove: vi.fn(), reorderMany }
+      })
+    );
+
+    await act(async () => {
+      await result.current.reorderMany({
+        mappings: [second, first],
+        selection: undefined,
+        signal: new AbortController().signal
+      });
+    });
+    expect(reorderMany).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: "r1" }));
+
+    await act(async () => {
+      await expect(
+        result.current.reorderMany({
+          mappings: [first, second],
+          selection: undefined,
+          expectedRevision: "stale",
+          signal: new AbortController().signal
+        })
+      ).rejects.toThrow("stale expected revision");
+    });
+    expect(reorderMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("rolls back the local order and invokes the rollback adapter when atomic reorder fails", async () => {
+    const first = { id: "m1" };
+    const second = { id: "m2" };
+    const rollback = vi.fn().mockResolvedValue(undefined);
+    const adapter = {
+      create: vi.fn().mockResolvedValue(first),
+      remove: vi.fn().mockResolvedValue(undefined),
+      reorderMany: vi.fn().mockRejectedValue(new Error("revision conflict")),
+      rollbackReorder: rollback
+    };
+    const { result } = renderHook(() =>
+      useSurveyMappingCrud<{ readonly id: string }, { readonly id: string }, { readonly deckId: string }>({
+        domain: { id: "survey" },
+        mappings: [first, second],
+        revision: "r1",
+        adapter
+      })
+    );
+
+    await act(async () => {
+      await expect(
+        result.current.reorderMany({
+          mappings: [second, first],
+          selection: { deckId: "deck" },
+          signal: new AbortController().signal
+        })
+      ).rejects.toThrow("revision conflict");
+    });
+
+    expect(result.current.mappings).toEqual([first, second]);
+    expect(result.current.state).toMatchObject({ operation: "error" });
+    expect(rollback).toHaveBeenCalledWith(
+      expect.objectContaining({ mappings: [first, second], revision: "r1", selection: { deckId: "deck" } })
+    );
   });
 
   it("provides one translation scope to headless consumers and Form Engine UI", () => {
@@ -929,10 +1101,10 @@ describe("custom survey client", () => {
       targetLocale: "ja",
       signal: new AbortController().signal,
       translationAdapter: {
-        translate: (text) => `sync:${text}`,
+        translateText: async (text) => `sync:${text}`,
         translateBatch: async (texts) => texts.map((text) => `translated:${text}`)
       },
-      preserveMetadata: true
+      metadataPolicy: { source: "AI", preserveManualEdits: true, updateSourceTextHash: true }
     });
 
     expect(result.schema.translations?.ja?.title).toBe("translated:Customer survey");
@@ -942,6 +1114,31 @@ describe("custom survey client", () => {
     );
     expect(result.schema.translationMetadata?.ja?.title).toEqual(expect.objectContaining({ makerId: "maker" }));
     expect(result.report.updatedSlots.length).toBeGreaterThan(0);
+  });
+
+  it("uses the async translation contract and reports package-owned metadata policy", async () => {
+    const onReport = vi.fn();
+    const translateBatch = vi.fn(async (texts: readonly string[], targetLocale: string) =>
+      texts.map((text) => `${targetLocale}:${text}`)
+    );
+    const result = await translateSurveySchema({
+      schema,
+      sourceLocale: "en",
+      targetLocale: "ja",
+      translationAdapter: {
+        translateText: vi.fn(async (text) => `text:${text}`),
+        translateBatch
+      },
+      metadataPolicy: { source: "MANUAL", preserveManualEdits: true, updateSourceTextHash: false },
+      onReport
+    });
+
+    expect(translateBatch).toHaveBeenCalled();
+    expect(result.schema.fields[0]?.translationMetadata?.ja?.title).toEqual(
+      expect.objectContaining({ sourceLocale: "en", translationSource: "manual" })
+    );
+    expect(result.schema.fields[0]?.translationMetadata?.ja?.title).not.toHaveProperty("sourceTextHash");
+    expect(onReport).toHaveBeenCalledWith(result.report);
   });
 
   it("maps domain quality issue fields into the Form Engine contract", () => {

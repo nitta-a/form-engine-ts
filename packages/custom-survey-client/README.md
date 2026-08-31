@@ -19,6 +19,50 @@ The package has no dependency on Maker authentication, tRPC, Jotai, or URL state
 
 Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt application translation functions without an unsafe cast. `SurveyProvider` is the unified provider for Form Engine and survey translations; it accepts a typed `translation` scope, a structural i18next-compatible `i18n` instance, or a transport-neutral translation adapter. When no local i18n props are passed it composes with the surrounding Form Engine provider instead of replacing it. `@form-engine-ts/custom-survey-client` is publishable with ESM, CommonJS, and declaration outputs; React and Form Engine packages are peer dependencies.
 
+## v7.6 APIs
+
+Response Summary language state, language labels, language tabs, and language-specific unanswered counts can now be owned by
+the package hook. The hook result is directly spreadable into the component:
+
+```tsx
+const summaryDomain = useSurveyResponseSummaryDomain({
+  summary,
+  version,
+  domainAdapter,
+  languageOptions,
+  defaultLanguage: null,
+  languageLabel: (language) => languageNames[language] ?? language
+});
+
+<SurveyResponseSummaryDomain {...summaryDomain} />
+```
+
+`toLanguageSummaryInput` keeps application-owned aggregate conversion inside the domain adapter. For schema translation,
+use the async-only adapter and package-owned metadata policy/report callback:
+
+```tsx
+await translateSurveySchema({
+  schema,
+  sourceLocale: "en",
+  targetLocale: "ja",
+  signal,
+  translationAdapter: { translateText, translateBatch },
+  metadataPolicy: { source: "AI", preserveManualEdits: true, updateSourceTextHash: true },
+  onReport: setTranslationReport
+});
+```
+
+Mapping reorder supports one atomic operation that returns the committed order and revision. The transport adapter must
+perform the transaction and may provide `rollbackReorder` for a failed commit or result validation:
+
+```tsx
+const result = await mappingCrud.reorderMany({ mappings, selection, signal, expectedRevision });
+```
+
+`reorderMany` is the atomic contract: the adapter performs one transaction and returns the committed mappings and
+revision. `translateSurveySchema` requires `AsyncTranslationAdapter`; synchronous translation belongs to other legacy
+adapter APIs and is not used for schema translation.
+
 ## v7.5 APIs
 
 `SurveyWorkflowControlled` now treats `expanded` as the source of truth for step
