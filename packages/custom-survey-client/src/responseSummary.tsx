@@ -163,13 +163,12 @@ function renderSummaryData(
 ): React.JSX.Element {
   const questionRenderer = renderQuestion ?? slots?.renderQuestion;
   const resolvedLabels = { ...defaultSummaryLabels, ...labels };
-  const languageTabs = slots?.renderLanguageTabs ?? slots?.languageTabs;
   return (
     <section className={className} data-form-id={data.formId} data-version={data.version}>
       {slots?.renderHeader?.(data) ?? slots?.header?.(data) ?? <h2>{data.title}</h2>}
-      {data.languages === undefined || data.languages.length === 0 || languageTabs === undefined
+      {data.languages === undefined || data.languages.length === 0 || slots?.renderLanguageTabs === undefined
         ? null
-        : languageTabs({
+        : slots.renderLanguageTabs({
             languages: data.languages,
             activeLanguage: data.sourceLanguage,
             onChange: onSourceLanguageChange ?? (() => undefined)

@@ -873,17 +873,20 @@ export interface SurveyResponseSummaryLegacyCustomDomainProps<TDomain, TDomainSu
   readonly domainAdapter: SurveyResponseSummaryMapperAdapter<TDomain, TDomainSummary>;
 }
 
-export interface SurveyResponseSummarySlots<TSkipReason = SurveyResponseSummarySkipReason> {
+export interface SurveyResponseSummarySlots {
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-  readonly renderHeader?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
+  readonly renderHeader?: (data: SurveyResponseSummaryData) => ReactNode;
   readonly renderLanguageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
-  readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
-  readonly header?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
+  readonly header?: (data: SurveyResponseSummaryData) => ReactNode;
   readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-  readonly skipReasons?: (reasons: readonly TSkipReason[]) => ReactNode;
+  readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
 }
 
-export interface SurveyResponseSummaryDomainSlots extends SurveyResponseSummarySlots<unknown> {
+export interface SurveyResponseSummaryDomainSlots extends SurveyResponseSummarySlots {
+  readonly renderHeader?: (data: SurveyResponseSummaryData<unknown, unknown>) => ReactNode;
+  readonly header?: (data: SurveyResponseSummaryData<unknown, unknown>) => ReactNode;
+  readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+  readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
   readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
 }
 
@@ -898,7 +901,7 @@ export interface SurveyResponseSummaryComponentProps extends SurveyResponseSumma
 }
 
 export type SurveyResponseSummaryDomainComponentProps<TDomain> = SurveyResponseSummaryDomainProps<TDomain> & {
-  readonly slots?: SurveyResponseSummarySlots;
+  readonly slots?: SurveyResponseSummaryDomainSlots;
 };
 
 export type SurveyResponseSummaryCustomDomainComponentProps<TDomain, TDomainSummary> =

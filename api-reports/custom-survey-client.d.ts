@@ -674,16 +674,19 @@ interface SurveyResponseSummaryLegacyCustomDomainProps<TDomain, TDomainSummary> 
     readonly version: TDomain;
     readonly domainAdapter: SurveyResponseSummaryMapperAdapter<TDomain, TDomainSummary>;
 }
-interface SurveyResponseSummarySlots<TSkipReason = SurveyResponseSummarySkipReason> {
+interface SurveyResponseSummarySlots {
     readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-    readonly renderHeader?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
+    readonly renderHeader?: (data: SurveyResponseSummaryData) => ReactNode;
     readonly renderLanguageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
-    readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
-    readonly header?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
+    readonly header?: (data: SurveyResponseSummaryData) => ReactNode;
     readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
-    readonly skipReasons?: (reasons: readonly TSkipReason[]) => ReactNode;
+    readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
 }
-interface SurveyResponseSummaryDomainSlots extends SurveyResponseSummarySlots<unknown> {
+interface SurveyResponseSummaryDomainSlots extends SurveyResponseSummarySlots {
+    readonly renderHeader?: (data: SurveyResponseSummaryData<unknown, unknown>) => ReactNode;
+    readonly header?: (data: SurveyResponseSummaryData<unknown, unknown>) => ReactNode;
+    readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+    readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
     readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
 }
 interface SurveyResponseSummaryLanguageTabsProps {
@@ -695,7 +698,7 @@ interface SurveyResponseSummaryComponentProps extends SurveyResponseSummaryProps
     readonly slots?: SurveyResponseSummarySlots;
 }
 type SurveyResponseSummaryDomainComponentProps<TDomain> = SurveyResponseSummaryDomainProps<TDomain> & {
-    readonly slots?: SurveyResponseSummarySlots;
+    readonly slots?: SurveyResponseSummaryDomainSlots;
 };
 type SurveyResponseSummaryCustomDomainComponentProps<TDomain, TDomainSummary> = SurveyResponseSummaryLegacyCustomDomainProps<TDomain, TDomainSummary> & {
     readonly slots?: SurveyResponseSummarySlots;
