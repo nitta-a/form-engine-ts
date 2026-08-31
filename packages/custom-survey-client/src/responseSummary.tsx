@@ -2,6 +2,7 @@ import { type FormField, type FormSchema, type FormVersionRecord, resolveLocaliz
 import type {
   SurveyResponseSummaryComponentProps,
   SurveyResponseSummaryData,
+  SurveyResponseSummaryDomainComponentProps,
   SurveyResponseSummaryQuestion,
   SurveySummaryInput
 } from "./types";
@@ -141,4 +142,12 @@ export function SurveyResponseSummary({
       </div>
     </section>
   );
+}
+
+/** Domain-record variant that applies the mapper supplied by the application once. */
+export function SurveyResponseSummaryDomain<TDomain>(
+  props: SurveyResponseSummaryDomainComponentProps<TDomain>
+): React.JSX.Element {
+  const { domainAdapter, version, ...summaryProps } = props;
+  return <SurveyResponseSummary {...summaryProps} version={domainAdapter.toFormSchema(version)} />;
 }

@@ -5,7 +5,8 @@ import type {
   SurveyEditorAdapterInput,
   SurveyEditorOperationState,
   SurveyEditorProps,
-  SurveyEditorRenderProps
+  SurveyEditorRenderProps,
+  UseSurveyEditorOptions
 } from "./types";
 
 function normalizeError(cause: unknown): Error {
@@ -30,9 +31,6 @@ function updateSurveyDraft(adapter: SurveyEditorAdapterInput, schema: FormSchema
   if (update === undefined) throw new TypeError("SurveyEditorAdapter requires updateSurveyDraft.");
   return update(schema);
 }
-
-export interface UseSurveyEditorOptions
-  extends Omit<SurveyEditorProps, "render" | "slots" | "saveLabel" | "translateLabel"> {}
 
 export interface UseSurveyEditorResult extends SurveyEditorRenderProps {
   readonly builder: ReturnType<typeof useFormBuilder>;

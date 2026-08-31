@@ -13,7 +13,11 @@ import type {
 } from "./types";
 
 function normalizeError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(String(cause));
+  if (cause instanceof Error) return cause;
+  if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
+    return new Error(cause.message);
+  }
+  return new Error(String(cause));
 }
 
 function findingsFor(
@@ -97,7 +101,21 @@ export async function translateFreeTextAnswers(
   const findings = items.flatMap((item) => findingsFor(item, options.detectPii));
   const emptyResults = new Map<string, string>();
   if (findings.length > 0 && options.piiConfirmed !== true) {
-    return pendingOutcome(items, findings);
+    if (options.onPiiConfirmation === undefined) return pendingOutcome(items, findings);
+    try {
+      const confirmed = await options.onPiiConfirmation(findings);
+      if (!confirmed) return pendingOutcome(items, findings);
+    } catch (cause) {
+      const error = normalizeError(cause);
+      const errors = new Map(items.map((item) => [item.id, error]));
+      return createOutcome(
+        items,
+        findings,
+        emptyResults,
+        errors,
+        items.map((item) => ({ item, cause }))
+      );
+    }
   }
 
   const batchSize = options.batchSize ?? 20;
@@ -186,6 +204,11 @@ function optionsWithDefaults(
         ? {}
         : { detectPii: defaults.detectPii }
       : { detectPii: options.detectPii }),
+    ...(options.onPiiConfirmation === undefined
+      ? defaults.onPiiConfirmation === undefined
+        ? {}
+        : { onPiiConfirmation: defaults.onPiiConfirmation }
+      : { onPiiConfirmation: options.onPiiConfirmation }),
     ...(options.piiConfirmed === undefined ? {} : { piiConfirmed: options.piiConfirmed }),
     ...(options.signal === undefined ? {} : { signal: options.signal })
   };

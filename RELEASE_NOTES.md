@@ -5,6 +5,15 @@ current release and usage information.
 
 ## Latest release
 
+### v7.3.0 — 2026-08-31
+
+- Added direct free-text translation state synchronization and application-owned asynchronous PII confirmation callbacks.
+- Added structured version action results with adapter error messages, original quality-check payloads, and operation-level result state while preserving boolean v7.2 returns by default.
+- Added reusable domain adapters for editor, response summary, and free-text features, plus the slot-based, UI-library-neutral `SurveyVersionPanel`.
+- Unified provider inputs with namespace and i18n-compatible options and aligned all public packages to version 7.3.0.
+
+See the [GitHub release for v7.3.0](https://github.com/nitta-a/form-engine-ts/releases/tag/v7.3.0).
+
 ### v7.1.0 — 2026-08-31
 
 - Expanded `@form-engine-ts/custom-survey-client` with action-oriented editor and version controller aliases while preserving the existing adapter and hook names.

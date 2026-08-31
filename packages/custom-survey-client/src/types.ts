@@ -32,9 +32,23 @@ export interface SurveyTranslationAdapter extends TranslationAdapter {
 export interface SurveyUiProviderProps {
   readonly locale?: string;
   readonly fallbackLocale?: string;
+  readonly namespaces?: readonly string[];
+  /** Accepts an application i18next instance without requiring an i18next dependency. */
+  readonly i18n?: SurveyI18n;
   readonly translationAdapter?: SurveyTranslationAdapter;
   readonly translator?: (key: string, params?: Record<string, unknown>) => string;
   readonly children: ReactNode;
+}
+
+/** Minimal i18next-compatible surface; the full i18next instance can be supplied structurally. */
+export interface SurveyI18n {
+  readonly language?: string;
+  t(key: string, params?: Readonly<Record<string, unknown>>): unknown;
+}
+
+/** Maps an application-owned survey record to the Form Engine schema used by headless UI primitives. */
+export interface SurveySchemaDomainAdapter<TDomain> {
+  readonly toFormSchema: (domain: TDomain) => FormSchema;
 }
 
 export interface SurveyEditorTranslateRequest {
@@ -58,6 +72,23 @@ export interface SurveyEditorAdapter {
 export interface SurveyEditorActionsAdapter {
   readonly translateSurveyPreview: (request: SurveyEditorTranslateRequest) => Promise<FormSchema>;
   readonly updateSurveyDraft: (schema: FormSchema) => Promise<void>;
+}
+
+export interface SurveyEditorDomainActionsAdapter<TDomain> {
+  readonly translateSurveyPreview: (
+    request: SurveyEditorTranslateRequest & { readonly domain: TDomain }
+  ) => Promise<TDomain>;
+  readonly updateSurveyDraft: (domain: TDomain) => Promise<void>;
+}
+
+export interface UseSurveyEditorDomainOptions<TDomain>
+  extends Omit<UseSurveyEditorOptions, "schema" | "adapter" | "onChange"> {
+  readonly domain: TDomain;
+  readonly domainAdapter: SurveySchemaDomainAdapter<TDomain> & {
+    readonly fromFormSchema: (schema: FormSchema, previous: TDomain) => TDomain;
+  };
+  readonly adapter: SurveyEditorDomainActionsAdapter<TDomain>;
+  readonly onDomainChange?: (domain: TDomain) => void;
 }
 
 export type SurveyEditorAdapterInput = SurveyEditorAdapter | SurveyEditorActionsAdapter;
@@ -102,6 +133,9 @@ export interface SurveyEditorProps
   readonly translateLabel?: string;
 }
 
+export interface UseSurveyEditorOptions
+  extends Omit<SurveyEditorProps, "render" | "slots" | "saveLabel" | "translateLabel"> {}
+
 export interface FreeTextAnswerItem {
   readonly id: string;
   readonly responseId: string;
@@ -114,6 +148,10 @@ export interface FreeTextAnswerItem {
 
 export type FreeTextAnswerSource = FreeTextAnswerItem | FormResponse;
 export type FreeTextAnswerInput = FreeTextAnswerItem | TextAnswerItem | FormResponse;
+
+export interface FreeTextAnswerDomainAdapter<TDomain> {
+  readonly toFreeTextAnswerItem: (domain: TDomain) => FreeTextAnswerItem;
+}
 
 export interface FreeTextTranslationRequest {
   readonly items: readonly FreeTextAnswerItem[];
@@ -136,6 +174,7 @@ export interface TranslateFreeTextAnswersOptions {
   readonly sourceLanguage?: string;
   readonly batchSize?: number;
   readonly piiConfirmed?: boolean;
+  readonly onPiiConfirmation?: (findings: readonly SensitiveDataFinding[]) => boolean | Promise<boolean>;
   readonly detectPii?: (item: FreeTextAnswerItem) => readonly SensitiveDataFinding[];
   readonly signal?: AbortSignal;
 }
@@ -175,9 +214,10 @@ export interface CreateFreeTextTranslationControllerOptions {
   readonly sourceLanguage?: string;
   readonly batchSize?: number;
   readonly detectPii?: (item: FreeTextAnswerItem) => readonly SensitiveDataFinding[];
+  readonly onPiiConfirmation?: TranslateFreeTextAnswersOptions["onPiiConfirmation"];
 }
 
-export type FreeTextItemStatus = "idle" | "translating" | "success" | "error";
+export type FreeTextItemStatus = "idle" | "pending" | "translating" | "success" | "error";
 
 export interface FreeTextTranslationItemState extends FreeTextAnswerItem {
   readonly status: FreeTextItemStatus;
@@ -204,6 +244,22 @@ export interface UseFreeTextAnswerTranslationOptions {
   readonly sourceLanguage?: string;
   readonly batchSize?: number;
   readonly detectPii?: (item: FreeTextAnswerItem) => readonly SensitiveDataFinding[];
+  readonly onPiiConfirmation?: TranslateFreeTextAnswersOptions["onPiiConfirmation"];
+}
+
+export interface UseFreeTextDomainAnswerTranslationOptions<TDomain>
+  extends Omit<UseFreeTextAnswerTranslationOptions, "items"> {
+  readonly items: readonly TDomain[];
+  readonly domainAdapter: FreeTextAnswerDomainAdapter<TDomain>;
+}
+
+export interface UseFreeTextDomainAnswerTranslationResult<TDomain>
+  extends Omit<UseFreeTextAnswerTranslationResult, "translate"> {
+  /** Translates application-owned answer records directly while preserving adapter-provided IDs. */
+  readonly translate: (
+    items: readonly TDomain[],
+    options?: DirectFreeTextTranslationOptions
+  ) => Promise<FreeTextTranslationOutcome>;
 }
 
 export interface UseFreeTextAnswerTranslationResult extends FreeTextTranslationState {
@@ -248,6 +304,13 @@ export interface QualityIssue {
 
 export interface QualityCheckResult {
   readonly issues: readonly QualityIssue[];
+}
+
+export interface SurveyVersionActionResult<TData = void> {
+  readonly succeeded: boolean;
+  readonly data?: TData;
+  readonly error?: Error;
+  readonly requiresConfirmation?: boolean;
 }
 
 export type QualityIssueDecision = "accept" | "reject";
@@ -368,6 +431,13 @@ export type SurveyVersionOperationStatus = "idle" | "loading" | "success" | "err
 export interface SurveyVersionOperationState {
   readonly status: SurveyVersionOperationStatus;
   readonly error?: Error;
+  readonly result?: SurveyVersionActionResult;
+}
+
+export interface SurveyVersionQualityState {
+  readonly status: SurveyVersionOperationStatus;
+  readonly error?: Error;
+  readonly result?: QualityCheckResult;
 }
 
 export interface UseSurveyVersionOperationsOptions {
@@ -377,15 +447,24 @@ export interface UseSurveyVersionOperationsOptions {
 }
 
 export interface UseSurveyVersionOperationsResult {
-  readonly quality: SurveyVersionOperationState & { readonly result?: QualityCheckResult };
+  readonly quality: SurveyVersionQualityState;
   readonly qualityDecisions: Readonly<Record<string, QualityIssueDecision>>;
   readonly operations: Readonly<Record<SurveyVersionOperationName, SurveyVersionOperationState>>;
   readonly runQualityCheck: () => Promise<QualityCheckResult | undefined>;
   readonly decideQualityIssue: (issue: QualityIssue, decision: QualityIssueDecision) => Promise<boolean>;
+  readonly decideQualityIssueResult: (
+    issue: QualityIssue,
+    decision: QualityIssueDecision
+  ) => Promise<SurveyVersionActionResult>;
   readonly publish: (options?: { readonly allowWarnings?: boolean }) => Promise<boolean>;
+  readonly publishResult: (options?: { readonly allowWarnings?: boolean }) => Promise<SurveyVersionActionResult>;
   readonly cloneDraft: () => Promise<boolean>;
+  readonly cloneDraftResult: () => Promise<SurveyVersionActionResult>;
   readonly deleteDraft: () => Promise<boolean>;
+  readonly deleteDraftResult: () => Promise<SurveyVersionActionResult>;
   readonly setVisibility: (status: "draft" | "published" | "archived") => Promise<boolean>;
+  readonly setVisibilityResult: (status: "draft" | "published" | "archived") => Promise<SurveyVersionActionResult>;
+  readonly runQualityCheckResult: () => Promise<SurveyVersionActionResult<QualityCheckResult>>;
   /** @deprecated Use cloneDraft. */
   readonly duplicate: () => Promise<boolean>;
   /** @deprecated Use deleteDraft. */
@@ -437,6 +516,11 @@ export interface SurveyResponseSummaryProps {
   readonly className?: string;
 }
 
+export interface SurveyResponseSummaryDomainProps<TDomain> extends Omit<SurveyResponseSummaryProps, "version"> {
+  readonly version: TDomain;
+  readonly domainAdapter: SurveySchemaDomainAdapter<TDomain>;
+}
+
 export interface SurveyResponseSummarySlots {
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly renderHeader?: (data: SurveyResponseSummaryData) => ReactNode;
@@ -445,6 +529,10 @@ export interface SurveyResponseSummarySlots {
 export interface SurveyResponseSummaryComponentProps extends SurveyResponseSummaryProps {
   readonly slots?: SurveyResponseSummarySlots;
 }
+
+export type SurveyResponseSummaryDomainComponentProps<TDomain> = SurveyResponseSummaryDomainProps<TDomain> & {
+  readonly slots?: SurveyResponseSummarySlots;
+};
 
 export type SurveyClientAsyncState = {
   readonly status: "idle" | "loading" | "success" | "error";

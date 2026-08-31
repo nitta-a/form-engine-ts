@@ -17,7 +17,11 @@ import type {
 } from "./types";
 
 function normalizeError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(String(cause));
+  if (cause instanceof Error) return cause;
+  if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
+    return new Error(cause.message);
+  }
+  return new Error(String(cause));
 }
 
 function initialItems(items: readonly FreeTextAnswerItem[]): FreeTextTranslationItemState[] {
@@ -50,6 +54,36 @@ function initialState(
   };
 }
 
+function mergeDirectOutcome(
+  current: FreeTextTranslationState,
+  outcome: Awaited<ReturnType<typeof translateFreeTextAnswers>>
+): FreeTextTranslationState {
+  const outcomeById = new Map(outcome.items.map((item) => [item.id, item]));
+  const existingIds = new Set(current.items.map((item) => item.id));
+  const mergedItems: FreeTextTranslationItemState[] = current.items.map((item) => {
+    const next = outcomeById.get(item.id);
+    return next === undefined ? item : next;
+  });
+  for (const item of outcome.items) {
+    if (!existingIds.has(item.id)) mergedItems.push(item);
+  }
+  const status =
+    outcome.status === "needs_confirmation"
+      ? "needs_confirmation"
+      : outcome.status === "success"
+        ? "success"
+        : outcome.status === "cancelled"
+          ? "idle"
+          : "error";
+  return {
+    ...current,
+    status,
+    items: mergedItems,
+    findings: outcome.findings,
+    ...(outcome.error === undefined ? {} : { error: outcome.error })
+  };
+}
+
 function findingsFor(
   item: FreeTextAnswerItem,
   detectPii: UseFreeTextAnswerTranslationOptions["detectPii"]
@@ -64,7 +98,8 @@ export function useFreeTextAnswerTranslation({
   targetLanguage,
   sourceLanguage,
   batchSize = 20,
-  detectPii
+  detectPii,
+  onPiiConfirmation: onPiiConfirmationFromHook
 }: UseFreeTextAnswerTranslationOptions): UseFreeTextAnswerTranslationResult {
   const items = useStableFreeTextItems(inputItems);
   const effectiveSourceLanguage = sourceLanguage ?? items[0]?.sourceLanguage ?? "";
@@ -104,9 +139,23 @@ export function useFreeTextAnswerTranslation({
     async (skipConfirmation: boolean): Promise<FreeTextTranslationState> => {
       const findings = selectedItems.flatMap((item) => findingsFor(item, detectPii));
       if (!skipConfirmation && findings.length > 0 && !piiConfirmed) {
-        const next = { ...state, status: "needs_confirmation" as const, findings };
-        setState(next);
-        return next;
+        if (onPiiConfirmationFromHook === undefined) {
+          const next = { ...state, status: "needs_confirmation" as const, findings };
+          setState(next);
+          return next;
+        }
+        try {
+          if (!(await onPiiConfirmationFromHook(findings))) {
+            const next = { ...state, status: "needs_confirmation" as const, findings };
+            setState(next);
+            return next;
+          }
+        } catch (cause) {
+          const error = normalizeError(cause);
+          const next = { ...state, status: "error" as const, findings, error };
+          setState(next);
+          return next;
+        }
       }
       if (selectedItems.length === 0) return state;
       if (!Number.isSafeInteger(batchSize) || batchSize < 1) {
@@ -177,7 +226,7 @@ export function useFreeTextAnswerTranslation({
         return failed;
       }
     },
-    [adapter, batchSize, detectPii, piiConfirmed, selectedItems, state, targetLanguage]
+    [adapter, batchSize, detectPii, onPiiConfirmationFromHook, piiConfirmed, selectedItems, state, targetLanguage]
   );
 
   const confirmPii = useCallback(() => {
@@ -193,17 +242,22 @@ export function useFreeTextAnswerTranslation({
   const translateSelected = useCallback(() => executeTranslation(false), [executeTranslation]);
 
   const translate = useCallback(
-    (inputItems: readonly FreeTextAnswerInput[], options: DirectFreeTextTranslationOptions = {}) =>
-      translateFreeTextAnswers(inputItems, adapter, {
+    async (inputItems: readonly FreeTextAnswerInput[], options: DirectFreeTextTranslationOptions = {}) => {
+      const onPiiConfirmation = options.onPiiConfirmation ?? onPiiConfirmationFromHook;
+      const outcome = await translateFreeTextAnswers(inputItems, adapter, {
         ...options,
         targetLanguage: options.targetLanguage ?? targetLanguage,
         ...(options.sourceLanguage === undefined
           ? sourceLanguage === undefined
             ? {}
             : { sourceLanguage }
-          : { sourceLanguage: options.sourceLanguage })
-      }),
-    [adapter, sourceLanguage, targetLanguage]
+          : { sourceLanguage: options.sourceLanguage }),
+        ...(onPiiConfirmation === undefined ? {} : { onPiiConfirmation })
+      });
+      setState((current) => mergeDirectOutcome(current, outcome));
+      return outcome;
+    },
+    [adapter, onPiiConfirmationFromHook, sourceLanguage, targetLanguage]
   );
 
   const reset = useCallback(() => {
@@ -229,7 +283,7 @@ export function useFreeTextAnswerTranslation({
 export function useFreeTextAnswerTranslationController(
   options: CreateFreeTextTranslationControllerOptions
 ): FreeTextTranslationController {
-  const { adapter, targetLanguage, sourceLanguage, batchSize, detectPii } = options;
+  const { adapter, targetLanguage, sourceLanguage, batchSize, detectPii, onPiiConfirmation } = options;
   return useMemo(
     () =>
       createFreeTextTranslationController({
@@ -237,9 +291,10 @@ export function useFreeTextAnswerTranslationController(
         targetLanguage,
         ...(sourceLanguage === undefined ? {} : { sourceLanguage }),
         ...(batchSize === undefined ? {} : { batchSize }),
-        ...(detectPii === undefined ? {} : { detectPii })
+        ...(detectPii === undefined ? {} : { detectPii }),
+        ...(onPiiConfirmation === undefined ? {} : { onPiiConfirmation })
       }),
-    [adapter, batchSize, detectPii, sourceLanguage, targetLanguage]
+    [adapter, batchSize, detectPii, onPiiConfirmation, sourceLanguage, targetLanguage]
   );
 }
 
@@ -261,6 +316,7 @@ export function FreeTextAnswerTranslations({
   sourceLanguage,
   batchSize,
   detectPii,
+  onPiiConfirmation,
   slots,
   title = "Free-text answers",
   translateLabel = "Translate selected"
@@ -271,7 +327,8 @@ export function FreeTextAnswerTranslations({
     targetLanguage,
     ...(sourceLanguage === undefined ? {} : { sourceLanguage }),
     ...(batchSize === undefined ? {} : { batchSize }),
-    ...(detectPii === undefined ? {} : { detectPii })
+    ...(detectPii === undefined ? {} : { detectPii }),
+    ...(onPiiConfirmation === undefined ? {} : { onPiiConfirmation })
   });
   const selected = new Set(translation.selectedIds);
   const groups = new Map<string, FreeTextTranslationItemState[]>();

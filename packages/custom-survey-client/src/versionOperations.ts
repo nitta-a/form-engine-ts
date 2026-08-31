@@ -7,15 +7,33 @@ import type {
   QualityIssue,
   QualityIssueDecision,
   SurveyVersionActionAdapter,
+  SurveyVersionActionResult,
   SurveyVersionOperationName,
   SurveyVersionOperationState,
+  SurveyVersionQualityState,
   UseSurveyVersionDomainActionsOptions,
   UseSurveyVersionOperationsOptions,
   UseSurveyVersionOperationsResult
 } from "./types";
 
 function normalizeError(cause: unknown): Error {
-  return cause instanceof Error ? cause : new Error(String(cause));
+  if (cause instanceof Error) return cause;
+  if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
+    return new Error(cause.message);
+  }
+  return new Error(String(cause));
+}
+
+function actionResult<TData = void>(
+  succeeded: boolean,
+  error?: Error,
+  options: { readonly requiresConfirmation?: boolean } = {}
+): SurveyVersionActionResult<TData> {
+  return {
+    succeeded,
+    ...(error === undefined ? {} : { error }),
+    ...(options.requiresConfirmation === true ? { requiresConfirmation: true } : {})
+  };
 }
 
 function operationStates(): Record<SurveyVersionOperationName, SurveyVersionOperationState> {
@@ -78,12 +96,13 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
   adapter
 }: UseSurveyVersionDomainActionsOptions<TVersion, TState>): UseSurveyVersionOperationsResult {
   const [operations, setOperations] = useState(operationStates);
-  const [quality, setQuality] = useState<SurveyVersionOperationState & { readonly result?: QualityCheckResult }>({
+  const [quality, setQuality] = useState<SurveyVersionQualityState>({
     status: "idle"
   });
   const [qualityDecisions, setQualityDecisions] = useState<Readonly<Record<string, QualityIssueDecision>>>({});
   const qualityDecisionsRef = useRef<Readonly<Record<string, QualityIssueDecision>>>({});
   const qualityRef = useRef<QualityCheckResult | undefined>(undefined);
+  const qualityErrorRef = useRef<Error | undefined>(undefined);
   const previousVersion = useRef<{
     readonly version: TVersion;
     readonly state?: TState;
@@ -99,6 +118,7 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
       ...(versionState === undefined ? {} : { state: versionState })
     };
     qualityRef.current = undefined;
+    qualityErrorRef.current = undefined;
     setQuality({ status: "idle" });
     qualityDecisionsRef.current = {};
     setQualityDecisions({});
@@ -120,11 +140,13 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
       if (qualityCheck === undefined) throw new TypeError("SurveyVersionActionsAdapter requires runQualityCheck.");
       const result = await qualityCheck(request(controller.signal));
       qualityRef.current = result;
+      qualityErrorRef.current = undefined;
       setQuality({ status: "success", result });
       setOperations((current) => setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "success" }));
       return result;
     } catch (cause) {
       const error = normalizeError(cause);
+      qualityErrorRef.current = error;
       setQuality({ status: "error", error });
       setOperations((current) =>
         setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "error", error })
@@ -133,18 +155,29 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
     }
   }, [adapter, request]);
 
-  const publish = useCallback(
-    async (options: { readonly allowWarnings?: boolean } = {}): Promise<boolean> => {
+  const publishActionResult = useCallback(
+    async (options: { readonly allowWarnings?: boolean } = {}): Promise<SurveyVersionActionResult> => {
       const allowWarnings = options.allowWarnings ?? false;
       const qualityCheck = adapter.runQualityCheck ?? adapter.qualityCheck;
       const qualityResult = qualityCheck === undefined ? undefined : (qualityRef.current ?? (await runQualityCheck()));
-      if (qualityCheck !== undefined && qualityResult === undefined) return false;
+      if (qualityCheck !== undefined && qualityResult === undefined) {
+        const result = actionResult(false, qualityErrorRef.current);
+        setOperations((current) =>
+          setOperation(current, ["publish"], {
+            status: "error",
+            result,
+            ...(result.error === undefined ? {} : { error: result.error })
+          })
+        );
+        return result;
+      }
       const unresolvedIssues = (qualityResult?.issues ?? []).filter(
         (issue) => qualityDecisionsRef.current[issueKey(issue)] !== "accept"
       );
       if (!allowWarnings && unresolvedIssues.length > 0) {
-        setOperations((current) => setOperation(current, ["publish"], { status: "needs_confirmation" }));
-        return false;
+        const result = actionResult(false, undefined, { requiresConfirmation: true });
+        setOperations((current) => setOperation(current, ["publish"], { status: "needs_confirmation", result }));
+        return result;
       }
       const publishAction = adapter.publish;
       const controller = new AbortController();
@@ -156,19 +189,34 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
           allowWarnings
         };
         await publishAction(publishRequest);
-        setOperations((current) => setOperation(current, ["publish"], { status: "success" }));
-        return true;
+        const result = actionResult(true);
+        setOperations((current) => setOperation(current, ["publish"], { status: "success", result }));
+        return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, ["publish"], { status: "error", error }));
-        return false;
+        const result = actionResult(false, error);
+        setOperations((current) => setOperation(current, ["publish"], { status: "error", error, result }));
+        return result;
       }
     },
     [adapter.publish, adapter.qualityCheck, adapter.runQualityCheck, request, runQualityCheck]
   );
 
-  const decideQualityIssue = useCallback(
-    async (issue: QualityIssue, decision: QualityIssueDecision): Promise<boolean> => {
+  const publish = useCallback(
+    async (options: { readonly allowWarnings?: boolean } = {}): Promise<boolean> =>
+      (await publishActionResult(options)).succeeded,
+    [publishActionResult]
+  );
+
+  const publishResult = useCallback(
+    async (options: { readonly allowWarnings?: boolean } = {}): Promise<SurveyVersionActionResult> => {
+      return publishActionResult(options);
+    },
+    [publishActionResult]
+  );
+
+  const decideQualityIssueResult = useCallback(
+    async (issue: QualityIssue, decision: QualityIssueDecision): Promise<SurveyVersionActionResult> => {
       const decide = adapter.decideQualityIssue;
       const controller = new AbortController();
       setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "loading" }));
@@ -183,15 +231,23 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
         const key = issueKey(issue);
         qualityDecisionsRef.current = { ...qualityDecisionsRef.current, [key]: decision };
         setQualityDecisions((current) => ({ ...current, [key]: decision }));
-        setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "success" }));
-        return true;
+        const result = actionResult(true);
+        setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "success", result }));
+        return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "error", error }));
-        return false;
+        const result = actionResult(false, error);
+        setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "error", error, result }));
+        return result;
       }
     },
     [adapter.decideQualityIssue, request]
+  );
+
+  const decideQualityIssue = useCallback(
+    async (issue: QualityIssue, decision: QualityIssueDecision): Promise<boolean> =>
+      (await decideQualityIssueResult(issue, decision)).succeeded,
+    [decideQualityIssueResult]
   );
 
   const runSimpleOperation = useCallback(
@@ -199,33 +255,43 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
       names: readonly SurveyVersionOperationName[],
       operation: ((request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>) | undefined,
       requiredName: string
-    ): Promise<boolean> => {
+    ): Promise<SurveyVersionActionResult> => {
       const controller = new AbortController();
       setOperations((current) => setOperation(current, names, { status: "loading" }));
       try {
         if (operation === undefined) throw new TypeError(`SurveyVersionActionsAdapter requires ${requiredName}.`);
         await operation(request(controller.signal));
-        setOperations((current) => setOperation(current, names, { status: "success" }));
-        return true;
+        const result = actionResult(true);
+        setOperations((current) => setOperation(current, names, { status: "success", result }));
+        return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, names, { status: "error", error }));
-        return false;
+        const result = actionResult(false, error);
+        setOperations((current) => setOperation(current, names, { status: "error", error, result }));
+        return result;
       }
     },
     [request]
   );
 
-  const cloneDraft = useCallback(
+  const cloneDraftResult = useCallback(
     () => runSimpleOperation(["cloneDraft", "duplicate"], adapter.cloneDraft ?? adapter.duplicate, "cloneDraft"),
     [adapter.cloneDraft, adapter.duplicate, runSimpleOperation]
   );
-  const deleteDraft = useCallback(
+  const cloneDraft = useCallback(
+    async (): Promise<boolean> => (await cloneDraftResult()).succeeded,
+    [cloneDraftResult]
+  );
+  const deleteDraftResult = useCallback(
     () => runSimpleOperation(["deleteDraft", "delete"], adapter.deleteDraft ?? adapter.delete, "deleteDraft"),
     [adapter.delete, adapter.deleteDraft, runSimpleOperation]
   );
-  const setVisibility = useCallback(
-    async (status: "draft" | "published" | "archived"): Promise<boolean> => {
+  const deleteDraft = useCallback(
+    async (): Promise<boolean> => (await deleteDraftResult()).succeeded,
+    [deleteDraftResult]
+  );
+  const setVisibilityResult = useCallback(
+    async (status: "draft" | "published" | "archived"): Promise<SurveyVersionActionResult> => {
       const setVisibilityAction = adapter.setVisibility ?? adapter.setStatus;
       const controller = new AbortController();
       setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "loading" }));
@@ -233,15 +299,27 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
         if (setVisibilityAction === undefined)
           throw new TypeError("SurveyVersionActionsAdapter requires setVisibility.");
         await setVisibilityAction({ ...request(controller.signal), status });
-        setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "success" }));
-        return true;
+        const result = actionResult(true);
+        setOperations((current) =>
+          setOperation(current, ["setVisibility", "setStatus"], { status: "success", result })
+        );
+        return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "error", error }));
-        return false;
+        const result = actionResult(false, error);
+        setOperations((current) =>
+          setOperation(current, ["setVisibility", "setStatus"], { status: "error", error, result })
+        );
+        return result;
       }
     },
     [adapter.setStatus, adapter.setVisibility, request]
+  );
+
+  const setVisibility = useCallback(
+    async (status: "draft" | "published" | "archived"): Promise<boolean> =>
+      (await setVisibilityResult(status)).succeeded,
+    [setVisibilityResult]
   );
 
   return {
@@ -250,10 +328,21 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
     operations,
     runQualityCheck,
     decideQualityIssue,
+    decideQualityIssueResult,
     publish,
+    publishResult,
+    runQualityCheckResult: async () => {
+      const result = await runQualityCheck();
+      return result === undefined
+        ? actionResult<QualityCheckResult>(false, qualityErrorRef.current)
+        : { succeeded: true, data: result };
+    },
     cloneDraft,
+    cloneDraftResult,
     deleteDraft,
+    deleteDraftResult,
     setVisibility,
+    setVisibilityResult,
     duplicate: cloneDraft,
     delete: deleteDraft,
     setStatus: setVisibility

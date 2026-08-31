@@ -1,5 +1,5 @@
 import type { FormAnalytics, FormSchema } from "@form-engine-ts/core";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import {
   composeSurveyVersionActions,
   createFreeTextTranslationController,
@@ -8,14 +8,20 @@ import {
   SurveyEditor,
   type SurveyEditorAdapter,
   SurveyResponseSummary,
+  type SurveyUiProviderProps,
   type SurveyVersionActionAdapter,
   type SurveyVersionAdapter,
+  SurveyVersionPanel,
+  surveyQualityIssueKey,
   toSurveyResponseSummary,
   translateFreeTextAnswers,
   useFreeTextAnswerTranslation,
+  useFreeTextDomainAnswerTranslation,
   useSurveyEditor,
+  useSurveyMapping,
   useSurveyVersionDomainActions,
-  useSurveyVersionOperations
+  useSurveyVersionOperations,
+  useSurveyWorkflow
 } from "../src";
 
 const schema: FormSchema = {
@@ -186,6 +192,125 @@ describe("custom survey client", () => {
     });
   });
 
+  it("updates hook item state for direct translation and accepts an application PII callback", async () => {
+    const item: FreeTextAnswerItem = {
+      id: "direct-email",
+      responseId: "r1",
+      fieldId: "comment",
+      text: "person@example.com",
+      sourceLanguage: "en",
+      findings: [{ fieldId: "comment", type: "email" }]
+    };
+    const onPiiConfirmation = vi.fn().mockResolvedValue(true);
+    const adapter = { translateBatch: vi.fn().mockResolvedValue([{ id: item.id, text: "翻訳済み" }]) };
+    const { result } = renderHook(() =>
+      useFreeTextAnswerTranslation({
+        items: [item],
+        adapter,
+        targetLanguage: "ja",
+        onPiiConfirmation
+      })
+    );
+
+    await act(async () => {
+      const outcome = await result.current.translate([item]);
+      expect(outcome.status).toBe("success");
+    });
+
+    expect(onPiiConfirmation).toHaveBeenCalledWith(item.findings);
+    expect(result.current.items[0]).toEqual(expect.objectContaining({ id: item.id, translatedText: "翻訳済み" }));
+    expect(result.current.items[0]?.status).toBe("success");
+  });
+
+  it("translates domain answer arrays directly and preserves adapter-provided IDs", async () => {
+    type DomainAnswer = { readonly answerId: string; readonly text: string };
+    const answer: DomainAnswer = { answerId: "domain-1", text: "hello" };
+    const adapter = {
+      translateBatch: vi.fn().mockResolvedValue([{ id: answer.answerId, text: "こんにちは" }])
+    };
+    const { result } = renderHook(() =>
+      useFreeTextDomainAnswerTranslation({
+        items: [answer],
+        domainAdapter: {
+          toFreeTextAnswerItem: (domainAnswer) => ({
+            id: domainAnswer.answerId,
+            responseId: domainAnswer.answerId,
+            fieldId: "comment",
+            text: domainAnswer.text,
+            sourceLanguage: "en"
+          })
+        },
+        adapter,
+        targetLanguage: "ja"
+      })
+    );
+
+    await act(async () => {
+      const outcome = await result.current.translate([answer]);
+      expect(outcome.items[0]).toEqual(expect.objectContaining({ id: "domain-1", translatedText: "こんにちは" }));
+    });
+    expect(result.current.items[0]).toEqual(expect.objectContaining({ id: "domain-1", translatedText: "こんにちは" }));
+  });
+
+  it("accepts an i18next-shaped instance without a type assertion", () => {
+    const i18n = {
+      language: "ja",
+      t: (key: string, options?: { readonly ns?: string | readonly string[] }) => `${options?.ns ?? "common"}:${key}`
+    };
+    const props: SurveyUiProviderProps = { i18n, children: null };
+    expect(props.i18n).toBe(i18n);
+  });
+
+  it("returns the adapter error from structured version action results", async () => {
+    const error = new Error("publish failed at Maker API");
+    const publish = vi.fn().mockRejectedValue(error);
+    const { result } = renderHook(() => useSurveyVersionOperations({ version: schema, adapter: { publish } }));
+
+    let actionResult: { succeeded: boolean; error?: Error } | undefined;
+    await act(async () => {
+      actionResult = await result.current.publishResult();
+    });
+
+    expect(actionResult).toEqual({ succeeded: false, error });
+    expect(result.current.operations.publish.result).toEqual({ succeeded: false, error });
+  });
+
+  it("supports generic domain workflow and mapping adapters", async () => {
+    type SurveyDomain = { readonly id: string; readonly state: string };
+    const domain: SurveyDomain = { id: "survey", state: "draft" };
+    const transition = vi.fn().mockResolvedValue({ ...domain, state: "published" });
+    const onDomainChange = vi.fn();
+    const workflow = renderHook(() =>
+      useSurveyWorkflow({
+        domain,
+        transitions: [{ id: "publish", label: "Publish" }],
+        adapter: { transition },
+        onDomainChange
+      })
+    );
+
+    await act(async () => expect(await workflow.result.current.transition("publish")).toBe(true));
+    expect(transition).toHaveBeenCalledWith(expect.objectContaining({ domain, transition: "publish" }));
+    expect(onDomainChange).toHaveBeenCalledWith({ id: "survey", state: "published" });
+
+    const saveMappings = vi.fn().mockResolvedValue(undefined);
+    const mappings = [{ id: "m1", sourceFieldId: "name", targetFieldId: "fullName" }];
+    const mapping = renderHook(() => useSurveyMapping({ domain, mappings, adapter: { saveMappings } }));
+    act(() =>
+      mapping.result.current.setMappings([...mappings, { id: "m2", sourceFieldId: "email", targetFieldId: "mail" }])
+    );
+    await act(async () => expect(await mapping.result.current.save()).toBe(true));
+    expect(saveMappings).toHaveBeenCalledWith(
+      expect.objectContaining({ mappings: expect.arrayContaining([expect.objectContaining({ id: "m2" })]) })
+    );
+  });
+
+  it("uses stable quality issue keys for custom quality slots", () => {
+    expect(surveyQualityIssueKey({ code: "missing", message: "Missing", path: "fields.0.title" })).toBe(
+      "missing:fields.0.title"
+    );
+  });
+
   it("gates publishing behind a warning confirmation and tracks operation state", async () => {
     const adapter: SurveyVersionAdapter = {
       qualityCheck: vi
@@ -248,6 +373,29 @@ describe("custom survey client", () => {
 
     expect(publish).toHaveBeenCalledWith(expect.objectContaining({ allowWarnings: false, version: schema }));
     expect(cloneDraft).toHaveBeenCalledWith(expect.objectContaining({ version: schema }));
+  });
+
+  it("allows the default version panel warning dialog to be dismissed", async () => {
+    const adapter: SurveyVersionAdapter = {
+      qualityCheck: vi.fn().mockResolvedValue({
+        issues: [{ code: "missing", message: "Missing translation", severity: "warning" }]
+      }),
+      publish: vi.fn().mockResolvedValue(undefined)
+    };
+    const { result } = renderHook(() => useSurveyVersionOperations({ version: schema, adapter }));
+
+    await act(async () => {
+      await result.current.runQualityCheck();
+      await result.current.publish();
+    });
+
+    const view = render(<SurveyVersionPanel version={schema} actions={result.current} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Quality warnings must be confirmed");
+    await act(async () => {
+      screen.getByRole("button", { name: "Cancel" }).click();
+    });
+    expect(screen.queryByText("Quality warnings must be confirmed before publishing.")).toBeNull();
+    view.unmount();
   });
 
   it("passes application-owned version records through the domain controller", async () => {
