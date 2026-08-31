@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 
 export interface SurveyWorkflowTransition<TTransitionId = string> {
   readonly id: TTransitionId;
@@ -8,6 +8,7 @@ export interface SurveyWorkflowTransition<TTransitionId = string> {
 export interface SurveyWorkflowTransitionRequest<TDomain, TTransitionId> {
   readonly domain: TDomain;
   readonly transition: TTransitionId;
+  readonly workflowState?: SurveyWorkflowState<TTransitionId>;
   readonly signal: AbortSignal;
 }
 
@@ -23,19 +24,38 @@ export interface SurveyWorkflowState<TTransitionId = string> {
   readonly status: SurveyWorkflowStatus;
   readonly transition?: TTransitionId;
   readonly error?: Error;
+  readonly completed?: boolean;
+  readonly progressValue?: number;
+  readonly tabIndex?: number;
+  readonly expanded?: boolean;
 }
 
 export interface UseSurveyWorkflowOptions<TDomain, TTransitionId = string> {
   readonly domain: TDomain;
   readonly transitions: readonly SurveyWorkflowTransition<TTransitionId>[];
   readonly adapter: SurveyWorkflowAdapter<TDomain, TTransitionId>;
+  /** A calculated state supplied by the host application. */
+  readonly controlledState?: SurveyWorkflowState<TTransitionId>;
+  /** Alias for controlledState, convenient when the host already calls this value state. */
+  readonly state?: SurveyWorkflowState<TTransitionId>;
+  readonly expanded?: boolean;
+  readonly onToggle?: (expanded: boolean) => void;
+  readonly progressValue?: number;
+  readonly tabIndex?: number;
+  readonly onTabChange?: (tabIndex: number) => void;
+  readonly onStateChange?: (state: SurveyWorkflowState<TTransitionId>) => void;
   readonly onDomainChange?: (domain: TDomain) => void;
 }
 
 export interface UseSurveyWorkflowResult<TDomain, TTransitionId = string> {
   readonly domain: TDomain;
   readonly state: SurveyWorkflowState<TTransitionId>;
+  readonly expanded: boolean;
+  readonly progressValue?: number;
+  readonly tabIndex?: number;
   readonly transition: (transition: TTransitionId) => Promise<boolean>;
+  readonly toggle: () => void;
+  readonly setTab: (tabIndex: number) => void;
 }
 
 export interface SurveyWorkflowPanelSlots<TDomain, TTransitionId = string> {
@@ -45,6 +65,7 @@ export interface SurveyWorkflowPanelSlots<TDomain, TTransitionId = string> {
     readonly run: () => void;
   }) => ReactNode;
   readonly notifications?: (state: SurveyWorkflowState<TTransitionId>) => ReactNode;
+  readonly status?: (state: SurveyWorkflowState<TTransitionId>) => ReactNode;
   readonly after?: (domain: TDomain) => ReactNode;
 }
 
@@ -55,6 +76,28 @@ export interface SurveyWorkflowPanelProps<TDomain, TTransitionId = string>
   readonly title?: string;
 }
 
+export interface SurveyWorkflowControlledProps<TState> {
+  readonly state: TState;
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+  readonly progress?: { readonly value: number; readonly label?: ReactNode };
+  readonly onNavigate?: (tab: number) => void;
+  readonly steps?: readonly unknown[];
+  readonly renderStep?: (step: unknown, state: TState) => ReactNode;
+  readonly slots?: {
+    readonly header?: (state: TState) => ReactNode;
+    readonly step?: (step: unknown, state: TState) => ReactNode;
+    readonly notifications?: (state: TState) => ReactNode;
+  };
+}
+
+export interface UseSurveyWorkflowControlledResult<TState> {
+  readonly state: TState;
+  readonly expanded: boolean;
+  readonly toggle: () => void;
+  readonly navigate: (tab: number) => void;
+}
+
 function normalizeError(cause: unknown): Error {
   if (cause instanceof Error) return cause;
   if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
@@ -63,47 +106,148 @@ function normalizeError(cause: unknown): Error {
   return new Error(String(cause));
 }
 
+export function useSurveyWorkflowControlled<TState>(
+  props: SurveyWorkflowControlledProps<TState>
+): UseSurveyWorkflowControlledResult<TState> {
+  const toggle = useCallback(() => props.onToggle(), [props.onToggle]);
+  const navigate = useCallback((tab: number) => props.onNavigate?.(tab), [props.onNavigate]);
+  return { state: props.state, expanded: props.expanded, toggle, navigate };
+}
+
+export function SurveyWorkflowControlled<TState>(props: SurveyWorkflowControlledProps<TState>): React.JSX.Element {
+  const workflow = useSurveyWorkflowControlled(props);
+  return (
+    <section className="fe-survey-workflow-controlled">
+      {props.slots?.header?.(workflow.state)}
+      <button type="button" aria-expanded={workflow.expanded} onClick={workflow.toggle}>
+        {workflow.expanded ? "Collapse" : "Expand"}
+      </button>
+      {props.progress === undefined ? null : (
+        <div role="progressbar" aria-valuenow={props.progress.value}>
+          {props.progress.label ?? `${props.progress.value}%`}
+        </div>
+      )}
+      <div>
+        {props.steps?.map((step) => (
+          <div key={typeof step === "string" || typeof step === "number" ? step : JSON.stringify(step)}>
+            {props.slots?.step?.(step, workflow.state) ?? props.renderStep?.(step, workflow.state)}
+          </div>
+        ))}
+      </div>
+      {props.slots?.notifications?.(workflow.state)}
+    </section>
+  );
+}
+
 export function useSurveyWorkflow<TDomain, TTransitionId = string>({
   domain,
   transitions,
   adapter,
+  controlledState,
+  state: inputState,
+  expanded: controlledExpanded,
+  onToggle,
+  progressValue: controlledProgressValue,
+  tabIndex: controlledTabIndex,
+  onTabChange,
+  onStateChange,
   onDomainChange
 }: UseSurveyWorkflowOptions<TDomain, TTransitionId>): UseSurveyWorkflowResult<TDomain, TTransitionId> {
   const domainRef = useRef(domain);
   domainRef.current = domain;
-  const [state, setState] = useState<SurveyWorkflowState<TTransitionId>>({ status: "idle" });
+  const [internalState, setInternalState] = useState<SurveyWorkflowState<TTransitionId>>({ status: "idle" });
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const resolvedControlledState = controlledState ?? inputState;
+  const expanded = controlledExpanded ?? resolvedControlledState?.expanded ?? internalExpanded;
+  const state = useMemo<SurveyWorkflowState<TTransitionId>>(
+    () => ({
+      ...internalState,
+      ...resolvedControlledState,
+      expanded,
+      ...(controlledProgressValue === undefined
+        ? resolvedControlledState?.progressValue === undefined
+          ? {}
+          : { progressValue: resolvedControlledState.progressValue }
+        : { progressValue: controlledProgressValue }),
+      ...(controlledTabIndex === undefined
+        ? resolvedControlledState?.tabIndex === undefined
+          ? {}
+          : { tabIndex: resolvedControlledState.tabIndex }
+        : { tabIndex: controlledTabIndex })
+    }),
+    [controlledProgressValue, controlledTabIndex, expanded, internalState, resolvedControlledState]
+  );
+  const setState = useCallback(
+    (next: SurveyWorkflowState<TTransitionId>) => {
+      setInternalState(next);
+      onStateChange?.(next);
+    },
+    [onStateChange]
+  );
+
+  const toggle = useCallback(() => {
+    const nextExpanded = !expanded;
+    if (controlledExpanded === undefined && resolvedControlledState?.expanded === undefined)
+      setInternalExpanded(nextExpanded);
+    onToggle?.(nextExpanded);
+  }, [controlledExpanded, expanded, onToggle, resolvedControlledState?.expanded]);
+
+  const setTab = useCallback(
+    (nextTabIndex: number) => {
+      if (controlledTabIndex === undefined && resolvedControlledState?.tabIndex === undefined) {
+        setInternalState((current) => ({ ...current, tabIndex: nextTabIndex }));
+      }
+      onTabChange?.(nextTabIndex);
+    },
+    [controlledTabIndex, onTabChange, resolvedControlledState?.tabIndex]
+  );
 
   const transition = useCallback(
     async (transitionId: TTransitionId): Promise<boolean> => {
       const knownTransition = transitions.some(({ id }) => id === transitionId);
       if (!knownTransition) {
-        setState({ status: "error", transition: transitionId, error: new Error("Unknown workflow transition.") });
+        setState({
+          ...state,
+          status: "error",
+          transition: transitionId,
+          error: new Error("Unknown workflow transition.")
+        });
         return false;
       }
       const controller = new AbortController();
-      setState({ status: "loading", transition: transitionId });
+      setState({ ...state, status: "loading", transition: transitionId });
       try {
         const nextDomain = await adapter.transition({
           domain: domainRef.current,
           transition: transitionId,
+          workflowState: state,
           signal: controller.signal
         });
         if (nextDomain !== undefined) {
           domainRef.current = nextDomain;
           onDomainChange?.(nextDomain);
         }
-        setState({ status: "success", transition: transitionId });
+        setState({ ...state, status: "success", transition: transitionId });
         return true;
       } catch (cause) {
         const error = normalizeError(cause);
-        setState({ status: "error", transition: transitionId, error });
+        setState({ ...state, status: "error", transition: transitionId, error });
         return false;
       }
     },
-    [adapter, onDomainChange, transitions]
+    [adapter, onDomainChange, setState, state, transitions]
   );
 
-  return { domain: domainRef.current, state, transition };
+  return {
+    domain: domainRef.current,
+    state,
+    expanded,
+    ...(state.progressValue === undefined ? {} : { progressValue: state.progressValue }),
+    ...(state.tabIndex === undefined ? {} : { tabIndex: state.tabIndex }),
+    transition,
+    toggle,
+    setTab
+  };
 }
 
 /** Generic workflow controls with application-owned transition labels and transport. */
@@ -118,6 +262,10 @@ export function SurveyWorkflowPanel<TDomain, TTransitionId = string>({
   return (
     <section className="fe-survey-workflow-panel">
       <h2>{title}</h2>
+      <button type="button" aria-expanded={workflow.expanded} onClick={workflow.toggle}>
+        {workflow.expanded ? "Collapse" : "Expand"}
+      </button>
+      {slots?.status?.(workflow.state)}
       <div>
         {options.transitions.map((transitionOption) => {
           const run = () => void workflow.transition(transitionOption.id);

@@ -7,11 +7,18 @@ import type {
   QualityIssue,
   QualityIssueDecision,
   SurveyVersionActionAdapter,
+  SurveyVersionActionEvent,
   SurveyVersionActionResult,
+  SurveyVersionAdapterResponse,
+  SurveyVersionDomainActionAdapter,
+  SurveyVersionDomainActionsResult,
+  SurveyVersionDomainOperationsResult,
   SurveyVersionOperationName,
   SurveyVersionOperationState,
+  SurveyVersionQualityResult,
   SurveyVersionQualityState,
   UseSurveyVersionDomainActionsOptions,
+  UseSurveyVersionDomainQualityActionsOptions,
   UseSurveyVersionOperationsOptions,
   UseSurveyVersionOperationsResult
 } from "./types";
@@ -27,13 +34,70 @@ function normalizeError(cause: unknown): Error {
 function actionResult<TData = void>(
   succeeded: boolean,
   error?: Error,
-  options: { readonly requiresConfirmation?: boolean } = {}
+  options: { readonly requiresConfirmation?: boolean; readonly cause?: unknown } = {}
 ): SurveyVersionActionResult<TData> {
   return {
     succeeded,
     ...(error === undefined ? {} : { error }),
+    ...(options.cause === undefined ? {} : { cause: options.cause }),
     ...(options.requiresConfirmation === true ? { requiresConfirmation: true } : {})
   };
+}
+
+function completedActionResult(result: Awaited<SurveyVersionAdapterResponse>): SurveyVersionActionResult {
+  return result === undefined ? actionResult(true) : result;
+}
+
+function failedActionResult(cause: unknown): SurveyVersionActionResult {
+  const error = normalizeError(cause);
+  return actionResult(false, error, cause instanceof Error ? {} : { cause });
+}
+
+function toDomainQualityResult<TQualityPayload>(
+  result: QualityCheckResult<TQualityPayload>
+): SurveyVersionQualityResult<TQualityPayload> {
+  const status = result.status;
+  let normalizedStatus: SurveyVersionQualityResult<TQualityPayload>["status"];
+  if (status === "STALE") normalizedStatus = "STALE";
+  else if (status === "RUNNING" || status === "running") normalizedStatus = "RUNNING";
+  else if (status === "FAILED" || status === "failed" || status === "error") normalizedStatus = "FAILED";
+  else normalizedStatus = "COMPLETED";
+  return {
+    status: normalizedStatus,
+    issues: result.issues,
+    ...(result.runId === undefined ? {} : { runId: result.runId }),
+    ...(typeof result.checkedRevision === "number" ? { checkedRevision: result.checkedRevision } : {}),
+    ...(result.payload === undefined
+      ? result.response === undefined
+        ? result.rawResponse === undefined
+          ? {}
+          : { payload: result.rawResponse }
+        : { payload: result.response }
+      : { payload: result.payload })
+  };
+}
+
+function toDomainQualityAction<TQualityPayload>(
+  action: SurveyVersionActionResult<QualityCheckResult<TQualityPayload>>
+): SurveyVersionActionResult<SurveyVersionQualityResult<TQualityPayload>> {
+  return {
+    succeeded: action.succeeded,
+    ...(action.data === undefined ? {} : { data: toDomainQualityResult(action.data) }),
+    ...(action.error === undefined ? {} : { error: action.error }),
+    ...(action.requiresConfirmation === undefined ? {} : { requiresConfirmation: action.requiresConfirmation }),
+    ...(action.cause === undefined ? {} : { cause: action.cause }),
+    ...(action.response === undefined ? {} : { response: action.response }),
+    ...(action.metadata === undefined ? {} : { metadata: action.metadata })
+  };
+}
+
+async function notifyAction(
+  adapter: Pick<SurveyVersionDomainActionAdapter<unknown>, "invalidate" | "notify">,
+  operation: SurveyVersionActionEvent["operation"],
+  result: SurveyVersionActionResult
+): Promise<void> {
+  await adapter.invalidate?.();
+  adapter.notify?.({ operation, result });
 }
 
 function operationStates(): Record<SurveyVersionOperationName, SurveyVersionOperationState> {
@@ -89,19 +153,35 @@ export function composeSurveyVersionActions<TVersion, TState>(
   return result;
 }
 
+export function composeSurveyVersionDomainActions<TVersion, TState, TQualityPayload = unknown>(
+  ...adapters: readonly SurveyVersionDomainActionAdapter<TVersion, TState, TQualityPayload>[]
+): SurveyVersionDomainActionAdapter<TVersion, TState, TQualityPayload> {
+  const result: SurveyVersionDomainActionAdapter<TVersion, TState, TQualityPayload> = {};
+  for (let index = adapters.length - 1; index >= 0; index -= 1) {
+    const adapter = adapters[index];
+    if (adapter !== undefined) Object.assign(result, adapter);
+  }
+  return result;
+}
+
 /** Manages quality checks and version lifecycle actions without choosing a transport or cache library. */
-function useSurveyVersionOperationsInternal<TVersion, TState>({
+function useSurveyVersionOperationsInternal<TVersion, TState, TQualityPayload>({
   version,
   state: versionState,
   adapter
-}: UseSurveyVersionDomainActionsOptions<TVersion, TState>): UseSurveyVersionOperationsResult {
+}: UseSurveyVersionDomainQualityActionsOptions<
+  TVersion,
+  TState,
+  TQualityPayload
+>): SurveyVersionDomainOperationsResult<TQualityPayload> {
   const [operations, setOperations] = useState(operationStates);
-  const [quality, setQuality] = useState<SurveyVersionQualityState>({
-    status: "idle"
+  const [quality, setQuality] = useState<SurveyVersionQualityState<TQualityPayload>>({
+    status: "idle",
+    issues: []
   });
   const [qualityDecisions, setQualityDecisions] = useState<Readonly<Record<string, QualityIssueDecision>>>({});
   const qualityDecisionsRef = useRef<Readonly<Record<string, QualityIssueDecision>>>({});
-  const qualityRef = useRef<QualityCheckResult | undefined>(undefined);
+  const qualityRef = useRef<QualityCheckResult<TQualityPayload> | undefined>(undefined);
   const qualityErrorRef = useRef<Error | undefined>(undefined);
   const previousVersion = useRef<{
     readonly version: TVersion;
@@ -119,7 +199,7 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
     };
     qualityRef.current = undefined;
     qualityErrorRef.current = undefined;
-    setQuality({ status: "idle" });
+    setQuality({ status: "idle", issues: [] });
     qualityDecisionsRef.current = {};
     setQualityDecisions({});
     setOperations(operationStates());
@@ -131,23 +211,42 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
     [version, versionState]
   );
 
-  const runQualityCheck = useCallback(async (): Promise<QualityCheckResult | undefined> => {
+  const runQualityCheck = useCallback(async (): Promise<QualityCheckResult<TQualityPayload> | undefined> => {
     const qualityCheck = adapter.runQualityCheck ?? adapter.qualityCheck;
     const controller = new AbortController();
-    setQuality({ status: "loading" });
+    setQuality((current) => ({
+      ...current,
+      status: "loading",
+      checkStatus: "running",
+      issues: current.issues ?? []
+    }));
     setOperations((current) => setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "loading" }));
     try {
       if (qualityCheck === undefined) throw new TypeError("SurveyVersionActionsAdapter requires runQualityCheck.");
       const result = await qualityCheck(request(controller.signal));
       qualityRef.current = result;
       qualityErrorRef.current = undefined;
-      setQuality({ status: "success", result });
+      setQuality({
+        status: "success",
+        result,
+        issues: result.issues,
+        checkStatus: result.status ?? (result.issues.length === 0 ? "passed" : "failed"),
+        ...(result.runId === undefined ? {} : { runId: result.runId }),
+        ...(result.checkedRevision === undefined ? {} : { checkedRevision: result.checkedRevision })
+      });
       setOperations((current) => setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "success" }));
       return result;
     } catch (cause) {
       const error = normalizeError(cause);
       qualityErrorRef.current = error;
-      setQuality({ status: "error", error });
+      setQuality((current) => ({
+        ...current,
+        status: "error",
+        checkStatus: "error",
+        issues: current.issues ?? [],
+        error,
+        cause
+      }));
       setOperations((current) =>
         setOperation(current, ["runQualityCheck", "qualityCheck"], { status: "error", error })
       );
@@ -179,7 +278,7 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
         setOperations((current) => setOperation(current, ["publish"], { status: "needs_confirmation", result }));
         return result;
       }
-      const publishAction = adapter.publish;
+      const publishAction = adapter.publishResult ?? adapter.publish;
       const controller = new AbortController();
       setOperations((current) => setOperation(current, ["publish"], { status: "loading" }));
       try {
@@ -188,18 +287,24 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
           ...request(controller.signal),
           allowWarnings
         };
-        await publishAction(publishRequest);
-        const result = actionResult(true);
-        setOperations((current) => setOperation(current, ["publish"], { status: "success", result }));
+        const result = completedActionResult(await publishAction(publishRequest));
+        setOperations((current) =>
+          setOperation(current, ["publish"], {
+            status: result.succeeded ? "success" : "error",
+            result,
+            ...(result.error === undefined ? {} : { error: result.error })
+          })
+        );
+        if (result.succeeded) await notifyAction(adapter, "publish", result);
         return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        const result = actionResult(false, error);
+        const result = failedActionResult(cause);
         setOperations((current) => setOperation(current, ["publish"], { status: "error", error, result }));
         return result;
       }
     },
-    [adapter.publish, adapter.qualityCheck, adapter.runQualityCheck, request, runQualityCheck]
+    [adapter, request, runQualityCheck]
   );
 
   const publish = useCallback(
@@ -217,7 +322,7 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
 
   const decideQualityIssueResult = useCallback(
     async (issue: QualityIssue, decision: QualityIssueDecision): Promise<SurveyVersionActionResult> => {
-      const decide = adapter.decideQualityIssue;
+      const decide = adapter.decideQualityIssueResult ?? adapter.decideQualityIssue;
       const controller = new AbortController();
       setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "loading" }));
       try {
@@ -227,21 +332,31 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
           issue,
           decision
         };
-        await decide(decisionRequest);
+        const result = completedActionResult(await decide(decisionRequest));
+        if (!result.succeeded) {
+          setOperations((current) =>
+            setOperation(current, ["decideQualityIssue"], {
+              status: "error",
+              result,
+              ...(result.error === undefined ? {} : { error: result.error })
+            })
+          );
+          return result;
+        }
         const key = issueKey(issue);
         qualityDecisionsRef.current = { ...qualityDecisionsRef.current, [key]: decision };
         setQualityDecisions((current) => ({ ...current, [key]: decision }));
-        const result = actionResult(true);
         setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "success", result }));
+        await notifyAction(adapter, "decideQualityIssue", result);
         return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        const result = actionResult(false, error);
+        const result = failedActionResult(cause);
         setOperations((current) => setOperation(current, ["decideQualityIssue"], { status: "error", error, result }));
         return result;
       }
     },
-    [adapter.decideQualityIssue, request]
+    [adapter, request]
   );
 
   const decideQualityIssue = useCallback(
@@ -253,38 +368,57 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
   const runSimpleOperation = useCallback(
     async (
       names: readonly SurveyVersionOperationName[],
-      operation: ((request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>) | undefined,
+      operation:
+        | ((request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>)
+        | ((request: DomainSurveyVersionOperationRequest<TVersion, TState>) => SurveyVersionAdapterResponse)
+        | undefined,
       requiredName: string
     ): Promise<SurveyVersionActionResult> => {
       const controller = new AbortController();
       setOperations((current) => setOperation(current, names, { status: "loading" }));
       try {
         if (operation === undefined) throw new TypeError(`SurveyVersionActionsAdapter requires ${requiredName}.`);
-        await operation(request(controller.signal));
-        const result = actionResult(true);
-        setOperations((current) => setOperation(current, names, { status: "success", result }));
+        const result = completedActionResult(await operation(request(controller.signal)));
+        setOperations((current) =>
+          setOperation(current, names, {
+            status: result.succeeded ? "success" : "error",
+            result,
+            ...(result.error === undefined ? {} : { error: result.error })
+          })
+        );
+        if (result.succeeded) await notifyAction(adapter, names[0] ?? "cloneDraft", result);
         return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        const result = actionResult(false, error);
+        const result = failedActionResult(cause);
         setOperations((current) => setOperation(current, names, { status: "error", error, result }));
         return result;
       }
     },
-    [request]
+    [request, adapter]
   );
 
   const cloneDraftResult = useCallback(
-    () => runSimpleOperation(["cloneDraft", "duplicate"], adapter.cloneDraft ?? adapter.duplicate, "cloneDraft"),
-    [adapter.cloneDraft, adapter.duplicate, runSimpleOperation]
+    () =>
+      runSimpleOperation(
+        ["cloneDraft", "duplicate"],
+        adapter.cloneDraftResult ?? adapter.cloneDraft ?? adapter.duplicateResult ?? adapter.duplicate,
+        "cloneDraft"
+      ),
+    [adapter.cloneDraft, adapter.cloneDraftResult, adapter.duplicate, adapter.duplicateResult, runSimpleOperation]
   );
   const cloneDraft = useCallback(
     async (): Promise<boolean> => (await cloneDraftResult()).succeeded,
     [cloneDraftResult]
   );
   const deleteDraftResult = useCallback(
-    () => runSimpleOperation(["deleteDraft", "delete"], adapter.deleteDraft ?? adapter.delete, "deleteDraft"),
-    [adapter.delete, adapter.deleteDraft, runSimpleOperation]
+    () =>
+      runSimpleOperation(
+        ["deleteDraft", "delete"],
+        adapter.deleteDraftResult ?? adapter.deleteDraft ?? adapter.deleteResult ?? adapter.delete,
+        "deleteDraft"
+      ),
+    [adapter.delete, adapter.deleteDraft, adapter.deleteDraftResult, adapter.deleteResult, runSimpleOperation]
   );
   const deleteDraft = useCallback(
     async (): Promise<boolean> => (await deleteDraftResult()).succeeded,
@@ -292,28 +426,33 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
   );
   const setVisibilityResult = useCallback(
     async (status: "draft" | "published" | "archived"): Promise<SurveyVersionActionResult> => {
-      const setVisibilityAction = adapter.setVisibility ?? adapter.setStatus;
+      const setVisibilityAction =
+        adapter.setVisibilityResult ?? adapter.setVisibility ?? adapter.setStatusResult ?? adapter.setStatus;
       const controller = new AbortController();
       setOperations((current) => setOperation(current, ["setVisibility", "setStatus"], { status: "loading" }));
       try {
         if (setVisibilityAction === undefined)
           throw new TypeError("SurveyVersionActionsAdapter requires setVisibility.");
-        await setVisibilityAction({ ...request(controller.signal), status });
-        const result = actionResult(true);
+        const result = completedActionResult(await setVisibilityAction({ ...request(controller.signal), status }));
         setOperations((current) =>
-          setOperation(current, ["setVisibility", "setStatus"], { status: "success", result })
+          setOperation(current, ["setVisibility", "setStatus"], {
+            status: result.succeeded ? "success" : "error",
+            result,
+            ...(result.error === undefined ? {} : { error: result.error })
+          })
         );
+        if (result.succeeded) await notifyAction(adapter, "setVisibility", result);
         return result;
       } catch (cause) {
         const error = normalizeError(cause);
-        const result = actionResult(false, error);
+        const result = failedActionResult(cause);
         setOperations((current) =>
           setOperation(current, ["setVisibility", "setStatus"], { status: "error", error, result })
         );
         return result;
       }
     },
-    [adapter.setStatus, adapter.setVisibility, request]
+    [adapter.setStatus, adapter.setStatusResult, adapter.setVisibility, adapter.setVisibilityResult, request, adapter]
   );
 
   const setVisibility = useCallback(
@@ -334,7 +473,7 @@ function useSurveyVersionOperationsInternal<TVersion, TState>({
     runQualityCheckResult: async () => {
       const result = await runQualityCheck();
       return result === undefined
-        ? actionResult<QualityCheckResult>(false, qualityErrorRef.current)
+        ? actionResult<QualityCheckResult<TQualityPayload>>(false, qualityErrorRef.current)
         : { succeeded: true, data: result };
     },
     cloneDraft,
@@ -357,10 +496,29 @@ export function useSurveyVersionOperations(
 }
 
 /** Generic controller for application-owned version records and state. */
+export function useSurveyVersionDomainActions<TVersion, TState = unknown, TQualityPayload = unknown>(
+  options: UseSurveyVersionDomainQualityActionsOptions<TVersion, TState, TQualityPayload>
+): SurveyVersionDomainActionsResult<TQualityPayload>;
 export function useSurveyVersionDomainActions<TVersion, TState = unknown>(
   options: UseSurveyVersionDomainActionsOptions<TVersion, TState>
-): UseSurveyVersionOperationsResult {
-  return useSurveyVersionOperationsInternal(options);
+): UseSurveyVersionOperationsResult;
+export function useSurveyVersionDomainActions<TVersion, TState = unknown, TQualityPayload = unknown>(
+  options: UseSurveyVersionDomainQualityActionsOptions<TVersion, TState, TQualityPayload>
+): SurveyVersionDomainActionsResult<TQualityPayload> {
+  const internal = useSurveyVersionOperationsInternal(options);
+  const result = internal.quality.result === undefined ? undefined : toDomainQualityResult(internal.quality.result);
+  return {
+    ...internal,
+    quality: {
+      status: internal.quality.status,
+      ...(result === undefined ? {} : { result }),
+      ...(internal.quality.error === undefined ? {} : { error: internal.quality.error })
+    },
+    runQualityCheckResult: async () => {
+      const action = await internal.runQualityCheckResult();
+      return toDomainQualityAction(action);
+    }
+  };
 }
 
 /** Preferred action-oriented name for the version controller. */

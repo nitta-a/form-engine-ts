@@ -1,8 +1,9 @@
-import type { FormSchema } from "@form-engine-ts/core";
+import type { FormSchema, QuestionType } from "@form-engine-ts/core";
 import { FormBuilder, useFormBuilder } from "@form-engine-ts/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   SurveyEditorAdapterInput,
+  SurveyEditorDomainSlots,
   SurveyEditorOperationState,
   SurveyEditorProps,
   SurveyEditorRenderProps,
@@ -35,6 +36,15 @@ function updateSurveyDraft(adapter: SurveyEditorAdapterInput, schema: FormSchema
 export interface UseSurveyEditorResult extends SurveyEditorRenderProps {
   readonly builder: ReturnType<typeof useFormBuilder>;
   readonly onChange: (schema: FormSchema) => void;
+  readonly addQuestion: (type: QuestionType, pageId?: string) => Promise<boolean>;
+  readonly removeQuestion: (fieldId: string) => Promise<boolean>;
+  readonly reorderQuestions: (fieldId: string, targetIndex: number) => Promise<boolean>;
+}
+
+export interface UseSurveyEditorDomainResult<TDomain> extends UseSurveyEditorResult {
+  readonly domain: TDomain;
+  readonly slots?: SurveyEditorDomainSlots;
+  readonly domainMetadata?: unknown;
 }
 
 /** Combines the existing headless builder state with save and schema translation operations. */
@@ -49,15 +59,18 @@ export function useSurveyEditor({
 }: UseSurveyEditorOptions): UseSurveyEditorResult {
   const [draftSchema, setDraftSchema] = useState(schema);
   const [state, setState] = useState<SurveyEditorOperationState>(initialState);
+  const [dirty, setDirty] = useState(false);
   const translationController = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => {
     setDraftSchema(schema);
+    setDirty(false);
   }, [schema]);
 
   const updateSchema = useCallback(
     (nextSchema: FormSchema) => {
       setDraftSchema(nextSchema);
+      setDirty(true);
       setState((current) => (current.status === "idle" ? current : initialState()));
       onChange?.(nextSchema);
     },
@@ -70,10 +83,26 @@ export function useSurveyEditor({
     ...builderOptions
   });
 
+  const addQuestion = useCallback(
+    async (type: QuestionType, pageId?: string): Promise<boolean> => builder.addField(type, pageId).success,
+    [builder]
+  );
+
+  const reorderQuestions = useCallback(
+    async (fieldId: string, targetIndex: number): Promise<boolean> => builder.moveField(fieldId, targetIndex).success,
+    [builder]
+  );
+
+  const removeQuestion = useCallback(
+    async (fieldId: string): Promise<boolean> => builder.removeField(fieldId).success,
+    [builder]
+  );
+
   const save = useCallback(async (): Promise<boolean> => {
     setState({ status: "loading" });
     try {
       await updateSurveyDraft(adapter, draftSchema);
+      setDirty(false);
       setState({ status: "success" });
       return true;
     } catch (cause) {
@@ -107,7 +136,20 @@ export function useSurveyEditor({
     }
   }, [adapter, draftSchema, sourceLocale, targetLocale, updateSchema]);
 
-  return { schema: draftSchema, sourceLocale, targetLocale, state, save, translate, builder, onChange: updateSchema };
+  return {
+    schema: draftSchema,
+    sourceLocale,
+    targetLocale,
+    state,
+    dirty,
+    save,
+    translate,
+    builder,
+    onChange: updateSchema,
+    addQuestion,
+    removeQuestion,
+    reorderQuestions
+  };
 }
 
 /** Preferred explicit controller name; useSurveyEditor remains as a compatibility alias. */
@@ -154,6 +196,7 @@ export function SurveyEditor(props: SurveyEditorProps): React.JSX.Element {
     sourceLocale: editor.sourceLocale,
     targetLocale: editor.targetLocale,
     state: editor.state,
+    ...(editor.dirty === undefined ? {} : { dirty: editor.dirty }),
     save: editor.save,
     translate: editor.translate
   };
@@ -167,13 +210,17 @@ export function SurveyEditor(props: SurveyEditorProps): React.JSX.Element {
       {editor.state.error !== undefined ? <div role="alert">{editor.state.error.message}</div> : null}
       {slots?.notifications?.(renderedProps)}
       {slots?.cardSettings?.(renderedProps)}
+      {slots?.cardAppearance?.(renderedProps)}
       <FormBuilder
         {...builderOptions}
         schema={editor.schema}
         onChange={editor.onChange}
         {...(locale === undefined ? {} : { locale })}
       />
+      {slots?.responseSettings?.(renderedProps)}
+      {slots?.translationSettings?.(renderedProps)}
       {slots?.submissionSettings?.(renderedProps)}
+      {slots?.validationPolicy?.(renderedProps)}
       {slots?.after?.(renderedProps)}
     </section>
   );

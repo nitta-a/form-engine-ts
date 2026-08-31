@@ -1,5 +1,6 @@
 import type {
   FormAnalytics,
+  FormField,
   FormResponse,
   FormSchema,
   FormVersionRecord,
@@ -33,11 +34,21 @@ export interface SurveyUiProviderProps {
   readonly locale?: string;
   readonly fallbackLocale?: string;
   readonly namespaces?: readonly string[];
+  readonly commonNamespace?: string;
+  readonly customSurveyNamespace?: string;
   /** Accepts an application i18next instance without requiring an i18next dependency. */
   readonly i18n?: SurveyI18n;
   readonly translationAdapter?: SurveyTranslationAdapter;
   readonly translator?: (key: string, params?: Record<string, unknown>) => string;
+  readonly translation?: SurveyTranslationScope;
   readonly children: ReactNode;
+}
+
+export interface SurveyProviderProps extends SurveyUiProviderProps {}
+
+export interface SurveyTranslationScope {
+  readonly common: (key: string, options?: Record<string, unknown>) => string;
+  readonly customSurvey: (key: string, options?: Record<string, unknown>) => string;
 }
 
 /** Minimal i18next-compatible surface; the full i18next instance can be supplied structurally. */
@@ -49,6 +60,30 @@ export interface SurveyI18n {
 /** Maps an application-owned survey record to the Form Engine schema used by headless UI primitives. */
 export interface SurveySchemaDomainAdapter<TDomain> {
   readonly toFormSchema: (domain: TDomain) => FormSchema;
+}
+
+export interface SurveyEditorDomainAdapter<TDomain> extends SurveySchemaDomainAdapter<TDomain> {
+  readonly fromFormSchema: (schema: FormSchema, previous: TDomain) => TDomain;
+}
+
+export type EditorRenderProps = SurveyEditorRenderProps;
+
+export interface SurveyEditorDomainSlots {
+  readonly cardAppearance?: (props: EditorRenderProps) => ReactNode;
+  readonly submissionSettings?: (props: EditorRenderProps) => ReactNode;
+  readonly translationSettings?: (props: EditorRenderProps) => ReactNode;
+  readonly validationPolicy?: (props: EditorRenderProps) => ReactNode;
+  readonly toolbar?: (props: EditorRenderProps) => ReactNode;
+  readonly notifications?: (props: EditorRenderProps) => ReactNode;
+}
+
+export interface SurveyEditorDomainAdapterOptions<TDomain> {
+  readonly domain: TDomain;
+  readonly domainAdapter: SurveyEditorDomainAdapter<TDomain>;
+  readonly adapter: SurveyEditorDomainActionsAdapter<TDomain>;
+  readonly onDomainChange?: (domain: TDomain) => void;
+  readonly slots?: SurveyEditorDomainSlots;
+  readonly domainMetadata?: unknown;
 }
 
 export interface SurveyEditorTranslateRequest {
@@ -79,6 +114,31 @@ export interface SurveyEditorDomainActionsAdapter<TDomain> {
     request: SurveyEditorTranslateRequest & { readonly domain: TDomain }
   ) => Promise<TDomain>;
   readonly updateSurveyDraft: (domain: TDomain) => Promise<void>;
+  readonly updateSurveyDraftResult?: (domain: TDomain) => Promise<TDomain>;
+}
+
+export interface SurveyEditorQuestionRequest<TDomain> {
+  readonly domain: TDomain;
+  readonly schema: FormSchema;
+  readonly signal: AbortSignal;
+}
+
+export interface SurveyEditorQuestionAdapter<TDomain> {
+  readonly addQuestion?: (
+    request: SurveyEditorQuestionRequest<TDomain> & { readonly question: FormField; readonly index: number }
+  ) => Promise<void> | Promise<TDomain>;
+  readonly reorderQuestions?: (
+    request: SurveyEditorQuestionRequest<TDomain> & { readonly fieldIds: readonly string[] }
+  ) => Promise<void> | Promise<TDomain>;
+  readonly removeQuestion?: (
+    request: SurveyEditorQuestionRequest<TDomain> & { readonly question: FormField; readonly index: number }
+  ) => Promise<void> | Promise<TDomain>;
+}
+
+export interface SurveyEditorConfigurationSlots {
+  readonly cardSettings?: ReactNode;
+  readonly responseSettings?: ReactNode;
+  readonly validationPolicy?: ReactNode;
 }
 
 export interface UseSurveyEditorDomainOptions<TDomain>
@@ -88,7 +148,10 @@ export interface UseSurveyEditorDomainOptions<TDomain>
     readonly fromFormSchema: (schema: FormSchema, previous: TDomain) => TDomain;
   };
   readonly adapter: SurveyEditorDomainActionsAdapter<TDomain>;
+  readonly questionAdapter?: SurveyEditorQuestionAdapter<TDomain>;
   readonly onDomainChange?: (domain: TDomain) => void;
+  readonly slots?: SurveyEditorDomainSlots;
+  readonly domainMetadata?: unknown;
 }
 
 export type SurveyEditorAdapterInput = SurveyEditorAdapter | SurveyEditorActionsAdapter;
@@ -108,6 +171,7 @@ export interface SurveyEditorRenderProps {
   readonly state: SurveyEditorOperationState;
   readonly save: () => Promise<boolean>;
   readonly translate: () => Promise<boolean>;
+  readonly dirty?: boolean;
 }
 
 export interface SurveyEditorSlots {
@@ -116,7 +180,11 @@ export interface SurveyEditorSlots {
   readonly status?: (props: SurveyEditorOperationState) => ReactNode;
   readonly notifications?: (props: SurveyEditorRenderProps) => ReactNode;
   readonly cardSettings?: (props: SurveyEditorRenderProps) => ReactNode;
+  readonly cardAppearance?: (props: SurveyEditorRenderProps) => ReactNode;
+  readonly responseSettings?: (props: SurveyEditorRenderProps) => ReactNode;
+  readonly translationSettings?: (props: SurveyEditorRenderProps) => ReactNode;
   readonly submissionSettings?: (props: SurveyEditorRenderProps) => ReactNode;
+  readonly validationPolicy?: (props: SurveyEditorRenderProps) => ReactNode;
 }
 
 export interface SurveyEditorProps
@@ -302,8 +370,37 @@ export interface QualityIssue {
   readonly metadata?: Readonly<Record<string, JsonValue>>;
 }
 
-export interface QualityCheckResult {
+export type QualityCheckStatus =
+  | "idle"
+  | "running"
+  | "passed"
+  | "failed"
+  | "error"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "STALE";
+
+export interface QualityCheckResult<TResponse = unknown> {
   readonly issues: readonly QualityIssue[];
+  readonly status?: QualityCheckStatus;
+  readonly payload?: TResponse;
+  /** The provider response is kept intact for domain-specific quality UIs and logging. */
+  readonly response?: TResponse;
+  readonly rawResponse?: TResponse;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
+  readonly runId?: string;
+  readonly checkedRevision?: string | number;
+}
+
+export type SurveyVersionQualityStatus = "RUNNING" | "COMPLETED" | "FAILED" | "STALE";
+
+export interface SurveyVersionQualityResult<TQualityPayload = unknown> {
+  readonly status: SurveyVersionQualityStatus;
+  readonly runId?: string;
+  readonly checkedRevision?: number;
+  readonly issues: readonly QualityIssue[];
+  readonly payload?: TQualityPayload;
 }
 
 export interface SurveyVersionActionResult<TData = void> {
@@ -311,9 +408,14 @@ export interface SurveyVersionActionResult<TData = void> {
   readonly data?: TData;
   readonly error?: Error;
   readonly requiresConfirmation?: boolean;
+  readonly cause?: unknown;
+  readonly response?: unknown;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
 }
 
 export type QualityIssueDecision = "accept" | "reject";
+
+export type SurveyVersionAdapterResponse<TData = void> = Promise<TData> | Promise<SurveyVersionActionResult<TData>>;
 
 export interface SurveyVersionOperationRequest {
   readonly version: FormVersionRecord | FormSchema;
@@ -333,51 +435,114 @@ export interface SurveyVersionQualityIssueDecisionRequest extends SurveyVersionO
 /** Transport-neutral lifecycle operations used by survey clients. */
 export interface SurveyVersionActionsAdapter {
   readonly publish: (request: SurveyVersionPublishRequest) => Promise<void>;
+  readonly publishResult?: (request: SurveyVersionPublishRequest) => Promise<SurveyVersionActionResult>;
   readonly runQualityCheck: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
   readonly decideQualityIssue: (request: SurveyVersionQualityIssueDecisionRequest) => Promise<void>;
+  readonly decideQualityIssueResult?: (
+    request: SurveyVersionQualityIssueDecisionRequest
+  ) => Promise<SurveyVersionActionResult>;
   readonly cloneDraft: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly cloneDraftResult?: (request: SurveyVersionOperationRequest) => Promise<SurveyVersionActionResult>;
   readonly deleteDraft: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly deleteDraftResult?: (request: SurveyVersionOperationRequest) => Promise<SurveyVersionActionResult>;
   readonly setVisibility: (
     request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
   ) => Promise<void>;
+  readonly setVisibilityResult?: (
+    request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
+  ) => Promise<SurveyVersionActionResult>;
 }
 
 export interface SurveyVersionQualityActions<TVersion = FormVersionRecord | FormSchema, TState = FormVersionState> {
   readonly publish?: (request: DomainSurveyVersionPublishRequest<TVersion, TState>) => Promise<void>;
+  readonly publishResult?: (
+    request: DomainSurveyVersionPublishRequest<TVersion, TState>
+  ) => Promise<SurveyVersionActionResult>;
   readonly runQualityCheck?: (
     request: DomainSurveyVersionOperationRequest<TVersion, TState>
   ) => Promise<QualityCheckResult>;
   readonly decideQualityIssue?: (
     request: DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState>
   ) => Promise<void>;
+  readonly decideQualityIssueResult?: (
+    request: DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState>
+  ) => Promise<SurveyVersionActionResult>;
+}
+
+export interface SurveyVersionDomainQualityActions<TVersion, TState = unknown, TQualityPayload = unknown> {
+  readonly publish?: (request: DomainSurveyVersionPublishRequest<TVersion, TState>) => Promise<void>;
+  readonly publishResult?: (
+    request: DomainSurveyVersionPublishRequest<TVersion, TState>
+  ) => Promise<SurveyVersionActionResult>;
+  readonly runQualityCheck?: (
+    request: DomainSurveyVersionOperationRequest<TVersion, TState>
+  ) => Promise<QualityCheckResult<TQualityPayload>>;
+  readonly decideQualityIssue?: (
+    request: DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState>
+  ) => Promise<void>;
+  readonly decideQualityIssueResult?: (
+    request: DomainSurveyVersionQualityIssueDecisionRequest<TVersion, TState>
+  ) => Promise<SurveyVersionActionResult>;
 }
 
 export interface SurveyVersionLifecycleActions<TVersion = FormVersionRecord | FormSchema, TState = FormVersionState> {
   readonly cloneDraft?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+  readonly cloneDraftResult?: (
+    request: DomainSurveyVersionOperationRequest<TVersion, TState>
+  ) => Promise<SurveyVersionActionResult>;
   readonly deleteDraft?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+  readonly deleteDraftResult?: (
+    request: DomainSurveyVersionOperationRequest<TVersion, TState>
+  ) => Promise<SurveyVersionActionResult>;
   readonly setVisibility?: (
     request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
       readonly status: "draft" | "published" | "archived";
     }
   ) => Promise<void>;
+  readonly setVisibilityResult?: (
+    request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
+      readonly status: "draft" | "published" | "archived";
+    }
+  ) => Promise<SurveyVersionActionResult>;
 }
 
 /** @deprecated Use SurveyVersionActionsAdapter. Kept as a structural compatibility contract. */
 export interface SurveyVersionAdapter {
   readonly publish?: (request: SurveyVersionPublishRequest) => Promise<void>;
+  readonly publishResult?: (request: SurveyVersionPublishRequest) => Promise<SurveyVersionActionResult>;
   readonly runQualityCheck?: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
   readonly decideQualityIssue?: (request: SurveyVersionQualityIssueDecisionRequest) => Promise<void>;
+  readonly decideQualityIssueResult?: (
+    request: SurveyVersionQualityIssueDecisionRequest
+  ) => Promise<SurveyVersionActionResult>;
   readonly cloneDraft?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly cloneDraftResult?: (request: SurveyVersionOperationRequest) => Promise<SurveyVersionActionResult>;
   readonly deleteDraft?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly deleteDraftResult?: (request: SurveyVersionOperationRequest) => Promise<SurveyVersionActionResult>;
   readonly setVisibility?: (
     request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
   ) => Promise<void>;
+  readonly setVisibilityResult?: (
+    request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
+  ) => Promise<SurveyVersionActionResult>;
   readonly qualityCheck?: (request: SurveyVersionOperationRequest) => Promise<QualityCheckResult>;
   readonly duplicate?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly duplicateResult?: (request: SurveyVersionOperationRequest) => Promise<SurveyVersionActionResult>;
   readonly delete?: (request: SurveyVersionOperationRequest) => Promise<void>;
+  readonly deleteResult?: (request: SurveyVersionOperationRequest) => Promise<SurveyVersionActionResult>;
   readonly setStatus?: (
     request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
   ) => Promise<void>;
+  readonly setStatusResult?: (
+    request: SurveyVersionOperationRequest & { readonly status: "draft" | "published" | "archived" }
+  ) => Promise<SurveyVersionActionResult>;
+  readonly invalidate?: () => void | Promise<void>;
+  readonly notify?: (event: SurveyVersionActionEvent) => void;
+}
+
+export interface SurveyVersionActionEvent {
+  readonly operation: SurveyVersionOperationName;
+  readonly result: SurveyVersionActionResult;
 }
 
 export interface DomainSurveyVersionOperationRequest<TVersion, TState = unknown> {
@@ -403,16 +568,60 @@ export type SurveyVersionActionAdapter<
   TState = FormVersionState
 > = SurveyVersionQualityActions<TVersion, TState> &
   SurveyVersionLifecycleActions<TVersion, TState> & {
+    readonly invalidate?: () => void | Promise<void>;
+    readonly notify?: (event: SurveyVersionActionEvent) => void;
     readonly qualityCheck?: (
       request: DomainSurveyVersionOperationRequest<TVersion, TState>
     ) => Promise<QualityCheckResult>;
     readonly duplicate?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+    readonly duplicateResult?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState>
+    ) => Promise<SurveyVersionActionResult>;
     readonly delete?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+    readonly deleteResult?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState>
+    ) => Promise<SurveyVersionActionResult>;
     readonly setStatus?: (
       request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
         readonly status: "draft" | "published" | "archived";
       }
     ) => Promise<void>;
+    readonly setStatusResult?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
+        readonly status: "draft" | "published" | "archived";
+      }
+    ) => Promise<SurveyVersionActionResult>;
+  };
+
+export type SurveyVersionDomainActionAdapter<
+  TVersion,
+  TState = unknown,
+  TQualityPayload = unknown
+> = SurveyVersionDomainQualityActions<TVersion, TState, TQualityPayload> &
+  SurveyVersionLifecycleActions<TVersion, TState> & {
+    readonly invalidate?: () => void | Promise<void>;
+    readonly notify?: (event: SurveyVersionActionEvent) => void;
+    readonly qualityCheck?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState>
+    ) => Promise<QualityCheckResult<TQualityPayload>>;
+    readonly duplicate?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+    readonly duplicateResult?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState>
+    ) => Promise<SurveyVersionActionResult>;
+    readonly delete?: (request: DomainSurveyVersionOperationRequest<TVersion, TState>) => Promise<void>;
+    readonly deleteResult?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState>
+    ) => Promise<SurveyVersionActionResult>;
+    readonly setStatus?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
+        readonly status: "draft" | "published" | "archived";
+      }
+    ) => Promise<void>;
+    readonly setStatusResult?: (
+      request: DomainSurveyVersionOperationRequest<TVersion, TState> & {
+        readonly status: "draft" | "published" | "archived";
+      }
+    ) => Promise<SurveyVersionActionResult>;
   };
 
 export type SurveyVersionOperationName =
@@ -434,10 +643,15 @@ export interface SurveyVersionOperationState {
   readonly result?: SurveyVersionActionResult;
 }
 
-export interface SurveyVersionQualityState {
+export interface SurveyVersionQualityState<TQualityPayload = unknown> {
   readonly status: SurveyVersionOperationStatus;
+  readonly checkStatus?: QualityCheckStatus;
   readonly error?: Error;
-  readonly result?: QualityCheckResult;
+  readonly cause?: unknown;
+  readonly result?: QualityCheckResult<TQualityPayload>;
+  readonly issues?: readonly QualityIssue[];
+  readonly runId?: string;
+  readonly checkedRevision?: string | number;
 }
 
 export interface UseSurveyVersionOperationsOptions {
@@ -473,11 +687,39 @@ export interface UseSurveyVersionOperationsResult {
   readonly setStatus: (status: "draft" | "published" | "archived") => Promise<boolean>;
 }
 
+export interface SurveyVersionDomainActionsResult<TQualityPayload = unknown>
+  extends Omit<SurveyVersionDomainOperationsResult<TQualityPayload>, "quality" | "runQualityCheckResult"> {
+  readonly quality: {
+    readonly status: SurveyVersionOperationStatus;
+    readonly result?: SurveyVersionQualityResult<TQualityPayload>;
+    readonly error?: Error;
+  };
+  readonly runQualityCheckResult: () => Promise<SurveyVersionActionResult<SurveyVersionQualityResult<TQualityPayload>>>;
+  readonly publishResult: (options?: { readonly allowWarnings?: boolean }) => Promise<SurveyVersionActionResult>;
+  readonly decideQualityIssueResult: (
+    issue: QualityIssue,
+    decision: QualityIssueDecision
+  ) => Promise<SurveyVersionActionResult>;
+}
+
+export interface SurveyVersionDomainOperationsResult<TQualityPayload = unknown>
+  extends Omit<UseSurveyVersionOperationsResult, "quality" | "runQualityCheck" | "runQualityCheckResult"> {
+  readonly quality: SurveyVersionQualityState<TQualityPayload>;
+  readonly runQualityCheck: () => Promise<QualityCheckResult<TQualityPayload> | undefined>;
+  readonly runQualityCheckResult: () => Promise<SurveyVersionActionResult<QualityCheckResult<TQualityPayload>>>;
+}
+
 export type UseSurveyVersionActionsOptions = UseSurveyVersionOperationsOptions;
 export interface UseSurveyVersionDomainActionsOptions<TVersion, TState = unknown> {
   readonly version: TVersion;
   readonly state?: TState;
   readonly adapter: SurveyVersionActionAdapter<TVersion, TState>;
+}
+
+export interface UseSurveyVersionDomainQualityActionsOptions<TVersion, TState = unknown, TQualityPayload = unknown> {
+  readonly version: TVersion;
+  readonly state?: TState;
+  readonly adapter: SurveyVersionDomainActionAdapter<TVersion, TState, TQualityPayload>;
 }
 export type UseSurveyVersionActionsResult = UseSurveyVersionOperationsResult;
 
@@ -485,12 +727,79 @@ export type SurveySummaryInput =
   | FormAnalytics
   | { readonly questions: readonly QuestionAggregate[]; readonly formId?: string; readonly formVersion?: number };
 
+export interface SurveyResponseSummaryLanguageAggregate {
+  readonly language: string;
+  readonly submissionCount: number;
+  readonly summary: SurveySummaryInput;
+}
+
+export interface SurveyResponseSummarySkipReason {
+  readonly reason: string;
+  readonly count: number;
+  readonly language?: string;
+}
+
+export interface SurveyResponseSummaryDomainAdapter<TSummary, TVersion> {
+  readonly toSummaryInput: (summary: TSummary) => SurveySummaryInput;
+  readonly toFormSchema: (version: TVersion) => FormSchema;
+  readonly sourceLanguage: (version: TVersion) => string;
+  readonly resolveLabel?: (request: {
+    readonly domain: TVersion;
+    readonly fieldId: string;
+    readonly sourceLanguage: string;
+  }) => string | undefined;
+  readonly mapLanguages?: (request: {
+    readonly domain: TVersion;
+    readonly summary: TSummary;
+  }) => readonly SurveyResponseSummaryLanguageAggregate[] | undefined;
+  readonly mapSkipReasons?: (request: {
+    readonly domain: TVersion;
+    readonly summary: TSummary;
+  }) => readonly unknown[] | undefined;
+  readonly getQuestionDefinition?: (request: { readonly domain: TVersion; readonly fieldId: string }) => unknown;
+  readonly getOptionDefinition?: (request: {
+    readonly domain: TVersion;
+    readonly fieldId: string;
+    readonly optionId: string;
+  }) => unknown;
+}
+
+export interface SurveyResponseSummaryMapperAdapter<TDomain, TDomainSummary = SurveySummaryInput> {
+  readonly toFormSchema: (domain: TDomain) => FormSchema;
+  readonly toSurveySummary?: (request: {
+    readonly domain: TDomain;
+    readonly summary: TDomainSummary;
+    readonly sourceLanguage: string;
+  }) => SurveySummaryInput;
+  readonly resolveLabel?: (request: {
+    readonly domain: TDomain;
+    readonly fieldId: string;
+    readonly sourceLanguage: string;
+  }) => string | undefined;
+  readonly mapLanguages?: (request: {
+    readonly domain: TDomain;
+    readonly summary: TDomainSummary;
+  }) => readonly SurveyResponseSummaryLanguageAggregate[] | undefined;
+  readonly mapSkipReasons?: (request: {
+    readonly domain: TDomain;
+    readonly summary: TDomainSummary;
+  }) => readonly SurveyResponseSummarySkipReason[] | undefined;
+  readonly getQuestionDefinition?: (request: { readonly domain: TDomain; readonly fieldId: string }) => unknown;
+  readonly getOptionDefinition?: (request: {
+    readonly domain: TDomain;
+    readonly fieldId: string;
+    readonly optionId: string;
+  }) => unknown;
+}
+
 export interface SurveyResponseSummaryQuestion {
   readonly fieldId: string;
   readonly label: string;
   readonly kind: QuestionAggregate["kind"];
   readonly answeredCount: number;
   readonly unansweredCount: number;
+  readonly definition?: unknown;
+  readonly optionDefinitions?: Readonly<Record<string, unknown>>;
   readonly options?: readonly {
     readonly id: string;
     readonly label: string;
@@ -500,18 +809,22 @@ export interface SurveyResponseSummaryQuestion {
   readonly statistics?: Readonly<Record<string, number | null>>;
 }
 
-export interface SurveyResponseSummaryData {
+export interface SurveyResponseSummaryData<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason> {
   readonly formId: string;
   readonly version: number;
   readonly sourceLanguage: string;
   readonly title: string;
   readonly questions: readonly SurveyResponseSummaryQuestion[];
+  readonly languages?: readonly SurveyResponseSummaryLanguageAggregate[];
+  readonly skipReasons?: readonly TSkipReason[];
+  readonly customData?: TCustomData;
 }
 
 export interface SurveyResponseSummaryProps {
   readonly summary: SurveySummaryInput;
   readonly version: FormVersionRecord | FormSchema;
   readonly sourceLanguage: string;
+  readonly onSourceLanguageChange?: (language: string) => void;
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly className?: string;
 }
@@ -521,9 +834,50 @@ export interface SurveyResponseSummaryDomainProps<TDomain> extends Omit<SurveyRe
   readonly domainAdapter: SurveySchemaDomainAdapter<TDomain>;
 }
 
+export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
+  readonly summary: TSummary;
+  readonly version: TVersion;
+  readonly domainAdapter: SurveyResponseSummaryDomainAdapter<TSummary, TVersion>;
+  readonly languageOptions?: readonly { readonly language: string; readonly count: number }[];
+  readonly selectedLanguage?: string | null;
+  readonly onLanguageChange?: (language: string | null) => void;
+  readonly slots?: SurveyResponseSummaryDomainSlots;
+  readonly className?: string;
+}
+
+export type SurveyResponseSummaryCustomDomainProps<TDomain, TDomainSummary> = SurveyResponseSummaryDomainInputProps<
+  TDomainSummary,
+  TDomain
+>;
+
+export type SurveyResponseSummaryLegacyDomainProps<TDomain> = SurveyResponseSummaryDomainProps<TDomain>;
+
+export interface SurveyResponseSummaryLegacyCustomDomainProps<TDomain, TDomainSummary>
+  extends Omit<SurveyResponseSummaryProps, "summary" | "version"> {
+  readonly summary: TDomainSummary;
+  readonly version: TDomain;
+  readonly domainAdapter: SurveyResponseSummaryMapperAdapter<TDomain, TDomainSummary>;
+}
+
 export interface SurveyResponseSummarySlots {
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly renderHeader?: (data: SurveyResponseSummaryData) => ReactNode;
+  readonly renderLanguageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
+  readonly header?: (data: SurveyResponseSummaryData) => ReactNode;
+  readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+  readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
+}
+
+export interface SurveyResponseSummaryDomainSlots {
+  readonly header?: (data: SurveyResponseSummaryData<unknown, unknown>) => ReactNode;
+  readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+  readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
+}
+
+export interface SurveyResponseSummaryLanguageTabsProps {
+  readonly languages: readonly SurveyResponseSummaryLanguageAggregate[];
+  readonly activeLanguage: string;
+  readonly onChange: (language: string) => void;
 }
 
 export interface SurveyResponseSummaryComponentProps extends SurveyResponseSummaryProps {
@@ -533,6 +887,23 @@ export interface SurveyResponseSummaryComponentProps extends SurveyResponseSumma
 export type SurveyResponseSummaryDomainComponentProps<TDomain> = SurveyResponseSummaryDomainProps<TDomain> & {
   readonly slots?: SurveyResponseSummarySlots;
 };
+
+export type SurveyResponseSummaryCustomDomainComponentProps<TDomain, TDomainSummary> =
+  SurveyResponseSummaryLegacyCustomDomainProps<TDomain, TDomainSummary> & {
+    readonly slots?: SurveyResponseSummarySlots;
+  };
+
+export interface UseSurveyResponseSummaryDomainOptions<TSummary, TVersion>
+  extends SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {}
+
+export interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
+  readonly data: SurveyResponseSummaryData<TSummary, unknown>;
+  readonly summary: TSummary;
+  readonly version: TVersion;
+  readonly selectedLanguage: string | null;
+  readonly languageOptions: readonly { readonly language: string; readonly count: number }[];
+  readonly setLanguage: (language: string | null) => void;
+}
 
 export type SurveyClientAsyncState = {
   readonly status: "idle" | "loading" | "success" | "error";

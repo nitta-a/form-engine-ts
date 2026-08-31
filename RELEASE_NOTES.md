@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v7.4.0 — 2026-08-31
+
+- Added domain-first Editor and Response Summary APIs with adapters, controlled state, custom aggregates, and replaceable slots.
+- Added typed Quality/Version action results, controlled Workflow state, generic Mapping CRUD, and a unified translation Provider contract.
+- Published the new APIs from the package root and documented the v7.3 to v7.4 migration and local implementation deletion map.
+- Aligned all public packages to version 7.4.0.
+
 ### v7.3.0 — 2026-08-31
 
 - Added direct free-text translation state synchronization and application-owned asynchronous PII confirmation callbacks.
