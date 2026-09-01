@@ -55,6 +55,29 @@ the same icon overrides. It separates registered-language switching/removal from
 a single registered language is shown as a non-interactive chip. `i18n.customDictionary` supports locale names, status
 labels, placeholders, headers, and message overrides.
 
+`MuiSurveyResponseSummaryDomain` is the opt-in MUI renderer for response summaries from
+`@form-engine-ts/custom-survey-client`. It groups questions into MUI `Card` components, renders choice distributions
+with `LinearProgress`, and renders numeric/rating or checkbox statistics as cards. The component consumes the existing
+domain adapter and summary aggregate shape, so no application-side question mapping is required:
+
+```tsx
+import { MuiSurveyResponseSummaryDomain } from "@form-engine-ts/mui";
+
+<MuiSurveyResponseSummaryDomain
+  summary={summary}
+  version={version}
+  domainAdapter={domainAdapter}
+  locale="ja-JP"
+  labels={{ answered: "回答済み", unanswered: "未回答", checked: "チェック済み", unchecked: "未チェック" }}
+  slotProps={{ questionCard: { sx: { borderRadius: 2 } } }}
+/>;
+```
+
+Use `MuiSurveyResponseSummary` when the application already has a mapped `SurveyResponseSummaryData` value. Both
+components expose `slots.question` / `slots.skipReasons` for application-owned overrides and `slotProps` for MUI
+styling. The existing non-MUI summary components and their default renderer are unchanged. MUI and Emotion remain
+optional to consumers that do not install `@form-engine-ts/mui`.
+
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";
 

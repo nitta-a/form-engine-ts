@@ -4,6 +4,7 @@ export * from "./components";
 export * from "./context";
 export * from "./icons";
 export * from "./MuiFormBuilder";
+export * from "./MuiSurveyResponseSummary";
 export * from "./slots";
 export * from "./types";
 export * from "./workspace/TargetLocaleSelector";

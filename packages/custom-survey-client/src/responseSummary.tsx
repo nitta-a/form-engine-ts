@@ -12,6 +12,7 @@ import type {
   SurveyResponseSummaryDomainSlots,
   SurveyResponseSummaryLanguageOption,
   SurveyResponseSummaryQuestion,
+  SurveyResponseSummaryVariant,
   SurveySummaryInput,
   SurveySummaryLoader,
   UseSurveyResponseSummaryDomainOptions,
@@ -53,7 +54,7 @@ function questionData(
           localizedOptions.find((candidate) => candidate.id === option.id)?.label ??
           options.find((candidate) => candidate.id === option.id)?.label ??
           option.id,
-        percentage: option.percentageOfSubmissions
+        percentage: clampPercentage(option.percentageOfSubmissions)
       }))
     };
   }
@@ -82,6 +83,11 @@ function questionData(
   return base;
 }
 
+function clampPercentage(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+}
+
 /** Converts analytics/domain data into a stable, localized shape for survey UI clients. */
 export function toSurveyResponseSummary(
   summary: SurveySummaryInput,
@@ -107,7 +113,16 @@ const defaultSummaryLabels: Required<SurveyResponseSummaryDomainLabels> = {
   languages: "Languages",
   answered: "Answered",
   unanswered: "Unanswered",
-  skipReasons: "Skip reasons"
+  skipReasons: "Skip reasons",
+  options: "Options",
+  statistics: "Statistics",
+  average: "Average",
+  minimum: "Minimum",
+  maximum: "Maximum",
+  total: "Total",
+  checked: "Checked",
+  unchecked: "Unchecked",
+  percentage: "Percentage"
 };
 
 function formatCount(count: number, language: string): string {
@@ -115,6 +130,24 @@ function formatCount(count: number, language: string): string {
     return new Intl.NumberFormat(language).format(count);
   } catch {
     return new Intl.NumberFormat().format(count);
+  }
+}
+
+function formatNumber(value: number | null, language: string): string {
+  if (value === null) return "—";
+  try {
+    return new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(value);
+  } catch {
+    return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  }
+}
+
+function formatPercentage(value: number, language: string): string {
+  const percentage = clampPercentage(value);
+  try {
+    return new Intl.NumberFormat(language, { style: "percent", maximumFractionDigits: 1 }).format(percentage / 100);
+  } catch {
+    return new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }).format(percentage / 100);
   }
 }
 
@@ -138,6 +171,132 @@ function defaultSkipReasons(reasons: readonly unknown[], label: string, language
         {entries.map((entry) => (
           <li key={entry.reason}>
             {entry.reason}: {formatCount(entry.count, language)}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function richStatistic(label: string, value: number | null, locale: string, className: string): React.JSX.Element {
+  return (
+    <div className={className}>
+      <dt>{label}</dt>
+      <dd>{formatNumber(value, locale)}</dd>
+    </div>
+  );
+}
+
+function richQuestion(
+  question: SurveyResponseSummaryQuestion,
+  labels: Required<SurveyResponseSummaryDomainLabels>,
+  locale: string
+): React.JSX.Element {
+  const statistics = question.statistics;
+  return (
+    <article className="form-engine-response-summary__question-card" data-question-kind={question.kind}>
+      <h3>{question.label}</h3>
+      <dl className="form-engine-response-summary__response-counts">
+        <div>
+          <dt>{labels.answered}</dt>
+          <dd>{formatCount(question.answeredCount, locale)}</dd>
+        </div>
+        <div>
+          <dt>{labels.unanswered}</dt>
+          <dd>{formatCount(question.unansweredCount, locale)}</dd>
+        </div>
+      </dl>
+      {question.options === undefined ? null : (
+        <section aria-label={labels.options} className="form-engine-response-summary__option-section">
+          <h4>{labels.options}</h4>
+          <ul className="form-engine-response-summary__option-list">
+            {question.options.map((option) => {
+              const percentage = clampPercentage(option.percentage);
+              const formattedPercentage = formatPercentage(percentage, locale);
+              return (
+                <li key={option.id} className="form-engine-response-summary__option">
+                  <div className="form-engine-response-summary__option-label">
+                    <span>{option.label}</span>
+                    <span>
+                      {formatCount(option.count, locale)} ({formattedPercentage})
+                    </span>
+                  </div>
+                  <progress
+                    max={100}
+                    value={percentage}
+                    aria-label={`${option.label}: ${labels.percentage} ${formattedPercentage}`}
+                  >
+                    {formattedPercentage}
+                  </progress>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {statistics === undefined ? null : (
+        <section aria-label={labels.statistics} className="form-engine-response-summary__statistics-section">
+          <h4>{labels.statistics}</h4>
+          {question.kind === "checkbox" ? (
+            <dl className="form-engine-response-summary__statistics-cards">
+              <div>
+                <dt>{labels.checked}</dt>
+                <dd>
+                  {formatCount(statistics.trueCount ?? 0, locale)} (
+                  {formatPercentage(statistics.truePercentage ?? 0, locale)})
+                </dd>
+              </div>
+              <div>
+                <dt>{labels.unchecked}</dt>
+                <dd>
+                  {formatCount(statistics.falseCount ?? 0, locale)} (
+                  {formatPercentage(statistics.falsePercentage ?? 0, locale)})
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <dl className="form-engine-response-summary__statistics-cards">
+              {richStatistic(
+                labels.average,
+                statistics.average ?? null,
+                locale,
+                "form-engine-response-summary__statistic"
+              )}
+              {richStatistic(
+                labels.minimum,
+                statistics.minimum ?? null,
+                locale,
+                "form-engine-response-summary__statistic"
+              )}
+              {richStatistic(
+                labels.maximum,
+                statistics.maximum ?? null,
+                locale,
+                "form-engine-response-summary__statistic"
+              )}
+              {richStatistic(labels.total, statistics.total ?? null, locale, "form-engine-response-summary__statistic")}
+            </dl>
+          )}
+        </section>
+      )}
+    </article>
+  );
+}
+
+function richSkipReasons(reasons: readonly unknown[], label: string, locale: string): React.JSX.Element | null {
+  const entries = reasons.flatMap((reason) => {
+    const entry = skipReasonEntry(reason);
+    return entry === undefined ? [] : [entry];
+  });
+  if (entries.length === 0) return null;
+  return (
+    <section aria-label={label} className="form-engine-response-summary__skip-reasons">
+      <h3>{label}</h3>
+      <ul>
+        {entries.map((entry) => (
+          <li key={entry.reason} className="form-engine-response-summary__skip-reason-card">
+            <span>{entry.reason}</span>
+            <strong>{formatCount(entry.count, locale)}</strong>
           </li>
         ))}
       </ul>
@@ -185,10 +344,23 @@ export function SurveyResponseSummary({
   onSourceLanguageChange,
   renderQuestion,
   slots,
-  className
+  className,
+  variant,
+  locale,
+  labels
 }: SurveyResponseSummaryComponentProps): React.JSX.Element {
   const data = toSurveyResponseSummary(summary, version, sourceLanguage);
-  return renderSummaryData(data, renderQuestion, slots, className, onSourceLanguageChange);
+  return renderSummaryData(
+    data,
+    renderQuestion,
+    slots,
+    className,
+    onSourceLanguageChange,
+    labels,
+    undefined,
+    variant,
+    locale
+  );
 }
 
 function renderSummaryData(
@@ -198,12 +370,20 @@ function renderSummaryData(
   className: string | undefined,
   onSourceLanguageChange: SurveyResponseSummaryComponentProps["onSourceLanguageChange"],
   labels?: SurveyResponseSummaryDomainLabels,
-  _languageLabel?: (language: string) => ReactNode
+  _languageLabel?: (language: string) => ReactNode,
+  variant: SurveyResponseSummaryVariant = "default",
+  locale?: string
 ): React.JSX.Element {
   const questionRenderer = renderQuestion ?? slots?.renderQuestion;
   const resolvedLabels = { ...defaultSummaryLabels, ...labels };
+  const displayLocale = locale ?? data.sourceLanguage;
   return (
-    <section className={className} data-form-id={data.formId} data-version={data.version}>
+    <section
+      className={className}
+      data-form-id={data.formId}
+      data-version={data.version}
+      data-summary-variant={variant}
+    >
       {slots?.renderHeader?.(data) ?? slots?.header?.(data) ?? <h2>{data.title}</h2>}
       {data.languages === undefined || data.languages.length === 0 || slots?.renderLanguageTabs === undefined
         ? null
@@ -214,13 +394,20 @@ function renderSummaryData(
           })}
       <div>
         {data.questions.map((question) => (
-          <div key={question.fieldId}>{questionRenderer?.(question) ?? defaultQuestion(question, resolvedLabels)}</div>
+          <div key={question.fieldId} className="form-engine-response-summary__question">
+            {questionRenderer?.(question) ??
+              (variant === "rich"
+                ? richQuestion(question, resolvedLabels, displayLocale)
+                : defaultQuestion(question, resolvedLabels))}
+          </div>
         ))}
       </div>
       {data.skipReasons === undefined || data.skipReasons.length === 0
         ? null
         : slots?.skipReasons === undefined
-          ? defaultSkipReasons(data.skipReasons, "Skip reasons", data.sourceLanguage)
+          ? variant === "rich"
+            ? richSkipReasons(data.skipReasons, resolvedLabels.skipReasons, displayLocale)
+            : defaultSkipReasons(data.skipReasons, resolvedLabels.skipReasons, displayLocale)
           : slots.skipReasons(data.skipReasons)}
     </section>
   );
@@ -307,14 +494,22 @@ function renderDomainSummaryData(
   className: string | undefined,
   labels: SurveyResponseSummaryDomainLabels | undefined,
   languageLabel: ((language: string) => ReactNode) | undefined,
-  summaryState: { readonly status: "idle" | "loading" | "success" | "error"; readonly error?: Error }
+  summaryState: { readonly status: "idle" | "loading" | "success" | "error"; readonly error?: Error },
+  variant: SurveyResponseSummaryVariant = "default",
+  locale?: string
 ): React.JSX.Element {
   const resolvedLabels = { ...defaultSummaryLabels, ...labels };
+  const displayLocale = locale ?? data.sourceLanguage;
   const languageAggregates =
     data.languages ??
     languageOptions.map(({ language, count }) => ({ language, submissionCount: count, summary: { questions: [] } }));
   return (
-    <section className={className} data-form-id={data.formId} data-version={data.version}>
+    <section
+      className={className}
+      data-form-id={data.formId}
+      data-version={data.version}
+      data-summary-variant={variant}
+    >
       {slots.header?.(data) ?? slots.renderHeader?.(data) ?? <h2>{data.title}</h2>}
       {languageOptions.length === 0
         ? null
@@ -349,12 +544,17 @@ function renderDomainSummaryData(
           {data.skipReasons === undefined || data.skipReasons.length === 0
             ? null
             : slots.skipReasons === undefined
-              ? defaultSkipReasons(data.skipReasons, resolvedLabels.skipReasons, data.sourceLanguage)
+              ? variant === "rich"
+                ? richSkipReasons(data.skipReasons, resolvedLabels.skipReasons, displayLocale)
+                : defaultSkipReasons(data.skipReasons, resolvedLabels.skipReasons, displayLocale)
               : slots.skipReasons(data.skipReasons)}
           <div>
             {data.questions.map((question) => (
-              <div key={question.fieldId}>
-                {slots.question?.(question) ?? defaultQuestion(question, resolvedLabels)}
+              <div key={question.fieldId} className="form-engine-response-summary__question">
+                {slots.question?.(question) ??
+                  (variant === "rich"
+                    ? richQuestion(question, resolvedLabels, displayLocale)
+                    : defaultQuestion(question, resolvedLabels))}
               </div>
             ))}
           </div>
@@ -486,6 +686,8 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
     ...(effectiveSummaryState.error === undefined ? {} : { summaryError: effectiveSummaryState.error }),
     reloadSummary,
     languageOptions: mapped.languageOptions,
+    ...(options.variant === undefined ? {} : { variant: options.variant }),
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
     ...(options.slots === undefined ? {} : { slots: options.slots }),
     ...(options.labels === undefined ? {} : { labels: options.labels }),
     ...(options.languageLabel === undefined ? {} : { languageLabel: options.languageLabel }),
@@ -509,7 +711,9 @@ function SurveyResponseSummaryDomainView<TSummary, TVersion>(
     props.className,
     props.labels,
     props.languageLabel,
-    props.summaryState ?? controller.summaryState
+    props.summaryState ?? controller.summaryState,
+    props.variant,
+    props.locale
   );
 }
 
@@ -526,10 +730,22 @@ function SurveyResponseSummaryLegacyDomainView<TDomain>(
     slots,
     className,
     labels,
-    languageLabel
+    languageLabel,
+    variant,
+    locale
   } = props;
   const data = toSurveyResponseSummary(summary, domainAdapter.toFormSchema(version), sourceLanguage);
-  return renderSummaryData(data, renderQuestion, slots, className, onSourceLanguageChange, labels, languageLabel);
+  return renderSummaryData(
+    data,
+    renderQuestion,
+    slots,
+    className,
+    onSourceLanguageChange,
+    labels,
+    languageLabel,
+    variant,
+    locale
+  );
 }
 
 function isDomainSummaryProps<TSummary, TVersion>(
@@ -557,8 +773,29 @@ export function SurveyResponseSummaryDomain<TSummary, TVersion>(
 export function SurveyResponseSummaryCustomDomain<TDomain, TDomainSummary>(
   props: SurveyResponseSummaryCustomDomainComponentProps<TDomain, TDomainSummary>
 ): React.JSX.Element {
-  const { domainAdapter, version, summary, sourceLanguage, onSourceLanguageChange, renderQuestion, slots, className } =
-    props;
+  const {
+    domainAdapter,
+    version,
+    summary,
+    sourceLanguage,
+    onSourceLanguageChange,
+    renderQuestion,
+    slots,
+    className,
+    variant,
+    locale,
+    labels
+  } = props;
   const data = mapSurveyResponseSummary({ domain: version, summary, sourceLanguage }, domainAdapter);
-  return renderSummaryData(data, renderQuestion, slots, className, onSourceLanguageChange);
+  return renderSummaryData(
+    data,
+    renderQuestion,
+    slots,
+    className,
+    onSourceLanguageChange,
+    labels,
+    undefined,
+    variant,
+    locale
+  );
 }

@@ -149,6 +149,9 @@ importers:
       '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
+      '@form-engine-ts/custom-survey-client':
+        specifier: workspace:*
+        version: link:../custom-survey-client
       '@form-engine-ts/react':
         specifier: workspace:*
         version: link:../react

@@ -40,6 +40,41 @@ Domain response summaries also render mapped skip reasons by default, using the 
 Pass `labels.skipReasons` to localize the heading or replace the complete area with `slots.skipReasons`; empty results
 remain hidden.
 
+Opt into the package-provided rich response-summary renderer with `variant="rich"`. It groups each question into a
+card, displays answered/unanswered counts, renders choice distributions with accessible progress bars, and renders
+numeric/rating or checkbox statistics as cards. The existing default renderer is unchanged, and `slots.question` /
+`slots.skipReasons` still take precedence over the rich defaults:
+
+```tsx
+<SurveyResponseSummaryDomain
+  {...summaryDomain}
+  variant="rich"
+  locale="ja-JP"
+  labels={{
+    answered: "回答済み",
+    unanswered: "未回答",
+    options: "選択肢",
+    statistics: "集計",
+    average: "平均",
+    minimum: "最小",
+    maximum: "最大",
+    total: "合計",
+    checked: "チェック済み",
+    unchecked: "未チェック",
+    skipReasons: "スキップ理由"
+  }}
+  slots={{ question: renderQuestion, skipReasons: renderSkipReasons }}
+/>;
+```
+
+`locale` controls localized count, statistic, and percentage formatting; when omitted, the active summary language is
+used. Progress values are normalized to the `0..100` range, including exact `0%` and `100%` values. CSS can target
+the stable `form-engine-response-summary__*` classes and `data-summary-variant="rich"` attribute without adding a UI
+library dependency.
+
+For a Material UI presentation layer, install the optional `@form-engine-ts/mui` package and use its
+`MuiSurveyResponseSummaryDomain` component. The core survey-client package remains usable without MUI or Emotion.
+
 `createSurveySchemaDomainAdapter` provides one shared text metadata codec for application-owned schema records. Its
 conversion boundary writes the canonical source-text hash and translation source/date fields, and normalizes legacy
 `isManuallyEdited`/`isManual` metadata on read. Use the codec for form title/description/completion text, page titles,

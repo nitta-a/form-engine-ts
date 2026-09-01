@@ -878,6 +878,136 @@ describe("custom survey client", () => {
     expect(screen.queryByText("Skip reasons")).not.toBeInTheDocument();
   });
 
+  it("renders the opt-in rich summary with cards, localized values, and bounded progress bars", () => {
+    const richSchema: FormSchema = {
+      ...schema,
+      fields: [
+        ...schema.fields,
+        { id: "score", type: "number", title: "Score", required: false },
+        { id: "rating", type: "rating", title: "Rating", required: false },
+        { id: "recommend", type: "checkbox", title: "Recommend", required: false }
+      ]
+    };
+    const adapter = {
+      toSummaryInput: () => ({
+        questions: [
+          {
+            fieldId: "satisfaction",
+            kind: "radio" as const,
+            answeredCount: 3,
+            unansweredCount: 0,
+            options: [
+              { id: "good", count: 3, percentageOfSubmissions: 100 },
+              { id: "bad", count: 0, percentageOfSubmissions: -10 }
+            ]
+          },
+          {
+            fieldId: "score",
+            kind: "number" as const,
+            answeredCount: 2,
+            unansweredCount: 1,
+            average: 2.5,
+            minimum: 1,
+            maximum: 4,
+            total: 5
+          },
+          {
+            fieldId: "rating",
+            kind: "rating" as const,
+            answeredCount: 0,
+            unansweredCount: 3,
+            average: null,
+            minimum: null,
+            maximum: null,
+            total: 0
+          },
+          {
+            fieldId: "recommend",
+            kind: "checkbox" as const,
+            answeredCount: 3,
+            unansweredCount: 0,
+            trueCount: 2,
+            falseCount: 1,
+            truePercentageOfSubmissions: 200,
+            falsePercentageOfSubmissions: 0
+          }
+        ]
+      }),
+      toFormSchema: () => richSchema,
+      sourceLanguage: () => "ja-JP",
+      mapSkipReasons: () => [{ reason: "not-applicable", count: 1234 }]
+    };
+
+    const { container } = render(
+      <SurveyResponseSummaryDomain
+        summary={{ aggregate: "maker-summary" }}
+        version={{ id: "version" }}
+        domainAdapter={adapter}
+        variant="rich"
+        labels={{
+          answered: "回答済み",
+          unanswered: "未回答",
+          options: "選択肢",
+          statistics: "集計",
+          average: "平均",
+          minimum: "最小",
+          maximum: "最大",
+          total: "合計",
+          checked: "チェック済み",
+          unchecked: "未チェック",
+          skipReasons: "スキップ理由"
+        }}
+      />
+    );
+
+    expect(container.querySelector('[data-summary-variant="rich"]')).toBeInTheDocument();
+    expect(screen.getByText("選択肢")).toBeInTheDocument();
+    expect(screen.getAllByText("平均")).toHaveLength(2);
+    expect(screen.getByText("2.5")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("チェック済み")).toBeInTheDocument();
+    expect(screen.getByText("スキップ理由")).toBeInTheDocument();
+    expect(screen.getByText("1,234")).toBeInTheDocument();
+
+    const progressBars = screen.getAllByRole("progressbar");
+    expect(progressBars[0]).toHaveValue(100);
+    expect(progressBars[1]).toHaveValue(0);
+    expect(progressBars[0]).toHaveAttribute("aria-label", "Good: Percentage 100%");
+    expect(progressBars[1]).toHaveAttribute("aria-label", "Bad: Percentage 0%");
+    expect(screen.getAllByText("—")).toHaveLength(3);
+  });
+
+  it("keeps rich question and skip reason slots as the highest-priority overrides", () => {
+    const question = vi.fn(() => <div data-testid="rich-question-slot">Custom question</div>);
+    const skipReasons = vi.fn(() => <div data-testid="rich-skip-slot">Custom reasons</div>);
+    const adapter = {
+      toSummaryInput: () => ({
+        questions: [
+          { fieldId: "satisfaction", kind: "radio" as const, answeredCount: 1, unansweredCount: 0, options: [] }
+        ]
+      }),
+      toFormSchema: () => schema,
+      sourceLanguage: () => "en",
+      mapSkipReasons: () => [{ reason: "other", count: 1 }]
+    };
+
+    render(
+      <SurveyResponseSummaryDomain
+        summary={{ aggregate: "maker-summary" }}
+        version={{ id: "version" }}
+        domainAdapter={adapter}
+        variant="rich"
+        slots={{ question, skipReasons }}
+      />
+    );
+
+    expect(screen.getByTestId("rich-question-slot")).toBeInTheDocument();
+    expect(screen.getByTestId("rich-skip-slot")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(question).toHaveBeenCalledWith(expect.objectContaining({ fieldId: "satisfaction" }));
+    expect(skipReasons).toHaveBeenCalledWith([{ reason: "other", count: 1 }]);
+  });
+
   it("supports generic mapping CRUD with operation state and invalidation", async () => {
     const first = { id: "m1" };
     const second = { id: "m2" };

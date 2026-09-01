@@ -5,7 +5,8 @@ import { ReactNode, ComponentType, ReactElement } from 'react';
 import * as _form_engine_ts_core from '@form-engine-ts/core';
 import { FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormSchema, DisplayRule, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus } from '@form-engine-ts/core';
 export { TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
-import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, ButtonProps, IconButtonProps } from '@mui/material';
+import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, ButtonProps, IconButtonProps, TabsProps, TabProps, CardContentProps, ListProps, ListItemProps, LinearProgressProps } from '@mui/material';
+import { SurveyResponseSummarySkipReason, SurveyResponseSummaryData, SurveyResponseSummaryLanguageOption, SurveyClientAsyncState, SurveyResponseSummaryDomainLabels, SurveyResponseSummaryQuestion, SurveyResponseSummaryDomainInputProps } from '@form-engine-ts/custom-survey-client';
 
 type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization" | "submissionSettings";
 type MuiButtonVariant = "contained" | "outlined" | "text";
@@ -205,6 +206,54 @@ interface MuiFormBuilderProps extends Omit<FormBuilderProps, "components" | "dis
 }
 declare function MuiFormBuilder({ muiOptions, layoutOptions, localizationOptions, localization, submissionSettingsOptions, muiSlotProps, components: customComponents, slots: customSlots, i18n, sectionOrder, ...props }: MuiFormBuilderProps): react.JSX.Element;
 
+type MuiSummaryDataAttributes = {
+    readonly [key: `data-${string}`]: string | number | boolean | undefined;
+};
+type MuiSummaryCardProps = CardProps & MuiSummaryDataAttributes;
+interface MuiSurveyResponseSummarySlots<TSkipReason = unknown> {
+    readonly renderHeader?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
+    readonly header?: (data: SurveyResponseSummaryData<unknown, TSkipReason>) => ReactNode;
+    readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+    readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+    readonly skipReasons?: (reasons: readonly TSkipReason[]) => ReactNode;
+}
+interface MuiSurveyResponseSummarySlotProps {
+    readonly root?: StackProps;
+    readonly tabs?: TabsProps;
+    readonly tab?: TabProps;
+    readonly questionCard?: MuiSummaryCardProps;
+    readonly questionContent?: CardContentProps;
+    readonly responseCounts?: StackProps;
+    readonly optionList?: ListProps;
+    readonly option?: ListItemProps;
+    readonly progress?: LinearProgressProps;
+    readonly statistics?: StackProps;
+    readonly statisticCard?: MuiSummaryCardProps;
+    readonly statisticContent?: CardContentProps;
+    readonly skipReasonsCard?: MuiSummaryCardProps;
+    readonly skipReasonList?: ListProps;
+    readonly skipReason?: ListItemProps;
+}
+interface MuiSurveyResponseSummaryDataProps<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason> {
+    readonly data: SurveyResponseSummaryData<TCustomData, TSkipReason>;
+    readonly languageOptions?: readonly SurveyResponseSummaryLanguageOption[];
+    readonly selectedLanguage?: string | null;
+    readonly onLanguageChange?: (language: string | null) => void;
+    readonly summaryState?: SurveyClientAsyncState;
+    readonly labels?: SurveyResponseSummaryDomainLabels;
+    /** Locale used for counts, statistics, and percentages. Defaults to the active summary language. */
+    readonly locale?: string;
+    readonly slots?: MuiSurveyResponseSummarySlots<TSkipReason>;
+    readonly slotProps?: MuiSurveyResponseSummarySlotProps;
+    readonly className?: string;
+}
+interface MuiSurveyResponseSummaryDomainProps<TSummary, TVersion> extends Omit<SurveyResponseSummaryDomainInputProps<TSummary, TVersion>, "slots" | "variant"> {
+    readonly slots?: MuiSurveyResponseSummarySlots<unknown>;
+    readonly slotProps?: MuiSurveyResponseSummarySlotProps;
+}
+declare function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason>(props: MuiSurveyResponseSummaryDataProps<TCustomData, TSkipReason>): React.JSX.Element;
+declare function MuiSurveyResponseSummaryDomain<TSummary, TVersion>(props: MuiSurveyResponseSummaryDomainProps<TSummary, TVersion>): React.JSX.Element;
+
 interface ConditionEditorProps {
     readonly schema: FormSchema;
     readonly fieldId: string;
@@ -351,4 +400,4 @@ interface TranslationWorkspaceProps {
 }
 declare function TranslationWorkspace(props: TranslationWorkspaceProps): react.JSX.Element;
 
-export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };
+export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

@@ -874,6 +874,8 @@ export interface SurveyResponseSummaryQuestion {
   readonly statistics?: Readonly<Record<string, number | null>>;
 }
 
+export type SurveyResponseSummaryVariant = "default" | "rich";
+
 export interface SurveyResponseSummaryData<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason> {
   readonly formId: string;
   readonly version: number;
@@ -898,6 +900,11 @@ export interface SurveyResponseSummaryProps {
   readonly sourceLanguage: string;
   readonly onSourceLanguageChange?: (language: string) => void;
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
+  /** Selects the package-provided question cards and progress-bar renderer. */
+  readonly variant?: SurveyResponseSummaryVariant;
+  /** Locale used for counts, statistics, and percentages. Defaults to sourceLanguage. */
+  readonly locale?: string;
+  readonly labels?: SurveyResponseSummaryDomainLabels;
   readonly className?: string;
 }
 
@@ -913,6 +920,15 @@ export interface SurveyResponseSummaryDomainLabels {
   readonly answered?: string;
   readonly unanswered?: string;
   readonly skipReasons?: string;
+  readonly options?: string;
+  readonly statistics?: string;
+  readonly average?: string;
+  readonly minimum?: string;
+  readonly maximum?: string;
+  readonly total?: string;
+  readonly checked?: string;
+  readonly unchecked?: string;
+  readonly percentage?: string;
 }
 
 export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
@@ -928,6 +944,9 @@ export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
   /** Optional state override used when spreading a domain hook result into this component. */
   readonly summaryState?: SurveyClientAsyncState;
   readonly slots?: SurveyResponseSummaryDomainSlots;
+  readonly variant?: SurveyResponseSummaryVariant;
+  /** Locale used for counts, statistics, and percentages. Defaults to the active language. */
+  readonly locale?: string;
   readonly labels?: SurveyResponseSummaryDomainLabels;
   readonly languageLabel?: (language: string) => ReactNode;
   readonly className?: string;
@@ -997,6 +1016,8 @@ export interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
   readonly summaryError?: Error;
   readonly reloadSummary: () => Promise<TSummary | undefined>;
   readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
+  readonly variant?: SurveyResponseSummaryVariant;
+  readonly locale?: string;
   readonly slots?: SurveyResponseSummaryDomainSlots;
   readonly labels?: SurveyResponseSummaryDomainLabels;
   readonly languageLabel?: (language: string) => ReactNode;
