@@ -1,6 +1,6 @@
 import type { FormSchema } from "@form-engine-ts/core";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { TranslationComparisonWorkspace } from "../src";
+import { TargetLocaleHeaderToolbar, TranslationComparisonWorkspace } from "../src";
 
 const schema: FormSchema = {
   id: "mui-comparison",
@@ -64,6 +64,85 @@ describe("TranslationComparisonWorkspace", () => {
 
     expect(onLocaleAdded).toHaveBeenCalledWith("fr");
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ supportedLocales: ["en", "ja", "fr"] }));
+  });
+
+  it("renders standard locale action icons and supports replacing the action content", () => {
+    const { unmount } = render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        availableLocales={["fr"]}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    expect(screen.getByTestId("AddIcon")).toBeInTheDocument();
+    expect(screen.getByTestId("DeleteOutlineIcon")).toBeInTheDocument();
+    unmount();
+
+    const renderLocaleActions = vi.fn(({ add, remove }) => (
+      <>
+        <button type="button" aria-label={add.label} onClick={add.onClick} disabled={add.disabled}>
+          {add.icon}
+          Add custom
+        </button>
+        <button type="button" aria-label={remove.label} onClick={remove.onClick} disabled={remove.disabled}>
+          {remove.icon}
+          Remove custom
+        </button>
+      </>
+    ));
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        availableLocales={["fr"]}
+        addIcon={<span data-testid="custom-add-icon" />}
+        removeIcon={<span data-testid="custom-remove-icon" />}
+        renderLocaleActions={renderLocaleActions}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    expect(renderLocaleActions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        add: expect.objectContaining({ action: "add", label: "Add language" }),
+        remove: expect.objectContaining({ action: "remove", label: "Remove language" })
+      })
+    );
+    expect(screen.getByTestId("custom-add-icon")).toBeInTheDocument();
+    expect(screen.getByTestId("custom-remove-icon")).toBeInTheDocument();
+  });
+
+  it("uses the same standard locale icons in TargetLocaleHeaderToolbar", () => {
+    render(
+      <TargetLocaleHeaderToolbar
+        supportedLocales={["en", "ja"]}
+        currentLocale="ja"
+        availableLocales={["fr"]}
+        onSelectLocale={vi.fn()}
+        onAddLocale={vi.fn()}
+        onRemoveLocale={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("AddIcon")).toBeInTheDocument();
+    expect(screen.getByTestId("DeleteOutlineIcon")).toBeInTheDocument();
+  });
+
+  it("keeps the locale removal confirmation flow on the icon-bearing button", () => {
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        availableLocales={["fr"]}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove language" }));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it("shows the internal path only when explicitly requested", () => {

@@ -47,10 +47,13 @@ and badge placement. The existing `i18n.messages`/`customCatalogs` options overr
 English catalog, so application dictionaries can remove residual English UI text.
 `appearance.sourceInput` and `appearance.targetInput` control border, background, radius, and height independently;
 `appearance.layout.equalInputHeight` synchronizes both inputs (enabled by default), while `alignInput`, `headerHeight`,
-`gridRatio`, row bounds, and `layout.byTarget` provide per-kind layout control. `TargetLocaleHeaderToolbar` separates
-registered-language switching/removal from the independent `AddLocaleDropdown`; a single registered language is shown
-as a non-interactive chip. `i18n.customDictionary` supports locale names, status labels, placeholders, headers, and
-message overrides.
+`gridRatio`, row bounds, and `layout.byTarget` provide per-kind layout control. Locale add/remove actions use MUI's
+`AddIcon` and `DeleteOutlineIcon` by default; pass `addIcon` or `removeIcon` to replace them, or provide
+`renderLocaleActions` to replace the action content while receiving localized labels, icons, disabled states, and
+callbacks. `TargetLocaleHeaderToolbar` uses the same icons for its add-language selector and remove action, and accepts
+the same icon overrides. It separates registered-language switching/removal from the independent `AddLocaleDropdown`;
+a single registered language is shown as a non-interactive chip. `i18n.customDictionary` supports locale names, status
+labels, placeholders, headers, and message overrides.
 
 ```tsx
 import { MuiFormBuilder } from "@form-engine-ts/mui";

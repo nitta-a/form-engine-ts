@@ -1,4 +1,5 @@
 import type {
+  CanonicalTranslationMetadata,
   FormAnalytics,
   FormField,
   FormResponse,
@@ -80,6 +81,40 @@ export interface SurveyI18n {
 /** Maps an application-owned survey record to the Form Engine schema used by headless UI primitives. */
 export interface SurveySchemaDomainAdapter<TDomain> {
   readonly toFormSchema: (domain: TDomain) => FormSchema;
+}
+
+export type SurveyEngineTextMetadata = Partial<CanonicalTranslationMetadata> & {
+  readonly isManuallyEdited?: boolean;
+  readonly isManual?: boolean;
+  readonly sourceText?: string;
+};
+
+export interface SurveySchemaTextMetadataCodec<TTextMetadata> {
+  readonly toEngine: (request: {
+    readonly value: string;
+    readonly metadata?: TTextMetadata;
+    readonly sourceText: string;
+  }) => {
+    readonly value: string;
+    readonly metadata?: Readonly<Record<string, JsonValue>>;
+  };
+  readonly fromEngine: (request: {
+    readonly value: string;
+    readonly metadata: SurveyEngineTextMetadata;
+    readonly sourceText: string;
+  }) => TTextMetadata;
+}
+
+export interface SurveySchemaDomainAdapterOptions<TDomain, TTextMetadata = unknown> {
+  readonly toFormSchema: (domain: TDomain) => FormSchema;
+  readonly fromFormSchema?: (schema: FormSchema, previous: TDomain) => TDomain;
+  readonly textMetadata?: SurveySchemaTextMetadataCodec<TTextMetadata>;
+}
+
+export interface SurveySchemaDomainAdapterWithTextMetadata<TDomain, TTextMetadata = unknown>
+  extends SurveySchemaDomainAdapter<TDomain> {
+  readonly fromFormSchema?: (schema: FormSchema, previous: TDomain) => TDomain;
+  readonly textMetadata?: SurveySchemaTextMetadataCodec<TTextMetadata>;
 }
 
 export interface SurveyEditorDomainAdapter<TDomain> extends SurveySchemaDomainAdapter<TDomain> {
@@ -747,6 +782,10 @@ export type SurveySummaryInput =
   | FormAnalytics
   | { readonly questions: readonly QuestionAggregate[]; readonly formId?: string; readonly formVersion?: number };
 
+export interface SurveySummaryLoader<TSummary> {
+  readonly load: (request: { readonly language: string; readonly signal: AbortSignal }) => Promise<TSummary>;
+}
+
 export interface SurveyResponseSummaryLanguageAggregate {
   readonly language: string;
   readonly submissionCount: number;
@@ -873,6 +912,7 @@ export interface SurveyResponseSummaryDomainLabels {
   readonly languages?: string;
   readonly answered?: string;
   readonly unanswered?: string;
+  readonly skipReasons?: string;
 }
 
 export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
@@ -884,6 +924,9 @@ export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
   readonly defaultLanguage?: string | null;
   readonly selectedLanguage?: string | null;
   readonly onLanguageChange?: (language: string | null) => void;
+  readonly summaryLoader?: SurveySummaryLoader<TSummary>["load"] | SurveySummaryLoader<TSummary>;
+  /** Optional state override used when spreading a domain hook result into this component. */
+  readonly summaryState?: SurveyClientAsyncState;
   readonly slots?: SurveyResponseSummaryDomainSlots;
   readonly labels?: SurveyResponseSummaryDomainLabels;
   readonly languageLabel?: (language: string) => ReactNode;
@@ -949,6 +992,10 @@ export interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
   readonly version: TVersion;
   readonly domainAdapter: SurveyResponseSummaryDomainAdapter<TSummary, TVersion>;
   readonly selectedLanguage: string | null;
+  readonly summaryState: SurveyClientAsyncState;
+  readonly summaryLoading: boolean;
+  readonly summaryError?: Error;
+  readonly reloadSummary: () => Promise<TSummary | undefined>;
   readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
   readonly slots?: SurveyResponseSummaryDomainSlots;
   readonly labels?: SurveyResponseSummaryDomainLabels;

@@ -1,7 +1,9 @@
 import type { LocaleOption } from "@form-engine-ts/core";
+import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { Box, Chip, FormControl, IconButton, InputLabel, MenuItem, Select, Typography } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material/Select";
+import type { ReactNode } from "react";
 
 export type TargetLocaleOption = string | LocaleOption;
 
@@ -11,6 +13,7 @@ export interface AddLocaleDropdownProps {
   readonly value?: string;
   readonly disabled?: boolean;
   readonly label?: string;
+  readonly icon?: ReactNode;
   readonly getLocaleDisplayName?: (locale: string) => string;
   readonly onAdd: (locale: string) => void;
 }
@@ -30,6 +33,7 @@ export function AddLocaleDropdown({
   value = "",
   disabled = false,
   label = "Add translation language",
+  icon = <AddIcon fontSize="small" />,
   getLocaleDisplayName,
   onAdd
 }: AddLocaleDropdownProps) {
@@ -41,7 +45,13 @@ export function AddLocaleDropdown({
   return (
     <FormControl size="small" sx={{ minWidth: 180 }} disabled={disabled || candidates.length === 0}>
       <InputLabel>{label}</InputLabel>
-      <Select value={value} label={label} onChange={handleChange} data-testid="add-locale-dropdown">
+      <Select
+        value={value}
+        label={label}
+        onChange={handleChange}
+        startAdornment={icon}
+        data-testid="add-locale-dropdown"
+      >
         {candidates.map((option) => {
           const locale = optionLocale(option);
           return (
@@ -66,7 +76,22 @@ export interface TargetLocaleToolbarProps {
   readonly selectionLabel?: string;
   readonly addLabel?: string;
   readonly removeLabel?: string;
+  readonly addIcon?: ReactNode;
+  readonly removeIcon?: ReactNode;
   readonly getLocaleDisplayName?: (locale: string) => string;
+}
+
+export interface TranslationLocaleActionProps {
+  readonly action: "add" | "remove";
+  readonly label: string;
+  readonly icon: ReactNode;
+  readonly disabled: boolean;
+  readonly onClick: () => void;
+}
+
+export interface TranslationLocaleActionsProps {
+  readonly add: TranslationLocaleActionProps;
+  readonly remove: TranslationLocaleActionProps;
 }
 
 export function TargetLocaleHeaderToolbar({
@@ -80,6 +105,8 @@ export function TargetLocaleHeaderToolbar({
   selectionLabel = "Translation language",
   addLabel = "Add translation language",
   removeLabel = "Remove translation language",
+  addIcon = <AddIcon fontSize="small" />,
+  removeIcon = <DeleteOutlineIcon fontSize="small" />,
   getLocaleDisplayName
 }: TargetLocaleToolbarProps) {
   const currentOption = supportedLocales.find((option) => optionLocale(option) === currentLocale);
@@ -125,7 +152,7 @@ export function TargetLocaleHeaderToolbar({
             onClick={() => onRemoveLocale(currentLocale)}
             size="small"
           >
-            <DeleteOutlineIcon fontSize="small" />
+            {removeIcon}
           </IconButton>
         ) : null}
       </Box>
@@ -134,6 +161,7 @@ export function TargetLocaleHeaderToolbar({
         disabled={disabled}
         existingLocales={supportedLocales.map(optionLocale)}
         {...(getLocaleDisplayName === undefined ? {} : { getLocaleDisplayName })}
+        icon={addIcon}
         label={addLabel}
         onAdd={onAddLocale}
       />

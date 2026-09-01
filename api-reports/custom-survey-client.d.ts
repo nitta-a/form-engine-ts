@@ -1,4 +1,4 @@
-import { JsonValue, TranslationAdapter, FormSchema, TranslationReport, TextAnswerItem, FormResponse, FormField, FormAnalytics, QuestionAggregate, FormVersionRecord, FormVersionState, QuestionType, FormEngineTranslator, TranslationSlot } from '@form-engine-ts/core';
+import { JsonValue, TranslationAdapter, FormSchema, TranslationReport, TextAnswerItem, FormResponse, FormField, CanonicalTranslationMetadata, FormAnalytics, QuestionAggregate, FormVersionRecord, FormVersionState, QuestionType, FormEngineTranslator, TranslationSlot } from '@form-engine-ts/core';
 import { FormBuilderProps, useFormBuilder } from '@form-engine-ts/react';
 import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 import { ReactNode } from 'react';
@@ -44,6 +44,35 @@ interface SurveyI18n {
 /** Maps an application-owned survey record to the Form Engine schema used by headless UI primitives. */
 interface SurveySchemaDomainAdapter<TDomain> {
     readonly toFormSchema: (domain: TDomain) => FormSchema;
+}
+type SurveyEngineTextMetadata = Partial<CanonicalTranslationMetadata> & {
+    readonly isManuallyEdited?: boolean;
+    readonly isManual?: boolean;
+    readonly sourceText?: string;
+};
+interface SurveySchemaTextMetadataCodec<TTextMetadata> {
+    readonly toEngine: (request: {
+        readonly value: string;
+        readonly metadata?: TTextMetadata;
+        readonly sourceText: string;
+    }) => {
+        readonly value: string;
+        readonly metadata?: Readonly<Record<string, JsonValue>>;
+    };
+    readonly fromEngine: (request: {
+        readonly value: string;
+        readonly metadata: SurveyEngineTextMetadata;
+        readonly sourceText: string;
+    }) => TTextMetadata;
+}
+interface SurveySchemaDomainAdapterOptions<TDomain, TTextMetadata = unknown> {
+    readonly toFormSchema: (domain: TDomain) => FormSchema;
+    readonly fromFormSchema?: (schema: FormSchema, previous: TDomain) => TDomain;
+    readonly textMetadata?: SurveySchemaTextMetadataCodec<TTextMetadata>;
+}
+interface SurveySchemaDomainAdapterWithTextMetadata<TDomain, TTextMetadata = unknown> extends SurveySchemaDomainAdapter<TDomain> {
+    readonly fromFormSchema?: (schema: FormSchema, previous: TDomain) => TDomain;
+    readonly textMetadata?: SurveySchemaTextMetadataCodec<TTextMetadata>;
 }
 interface SurveyEditorDomainAdapter<TDomain> extends SurveySchemaDomainAdapter<TDomain> {
     readonly fromFormSchema: (schema: FormSchema, previous: TDomain) => TDomain;
@@ -545,6 +574,12 @@ type SurveySummaryInput = FormAnalytics | {
     readonly formId?: string;
     readonly formVersion?: number;
 };
+interface SurveySummaryLoader<TSummary> {
+    readonly load: (request: {
+        readonly language: string;
+        readonly signal: AbortSignal;
+    }) => Promise<TSummary>;
+}
 interface SurveyResponseSummaryLanguageAggregate {
     readonly language: string;
     readonly submissionCount: number;
@@ -668,6 +703,7 @@ interface SurveyResponseSummaryDomainLabels {
     readonly languages?: string;
     readonly answered?: string;
     readonly unanswered?: string;
+    readonly skipReasons?: string;
 }
 interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
     readonly summary: TSummary;
@@ -678,6 +714,9 @@ interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
     readonly defaultLanguage?: string | null;
     readonly selectedLanguage?: string | null;
     readonly onLanguageChange?: (language: string | null) => void;
+    readonly summaryLoader?: SurveySummaryLoader<TSummary>["load"] | SurveySummaryLoader<TSummary>;
+    /** Optional state override used when spreading a domain hook result into this component. */
+    readonly summaryState?: SurveyClientAsyncState;
     readonly slots?: SurveyResponseSummaryDomainSlots;
     readonly labels?: SurveyResponseSummaryDomainLabels;
     readonly languageLabel?: (language: string) => ReactNode;
@@ -727,6 +766,10 @@ interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
     readonly version: TVersion;
     readonly domainAdapter: SurveyResponseSummaryDomainAdapter<TSummary, TVersion>;
     readonly selectedLanguage: string | null;
+    readonly summaryState: SurveyClientAsyncState;
+    readonly summaryLoading: boolean;
+    readonly summaryError?: Error;
+    readonly reloadSummary: () => Promise<TSummary | undefined>;
     readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
     readonly slots?: SurveyResponseSummaryDomainSlots;
     readonly labels?: SurveyResponseSummaryDomainLabels;
@@ -761,6 +804,7 @@ declare const useSurveyEditorController: typeof useSurveyEditor;
 declare function SurveyEditor(props: SurveyEditorProps): React.JSX.Element;
 
 declare function createSurveySchemaDomainAdapter<TDomain>(toFormSchema: SurveySchemaDomainAdapter<TDomain>["toFormSchema"]): SurveySchemaDomainAdapter<TDomain>;
+declare function createSurveySchemaDomainAdapter<TDomain, TTextMetadata>(input: SurveySchemaDomainAdapterOptions<TDomain, TTextMetadata>): SurveySchemaDomainAdapterWithTextMetadata<TDomain, TTextMetadata>;
 declare function toFreeTextAnswerItemsFromDomain<TDomain>(items: readonly TDomain[], adapter: FreeTextAnswerDomainAdapter<TDomain>): readonly FreeTextAnswerItem[];
 declare function useFreeTextDomainAnswerTranslation<TDomain>(options: UseFreeTextDomainAnswerTranslationOptions<TDomain>): UseFreeTextDomainAnswerTranslationResult<TDomain>;
 /** Keeps the application domain record as the source of truth while the builder edits a mapped schema. */
@@ -880,6 +924,29 @@ interface SurveyMappingReorderResult<TMapping, TRevision = unknown> {
     /** Revision returned by the atomic commit. */
     readonly revision: TRevision;
 }
+interface SurveyMappingMutationResult<TMapping, TRevision = unknown> {
+    /** The complete server state after the mutation. */
+    readonly mappings: readonly TMapping[];
+    /** Revision returned by the mutation commit. */
+    readonly revision: TRevision;
+    /** Optional created mapping when the mutation was create. */
+    readonly mapping?: TMapping;
+}
+type SurveyMappingMutationResponse<TMapping, TRevision = unknown> = TMapping | undefined | SurveyMappingMutationResult<TMapping, TRevision>;
+interface SurveyMappingRevisionConflict<TMapping, TRevision = unknown> {
+    readonly code: "REVISION_CONFLICT";
+    readonly expectedRevision: TRevision;
+    readonly currentRevision: TRevision;
+    readonly currentMappings: readonly TMapping[];
+}
+declare class SurveyMappingRevisionConflictError<TMapping, TRevision = unknown> extends Error implements SurveyMappingRevisionConflict<TMapping, TRevision> {
+    readonly code: "REVISION_CONFLICT";
+    readonly expectedRevision: TRevision;
+    readonly currentRevision: TRevision;
+    readonly currentMappings: readonly TMapping[];
+    constructor(conflict: Omit<SurveyMappingRevisionConflict<TMapping, TRevision>, "code">, message?: string);
+}
+declare function isSurveyMappingRevisionConflict<TMapping, TRevision = unknown>(value: unknown): value is SurveyMappingRevisionConflict<TMapping, TRevision>;
 interface SurveyMappingAtomicReorderRequest<TDomain, TMapping, TSelection, TRevision = unknown> {
     readonly domain: TDomain;
     readonly mappings: readonly TMapping[];
@@ -891,19 +958,41 @@ interface SurveyMappingCrudAdapter<TDomain, TMapping, TSelection, TRevision = un
     readonly create: (request: {
         readonly domain: TDomain;
         readonly selection: TSelection;
+        readonly expectedRevision?: TRevision;
         readonly signal: AbortSignal;
     }) => Promise<TMapping>;
+    readonly createWithRevision?: (request: {
+        readonly domain: TDomain;
+        readonly selection: TSelection;
+        readonly expectedRevision?: TRevision;
+        readonly signal: AbortSignal;
+    }) => Promise<SurveyMappingMutationResult<TMapping, TRevision>>;
     readonly remove: (request: {
         readonly domain: TDomain;
         readonly mapping: TMapping;
+        readonly expectedRevision?: TRevision;
         readonly signal: AbortSignal;
     }) => Promise<void>;
+    readonly removeWithRevision?: (request: {
+        readonly domain: TDomain;
+        readonly mapping: TMapping;
+        readonly expectedRevision?: TRevision;
+        readonly signal: AbortSignal;
+    }) => Promise<SurveyMappingMutationResult<TMapping, TRevision>>;
     readonly reorder?: (request: {
         readonly domain: TDomain;
         readonly mapping: TMapping;
         readonly displayOrder: number;
+        readonly expectedRevision?: TRevision;
         readonly signal: AbortSignal;
     }) => Promise<void>;
+    readonly reorderWithRevision?: (request: {
+        readonly domain: TDomain;
+        readonly mapping: TMapping;
+        readonly displayOrder: number;
+        readonly expectedRevision?: TRevision;
+        readonly signal: AbortSignal;
+    }) => Promise<SurveyMappingMutationResult<TMapping, TRevision>>;
     /** Persists and returns the complete order in one atomic request. */
     readonly reorderMany: (request: SurveyMappingAtomicReorderRequest<TDomain, TMapping, TSelection, TRevision>) => Promise<SurveyMappingReorderResult<TMapping, TRevision>>;
     /** Optional alias for reorderMany for hosts that use "all" terminology. */
@@ -923,16 +1012,30 @@ interface SurveyMappingCrudAdapter<TDomain, TMapping, TSelection, TRevision = un
         readonly domain: TDomain;
         readonly signal: AbortSignal;
     }) => Promise<readonly TMapping[]>;
+    readonly listWithRevision?: (request: {
+        readonly domain: TDomain;
+        readonly signal: AbortSignal;
+    }) => Promise<SurveyMappingReorderResult<TMapping, TRevision>>;
     readonly invalidate?: () => void | Promise<void>;
 }
 type SurveyMappingAtomicCrudAdapter<TDomain, TMapping, TSelection, TRevision = unknown> = SurveyMappingCrudAdapter<TDomain, TMapping, TSelection, TRevision>;
 type SurveyMappingCrudOperation = "idle" | "creating" | "removing" | "reordering" | "error";
+interface SurveyMappingCrudState<TMapping, TRevision = unknown> {
+    readonly operation: SurveyMappingCrudOperation;
+    readonly error?: Error;
+    /** Present when the latest operation was rejected against a newer server revision. */
+    readonly revisionConflict?: SurveyMappingRevisionConflict<TMapping, TRevision>;
+    /** A conflict is safe to retry after the returned current mappings/revision are accepted. */
+    readonly canRetry?: boolean;
+}
 interface UseSurveyMappingCrudResult<TMapping, TSelection = unknown, TRevision = unknown> {
     readonly mappings: readonly TMapping[];
     readonly revision?: TRevision;
     readonly state: {
         readonly operation: SurveyMappingCrudOperation;
         readonly error?: Error;
+        readonly revisionConflict?: SurveyMappingRevisionConflict<TMapping, TRevision>;
+        readonly canRetry?: boolean;
     };
     readonly create: (selection: unknown) => Promise<boolean>;
     readonly remove: (mapping: TMapping) => Promise<boolean>;
@@ -1299,4 +1402,4 @@ declare function useSurveyWorkflow<TDomain, TTransitionId = string>({ domain, tr
 /** Generic workflow controls with application-owned transition labels and transport. */
 declare function SurveyWorkflowPanel<TDomain, TTransitionId = string>({ render, slots, title, ...options }: SurveyWorkflowPanelProps<TDomain, TTransitionId>): React.JSX.Element;
 
-export { type AsyncTranslationAdapter, type CreateFreeTextTranslationControllerOptions, type CreateSurveyTranslationAdapterOptions, type CreateSurveyTranslationMetadataOptions, type DirectFreeTextTranslationOptions, type DomainSurveyVersionOperationRequest, type DomainSurveyVersionPublishRequest, type DomainSurveyVersionQualityIssueDecisionRequest, type EditorRenderProps, type FreeTextAnswerDomainAdapter, type FreeTextAnswerInput, type FreeTextAnswerItem, type FreeTextAnswerSource, type FreeTextAnswerTranslationSlots, FreeTextAnswerTranslations, type FreeTextAnswerTranslationsProps, type FreeTextItemStatus, type FreeTextTranslationAdapter, type FreeTextTranslationController, type FreeTextTranslationItemState, type FreeTextTranslationOutcome, type FreeTextTranslationOutcomeItem, type FreeTextTranslationOutcomeStatus, type FreeTextTranslationRequest, type FreeTextTranslationResult, type FreeTextTranslationState, type FreeTextTranslationStatus, type QualityCheckResult, type QualityCheckStatus, type QualityIssue, type QualityIssueDecision, type SurveyActionResult, type SurveyAsyncState, type SurveyClientAsyncState, type SurveyControlledValue, type SurveyControllerStatus, SurveyEditor, type SurveyEditorActionsAdapter, type SurveyEditorAdapter, type SurveyEditorAdapterInput, type SurveyEditorConfigurationSlots, type SurveyEditorDomainActionsAdapter, type SurveyEditorDomainAdapter, type SurveyEditorDomainAdapterOptions, type SurveyEditorDomainSlots, type SurveyEditorOperationState, type SurveyEditorOperationStatus, type SurveyEditorProps, type SurveyEditorQuestionAdapter, type SurveyEditorQuestionRequest, type SurveyEditorRenderProps, type SurveyEditorSlots, type SurveyEditorTranslateRequest, SurveyFreeTextTable, type SurveyFreeTextTableProps, type SurveyI18n, type SurveyMappingAdapter, type SurveyMappingAddRequest, type SurveyMappingAtomicCrudAdapter, type SurveyMappingAtomicReorderRequest, type SurveyMappingCrudAdapter, type SurveyMappingCrudOperation, type SurveyMappingEntry, type SurveyMappingListRequest, SurveyMappingPanel, type SurveyMappingPanelProps, type SurveyMappingPanelSlots, type SurveyMappingRemoveRequest, type SurveyMappingReorderRequest, type SurveyMappingReorderResult, type SurveyMappingSaveRequest, type SurveyMappingSelection, type SurveyMappingState, type SurveyMappingStatus, SurveyProvider, type SurveyProviderProps, type SurveyQualityCheckAdapter, type SurveyQualityEvent, type SurveyQualityIssueRecord, SurveyQualityPanel, type SurveyQualityPanelProps, type SurveyQualityPanelSlots, type SurveyQualityState, SurveyResponseSummary, type SurveyResponseSummaryComponentProps, SurveyResponseSummaryCustomDomain, type SurveyResponseSummaryCustomDomainComponentProps, type SurveyResponseSummaryCustomDomainProps, type SurveyResponseSummaryData, SurveyResponseSummaryDomain, type SurveyResponseSummaryDomainAdapter, type SurveyResponseSummaryDomainComponentProps, type SurveyResponseSummaryDomainInputProps, type SurveyResponseSummaryDomainLabels, type SurveyResponseSummaryDomainProps, type SurveyResponseSummaryDomainSlots, type SurveyResponseSummaryLanguageAggregate, type SurveyResponseSummaryLanguageOption, type SurveyResponseSummaryLanguageTabsProps, type SurveyResponseSummaryLegacyCustomDomainProps, type SurveyResponseSummaryLegacyDomainProps, type SurveyResponseSummaryMapperAdapter, type SurveyResponseSummaryMappingRequest, type SurveyResponseSummaryProps, type SurveyResponseSummaryQuestion, type SurveyResponseSummarySkipReason, type SurveyResponseSummarySlots, type SurveySchemaDomainAdapter, type SurveySlot, type SurveySummaryInput, type SurveyTranslationAdapter, type SurveyTranslationInput, type SurveyTranslationMetadataPolicy, type SurveyTranslationMetadataSource, type SurveyTranslationScope, SurveyUiProvider, type SurveyUiProviderProps, type SurveyVersionActionAdapter, type SurveyVersionActionEvent, type SurveyVersionActionResult, type SurveyVersionActionsAdapter, type SurveyVersionAdapter, type SurveyVersionAdapterResponse, type SurveyVersionDomainActionAdapter, type SurveyVersionDomainActionsResult, type SurveyVersionDomainOperationsResult, type SurveyVersionDomainQualityActions, SurveyVersionHistory, type SurveyVersionHistoryProps, type SurveyVersionHistorySlots, type SurveyVersionLifecycleActions, type SurveyVersionOperationName, type SurveyVersionOperationRequest, type SurveyVersionOperationState, type SurveyVersionOperationStatus, SurveyVersionPanel, type SurveyVersionPanelProps, type SurveyVersionPanelRenderProps, type SurveyVersionPanelSlots, type SurveyVersionPublishRequest, type SurveyVersionQualityActions, type SurveyVersionQualityIssueDecisionRequest, type SurveyVersionQualityResult, type SurveyVersionQualityState, type SurveyVersionQualityStatus, type SurveyWorkflowAdapter, SurveyWorkflowControlled, type SurveyWorkflowControlledProps, SurveyWorkflowPanel, type SurveyWorkflowPanelProps, type SurveyWorkflowPanelSlots, type SurveyWorkflowState, type SurveyWorkflowStatus, type SurveyWorkflowTransition, type SurveyWorkflowTransitionRequest, type TranslateFreeTextAnswersOptions, type TranslateSurveySchemaOptions, type TranslateSurveySchemaResult, type UseFreeTextAnswerTranslationOptions, type UseFreeTextAnswerTranslationResult, type UseFreeTextDomainAnswerTranslationOptions, type UseFreeTextDomainAnswerTranslationResult, type UseSurveyEditorDomainOptions, type UseSurveyEditorDomainResult, type UseSurveyEditorOptions, type UseSurveyEditorResult, type UseSurveyMappingCrudOptions, type UseSurveyMappingCrudResult, type UseSurveyMappingOptions, type UseSurveyMappingResult, type UseSurveyQualityControllerOptions, type UseSurveyQualityControllerResult, type UseSurveyResponseSummaryDomainOptions, type UseSurveyResponseSummaryDomainResult, type UseSurveyVersionActionsOptions, type UseSurveyVersionActionsResult, type UseSurveyVersionDomainActionsOptions, type UseSurveyVersionDomainQualityActionsOptions, type UseSurveyVersionOperationsOptions, type UseSurveyVersionOperationsResult, type UseSurveyWorkflowControlledResult, type UseSurveyWorkflowOptions, type UseSurveyWorkflowResult, composeSurveyVersionActions, composeSurveyVersionDomainActions, createFreeTextTranslationController, createSurveySchemaDomainAdapter, createSurveyTranslationAdapter, createSurveyTranslationMetadata, createSurveyTranslator, getFreeTextAnswerFindings, hasPiiCandidate, isSurveySummaryInput, mapSurveyQualityIssue, mapSurveyQualityIssues, mapSurveyResponseSummary, surveyQualityIssueKey, toFreeTextAnswerItems, toFreeTextAnswerItemsFromDomain, toSurveyQualityIssue, toSurveyResponseSummary, toSurveyResponseSummaryFromDomain, translateFreeTextAnswers, translateSurveySchema, useFreeTextAnswerTranslation, useFreeTextAnswerTranslationController, useFreeTextDomainAnswerTranslation, useSurveyEditor, useSurveyEditorController, useSurveyEditorDomain, useSurveyMapping, useSurveyMappingCrud, useSurveyQualityController, useSurveyResponseSummaryDomain, useSurveyTranslation, useSurveyVersionActions, useSurveyVersionActionsController, useSurveyVersionDomainActions, useSurveyVersionOperations, useSurveyWorkflow, useSurveyWorkflowControlled };
+export { type AsyncTranslationAdapter, type CreateFreeTextTranslationControllerOptions, type CreateSurveyTranslationAdapterOptions, type CreateSurveyTranslationMetadataOptions, type DirectFreeTextTranslationOptions, type DomainSurveyVersionOperationRequest, type DomainSurveyVersionPublishRequest, type DomainSurveyVersionQualityIssueDecisionRequest, type EditorRenderProps, type FreeTextAnswerDomainAdapter, type FreeTextAnswerInput, type FreeTextAnswerItem, type FreeTextAnswerSource, type FreeTextAnswerTranslationSlots, FreeTextAnswerTranslations, type FreeTextAnswerTranslationsProps, type FreeTextItemStatus, type FreeTextTranslationAdapter, type FreeTextTranslationController, type FreeTextTranslationItemState, type FreeTextTranslationOutcome, type FreeTextTranslationOutcomeItem, type FreeTextTranslationOutcomeStatus, type FreeTextTranslationRequest, type FreeTextTranslationResult, type FreeTextTranslationState, type FreeTextTranslationStatus, type QualityCheckResult, type QualityCheckStatus, type QualityIssue, type QualityIssueDecision, type SurveyActionResult, type SurveyAsyncState, type SurveyClientAsyncState, type SurveyControlledValue, type SurveyControllerStatus, SurveyEditor, type SurveyEditorActionsAdapter, type SurveyEditorAdapter, type SurveyEditorAdapterInput, type SurveyEditorConfigurationSlots, type SurveyEditorDomainActionsAdapter, type SurveyEditorDomainAdapter, type SurveyEditorDomainAdapterOptions, type SurveyEditorDomainSlots, type SurveyEditorOperationState, type SurveyEditorOperationStatus, type SurveyEditorProps, type SurveyEditorQuestionAdapter, type SurveyEditorQuestionRequest, type SurveyEditorRenderProps, type SurveyEditorSlots, type SurveyEditorTranslateRequest, type SurveyEngineTextMetadata, SurveyFreeTextTable, type SurveyFreeTextTableProps, type SurveyI18n, type SurveyMappingAdapter, type SurveyMappingAddRequest, type SurveyMappingAtomicCrudAdapter, type SurveyMappingAtomicReorderRequest, type SurveyMappingCrudAdapter, type SurveyMappingCrudOperation, type SurveyMappingCrudState, type SurveyMappingEntry, type SurveyMappingListRequest, type SurveyMappingMutationResponse, type SurveyMappingMutationResult, SurveyMappingPanel, type SurveyMappingPanelProps, type SurveyMappingPanelSlots, type SurveyMappingRemoveRequest, type SurveyMappingReorderRequest, type SurveyMappingReorderResult, type SurveyMappingRevisionConflict, SurveyMappingRevisionConflictError, type SurveyMappingSaveRequest, type SurveyMappingSelection, type SurveyMappingState, type SurveyMappingStatus, SurveyProvider, type SurveyProviderProps, type SurveyQualityCheckAdapter, type SurveyQualityEvent, type SurveyQualityIssueRecord, SurveyQualityPanel, type SurveyQualityPanelProps, type SurveyQualityPanelSlots, type SurveyQualityState, SurveyResponseSummary, type SurveyResponseSummaryComponentProps, SurveyResponseSummaryCustomDomain, type SurveyResponseSummaryCustomDomainComponentProps, type SurveyResponseSummaryCustomDomainProps, type SurveyResponseSummaryData, SurveyResponseSummaryDomain, type SurveyResponseSummaryDomainAdapter, type SurveyResponseSummaryDomainComponentProps, type SurveyResponseSummaryDomainInputProps, type SurveyResponseSummaryDomainLabels, type SurveyResponseSummaryDomainProps, type SurveyResponseSummaryDomainSlots, type SurveyResponseSummaryLanguageAggregate, type SurveyResponseSummaryLanguageOption, type SurveyResponseSummaryLanguageTabsProps, type SurveyResponseSummaryLegacyCustomDomainProps, type SurveyResponseSummaryLegacyDomainProps, type SurveyResponseSummaryMapperAdapter, type SurveyResponseSummaryMappingRequest, type SurveyResponseSummaryProps, type SurveyResponseSummaryQuestion, type SurveyResponseSummarySkipReason, type SurveyResponseSummarySlots, type SurveySchemaDomainAdapter, type SurveySchemaDomainAdapterOptions, type SurveySchemaDomainAdapterWithTextMetadata, type SurveySchemaTextMetadataCodec, type SurveySlot, type SurveySummaryInput, type SurveySummaryLoader, type SurveyTranslationAdapter, type SurveyTranslationInput, type SurveyTranslationMetadataPolicy, type SurveyTranslationMetadataSource, type SurveyTranslationScope, SurveyUiProvider, type SurveyUiProviderProps, type SurveyVersionActionAdapter, type SurveyVersionActionEvent, type SurveyVersionActionResult, type SurveyVersionActionsAdapter, type SurveyVersionAdapter, type SurveyVersionAdapterResponse, type SurveyVersionDomainActionAdapter, type SurveyVersionDomainActionsResult, type SurveyVersionDomainOperationsResult, type SurveyVersionDomainQualityActions, SurveyVersionHistory, type SurveyVersionHistoryProps, type SurveyVersionHistorySlots, type SurveyVersionLifecycleActions, type SurveyVersionOperationName, type SurveyVersionOperationRequest, type SurveyVersionOperationState, type SurveyVersionOperationStatus, SurveyVersionPanel, type SurveyVersionPanelProps, type SurveyVersionPanelRenderProps, type SurveyVersionPanelSlots, type SurveyVersionPublishRequest, type SurveyVersionQualityActions, type SurveyVersionQualityIssueDecisionRequest, type SurveyVersionQualityResult, type SurveyVersionQualityState, type SurveyVersionQualityStatus, type SurveyWorkflowAdapter, SurveyWorkflowControlled, type SurveyWorkflowControlledProps, SurveyWorkflowPanel, type SurveyWorkflowPanelProps, type SurveyWorkflowPanelSlots, type SurveyWorkflowState, type SurveyWorkflowStatus, type SurveyWorkflowTransition, type SurveyWorkflowTransitionRequest, type TranslateFreeTextAnswersOptions, type TranslateSurveySchemaOptions, type TranslateSurveySchemaResult, type UseFreeTextAnswerTranslationOptions, type UseFreeTextAnswerTranslationResult, type UseFreeTextDomainAnswerTranslationOptions, type UseFreeTextDomainAnswerTranslationResult, type UseSurveyEditorDomainOptions, type UseSurveyEditorDomainResult, type UseSurveyEditorOptions, type UseSurveyEditorResult, type UseSurveyMappingCrudOptions, type UseSurveyMappingCrudResult, type UseSurveyMappingOptions, type UseSurveyMappingResult, type UseSurveyQualityControllerOptions, type UseSurveyQualityControllerResult, type UseSurveyResponseSummaryDomainOptions, type UseSurveyResponseSummaryDomainResult, type UseSurveyVersionActionsOptions, type UseSurveyVersionActionsResult, type UseSurveyVersionDomainActionsOptions, type UseSurveyVersionDomainQualityActionsOptions, type UseSurveyVersionOperationsOptions, type UseSurveyVersionOperationsResult, type UseSurveyWorkflowControlledResult, type UseSurveyWorkflowOptions, type UseSurveyWorkflowResult, composeSurveyVersionActions, composeSurveyVersionDomainActions, createFreeTextTranslationController, createSurveySchemaDomainAdapter, createSurveyTranslationAdapter, createSurveyTranslationMetadata, createSurveyTranslator, getFreeTextAnswerFindings, hasPiiCandidate, isSurveyMappingRevisionConflict, isSurveySummaryInput, mapSurveyQualityIssue, mapSurveyQualityIssues, mapSurveyResponseSummary, surveyQualityIssueKey, toFreeTextAnswerItems, toFreeTextAnswerItemsFromDomain, toSurveyQualityIssue, toSurveyResponseSummary, toSurveyResponseSummaryFromDomain, translateFreeTextAnswers, translateSurveySchema, useFreeTextAnswerTranslation, useFreeTextAnswerTranslationController, useFreeTextDomainAnswerTranslation, useSurveyEditor, useSurveyEditorController, useSurveyEditorDomain, useSurveyMapping, useSurveyMappingCrud, useSurveyQualityController, useSurveyResponseSummaryDomain, useSurveyTranslation, useSurveyVersionActions, useSurveyVersionActionsController, useSurveyVersionDomainActions, useSurveyVersionOperations, useSurveyWorkflow, useSurveyWorkflowControlled };

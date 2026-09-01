@@ -1,7 +1,8 @@
 import { type FormField, type FormSchema, type FormVersionRecord, resolveLocalizedSchema } from "@form-engine-ts/core";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { mapSurveyResponseSummary } from "./response/summaryMapper";
 import type {
+  SurveyClientAsyncState,
   SurveyResponseSummaryComponentProps,
   SurveyResponseSummaryCustomDomainComponentProps,
   SurveyResponseSummaryData,
@@ -12,6 +13,7 @@ import type {
   SurveyResponseSummaryLanguageOption,
   SurveyResponseSummaryQuestion,
   SurveySummaryInput,
+  SurveySummaryLoader,
   UseSurveyResponseSummaryDomainOptions,
   UseSurveyResponseSummaryDomainResult
 } from "./types";
@@ -104,8 +106,44 @@ export function toSurveyResponseSummary(
 const defaultSummaryLabels: Required<SurveyResponseSummaryDomainLabels> = {
   languages: "Languages",
   answered: "Answered",
-  unanswered: "Unanswered"
+  unanswered: "Unanswered",
+  skipReasons: "Skip reasons"
 };
+
+function formatCount(count: number, language: string): string {
+  try {
+    return new Intl.NumberFormat(language).format(count);
+  } catch {
+    return new Intl.NumberFormat().format(count);
+  }
+}
+
+function skipReasonEntry(value: unknown): { readonly reason: string; readonly count: number } | undefined {
+  if (typeof value !== "object" || value === null || !("reason" in value) || !("count" in value)) return undefined;
+  return typeof value.reason === "string" && typeof value.count === "number" && Number.isFinite(value.count)
+    ? { reason: value.reason, count: value.count }
+    : undefined;
+}
+
+function defaultSkipReasons(reasons: readonly unknown[], label: string, language: string): React.JSX.Element | null {
+  const entries = reasons.flatMap((reason) => {
+    const entry = skipReasonEntry(reason);
+    return entry === undefined ? [] : [entry];
+  });
+  if (entries.length === 0) return null;
+  return (
+    <section aria-label={label}>
+      <h3>{label}</h3>
+      <ul>
+        {entries.map((entry) => (
+          <li key={entry.reason}>
+            {entry.reason}: {formatCount(entry.count, language)}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function defaultQuestion(
   question: SurveyResponseSummaryQuestion,
@@ -179,18 +217,25 @@ function renderSummaryData(
           <div key={question.fieldId}>{questionRenderer?.(question) ?? defaultQuestion(question, resolvedLabels)}</div>
         ))}
       </div>
+      {data.skipReasons === undefined || data.skipReasons.length === 0
+        ? null
+        : slots?.skipReasons === undefined
+          ? defaultSkipReasons(data.skipReasons, "Skip reasons", data.sourceLanguage)
+          : slots.skipReasons(data.skipReasons)}
     </section>
   );
 }
 
 function domainSummaryData<TSummary, TVersion>(
   options: UseSurveyResponseSummaryDomainOptions<TSummary, TVersion>,
-  selectedLanguage: string | null
+  selectedLanguage: string | null,
+  activeSummary: TSummary
 ): {
   readonly data: SurveyResponseSummaryData<TSummary, unknown>;
   readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
 } {
-  const { domainAdapter, summary, version } = options;
+  const { domainAdapter, version } = options;
+  const summary = activeSummary;
   const languages = domainAdapter.mapLanguages?.({ domain: version, summary });
   const sourceLanguage = selectedLanguage ?? domainAdapter.sourceLanguage(version);
   const selectedAggregate = languages?.find((language) => language.language === sourceLanguage);
@@ -261,7 +306,8 @@ function renderDomainSummaryData(
   slots: SurveyResponseSummaryDomainSlots,
   className: string | undefined,
   labels: SurveyResponseSummaryDomainLabels | undefined,
-  languageLabel: ((language: string) => ReactNode) | undefined
+  languageLabel: ((language: string) => ReactNode) | undefined,
+  summaryState: { readonly status: "idle" | "loading" | "success" | "error"; readonly error?: Error }
 ): React.JSX.Element {
   const resolvedLabels = { ...defaultSummaryLabels, ...labels };
   const languageAggregates =
@@ -294,14 +340,39 @@ function renderDomainSummaryData(
               })}
             </div>
           ))}
-      {slots.skipReasons?.(data.skipReasons ?? [])}
-      <div>
-        {data.questions.map((question) => (
-          <div key={question.fieldId}>{slots.question?.(question) ?? defaultQuestion(question, resolvedLabels)}</div>
-        ))}
-      </div>
+      {summaryState.status === "loading" ? <p role="status">Loading summary…</p> : null}
+      {summaryState.status === "error" ? (
+        <p role="alert">{summaryState.error?.message ?? "Unable to load summary."}</p>
+      ) : null}
+      {summaryState.status === "loading" || summaryState.status === "error" ? null : (
+        <>
+          {data.skipReasons === undefined || data.skipReasons.length === 0
+            ? null
+            : slots.skipReasons === undefined
+              ? defaultSkipReasons(data.skipReasons, resolvedLabels.skipReasons, data.sourceLanguage)
+              : slots.skipReasons(data.skipReasons)}
+          <div>
+            {data.questions.map((question) => (
+              <div key={question.fieldId}>
+                {slots.question?.(question) ?? defaultQuestion(question, resolvedLabels)}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
+}
+
+function summaryLoaderFunction<TSummary>(
+  loader: SurveySummaryLoader<TSummary>["load"] | SurveySummaryLoader<TSummary> | undefined
+): SurveySummaryLoader<TSummary>["load"] | undefined {
+  if (loader === undefined) return undefined;
+  return typeof loader === "function" ? loader : loader.load;
+}
+
+function normalizedError(cause: unknown): Error {
+  return cause instanceof Error ? cause : new Error(String(cause));
 }
 
 export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
@@ -309,20 +380,111 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
 ): UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
   const [internalLanguage, setInternalLanguage] = useState<string | null>(() => options.defaultLanguage ?? null);
   const selectedLanguage = options.selectedLanguage === undefined ? internalLanguage : options.selectedLanguage;
+  const sourceLanguage = options.domainAdapter.sourceLanguage(options.version);
+  const activeLanguage = selectedLanguage ?? sourceLanguage;
+  const loader = summaryLoaderFunction(options.summaryLoader);
+  const cacheRef = useRef<Map<string, TSummary>>(new Map([[activeLanguage, options.summary]]));
+  const activeSummaryRef = useRef<{ readonly language: string; readonly summary: TSummary }>({
+    language: activeLanguage,
+    summary: options.summary
+  });
+  const [activeSummaryState, setActiveSummaryState] = useState(activeSummaryRef.current);
+  const [summaryState, setSummaryState] = useState<SurveyClientAsyncState>(
+    () => options.summaryState ?? { status: "idle" }
+  );
+  const requestRef = useRef(0);
+  const controllerRef = useRef<AbortController | undefined>(undefined);
+  const pendingRef = useRef<Map<string, Promise<TSummary | undefined>>>(new Map());
+  const loadSummaryForLanguage = useCallback(
+    async (language: string, force = false): Promise<TSummary | undefined> => {
+      if (loader === undefined) return undefined;
+      if (!force) {
+        const cached = cacheRef.current.get(language);
+        if (cached !== undefined) {
+          const next = { language, summary: cached };
+          activeSummaryRef.current = next;
+          setActiveSummaryState(next);
+          setSummaryState({ status: "success" });
+          return cached;
+        }
+      }
+      const pending = pendingRef.current.get(language);
+      if (pending !== undefined && !force) return pending;
+      controllerRef.current?.abort();
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      const requestId = requestRef.current + 1;
+      requestRef.current = requestId;
+      activeSummaryRef.current = { language, summary: activeSummaryRef.current.summary };
+      setActiveSummaryState((current) => (current.language === language ? current : { ...current, language }));
+      setSummaryState({ status: "loading" });
+      const request = loader({ language, signal: controller.signal })
+        .then((loaded) => {
+          if (requestRef.current !== requestId || controller.signal.aborted) return undefined;
+          cacheRef.current.set(language, loaded);
+          const next = { language, summary: loaded };
+          activeSummaryRef.current = next;
+          setActiveSummaryState(next);
+          setSummaryState({ status: "success" });
+          return loaded;
+        })
+        .catch((cause: unknown) => {
+          if (requestRef.current !== requestId || controller.signal.aborted) return undefined;
+          setSummaryState({ status: "error", error: normalizedError(cause) });
+          return undefined;
+        })
+        .finally(() => {
+          if (pendingRef.current.get(language) === request) pendingRef.current.delete(language);
+        });
+      pendingRef.current.set(language, request);
+      return request;
+    },
+    [loader]
+  );
   const setLanguage = useCallback(
     (language: string | null) => {
       if (options.selectedLanguage === undefined) setInternalLanguage(language);
       options.onLanguageChange?.(language);
+      const nextLanguage = language ?? sourceLanguage;
+      if (loader !== undefined) void loadSummaryForLanguage(nextLanguage);
     },
-    [options.onLanguageChange, options.selectedLanguage]
+    [loadSummaryForLanguage, loader, options.onLanguageChange, options.selectedLanguage, sourceLanguage]
   );
-  const mapped = useMemo(() => domainSummaryData(options, selectedLanguage), [options, selectedLanguage]);
+  useEffect(() => {
+    if (loader === undefined || activeSummaryRef.current.language === activeLanguage) return;
+    void loadSummaryForLanguage(activeLanguage);
+  }, [activeLanguage, loadSummaryForLanguage, loader]);
+  useEffect(
+    () => () => {
+      controllerRef.current?.abort();
+    },
+    []
+  );
+  const activeSummary =
+    loader === undefined || activeLanguage === sourceLanguage
+      ? options.summary
+      : activeSummaryState.language === activeLanguage
+        ? activeSummaryState.summary
+        : options.summary;
+  const mapped = useMemo(
+    () => domainSummaryData(options, selectedLanguage, activeSummary),
+    [activeSummary, options, selectedLanguage]
+  );
+  const reloadSummary = useCallback(
+    () => loadSummaryForLanguage(activeLanguage, true),
+    [activeLanguage, loadSummaryForLanguage]
+  );
+  const effectiveSummaryState = options.summaryState ?? summaryState;
   return {
     data: mapped.data,
-    summary: options.summary,
+    summary: activeSummary,
     version: options.version,
     domainAdapter: options.domainAdapter,
     selectedLanguage,
+    summaryState: effectiveSummaryState,
+    summaryLoading: effectiveSummaryState.status === "loading",
+    ...(effectiveSummaryState.error === undefined ? {} : { summaryError: effectiveSummaryState.error }),
+    reloadSummary,
     languageOptions: mapped.languageOptions,
     ...(options.slots === undefined ? {} : { slots: options.slots }),
     ...(options.labels === undefined ? {} : { labels: options.labels }),
@@ -346,7 +508,8 @@ function SurveyResponseSummaryDomainView<TSummary, TVersion>(
     props.slots ?? {},
     props.className,
     props.labels,
-    props.languageLabel
+    props.languageLabel,
+    props.summaryState ?? controller.summaryState
   );
 }
 

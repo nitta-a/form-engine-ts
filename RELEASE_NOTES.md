@@ -5,6 +5,17 @@ current release and usage information.
 
 ## Latest release
 
+### v7.7.0 — 2026-09-02
+
+- Added standard `AddIcon` and `DeleteOutlineIcon` to MUI translation locale actions.
+- Added locale action icon overrides and a `renderLocaleActions` customization point to
+  `TranslationComparisonWorkspace`, while preserving labels, accessibility, confirmation, and mutation behavior.
+- Aligned `TargetLocaleHeaderToolbar` with the comparison workspace locale action icons.
+- Added per-language lazy Response Summary loading with abort handling, caching, typed loading/error state, and reload support.
+- Added localized default skip-reason rendering with a replaceable `slots.skipReasons` area.
+- Added the shared schema text metadata codec with source-text hashes, manual/automatic source state, dates, and legacy metadata normalization.
+- Added revision-aware Mapping create/remove/reorder operations and typed `REVISION_CONFLICT` state carrying the latest mappings and revision.
+
 ### v7.6.0 — 2026-09-01
 
 - Moved Response Summary language state, labels, tab inputs, and language-specific aggregate conversion into `useSurveyResponseSummaryDomain`; its result can be spread directly into `SurveyResponseSummaryDomain`.

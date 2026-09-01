@@ -56,10 +56,12 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.6.0** (2026-09-01). All public packages are currently aligned to version `7.6.0`.
-This release moves Response Summary language state and aggregate conversion, translation metadata policy/reporting, and atomic Mapping reorder results into the package.
+The latest release is **v7.7.0** (2026-09-02). All public packages are currently aligned to version `7.7.0`.
+This release adds standard add/remove icons and customizable locale actions to the MUI translation comparison workspace,
+per-language lazy response-summary loading and skip-reason UI, shared schema translation metadata codecs, and revision-aware
+Mapping CRUD conflict state, while preserving existing labels, accessibility, confirmation, and mutation behavior.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history. Publication is performed separately from this local
-v7.6.0 implementation.
+v7.7.0 implementation.
 
 ### Authoring and respondent experience
 
@@ -370,9 +372,9 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.6.0**（2026-09-01）です。公開パッケージはすべてバージョン `7.6.0` に揃えています。
-本リリースでは、Response Summaryの言語状態・集計変換、翻訳metadataとreport、Mappingの原子的な一括並び替え結果をパッケージへ移管しました。
-全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。公開作業は、このローカルv7.6.0実装とは別に行います。
+最新版は **v7.7.0**（2026-09-02）です。公開パッケージはすべてバージョン `7.7.0` に揃えています。
+本リリースでは、MUI翻訳比較ワークスペースの言語追加・削除操作に標準アイコンとカスタマイズ可能なlocale actionを追加し、Response Summaryの言語別遅延読み込み・スキップ理由表示、共有スキーマ翻訳メタデータcodec、revision対応Mapping CRUD競合状態も追加しています。既存のラベル、アクセシビリティ、確認、言語操作仕様は維持しました。
+全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。公開作業は、このローカルv7.7.0実装とは別に行います。
 
 ### 編集・回答体験
 

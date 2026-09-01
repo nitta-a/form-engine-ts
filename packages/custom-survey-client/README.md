@@ -19,6 +19,45 @@ The package has no dependency on Maker authentication, tRPC, Jotai, or URL state
 
 Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt application translation functions without an unsafe cast. `SurveyProvider` is the unified provider for Form Engine and survey translations; it accepts a typed `translation` scope, a structural i18next-compatible `i18n` instance, or a transport-neutral translation adapter. When no local i18n props are passed it composes with the surrounding Form Engine provider instead of replacing it. `@form-engine-ts/custom-survey-client` is publishable with ESM, CommonJS, and declaration outputs; React and Form Engine packages are peer dependencies.
 
+## v7.7 APIs
+
+Response Summary can load a summary lazily for each selected language. The hook caches successful language results,
+aborts the previous request when the language changes, and exposes typed loading/error/reload state:
+
+```tsx
+const summaryDomain = useSurveyResponseSummaryDomain({
+  summary,
+  version,
+  domainAdapter,
+  languageOptions,
+  summaryLoader: ({ language, signal }) => api.loadSummary({ language, signal })
+});
+
+<SurveyResponseSummaryDomain {...summaryDomain} />;
+```
+
+Domain response summaries also render mapped skip reasons by default, using the selected locale for number formatting.
+Pass `labels.skipReasons` to localize the heading or replace the complete area with `slots.skipReasons`; empty results
+remain hidden.
+
+`createSurveySchemaDomainAdapter` provides one shared text metadata codec for application-owned schema records. Its
+conversion boundary writes the canonical source-text hash and translation source/date fields, and normalizes legacy
+`isManuallyEdited`/`isManual` metadata on read. Use the codec for form title/description/completion text, page titles,
+question titles, and choice labels so all schema text slots follow the same rules:
+
+```tsx
+const adapter = createSurveySchemaDomainAdapter({
+  toFormSchema,
+  fromFormSchema,
+  textMetadata: { toEngine, fromEngine }
+});
+```
+
+Mapping `create`, `remove`, `reorder`, and atomic `reorderMany` requests carry `expectedRevision`. Revision-bearing
+mutation responses update the complete local mapping state. When the transport returns `REVISION_CONFLICT`, the hook
+exposes `state.revisionConflict` with the latest mappings/revision and `state.canRetry`; call `refresh()` or retry after
+the application accepts that state. `isSurveyMappingRevisionConflict` is available for transport-level error guards.
+
 ## v7.6 APIs
 
 Response Summary language state, language labels, language tabs, and language-specific unanswered counts can now be owned by

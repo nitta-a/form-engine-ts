@@ -20,10 +20,13 @@ import {
   type UseTranslationComparisonOptions,
   useFormEngineI18n
 } from "@form-engine-ts/react";
+import AddIcon from "@mui/icons-material/Add";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { Box, Button, Chip, IconButton, LinearProgress, MenuItem, Paper, TextField, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import type { MuiFormEngineI18nOptions } from "../types";
+import type { TranslationLocaleActionsProps } from "./TargetLocaleSelector";
 import {
   defaultTranslationSlotIcon,
   formatTranslationWorkspaceTemplate,
@@ -73,6 +76,9 @@ export interface TranslationComparisonWorkspaceProps {
   readonly createTranslationMetadata?: UseTranslationComparisonOptions["createTranslationMetadata"];
   readonly showInternalPath?: boolean;
   readonly localeSelectorMode?: "tabs" | "select";
+  readonly addIcon?: ReactNode;
+  readonly removeIcon?: ReactNode;
+  readonly renderLocaleActions?: (props: TranslationLocaleActionsProps) => ReactNode;
   readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
   readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
   readonly appearance?: TranslationComparisonAppearance;
@@ -80,6 +86,7 @@ export interface TranslationComparisonWorkspaceProps {
   readonly slots?: {
     readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
     readonly renderTargetLocaleSelector?: (props: TranslationComparisonLocaleSelectorProps) => ReactNode;
+    readonly renderLocaleActions?: (props: TranslationLocaleActionsProps) => ReactNode;
     readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
     readonly renderStatusBadge?: (props: { readonly status: TranslationStatus }) => ReactNode;
     readonly confirmRemoveLocale?: (props: ConfirmRemoveLocaleSlotProps) => ReactNode;
@@ -93,6 +100,9 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
     readOnly = false,
     showInternalPath = false,
     localeSelectorMode = "tabs",
+    addIcon,
+    removeIcon,
+    renderLocaleActions,
     renderItemIcon,
     getTranslationSlotIcon,
     appearance = {},
@@ -124,6 +134,30 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
     errorMessage,
     targetLocaleSelectorProps
   } = useTranslationComparisonView(props, translate);
+  const resolvedAddIcon = addIcon === undefined ? <AddIcon fontSize="small" /> : addIcon;
+  const resolvedRemoveIcon = removeIcon === undefined ? <DeleteOutlineIcon fontSize="small" /> : removeIcon;
+  const addLocaleLabel = translate("workspace.header.addLocale");
+  const removeLocaleLabel = translate("workspace.header.removeLocale");
+  const addLocaleDisabled = readOnly || !comparison.isAddLocaleAllowed(newLocale);
+  const removeLocaleDisabled =
+    availableLocales === undefined || !canRemoveTargetLocale || selectedLocaleOption?.removable === false;
+  const localeActions: TranslationLocaleActionsProps = {
+    add: {
+      action: "add",
+      label: addLocaleLabel,
+      icon: resolvedAddIcon,
+      disabled: addLocaleDisabled,
+      onClick: handleAddLocale
+    },
+    remove: {
+      action: "remove",
+      label: removeLocaleLabel,
+      icon: resolvedRemoveIcon,
+      disabled: removeLocaleDisabled,
+      onClick: () => void comparison.removeLocale(comparison.targetLocale)
+    }
+  };
+  const renderActions = renderLocaleActions ?? slots?.renderLocaleActions;
 
   return (
     <Box data-testid="translation-comparison-workspace">
@@ -262,9 +296,15 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
               disabled={readOnly}
               sx={{ minWidth: 180 }}
             />
-            <Button onClick={handleAddLocale} disabled={readOnly || !comparison.isAddLocaleAllowed(newLocale)}>
-              {translate("workspace.header.addLocale")}
-            </Button>
+            {renderActions?.(localeActions) ?? (
+              <Button
+                onClick={localeActions.add.onClick}
+                disabled={localeActions.add.disabled}
+                startIcon={resolvedAddIcon}
+              >
+                {localeActions.add.label}
+              </Button>
+            )}
           </>
         ) : (
           <>
@@ -283,17 +323,26 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
                 </MenuItem>
               ))}
             </TextField>
-            <Button onClick={handleAddLocale} disabled={readOnly || !comparison.isAddLocaleAllowed(newLocale)}>
-              {translate("workspace.header.addLocale")}
-            </Button>
-            <Button
-              color="error"
-              variant="outlined"
-              onClick={() => void comparison.removeLocale(comparison.targetLocale)}
-              disabled={!canRemoveTargetLocale || selectedLocaleOption?.removable === false}
-            >
-              {translate("workspace.header.removeLocale")}
-            </Button>
+            {renderActions?.(localeActions) ?? (
+              <>
+                <Button
+                  onClick={localeActions.add.onClick}
+                  disabled={localeActions.add.disabled}
+                  startIcon={resolvedAddIcon}
+                >
+                  {localeActions.add.label}
+                </Button>
+                <Button
+                  color="error"
+                  variant="outlined"
+                  onClick={localeActions.remove.onClick}
+                  disabled={localeActions.remove.disabled}
+                  startIcon={resolvedRemoveIcon}
+                >
+                  {localeActions.remove.label}
+                </Button>
+              </>
+            )}
           </>
         )}
       </Box>

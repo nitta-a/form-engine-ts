@@ -1,4 +1,4 @@
-import type { FormSchema, QuestionType } from "@form-engine-ts/core";
+import { type FormSchema, type JsonValue, normalizeTranslationMetadata, type QuestionType } from "@form-engine-ts/core";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useFreeTextAnswerTranslation } from "./freeText";
 import { toFreeTextAnswerItems } from "./freeTextNormalization";
@@ -7,6 +7,8 @@ import type {
   FreeTextAnswerDomainAdapter,
   FreeTextAnswerItem,
   SurveySchemaDomainAdapter,
+  SurveySchemaDomainAdapterOptions,
+  SurveySchemaDomainAdapterWithTextMetadata,
   UseFreeTextDomainAnswerTranslationOptions,
   UseFreeTextDomainAnswerTranslationResult,
   UseSurveyEditorDomainOptions
@@ -14,8 +16,42 @@ import type {
 
 export function createSurveySchemaDomainAdapter<TDomain>(
   toFormSchema: SurveySchemaDomainAdapter<TDomain>["toFormSchema"]
-): SurveySchemaDomainAdapter<TDomain> {
-  return { toFormSchema };
+): SurveySchemaDomainAdapter<TDomain>;
+export function createSurveySchemaDomainAdapter<TDomain, TTextMetadata>(
+  input: SurveySchemaDomainAdapterOptions<TDomain, TTextMetadata>
+): SurveySchemaDomainAdapterWithTextMetadata<TDomain, TTextMetadata>;
+export function createSurveySchemaDomainAdapter<TDomain, TTextMetadata>(
+  input: SurveySchemaDomainAdapter<TDomain>["toFormSchema"] | SurveySchemaDomainAdapterOptions<TDomain, TTextMetadata>
+): SurveySchemaDomainAdapterWithTextMetadata<TDomain, TTextMetadata> {
+  if (typeof input === "function") return { toFormSchema: input };
+  const options = input;
+  const { toFormSchema, fromFormSchema, textMetadata } = options;
+  if (textMetadata === undefined) return { toFormSchema, ...(fromFormSchema === undefined ? {} : { fromFormSchema }) };
+  return {
+    toFormSchema,
+    ...(fromFormSchema === undefined ? {} : { fromFormSchema }),
+    textMetadata: {
+      toEngine: (request) => {
+        const encoded = textMetadata.toEngine(request);
+        const normalized = normalizeTranslationMetadata(encoded.metadata, request.sourceText);
+        const metadata = {
+          ...normalized,
+          sourceTextHash: normalized.sourceTextHash
+        } satisfies Readonly<Record<string, JsonValue>>;
+        return { value: encoded.value, metadata };
+      },
+      fromEngine: (request) => {
+        const metadata = normalizeTranslationMetadata(request.metadata, request.sourceText);
+        return textMetadata.fromEngine({
+          ...request,
+          metadata: {
+            ...metadata,
+            isManuallyEdited: metadata.translationSource === "manual"
+          }
+        });
+      }
+    }
+  };
 }
 
 export function toFreeTextAnswerItemsFromDomain<TDomain>(

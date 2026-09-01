@@ -238,10 +238,11 @@ interface AddLocaleDropdownProps {
     readonly value?: string;
     readonly disabled?: boolean;
     readonly label?: string;
+    readonly icon?: ReactNode;
     readonly getLocaleDisplayName?: (locale: string) => string;
     readonly onAdd: (locale: string) => void;
 }
-declare function AddLocaleDropdown({ availableLocales, existingLocales, value, disabled, label, getLocaleDisplayName, onAdd }: AddLocaleDropdownProps): react.JSX.Element;
+declare function AddLocaleDropdown({ availableLocales, existingLocales, value, disabled, label, icon, getLocaleDisplayName, onAdd }: AddLocaleDropdownProps): react.JSX.Element;
 interface TargetLocaleToolbarProps {
     readonly supportedLocales: readonly TargetLocaleOption[];
     readonly currentLocale: string;
@@ -253,9 +254,22 @@ interface TargetLocaleToolbarProps {
     readonly selectionLabel?: string;
     readonly addLabel?: string;
     readonly removeLabel?: string;
+    readonly addIcon?: ReactNode;
+    readonly removeIcon?: ReactNode;
     readonly getLocaleDisplayName?: (locale: string) => string;
 }
-declare function TargetLocaleHeaderToolbar({ supportedLocales, currentLocale, availableLocales, onSelectLocale, onAddLocale, onRemoveLocale, disabled, selectionLabel, addLabel, removeLabel, getLocaleDisplayName }: TargetLocaleToolbarProps): react.JSX.Element;
+interface TranslationLocaleActionProps {
+    readonly action: "add" | "remove";
+    readonly label: string;
+    readonly icon: ReactNode;
+    readonly disabled: boolean;
+    readonly onClick: () => void;
+}
+interface TranslationLocaleActionsProps {
+    readonly add: TranslationLocaleActionProps;
+    readonly remove: TranslationLocaleActionProps;
+}
+declare function TargetLocaleHeaderToolbar({ supportedLocales, currentLocale, availableLocales, onSelectLocale, onAddLocale, onRemoveLocale, disabled, selectionLabel, addLabel, removeLabel, addIcon, removeIcon, getLocaleDisplayName }: TargetLocaleToolbarProps): react.JSX.Element;
 declare const TargetLocaleSelector: typeof TargetLocaleHeaderToolbar;
 
 interface TranslationComparisonWorkspaceProps {
@@ -281,6 +295,9 @@ interface TranslationComparisonWorkspaceProps {
     readonly createTranslationMetadata?: UseTranslationComparisonOptions["createTranslationMetadata"];
     readonly showInternalPath?: boolean;
     readonly localeSelectorMode?: "tabs" | "select";
+    readonly addIcon?: ReactNode;
+    readonly removeIcon?: ReactNode;
+    readonly renderLocaleActions?: (props: TranslationLocaleActionsProps) => ReactNode;
     readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
     readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
     readonly appearance?: TranslationComparisonAppearance;
@@ -288,6 +305,7 @@ interface TranslationComparisonWorkspaceProps {
     readonly slots?: {
         readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
         readonly renderTargetLocaleSelector?: (props: TranslationComparisonLocaleSelectorProps) => ReactNode;
+        readonly renderLocaleActions?: (props: TranslationLocaleActionsProps) => ReactNode;
         readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
         readonly renderStatusBadge?: (props: {
             readonly status: TranslationStatus;
@@ -333,4 +351,4 @@ interface TranslationWorkspaceProps {
 }
 declare function TranslationWorkspace(props: TranslationWorkspaceProps): react.JSX.Element;
 
-export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };
+export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

@@ -3,8 +3,10 @@ import { act, render, renderHook, screen, waitFor } from "@testing-library/react
 import {
   composeSurveyVersionActions,
   createFreeTextTranslationController,
+  createSurveySchemaDomainAdapter,
   type FreeTextAnswerItem,
   hasPiiCandidate,
+  isSurveyMappingRevisionConflict,
   mapSurveyQualityIssue,
   mapSurveyResponseSummary,
   SurveyEditor,
@@ -736,6 +738,146 @@ describe("custom survey client", () => {
     expect(result.current.onLanguageChange).toBe(result.current.setLanguage);
   });
 
+  it("loads summaries per language with abort handling and a language cache", async () => {
+    type Summary = { readonly answeredCount: number };
+    const resolvers = new Map<string, (summary: Summary) => void>();
+    const signals: AbortSignal[] = [];
+    const summaryLoader = vi.fn(({ language, signal }: { language: string; signal: AbortSignal }) => {
+      signals.push(signal);
+      return new Promise<Summary>((resolve, reject) => {
+        resolvers.set(language, resolve);
+        signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    });
+    const onLanguageChange = vi.fn();
+    const adapter = {
+      toSummaryInput: ({ answeredCount }: Summary) => ({
+        questions: [
+          {
+            fieldId: "satisfaction",
+            kind: "radio" as const,
+            answeredCount,
+            unansweredCount: 0,
+            options: []
+          }
+        ]
+      }),
+      toFormSchema: () => schema,
+      sourceLanguage: () => "en"
+    };
+    const { result } = renderHook(() =>
+      useSurveyResponseSummaryDomain({
+        summary: { answeredCount: 1 },
+        version: { id: "version" },
+        domainAdapter: adapter,
+        languageOptions: [
+          { language: "en", count: 1 },
+          { language: "ja", count: 2 },
+          { language: "fr", count: 3 }
+        ],
+        summaryLoader,
+        onLanguageChange
+      })
+    );
+
+    act(() => {
+      result.current.setLanguage("ja");
+    });
+    expect(result.current.summaryLoading).toBe(true);
+    expect(summaryLoader).toHaveBeenCalledWith({ language: "ja", signal: signals[0] });
+
+    act(() => {
+      resolvers.get("ja")?.({ answeredCount: 2 });
+    });
+    await waitFor(() => expect(result.current.summaryLoading).toBe(false));
+    expect(result.current.data.questions[0]?.answeredCount).toBe(2);
+    expect(result.current.summaryState.status).toBe("success");
+    expect(onLanguageChange).toHaveBeenCalledWith("ja");
+
+    act(() => {
+      result.current.setLanguage("fr");
+    });
+    expect(signals[0]?.aborted).toBe(true);
+    act(() => {
+      resolvers.get("fr")?.({ answeredCount: 3 });
+    });
+    await waitFor(() => expect(result.current.data.questions[0]?.answeredCount).toBe(3));
+
+    act(() => {
+      result.current.setLanguage("ja");
+    });
+    expect(summaryLoader).toHaveBeenCalledTimes(2);
+    expect(result.current.data.questions[0]?.answeredCount).toBe(2);
+  });
+
+  it("exposes summary loading errors without replacing the language callback", async () => {
+    const summaryLoader = vi.fn(async () => {
+      throw new Error("summary unavailable");
+    });
+    const { result } = renderHook(() =>
+      useSurveyResponseSummaryDomain({
+        summary: { answeredCount: 1 },
+        version: { id: "version" },
+        domainAdapter: {
+          toSummaryInput: () => ({ questions: [] }),
+          toFormSchema: () => schema,
+          sourceLanguage: () => "en"
+        },
+        summaryLoader
+      })
+    );
+
+    act(() => {
+      result.current.setLanguage("ja");
+    });
+    await waitFor(() => expect(result.current.summaryState.status).toBe("error"));
+
+    expect(result.current.summaryError?.message).toBe("summary unavailable");
+    expect(result.current.summaryLoading).toBe(false);
+  });
+
+  it("renders localized skip reasons by default and supports an empty or custom slot", () => {
+    const adapter = {
+      toSummaryInput: () => ({ questions: [] }),
+      toFormSchema: () => schema,
+      sourceLanguage: () => "de-DE",
+      mapSkipReasons: () => [{ reason: "not-applicable", count: 1234 }]
+    };
+    const { unmount } = render(
+      <SurveyResponseSummaryDomain
+        summary={{ aggregate: "maker-summary" }}
+        version={{ id: "version" }}
+        domainAdapter={adapter}
+        labels={{ skipReasons: "Skip reasons" }}
+      />
+    );
+
+    expect(screen.getByRole("heading", { name: "Skip reasons" })).toBeInTheDocument();
+    expect(screen.getByText("not-applicable: 1.234")).toBeInTheDocument();
+    unmount();
+
+    const skipReasons = vi.fn(() => <div data-testid="custom-skip-reasons">Custom reasons</div>);
+    const { rerender } = render(
+      <SurveyResponseSummaryDomain
+        summary={{ aggregate: "maker-summary" }}
+        version={{ id: "version" }}
+        domainAdapter={adapter}
+        slots={{ skipReasons }}
+      />
+    );
+    expect(screen.getByTestId("custom-skip-reasons")).toBeInTheDocument();
+    expect(skipReasons).toHaveBeenCalledWith([{ reason: "not-applicable", count: 1234 }]);
+
+    rerender(
+      <SurveyResponseSummaryDomain
+        summary={{ aggregate: "maker-summary" }}
+        version={{ id: "version" }}
+        domainAdapter={{ ...adapter, mapSkipReasons: () => [] }}
+      />
+    );
+    expect(screen.queryByText("Skip reasons")).not.toBeInTheDocument();
+  });
+
   it("supports generic mapping CRUD with operation state and invalidation", async () => {
     const first = { id: "m1" };
     const second = { id: "m2" };
@@ -766,6 +908,82 @@ describe("custom survey client", () => {
     expect(adapter.create).toHaveBeenCalledWith(expect.objectContaining({ selection: { deckId: "deck" } }));
     expect(result.current.mappings).toEqual([first]);
     expect(invalidate).toHaveBeenCalledTimes(3);
+  });
+
+  it("passes the current revision to every mapping mutation and commits revision-bearing responses", async () => {
+    const first = { id: "m1" };
+    const second = { id: "m2" };
+    const adapter = {
+      create: vi.fn(),
+      createWithRevision: vi.fn().mockResolvedValue({ mappings: [first], revision: "r2" }),
+      remove: vi.fn(),
+      removeWithRevision: vi.fn().mockResolvedValue({ mappings: [second], revision: "r3" }),
+      reorder: vi.fn(),
+      reorderWithRevision: vi.fn().mockResolvedValue({ mappings: [second, first], revision: "r4" }),
+      reorderMany: vi.fn().mockResolvedValue({ mappings: [first, second], revision: "r5" })
+    };
+    const { result } = renderHook(() =>
+      useSurveyMappingCrud<{ readonly id: string }, { readonly id: string }, { readonly deckId: string }, string>({
+        domain: { id: "survey" },
+        mappings: [],
+        revision: "r1",
+        adapter
+      })
+    );
+
+    await act(async () => {
+      expect(await result.current.create({ deckId: "deck" })).toBe(true);
+      expect(await result.current.remove(first)).toBe(true);
+      expect(await result.current.reorder(second, 0)).toBe(true);
+      await result.current.reorderMany({
+        mappings: [first, second],
+        selection: { deckId: "deck" },
+        signal: new AbortController().signal
+      });
+    });
+
+    expect(adapter.createWithRevision).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: "r1" }));
+    expect(adapter.removeWithRevision).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: "r2" }));
+    expect(adapter.reorderWithRevision).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: "r3" }));
+    expect(adapter.reorderMany).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: "r4" }));
+    expect(result.current.revision).toBe("r5");
+    expect(result.current.mappings).toEqual([first, second]);
+  });
+
+  it("exposes typed latest state for mapping revision conflicts", async () => {
+    const first = { id: "m1" };
+    const latest = { id: "m2" };
+    const conflict = {
+      code: "REVISION_CONFLICT" as const,
+      expectedRevision: "r1",
+      currentRevision: "r2",
+      currentMappings: [latest]
+    };
+    const reorder = vi.fn().mockRejectedValue(conflict);
+    const { result } = renderHook(() =>
+      useSurveyMappingCrud<{ readonly id: string }, { readonly id: string }, undefined, string>({
+        domain: { id: "survey" },
+        mappings: [first],
+        revision: "r1",
+        adapter: {
+          create: vi.fn(),
+          remove: vi.fn(),
+          reorder,
+          reorderMany: vi.fn().mockResolvedValue({ mappings: [latest], revision: "r2" })
+        }
+      })
+    );
+
+    await act(async () => {
+      expect(await result.current.reorder(first, 0)).toBe(false);
+    });
+
+    expect(isSurveyMappingRevisionConflict(result.current.state.revisionConflict)).toBe(true);
+    expect(result.current.state.revisionConflict).toEqual(conflict);
+    expect(result.current.state.canRetry).toBe(true);
+    expect(result.current.mappings).toEqual([latest]);
+    expect(result.current.revision).toBe("r2");
+    expect(reorder).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: "r1" }));
   });
 
   it("persists a complete mapping order through one bulk operation", async () => {
@@ -1092,6 +1310,67 @@ describe("custom survey client", () => {
       expect.objectContaining({ activeLanguage: "ja", languages: expect.any(Array) })
     );
     expect(screen.getByText("回答済み: 2 · 未回答: 1")).toBeInTheDocument();
+  });
+
+  it("provides a shared schema text metadata codec with hash and legacy normalization", () => {
+    type TextMetadata = {
+      readonly value?: string | undefined;
+      readonly translationSource?: string | undefined;
+      readonly isManuallyEdited?: boolean | undefined;
+      readonly sourceTextHash?: string | undefined;
+      readonly translatedAt?: string | undefined;
+      readonly editedAt?: string | undefined;
+    };
+    const adapter = createSurveySchemaDomainAdapter<
+      { readonly marker: string; readonly nextSchema?: FormSchema },
+      TextMetadata
+    >({
+      toFormSchema: () => schema,
+      fromFormSchema: (nextSchema, previous) => ({ ...previous, nextSchema }),
+      textMetadata: {
+        toEngine: ({ value, metadata }) => ({
+          value,
+          metadata: metadata === undefined ? {} : { translationSource: metadata.translationSource ?? "automatic" }
+        }),
+        fromEngine: ({ value, metadata }) => ({
+          value,
+          translationSource: metadata.translationSource,
+          isManuallyEdited: metadata.isManuallyEdited,
+          sourceTextHash: metadata.sourceTextHash,
+          translatedAt: metadata.translatedAt,
+          editedAt: metadata.editedAt
+        })
+      }
+    });
+
+    const encoded = adapter.textMetadata?.toEngine({
+      value: "顧客アンケート",
+      metadata: { translationSource: "manual" },
+      sourceText: "Customer survey"
+    });
+    expect(encoded?.metadata).toMatchObject({
+      translationSource: "manual",
+      sourceTextHash: expect.any(String)
+    });
+
+    const decoded = adapter.textMetadata?.fromEngine({
+      value: "顧客アンケート",
+      metadata: {
+        isManuallyEdited: true,
+        sourceText: "Customer survey",
+        translatedAt: "2026-09-02T00:00:00.000Z",
+        editedAt: "2026-09-02T01:00:00.000Z"
+      },
+      sourceText: "Customer survey"
+    });
+    expect(decoded).toEqual({
+      value: "顧客アンケート",
+      translationSource: "manual",
+      isManuallyEdited: true,
+      sourceTextHash: expect.any(String),
+      translatedAt: "2026-09-02T00:00:00.000Z",
+      editedAt: "2026-09-02T01:00:00.000Z"
+    });
   });
 
   it("translates a complete schema through the shared schema translator", async () => {

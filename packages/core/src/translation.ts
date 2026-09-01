@@ -524,7 +524,16 @@ function defaultTranslationMetadataMigrator(
     metadata !== null && typeof metadata === "object" ? (metadata as Readonly<Record<string, unknown>>) : undefined;
   const sourceLocale = typeof record?.sourceLocale === "string" ? record.sourceLocale : defaultLocale;
   const translationSource = isManualTranslationMetadata(record) ? "manual" : "automatic";
-  const canonicalKeys = new Set(["sourceLocale", "sourceTextHash", "translationSource", "translatedAt", "editedAt"]);
+  const canonicalKeys = new Set([
+    "sourceLocale",
+    "sourceTextHash",
+    "translationSource",
+    "translatedAt",
+    "editedAt",
+    "isManuallyEdited",
+    "isManual",
+    "sourceText"
+  ]);
   const extensions = Object.fromEntries(
     Object.entries(record ?? {}).filter(
       ([key, value]) => key !== "isManual" && !canonicalKeys.has(key) && isJsonValue(value)
@@ -538,6 +547,15 @@ function defaultTranslationMetadataMigrator(
     ...(typeof record?.translatedAt === "string" ? { translatedAt: record.translatedAt } : {}),
     ...(typeof record?.editedAt === "string" ? { editedAt: record.editedAt } : {})
   };
+}
+
+/** Normalizes canonical and legacy translation metadata for application-owned text codecs. */
+export function normalizeTranslationMetadata(
+  metadata: unknown,
+  sourceText: string,
+  defaultLocale = ""
+): CanonicalTranslationMetadata {
+  return defaultTranslationMetadataMigrator(metadata, sourceText, defaultLocale);
 }
 
 function isJsonValue(value: unknown): value is JsonValue {

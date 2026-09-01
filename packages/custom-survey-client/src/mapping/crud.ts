@@ -7,6 +7,60 @@ export interface SurveyMappingReorderResult<TMapping, TRevision = unknown> {
   readonly revision: TRevision;
 }
 
+export interface SurveyMappingMutationResult<TMapping, TRevision = unknown> {
+  /** The complete server state after the mutation. */
+  readonly mappings: readonly TMapping[];
+  /** Revision returned by the mutation commit. */
+  readonly revision: TRevision;
+  /** Optional created mapping when the mutation was create. */
+  readonly mapping?: TMapping;
+}
+
+export type SurveyMappingMutationResponse<TMapping, TRevision = unknown> =
+  | TMapping
+  | undefined
+  | SurveyMappingMutationResult<TMapping, TRevision>;
+
+export interface SurveyMappingRevisionConflict<TMapping, TRevision = unknown> {
+  readonly code: "REVISION_CONFLICT";
+  readonly expectedRevision: TRevision;
+  readonly currentRevision: TRevision;
+  readonly currentMappings: readonly TMapping[];
+}
+
+export class SurveyMappingRevisionConflictError<TMapping, TRevision = unknown>
+  extends Error
+  implements SurveyMappingRevisionConflict<TMapping, TRevision>
+{
+  readonly code = "REVISION_CONFLICT" as const;
+  readonly expectedRevision: TRevision;
+  readonly currentRevision: TRevision;
+  readonly currentMappings: readonly TMapping[];
+
+  constructor(conflict: Omit<SurveyMappingRevisionConflict<TMapping, TRevision>, "code">, message?: string) {
+    super(message ?? "Survey mapping revision conflict.");
+    this.name = "SurveyMappingRevisionConflictError";
+    this.expectedRevision = conflict.expectedRevision;
+    this.currentRevision = conflict.currentRevision;
+    this.currentMappings = conflict.currentMappings;
+  }
+}
+
+export function isSurveyMappingRevisionConflict<TMapping, TRevision = unknown>(
+  value: unknown
+): value is SurveyMappingRevisionConflict<TMapping, TRevision> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    value.code === "REVISION_CONFLICT" &&
+    "expectedRevision" in value &&
+    "currentRevision" in value &&
+    "currentMappings" in value &&
+    Array.isArray(value.currentMappings)
+  );
+}
+
 export interface SurveyMappingAtomicReorderRequest<TDomain, TMapping, TSelection, TRevision = unknown> {
   readonly domain: TDomain;
   readonly mappings: readonly TMapping[];
@@ -19,19 +73,41 @@ export interface SurveyMappingCrudAdapter<TDomain, TMapping, TSelection, TRevisi
   readonly create: (request: {
     readonly domain: TDomain;
     readonly selection: TSelection;
+    readonly expectedRevision?: TRevision;
     readonly signal: AbortSignal;
   }) => Promise<TMapping>;
+  readonly createWithRevision?: (request: {
+    readonly domain: TDomain;
+    readonly selection: TSelection;
+    readonly expectedRevision?: TRevision;
+    readonly signal: AbortSignal;
+  }) => Promise<SurveyMappingMutationResult<TMapping, TRevision>>;
   readonly remove: (request: {
     readonly domain: TDomain;
     readonly mapping: TMapping;
+    readonly expectedRevision?: TRevision;
     readonly signal: AbortSignal;
   }) => Promise<void>;
+  readonly removeWithRevision?: (request: {
+    readonly domain: TDomain;
+    readonly mapping: TMapping;
+    readonly expectedRevision?: TRevision;
+    readonly signal: AbortSignal;
+  }) => Promise<SurveyMappingMutationResult<TMapping, TRevision>>;
   readonly reorder?: (request: {
     readonly domain: TDomain;
     readonly mapping: TMapping;
     readonly displayOrder: number;
+    readonly expectedRevision?: TRevision;
     readonly signal: AbortSignal;
   }) => Promise<void>;
+  readonly reorderWithRevision?: (request: {
+    readonly domain: TDomain;
+    readonly mapping: TMapping;
+    readonly displayOrder: number;
+    readonly expectedRevision?: TRevision;
+    readonly signal: AbortSignal;
+  }) => Promise<SurveyMappingMutationResult<TMapping, TRevision>>;
   /** Persists and returns the complete order in one atomic request. */
   readonly reorderMany: (
     request: SurveyMappingAtomicReorderRequest<TDomain, TMapping, TSelection, TRevision>
@@ -54,6 +130,10 @@ export interface SurveyMappingCrudAdapter<TDomain, TMapping, TSelection, TRevisi
     readonly signal: AbortSignal;
   }) => Promise<void>;
   readonly list?: (request: { readonly domain: TDomain; readonly signal: AbortSignal }) => Promise<readonly TMapping[]>;
+  readonly listWithRevision?: (request: {
+    readonly domain: TDomain;
+    readonly signal: AbortSignal;
+  }) => Promise<SurveyMappingReorderResult<TMapping, TRevision>>;
   readonly invalidate?: () => void | Promise<void>;
 }
 
@@ -66,10 +146,24 @@ export type SurveyMappingAtomicCrudAdapter<
 
 export type SurveyMappingCrudOperation = "idle" | "creating" | "removing" | "reordering" | "error";
 
+export interface SurveyMappingCrudState<TMapping, TRevision = unknown> {
+  readonly operation: SurveyMappingCrudOperation;
+  readonly error?: Error;
+  /** Present when the latest operation was rejected against a newer server revision. */
+  readonly revisionConflict?: SurveyMappingRevisionConflict<TMapping, TRevision>;
+  /** A conflict is safe to retry after the returned current mappings/revision are accepted. */
+  readonly canRetry?: boolean;
+}
+
 export interface UseSurveyMappingCrudResult<TMapping, TSelection = unknown, TRevision = unknown> {
   readonly mappings: readonly TMapping[];
   readonly revision?: TRevision;
-  readonly state: { readonly operation: SurveyMappingCrudOperation; readonly error?: Error };
+  readonly state: {
+    readonly operation: SurveyMappingCrudOperation;
+    readonly error?: Error;
+    readonly revisionConflict?: SurveyMappingRevisionConflict<TMapping, TRevision>;
+    readonly canRetry?: boolean;
+  };
   readonly create: (selection: unknown) => Promise<boolean>;
   readonly remove: (mapping: TMapping) => Promise<boolean>;
   readonly reorder: (mapping: TMapping, displayOrder: number) => Promise<boolean>;
@@ -97,10 +191,40 @@ export interface UseSurveyMappingCrudOptions<TDomain, TMapping, TSelection, TRev
 
 function normalizeError(cause: unknown): Error {
   if (cause instanceof Error) return cause;
+  if (isSurveyMappingRevisionConflict(cause)) {
+    return new SurveyMappingRevisionConflictError(cause);
+  }
   if (typeof cause === "object" && cause !== null && "message" in cause && typeof cause.message === "string") {
     return new Error(cause.message);
   }
   return new Error(String(cause));
+}
+
+function mutationResult<TMapping, TRevision>(
+  value: unknown
+): SurveyMappingMutationResult<TMapping, TRevision> | undefined {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("mappings" in value) ||
+    !("revision" in value) ||
+    !Array.isArray(value.mappings)
+  ) {
+    return undefined;
+  }
+  return value as SurveyMappingMutationResult<TMapping, TRevision>;
+}
+
+function isMappingResponse<TMapping, TRevision>(
+  value: SurveyMappingMutationResponse<TMapping, TRevision>
+): value is TMapping {
+  return value !== undefined && mutationResult<TMapping, TRevision>(value) === undefined;
+}
+
+function isMappingArray<TMapping, TRevision>(
+  value: readonly TMapping[] | SurveyMappingReorderResult<TMapping, TRevision>
+): value is readonly TMapping[] {
+  return Array.isArray(value);
 }
 
 function moveMapping<TMapping>(
@@ -169,70 +293,148 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
     [options.onMappingsChange]
   );
 
+  const updateRevision = useCallback(
+    (nextRevision: TRevision | undefined) => {
+      revisionRef.current = nextRevision;
+      setRevision(nextRevision);
+      if (nextRevision !== undefined) options.onRevisionChange?.(nextRevision);
+    },
+    [options.onRevisionChange]
+  );
+
+  const applyConflict = useCallback(
+    (cause: unknown): boolean => {
+      if (!isSurveyMappingRevisionConflict<TMapping, TRevision>(cause)) return false;
+      setMappings(cause.currentMappings);
+      updateRevision(cause.currentRevision);
+      setState({
+        operation: "error",
+        error: normalizeError(cause),
+        revisionConflict: cause,
+        canRetry: true
+      });
+      return true;
+    },
+    [setMappings, updateRevision]
+  );
+
   const create = useCallback(
     async (selection: unknown): Promise<boolean> => {
       setState({ operation: "creating" });
       try {
-        const mapping = await options.adapter.create({
+        const expectedRevision = revisionRef.current;
+        const request = {
           domain: domainRef.current,
           // The public API accepts unknown so untyped selection widgets can be composed;
           // the generic adapter contract is the validation boundary for the host application.
           selection: selection as TSelection,
+          ...(expectedRevision === undefined ? {} : { expectedRevision }),
           signal: new AbortController().signal
-        });
-        setMappings([...mappings, mapping]);
+        };
+        const response =
+          options.adapter.createWithRevision === undefined
+            ? await options.adapter.create(request)
+            : await options.adapter.createWithRevision(request);
+        const committed = mutationResult<TMapping, TRevision>(response);
+        if (committed !== undefined) {
+          setMappings(committed.mappings);
+          updateRevision(committed.revision);
+        } else if (response === undefined) {
+          throw new TypeError("SurveyMappingCrudAdapter.create must return a mapping or a committed result.");
+        } else if (isMappingResponse<TMapping, TRevision>(response)) {
+          setMappings([...mappingsRef.current, response]);
+        } else {
+          throw new TypeError("SurveyMappingCrudAdapter.create returned an invalid mapping response.");
+        }
         setState({ operation: "idle" });
         await options.adapter.invalidate?.();
         return true;
       } catch (cause) {
+        if (applyConflict(cause)) return false;
         setState({ operation: "error", error: normalizeError(cause) });
         return false;
       }
     },
-    [mappings, options.adapter, setMappings]
+    [applyConflict, options.adapter, setMappings, updateRevision]
   );
 
   const remove = useCallback(
     async (mapping: TMapping): Promise<boolean> => {
       setState({ operation: "removing" });
       try {
-        await options.adapter.remove({ domain: domainRef.current, mapping, signal: new AbortController().signal });
-        setMappings(mappings.filter((candidate) => candidate !== mapping));
+        const expectedRevision = revisionRef.current;
+        const request = {
+          domain: domainRef.current,
+          mapping,
+          ...(expectedRevision === undefined ? {} : { expectedRevision }),
+          signal: new AbortController().signal
+        };
+        const response =
+          options.adapter.removeWithRevision === undefined
+            ? await options.adapter.remove(request)
+            : await options.adapter.removeWithRevision(request);
+        const committed = mutationResult<TMapping, TRevision>(response);
+        if (committed !== undefined) {
+          setMappings(committed.mappings);
+          updateRevision(committed.revision);
+        } else {
+          setMappings(mappingsRef.current.filter((candidate) => candidate !== mapping));
+        }
         setState({ operation: "idle" });
         await options.adapter.invalidate?.();
         return true;
       } catch (cause) {
+        if (applyConflict(cause)) return false;
         setState({ operation: "error", error: normalizeError(cause) });
         return false;
       }
     },
-    [mappings, options.adapter, setMappings]
+    [applyConflict, options.adapter, setMappings, updateRevision]
   );
 
   const reorder = useCallback(
     async (mapping: TMapping, displayOrder: number): Promise<boolean> => {
-      if (options.adapter.reorder === undefined) {
+      const legacyReorder = options.adapter.reorder;
+      const revisionReorder = options.adapter.reorderWithRevision;
+      if (legacyReorder === undefined && revisionReorder === undefined) {
         setState({ operation: "error", error: new TypeError("SurveyMappingCrudAdapter requires reorder.") });
         return false;
       }
       setState({ operation: "reordering" });
       try {
-        await options.adapter.reorder({
+        const expectedRevision = revisionRef.current;
+        const request = {
           domain: domainRef.current,
           mapping,
           displayOrder,
+          ...(expectedRevision === undefined ? {} : { expectedRevision }),
           signal: new AbortController().signal
-        });
-        setMappings(moveMapping(mappings, mapping, displayOrder));
+        };
+        let response: unknown;
+        if (revisionReorder !== undefined) {
+          response = await revisionReorder(request);
+        } else if (legacyReorder !== undefined) {
+          response = await legacyReorder(request);
+        } else {
+          throw new TypeError("SurveyMappingCrudAdapter requires reorder.");
+        }
+        const committed = mutationResult<TMapping, TRevision>(response);
+        if (committed !== undefined) {
+          setMappings(committed.mappings);
+          updateRevision(committed.revision);
+        } else {
+          setMappings(moveMapping(mappingsRef.current, mapping, displayOrder));
+        }
         setState({ operation: "idle" });
         await options.adapter.invalidate?.();
         return true;
       } catch (cause) {
+        if (applyConflict(cause)) return false;
         setState({ operation: "error", error: normalizeError(cause) });
         return false;
       }
     },
-    [mappings, options.adapter, setMappings]
+    [applyConflict, options.adapter, setMappings, updateRevision]
   );
 
   const reorderMany = useCallback(
@@ -246,8 +448,16 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         previousRevision !== undefined &&
         !Object.is(request.expectedRevision, previousRevision)
       ) {
-        const error = new Error("SurveyMappingAtomicCrudAdapter rejected a stale expected revision.");
-        setState({ operation: "error", error });
+        const conflict = new SurveyMappingRevisionConflictError<TMapping, TRevision>(
+          {
+            expectedRevision: request.expectedRevision,
+            currentRevision: previousRevision,
+            currentMappings: previousMappings
+          },
+          "SurveyMappingAtomicCrudAdapter rejected a stale expected revision."
+        );
+        applyConflict(conflict);
+        const error = normalizeError(conflict);
         throw error;
       }
       const expectedRevision = request.expectedRevision ?? previousRevision;
@@ -263,11 +473,10 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         });
         result = assertAtomicResult<TMapping, TRevision>(committed);
         setMappings(result.mappings);
-        setRevision(result.revision);
-        revisionRef.current = result.revision;
-        options.onRevisionChange?.(result.revision);
+        updateRevision(result.revision);
         setState({ operation: "idle" });
       } catch (cause) {
+        if (applyConflict(cause)) throw normalizeError(cause);
         try {
           await options.adapter.rollbackReorder?.({
             domain: domainRef.current,
@@ -281,8 +490,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
           // Keep the original commit/revision error as the operation result.
         } finally {
           setMappings(previousMappings);
-          setRevision(previousRevision);
-          revisionRef.current = previousRevision;
+          updateRevision(previousRevision);
           setState({ operation: "error", error: normalizeError(cause) });
         }
         throw normalizeError(cause);
@@ -295,20 +503,33 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
       }
       return result;
     },
-    [options.adapter, options.onRevisionChange, setMappings]
+    [applyConflict, options.adapter, setMappings, updateRevision]
   );
 
   const refresh = useCallback(async (): Promise<boolean> => {
-    if (options.adapter.list === undefined) return false;
+    if (options.adapter.list === undefined && options.adapter.listWithRevision === undefined) return false;
     try {
-      const next = await options.adapter.list({ domain: domainRef.current, signal: new AbortController().signal });
-      setMappings(next);
+      const request = { domain: domainRef.current, signal: new AbortController().signal };
+      const response =
+        options.adapter.listWithRevision === undefined
+          ? await options.adapter.list?.(request)
+          : await options.adapter.listWithRevision(request);
+      const committed = mutationResult<TMapping, TRevision>(response);
+      if (committed === undefined && response !== undefined && isMappingArray<TMapping, TRevision>(response)) {
+        setMappings(response);
+      } else if (committed !== undefined) {
+        setMappings(committed.mappings);
+        updateRevision(committed.revision);
+      } else {
+        throw new TypeError("SurveyMappingCrudAdapter.list returned an invalid response.");
+      }
       return true;
     } catch (cause) {
+      if (applyConflict(cause)) return false;
       setState({ operation: "error", error: normalizeError(cause) });
       return false;
     }
-  }, [options.adapter.list, setMappings]);
+  }, [applyConflict, options.adapter.list, options.adapter.listWithRevision, setMappings, updateRevision]);
 
   return {
     mappings,
