@@ -94,6 +94,7 @@ export interface SurveySchemaTextMetadataCodec<TTextMetadata> {
     readonly value: string;
     readonly metadata?: TTextMetadata;
     readonly sourceText: string;
+    readonly sourceLocale?: string;
   }) => {
     readonly value: string;
     readonly metadata?: Readonly<Record<string, JsonValue>>;
@@ -103,6 +104,45 @@ export interface SurveySchemaTextMetadataCodec<TTextMetadata> {
     readonly metadata: SurveyEngineTextMetadata;
     readonly sourceText: string;
   }) => TTextMetadata;
+}
+
+export interface SurveyTextMetadata {
+  readonly sourceText?: string;
+  readonly sourceTextHash?: string;
+  readonly sourceLocale?: string;
+  readonly translationSource?: "automatic" | "manual";
+  readonly isManuallyEdited?: boolean;
+  readonly isManual?: boolean;
+  readonly translatedAt?: string;
+  readonly editedAt?: string;
+  readonly [key: string]: JsonValue | undefined;
+}
+
+export interface SurveyTextMetadataInput {
+  readonly value: string;
+  readonly metadata?: SurveyTextMetadata;
+  readonly sourceText: string;
+  readonly sourceLocale?: string;
+}
+
+export interface SurveyEngineText {
+  readonly value: string;
+  readonly sourceText: string;
+  readonly metadata: Readonly<Record<string, JsonValue>>;
+}
+
+export interface SurveyTextMetadataCodec {
+  readonly toEngine: (input: SurveyTextMetadataInput) => SurveyEngineText;
+  readonly fromEngine: (
+    input: SurveyEngineText & { readonly metadata: SurveyEngineTextMetadata }
+  ) => SurveyTextMetadata;
+}
+
+export interface CreateSurveyTextMetadataCodecOptions {
+  /** Retains non-canonical JSON metadata keys during both encode and decode. */
+  readonly preserveUnknown?: boolean;
+  /** Generates a hash from the supplied source text, or preserves an existing hash. */
+  readonly sourceTextHash?: "auto" | "preserve";
 }
 
 export interface SurveySchemaDomainAdapterOptions<TDomain, TTextMetadata = unknown> {

@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v7.8.0 — 2026-09-02
+
+- Added root-exported Survey definition/FormSchema conversion APIs with reverse conversion, choice normalization, supported constraints, locale/version, completion message, and metadata preservation.
+- Added standard React Renderer accessibility hardening for native field groups, control-level ARIA state, keyboard/read-aloud semantics, visually hidden controls, and axe regression tests.
+- Added a standard Mapping conflict callback with atomic latest mappings/revision state updates, plus `retry()` and `reload()` operations for create, remove, and reorder workflows.
+- Added a common translation text metadata codec with source-text hash generation, automatic/manual translation state, edit timestamps, unknown metadata preservation, and translation `AbortSignal` integration.
+
 ### v7.7.0 — 2026-09-02
 
 - Added standard `AddIcon` and `DeleteOutlineIcon` to MUI translation locale actions.

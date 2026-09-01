@@ -45,7 +45,7 @@ describe("FormRenderer choice-field appearance", () => {
   it("keeps radio and checkbox fields flat by default without affecting other fields", () => {
     const { container } = render(<FormRenderer schema={schema} onSubmit={() => undefined} />);
 
-    expect(container.querySelector('[data-field-id="choice"]')?.tagName).toBe("DIV");
+    expect(container.querySelector('[data-field-id="choice"]')?.tagName).toBe("FIELDSET");
     expect(container.querySelector('[data-field-id="consent"]')?.tagName).toBe("DIV");
     expect(container.querySelector('[data-field-id="choice"]')).not.toHaveClass("fe-choice-group");
     expect(container.querySelector('[data-field-id="consent"]')).not.toHaveClass("fe-choice-group");
@@ -72,8 +72,9 @@ describe("FormRenderer choice-field appearance", () => {
     const checkboxGroup = screen.getByRole("group", { name: "Agree to the terms" });
     const multiSelectGroup = screen.getByRole("group", { name: "Preferred channels" });
     expect(radioGroup).toHaveClass("fe-choice-group");
-    expect(checkboxGroup).toHaveAttribute("aria-required", "true");
-    expect(checkboxGroup).toHaveAttribute("aria-invalid", "false");
+    expect(checkboxGroup).not.toHaveAttribute("aria-required");
+    expect(checkboxGroup).not.toHaveAttribute("aria-invalid");
+    expect(within(checkboxGroup).getByLabelText("Agree to the terms")).toHaveAttribute("required");
     expect(multiSelectGroup).toHaveClass("fe-choice-group");
     expect(multiSelectGroup).toHaveClass("fe-field--multi-select");
 
@@ -152,9 +153,12 @@ describe("FormRenderer choice-field appearance", () => {
     const radioGroup = screen.getByRole("group", { name: "Preferred contact" });
     const checkboxGroup = screen.getByRole("group", { name: "Agree to the terms" });
     const multiSelectGroup = screen.getByRole("group", { name: "Preferred channels" });
-    expect(radioGroup).toHaveAttribute("aria-invalid", "true");
-    expect(checkboxGroup).toHaveAttribute("aria-invalid", "true");
-    expect(multiSelectGroup).toHaveAttribute("aria-invalid", "true");
+    expect(radioGroup).not.toHaveAttribute("aria-invalid");
+    expect(checkboxGroup).not.toHaveAttribute("aria-invalid");
+    expect(multiSelectGroup).not.toHaveAttribute("aria-invalid");
+    expect(within(radioGroup).getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
+    expect(within(checkboxGroup).getByLabelText("Agree to the terms")).toHaveAttribute("aria-invalid", "true");
+    expect(within(multiSelectGroup).getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
     expect(within(radioGroup).getByRole("alert")).toHaveClass("fe-field-error");
     expect(within(checkboxGroup).getByRole("alert")).toHaveClass("fe-field-error");
     expect(within(multiSelectGroup).getByRole("alert")).toHaveClass("fe-field-error");

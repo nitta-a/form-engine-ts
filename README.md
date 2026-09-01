@@ -56,12 +56,10 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.7.0** (2026-09-02). All public packages are currently aligned to version `7.7.0`.
-This release adds standard add/remove icons and customizable locale actions to the MUI translation comparison workspace,
-per-language lazy response-summary loading and skip-reason UI, shared schema translation metadata codecs, and revision-aware
-Mapping CRUD conflict state, while preserving existing labels, accessibility, confirmation, and mutation behavior.
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history. Publication is performed separately from this local
-v7.7.0 implementation.
+The latest release is **v7.8.0** (2026-09-02). All public packages are currently aligned to version `7.8.0`.
+This release adds common Survey definition/FormSchema conversion, standard Renderer accessibility regression coverage,
+revision-aware Mapping conflict recovery with retry/reload, and a shared translation text metadata codec with AbortSignal
+integration. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
 
@@ -372,9 +370,9 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.7.0**（2026-09-02）です。公開パッケージはすべてバージョン `7.7.0` に揃えています。
-本リリースでは、MUI翻訳比較ワークスペースの言語追加・削除操作に標準アイコンとカスタマイズ可能なlocale actionを追加し、Response Summaryの言語別遅延読み込み・スキップ理由表示、共有スキーマ翻訳メタデータcodec、revision対応Mapping CRUD競合状態も追加しています。既存のラベル、アクセシビリティ、確認、言語操作仕様は維持しました。
-全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。公開作業は、このローカルv7.7.0実装とは別に行います。
+最新版は **v7.8.0**（2026-09-02）です。公開パッケージはすべてバージョン `7.8.0` に揃えています。
+本リリースでは、Survey定義とFormSchemaの共通変換、標準Rendererのアクセシビリティ回帰検査、revision競合時のMapping再試行・再読み込み、AbortSignal連携付きの共有翻訳テキストmetadata codecを追加しました。
+全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
 

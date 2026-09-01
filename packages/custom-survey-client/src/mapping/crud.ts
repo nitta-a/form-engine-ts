@@ -170,6 +170,10 @@ export interface UseSurveyMappingCrudResult<TMapping, TSelection = unknown, TRev
   readonly reorderMany: (
     request: Omit<SurveyMappingAtomicReorderRequest<unknown, TMapping, TSelection, TRevision>, "domain">
   ) => Promise<SurveyMappingReorderResult<TMapping, TRevision>>;
+  /** Replays the last failed mutation with the current revision. */
+  readonly retry: () => Promise<boolean>;
+  /** Reloads mappings and revision from the adapter. */
+  readonly reload: () => Promise<boolean>;
   readonly reorderAll?: (
     request: Omit<SurveyMappingAtomicReorderRequest<unknown, TMapping, TSelection, TRevision>, "domain">
   ) => Promise<SurveyMappingReorderResult<TMapping, TRevision>>;
@@ -187,7 +191,14 @@ export interface UseSurveyMappingCrudOptions<TDomain, TMapping, TSelection, TRev
   readonly onRevisionChange?: (revision: TRevision) => void;
   readonly onMappingsChange?: (mappings: readonly TMapping[]) => void;
   readonly onDomainChange?: (domain: TDomain) => void;
+  readonly onConflict?: (conflict: SurveyMappingRevisionConflict<TMapping, TRevision>) => void;
 }
+
+type RetryOperation<TMapping, TSelection> =
+  | { readonly kind: "create"; readonly selection: unknown }
+  | { readonly kind: "remove"; readonly mapping: TMapping }
+  | { readonly kind: "reorder"; readonly mapping: TMapping; readonly displayOrder: number }
+  | { readonly kind: "reorderMany"; readonly mappings: readonly TMapping[]; readonly selection: TSelection };
 
 function normalizeError(cause: unknown): Error {
   if (cause instanceof Error) return cause;
@@ -272,6 +283,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
   const [revision, setRevision] = useState<TRevision | undefined>(options.revision);
   const revisionRef = useRef<TRevision | undefined>(options.revision);
   const domainRef = useRef(options.domain);
+  const lastOperationRef = useRef<RetryOperation<TMapping, TSelection> | undefined>(undefined);
   const inputMappingsRef = useRef(options.mappings);
   const mappingsRef = useRef<readonly TMapping[]>(options.mappings);
   domainRef.current = options.domain;
@@ -313,13 +325,19 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         revisionConflict: cause,
         canRetry: true
       });
+      try {
+        options.onConflict?.(cause);
+      } catch {
+        // A consumer callback must not replace the normalized conflict result.
+      }
       return true;
     },
-    [setMappings, updateRevision]
+    [options.onConflict, setMappings, updateRevision]
   );
 
   const create = useCallback(
     async (selection: unknown): Promise<boolean> => {
+      lastOperationRef.current = { kind: "create", selection };
       setState({ operation: "creating" });
       try {
         const expectedRevision = revisionRef.current;
@@ -348,6 +366,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         }
         setState({ operation: "idle" });
         await options.adapter.invalidate?.();
+        lastOperationRef.current = undefined;
         return true;
       } catch (cause) {
         if (applyConflict(cause)) return false;
@@ -360,6 +379,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
 
   const remove = useCallback(
     async (mapping: TMapping): Promise<boolean> => {
+      lastOperationRef.current = { kind: "remove", mapping };
       setState({ operation: "removing" });
       try {
         const expectedRevision = revisionRef.current;
@@ -382,6 +402,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         }
         setState({ operation: "idle" });
         await options.adapter.invalidate?.();
+        lastOperationRef.current = undefined;
         return true;
       } catch (cause) {
         if (applyConflict(cause)) return false;
@@ -394,6 +415,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
 
   const reorder = useCallback(
     async (mapping: TMapping, displayOrder: number): Promise<boolean> => {
+      lastOperationRef.current = { kind: "reorder", mapping, displayOrder };
       const legacyReorder = options.adapter.reorder;
       const revisionReorder = options.adapter.reorderWithRevision;
       if (legacyReorder === undefined && revisionReorder === undefined) {
@@ -427,6 +449,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         }
         setState({ operation: "idle" });
         await options.adapter.invalidate?.();
+        lastOperationRef.current = undefined;
         return true;
       } catch (cause) {
         if (applyConflict(cause)) return false;
@@ -441,6 +464,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
     async (
       request: Omit<SurveyMappingAtomicReorderRequest<unknown, TMapping, TSelection, TRevision>, "domain">
     ): Promise<SurveyMappingReorderResult<TMapping, TRevision>> => {
+      lastOperationRef.current = { kind: "reorderMany", mappings: request.mappings, selection: request.selection };
       const previousMappings = mappingsRef.current;
       const previousRevision = revisionRef.current;
       if (
@@ -501,6 +525,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
         setState({ operation: "error", error: normalizeError(cause) });
         throw normalizeError(cause);
       }
+      lastOperationRef.current = undefined;
       return result;
     },
     [applyConflict, options.adapter, setMappings, updateRevision]
@@ -523,6 +548,7 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
       } else {
         throw new TypeError("SurveyMappingCrudAdapter.list returned an invalid response.");
       }
+      setState({ operation: "idle" });
       return true;
     } catch (cause) {
       if (applyConflict(cause)) return false;
@@ -530,6 +556,25 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
       return false;
     }
   }, [applyConflict, options.adapter.list, options.adapter.listWithRevision, setMappings, updateRevision]);
+
+  const reload = refresh;
+  const retry = useCallback(async (): Promise<boolean> => {
+    const operation = lastOperationRef.current;
+    if (operation === undefined) return false;
+    if (operation.kind === "create") return create(operation.selection);
+    if (operation.kind === "remove") return remove(operation.mapping);
+    if (operation.kind === "reorder") return reorder(operation.mapping, operation.displayOrder);
+    try {
+      await reorderMany({
+        mappings: operation.mappings,
+        selection: operation.selection,
+        signal: new AbortController().signal
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [create, remove, reorder, reorderMany]);
 
   return {
     mappings,
@@ -553,6 +598,8 @@ export function useSurveyMappingCrud<TDomain, TMapping, TSelection = unknown, TR
             request: Omit<SurveyMappingAtomicReorderRequest<unknown, TMapping, TSelection, TRevision>, "domain">
           ) => reorderMany({ ...request })
         }),
-    refresh
+    refresh,
+    reload,
+    retry
   };
 }

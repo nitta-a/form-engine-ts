@@ -196,14 +196,11 @@ function ChoiceGroupFrame({
   };
   if (renderChoiceGroup !== undefined) return <>{renderChoiceGroup(groupProps)}</>;
   return (
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: The grouped fieldset exposes the required state for the complete choice question.
     <fieldset
       className={className}
       data-field-id={field.id}
       disabled={disabled}
       aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
-      aria-invalid={Boolean(error)}
-      aria-required={field.required}
       style={slotProps?.style}
     >
       <legend className="fe-choice-legend">
@@ -269,6 +266,9 @@ function DefaultField({
                 type="checkbox"
                 checked={value === true}
                 aria-label={props.a11y?.ariaLabel ?? field.title}
+                aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+                aria-invalid={error === undefined ? undefined : true}
+                aria-required={field.required === true ? true : undefined}
                 required={field.required}
                 disabled={disabled}
                 readOnly={readOnly}
@@ -327,7 +327,10 @@ function DefaultField({
                     value={option.id}
                     checked={checked}
                     aria-label={optionAccessibleName(option, props.a11y)}
-                    required={field.required}
+                    aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+                    aria-invalid={error === undefined ? undefined : true}
+                    aria-required={isRadio && field.required ? true : undefined}
+                    required={isRadio && field.required}
                     disabled={disabled}
                     readOnly={readOnly}
                     onKeyDown={
@@ -369,12 +372,17 @@ function DefaultField({
       );
     }
     if (field.type === "radio") {
+      const labelId = `${inputId}-label`;
       return (
-        <div className="fe-field fe-field--radio" data-field-id={field.id}>
-          <div className="fe-label">
+        <fieldset
+          className="fe-field fe-field--radio"
+          data-field-id={field.id}
+          aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+        >
+          <legend id={labelId} className="fe-label">
             {field.title}
             {requiredIndicator(field.required, props.a11y)}
-          </div>
+          </legend>
           {field.options.map((option, index) => {
             const optionId = `${inputId}-${index}`;
             return (
@@ -395,11 +403,15 @@ function DefaultField({
             );
           })}
           <FieldMessage props={props} />
-        </div>
+        </fieldset>
       );
     }
     return (
-      <fieldset className={`fe-field fe-field--${field.type}`} data-field-id={field.id} {...ariaProps}>
+      <fieldset
+        className={`fe-field fe-field--${field.type}`}
+        data-field-id={field.id}
+        aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+      >
         <legend className="fe-label">
           {field.title}
           {requiredIndicator(field.required, props.a11y)}
@@ -416,7 +428,9 @@ function DefaultField({
                 value={option.id}
                 checked={checked}
                 aria-label={optionAccessibleName(option, props.a11y)}
-                required={field.required}
+                aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+                aria-invalid={error === undefined ? undefined : true}
+                required={field.type === "radio" && field.required}
                 onChange={(event) => {
                   if (field.type === "radio") setValue(option.id);
                   else
@@ -440,7 +454,11 @@ function DefaultField({
     const min = field.min ?? 1;
     const max = field.max ?? 5;
     return (
-      <fieldset className="fe-field fe-field--rating" data-field-id={field.id} {...ariaProps}>
+      <fieldset
+        className="fe-field fe-field--rating"
+        data-field-id={field.id}
+        aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+      >
         <legend className="fe-label">
           {field.title}
           {requiredIndicator(field.required, props.a11y)}
@@ -456,6 +474,8 @@ function DefaultField({
                   type="radio"
                   value={rating}
                   checked={value === rating}
+                  aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+                  aria-invalid={error === undefined ? undefined : true}
                   required={field.required}
                   onChange={() => setValue(rating)}
                 />
@@ -520,6 +540,7 @@ function DefaultField({
         {...ariaProps}
         id={inputId}
         name={field.id}
+        aria-label={isGroupedChoiceField ? (props.a11y?.ariaLabel ?? field.title) : props.a11y?.ariaLabel}
         required={field.required}
         disabled={disabled}
         value={typeof value === "string" ? value : ""}
@@ -527,7 +548,7 @@ function DefaultField({
       >
         <option value="">—</option>
         {field.options.map((option) => (
-          <option value={option.id} key={option.id} aria-label={optionAccessibleName(option, props.a11y)}>
+          <option value={option.id} key={option.id}>
             {option.label}
           </option>
         ))}

@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/react",
-  "version": "7.7.0",
+  "version": "7.8.0",
   "publishConfig": {
     "access": "public"
   },
@@ -54,5 +54,8 @@
   "peerDependencies": {
     "react": ">=18.2 <20",
     "react-dom": ">=18.2 <20"
+  },
+  "devDependencies": {
+    "axe-core": "^4.11.0"
   }
 }

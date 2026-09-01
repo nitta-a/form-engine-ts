@@ -6,7 +6,7 @@ import {
   type TranslationReport,
   type TranslationSlot
 } from "@form-engine-ts/core";
-import type { AsyncTranslationAdapter } from "./types";
+import type { AsyncTranslationAdapter, SurveyTextMetadataCodec } from "./types";
 
 export type SurveyTranslationMetadataSource = "AI" | "MANUAL";
 
@@ -29,12 +29,14 @@ export function createSurveyTranslationMetadata(
   slot: TranslationSlot,
   options: CreateSurveyTranslationMetadataOptions
 ): Readonly<Record<string, JsonValue>> {
+  const timestamp = new Date().toISOString();
   return {
     ...slot.existingTranslationMetadata,
     sourceLocale: options.sourceLocale,
     ...(options.policy.updateSourceTextHash ? { sourceTextHash: computeSourceTextHash(slot.sourceText) } : {}),
     translationSource: options.policy.source === "MANUAL" ? "manual" : "automatic",
-    translatedAt: new Date().toISOString()
+    translatedAt: timestamp,
+    ...(options.policy.source === "MANUAL" ? { editedAt: timestamp } : {})
   };
 }
 
@@ -45,6 +47,8 @@ export interface TranslateSurveySchemaOptions {
   readonly signal?: AbortSignal;
   readonly translationAdapter: AsyncTranslationAdapter;
   readonly metadataPolicy: SurveyTranslationMetadataPolicy;
+  /** Optional common codec for application-owned translation metadata. */
+  readonly metadataCodec?: SurveyTextMetadataCodec;
   readonly onReport?: (report: TranslationReport) => void;
 }
 
@@ -57,14 +61,20 @@ export interface TranslateSurveySchemaResult {
 export async function translateSurveySchema(
   options: TranslateSurveySchemaOptions
 ): Promise<TranslateSurveySchemaResult> {
-  const { schema, sourceLocale, targetLocale, signal, translationAdapter, metadataPolicy } = options;
+  const { schema, sourceLocale, targetLocale, signal, translationAdapter, metadataPolicy, metadataCodec } = options;
   const originalDefaultLocale = schema.defaultLocale;
   const sourceSchema = originalDefaultLocale === sourceLocale ? schema : { ...schema, defaultLocale: sourceLocale };
   const result = await populateSchemaTranslations(sourceSchema, [targetLocale], translationAdapter, {
     overwrite: "all",
     preserveManualTranslations: metadataPolicy.preserveManualEdits,
-    createMetadata: (slot: TranslationSlot) =>
-      createSurveyTranslationMetadata(slot, { sourceLocale, policy: metadataPolicy }),
+    createMetadata: (slot: TranslationSlot, translatedText: string) => {
+      const metadata = createSurveyTranslationMetadata(slot, { sourceLocale, policy: metadataPolicy });
+      if (metadataCodec === undefined) return metadata;
+      return (
+        metadataCodec.toEngine({ value: translatedText, sourceText: slot.sourceText, sourceLocale, metadata })
+          .metadata ?? metadata
+      );
+    },
     ...(signal === undefined ? {} : { signal })
   });
   options.onReport?.(result.report);

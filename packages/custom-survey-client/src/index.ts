@@ -11,6 +11,8 @@ export * from "./SurveyQualityPanel";
 export * from "./SurveyVersionHistory";
 export * from "./SurveyVersionPanel";
 export * from "./shared";
+export * from "./surveyDefinition";
+export * from "./textMetadata";
 export * from "./translation";
 export * from "./types";
 export * from "./versionOperations";

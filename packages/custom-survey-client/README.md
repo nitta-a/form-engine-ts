@@ -21,6 +21,42 @@ Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt appli
 
 ## v7.7 APIs
 
+Survey Viewer and Maker can share one explicit definition conversion boundary. The converter accepts the supported
+question types, maps `single-choice` to the Form Engine's `radio` or `select`, and normalizes those fields back to
+`single-choice` when converting a schema:
+
+```tsx
+import { formSchemaToSurveyDefinition, surveyDefinitionToFormSchema } from "@form-engine-ts/custom-survey-client";
+
+const schema = surveyDefinitionToFormSchema({
+  id: "customer-survey",
+  version: 1,
+  locale: "en",
+  title: "Customer survey",
+  fields: [
+    {
+      id: "contact",
+      type: "single-choice",
+      selectionStyle: "radio",
+      title: "Contact method",
+      required: true,
+      options: [{ id: "email", label: "Email" }]
+    }
+  ]
+});
+
+const definition = formSchemaToSurveyDefinition(schema);
+```
+
+`useSurveyMappingCrud` updates mappings and revision before calling `onConflict`. The callback receives
+`expectedRevision`, `currentRevision`, and `currentMappings`; use `retry()` to replay the last failed mutation or
+`reload()` to fetch the current server state. `refresh()` remains available as a compatibility alias.
+
+`createSurveyTextMetadataCodec({ preserveUnknown: true, sourceTextHash: "auto" })` provides the common text metadata
+boundary. It retains source text, generates the source hash, normalizes automatic/manual state and legacy flags, and
+preserves translation/edit dates and unknown JSON metadata. Pass it as `metadataCodec` to `translateSurveySchema` to
+keep the same metadata contract while forwarding its `AbortSignal` to the asynchronous translation adapter.
+
 Response Summary can load a summary lazily for each selected language. The hook caches successful language results,
 aborts the previous request when the language changes, and exposes typed loading/error/reload state:
 
