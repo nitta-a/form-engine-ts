@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v7.9.0 — 2026-09-08
+
+- Added Core content-mode primitives for quiz authoring, immediate feedback, grading, poll publication, and poll result aggregation.
+- Added preview flows for creating and editing quiz/poll content, submitting responses, and viewing results.
+- Added reusable React page-condition controls with injected builder primitives, preceding-question restrictions, read-only support, and the existing condition operators.
+- Added MUI multi-page builder management with page creation/deletion, title and description editing, question assignment and ordering, conditional visibility, translations, feature flags, and custom slots.
+- Aligned all public packages to version 7.9.0.
+
 ### v7.8.0 — 2026-09-02
 
 - Added root-exported Survey definition/FormSchema conversion APIs with reverse conversion, choice normalization, supported constraints, locale/version, completion message, and metadata preservation.

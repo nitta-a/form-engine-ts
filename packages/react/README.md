@@ -287,3 +287,11 @@ in `loadResults` and vote eligibility atomically when persisting submissions.
 Use the existing `FormRenderer.slots.renderCompletion` `schema` and `answers`
 snapshot for final quiz evaluation. Immediate feedback can observe `useForm().values`;
 changing a choice updates feedback, while final scoring uses submitted answers.
+
+### Reusing page condition controls in custom builder slots
+
+`BuilderPageConditionEditor` and `BuilderPageConditionEditorProps` expose the default page-condition controls.
+Pass `schema`, `page`, the slot's `components` and `translate`, optional `readOnly`, and an `onChange` callback.
+It restricts source choices to preceding pages and shares the default builder's operator/value behavior. It renders
+through injected builder primitives, so adapters such as MUI can reuse it without importing vendor UI into React.
+Apply its result using `actions.updatePage`; remove the `displayCondition` property when the result is `undefined`.

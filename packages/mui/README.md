@@ -185,3 +185,60 @@ Keep `createMuiBuilderProps` results stable across renders to preserve editor fo
 the final result from the renderer completion snapshot. Existing
 `MuiSurveyResponseSummary` renders poll percentages from mapped analytics; use the
 React `usePollResults` hook to gate and refresh aggregation requests.
+
+## Multi-page editing
+
+`MuiFormBuilder` includes `MuiPagesEditor` (also exported as `MuiPagesEditorSlot`) in `muiBuilderSlots.pages`.
+It supports enabling pages, adding/deleting pages, title/description editing, question assignment, keyboard-accessible
+move-up/down buttons, page display conditions, and manual page translations with metadata. The controls use the
+existing MUI adapters and respect `readOnly`, feature flags, localization, `muiOptions`, and `muiSlotProps.card/stack`.
+
+```tsx
+import type { FormSchema } from "@form-engine-ts/core";
+import { MuiFormBuilder } from "@form-engine-ts/mui";
+import { useState } from "react";
+
+const initialSchema: FormSchema = {
+  id: "feedback",
+  version: 1,
+  title: "Feedback",
+  fields: [
+    { id: "name", type: "text", title: "Name", required: true },
+    { id: "age", type: "number", title: "Age", required: false },
+    { id: "comment", type: "textarea", title: "Comment", required: false }
+  ],
+  pages: [
+    { id: "basic", title: "Basic information", questionIds: ["name", "age"] },
+    { id: "feedback-page", title: "Feedback", questionIds: ["comment"] }
+  ]
+};
+
+export function MultiPageSurveyEditor() {
+  const [schema, setSchema] = useState(initialSchema);
+  return (
+    <MuiFormBuilder
+      schema={schema}
+      onChange={setSchema}
+      features={{ pages: true, conditions: true, localization: true }}
+      muiOptions={{ size: "small", dense: true }}
+    />
+  );
+}
+```
+
+The existing preview application's **MUI Mode** uses this slot automatically when pages are enabled. Use the page
+manager to choose a question for a new page, or a question's page selector to move it to another existing page.
+
+The editor delegates mutations to React's `BuilderSlotActions`; it does not maintain a second schema model.
+Existing headless rules still apply: pages cannot be created empty; splitting requires a source page with at least two
+questions. Deleting a page moves its questions to a neighbor, and deleting the last page returns to single-page mode.
+Moving a page removes its condition when the referenced question is no longer on a preceding page. Assigning the
+last question away removes the now-empty page. As in the headless API, deletion/assignment do not repair every
+pre-existing condition reference; the application should validate the resulting schema before saving.
+Page conditions use `FormPage.displayCondition` (one preceding question with the existing operators), not the field
+editor's nested `DisplayRule` AND/OR groups. Drag-and-drop ordering is not included; use the move buttons.
+
+`createMuiPagesEditorSlot(options)` creates an independently configured slot, and `MuiPagesEditorProps` extends
+React's `BuilderPagesSlotProps`. `createMuiBuilderSlots(options, { pages: CustomPages })` and
+`<MuiFormBuilder slots={{ pages: CustomPages }} />` keep custom overrides. For a low-level React builder, use
+`createMuiBuilderProps(options)` to apply the MUI components and slots together.

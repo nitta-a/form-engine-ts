@@ -1,5 +1,6 @@
 export type { QuestionType } from "@form-engine-ts/core";
 export * from "./attempt";
+export * from "./BuilderPageConditionEditor";
 export * from "./builder";
 export * from "./context";
 export * from "./hooks/useFormBuilder";

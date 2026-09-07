@@ -3,6 +3,7 @@ import { DEFAULT_MUI_SECTION_ORDER, type MuiAdapterOptions } from "../types";
 import { createMuiFieldEditorSlot, MuiFieldEditorSlot } from "./FieldEditor";
 import { createMuiLocalizationSlot, MuiLocalizationSlot } from "./Localization";
 import { createMuiOptionEditorSlot, MuiOptionEditorSlot } from "./OptionEditor";
+import { createMuiPagesEditorSlot, MuiPagesEditorSlot } from "./PagesEditor";
 import { createMuiToolbarSlot, MuiToolbarSlot } from "./Toolbar";
 
 export * from "./ConditionEditor";
@@ -10,11 +11,13 @@ export * from "./FieldEditor";
 export * from "./Localization";
 export * from "./MuiChoiceGroupSlot";
 export * from "./OptionEditor";
+export * from "./PagesEditor";
 export * from "./Toolbar";
 
 export const muiBuilderSlots: FormBuilderSlots = {
   sectionOrder: DEFAULT_MUI_SECTION_ORDER,
   toolbar: MuiToolbarSlot,
+  pages: MuiPagesEditorSlot,
   fieldEditor: MuiFieldEditorSlot,
   optionEditor: MuiOptionEditorSlot,
   localization: MuiLocalizationSlot
@@ -27,6 +30,7 @@ export function createMuiBuilderSlots(
   return {
     sectionOrder: options?.layoutOptions?.sectionOrder ?? DEFAULT_MUI_SECTION_ORDER,
     toolbar: createMuiToolbarSlot(options),
+    pages: createMuiPagesEditorSlot(options),
     fieldEditor: createMuiFieldEditorSlot(options),
     optionEditor: createMuiOptionEditorSlot(options),
     localization: createMuiLocalizationSlot(options),

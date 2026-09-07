@@ -2,7 +2,6 @@
 import {
   type AsyncTranslationAdapter,
   type ConditionOperator,
-  type ConditionValue,
   DEFAULT_FIELD_TYPE_DEFINITIONS,
   type DisplayCondition,
   type FieldType,
@@ -18,6 +17,13 @@ import {
 } from "@form-engine-ts/core";
 import type { ReactElement, ReactNode } from "react";
 import { Children, createContext, isValidElement, useContext, useState } from "react";
+import { BuilderPageConditionEditor } from "./BuilderPageConditionEditor";
+import {
+  ConditionValueEditor,
+  conditionOperators,
+  conditionWithValue,
+  defaultConditionValue
+} from "./builderConditions";
 import {
   type BuilderActionError,
   type BuilderActionResult,
@@ -813,81 +819,6 @@ function manualTranslationContext(
   };
 }
 
-function defaultConditionValue(field: FormField): ConditionValue {
-  if (field.type === "checkbox") return true;
-  if (field.type === "number" || field.type === "rating") return field.min ?? 1;
-  if ("options" in field) return field.options[0]?.id ?? "";
-  return "";
-}
-
-function conditionOperators(field: FormField): readonly ConditionOperator[] {
-  if (field.type === "multi-select") return ["contains", "not_empty"];
-  if (field.type === "text" || field.type === "textarea") {
-    return ["equals", "not_equals", "contains", "not_empty"];
-  }
-  return ["equals", "not_equals", "not_empty"];
-}
-
-function conditionWithValue(questionId: string, operator: ConditionOperator, value: ConditionValue): DisplayCondition {
-  return operator === "not_empty" ? { questionId, operator } : { questionId, operator, value };
-}
-
-function ConditionValueEditor({
-  source,
-  condition,
-  onChange,
-  translate,
-  components
-}: {
-  readonly source: FormField;
-  readonly condition: DisplayCondition;
-  readonly onChange: (condition: DisplayCondition) => void;
-  readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
-  readonly components: Required<FormBuilderComponents>;
-}) {
-  const { Select, TextInput } = components;
-  if (condition.operator === "not_empty") return null;
-  const update = (value: ConditionValue) => onChange({ ...condition, value });
-  if (source.type === "checkbox") {
-    return (
-      <Select
-        value={String(condition.value)}
-        onChange={(value) => update(value === "true")}
-        options={[
-          { value: "true", label: translate("builder.conditionTrue") },
-          { value: "false", label: translate("builder.conditionFalse") }
-        ]}
-      />
-    );
-  }
-  if (source.type === "number" || source.type === "rating") {
-    return (
-      <TextInput
-        aria-label={translate("builder.conditionValue")}
-        type="number"
-        value={typeof condition.value === "number" ? String(condition.value) : ""}
-        onChange={(value) => update(value === "" ? 0 : Number(value))}
-      />
-    );
-  }
-  if ("options" in source) {
-    return (
-      <Select
-        value={String(condition.value ?? "")}
-        onChange={update}
-        options={source.options.map((option) => ({ value: option.id, label: option.label }))}
-      />
-    );
-  }
-  return (
-    <TextInput
-      aria-label={translate("builder.conditionValue")}
-      value={typeof condition.value === "string" ? condition.value : ""}
-      onChange={update}
-    />
-  );
-}
-
 export function resolveInitialFieldType(
   defaultType?: QuestionType,
   allowedTypes?: readonly QuestionType[]
@@ -1475,11 +1406,6 @@ export function FormBuilder({
                     ) : (
                       <>
                         {schema.pages.map((page, pageIndex) => {
-                          const priorQuestionIds = new Set(
-                            schema.pages?.slice(0, pageIndex).flatMap((item) => item.questionIds)
-                          );
-                          const availableSources = schema.fields.filter((field) => priorQuestionIds.has(field.id));
-                          const source = schema.fields.find((field) => field.id === page.displayCondition?.questionId);
                           return (
                             <Fieldset
                               className={builderClass("form-engine-builder__page")}
@@ -1609,71 +1535,23 @@ export function FormBuilder({
                                 </div>
                               )}
                               {conditionsEnabled ? (
-                                <div className={builderClass("form-engine-builder__condition")}>
-                                  <div className={builderClass("form-engine-builder__field")}>
-                                    <Select
-                                      id={`builder-page-${page.id}-condition`}
-                                      label={translate("builder.pageCondition")}
-                                      value={page.displayCondition?.questionId ?? ""}
-                                      onChange={(value) => {
-                                        const selected = schema.fields.find((field) => field.id === value);
-                                        updatePage(page.id, (current) => {
-                                          if (selected === undefined) {
-                                            const { displayCondition: _condition, ...withoutCondition } = current;
-                                            return withoutCondition;
-                                          }
-                                          return {
-                                            ...current,
-                                            displayCondition: conditionWithValue(
-                                              selected.id,
-                                              conditionOperators(selected)[0] ?? "not_empty",
-                                              defaultConditionValue(selected)
-                                            )
-                                          };
-                                        });
-                                      }}
-                                      options={[
-                                        { value: "", label: translate("builder.alwaysVisible") },
-                                        ...availableSources.map((field) => ({ value: field.id, label: field.title }))
-                                      ]}
-                                    />
-                                  </div>
-                                  {page.displayCondition !== undefined && source !== undefined ? (
-                                    <>
-                                      <Select
-                                        aria-label={translate("builder.conditionOperator")}
-                                        value={page.displayCondition.operator}
-                                        onChange={(value) => {
-                                          const operator = value as ConditionOperator;
-                                          updatePage(page.id, (current) => ({
-                                            ...current,
-                                            displayCondition: conditionWithValue(
-                                              source.id,
-                                              operator,
-                                              defaultConditionValue(source)
-                                            )
-                                          }));
-                                        }}
-                                        options={conditionOperators(source).map((operator) => ({
-                                          value: operator,
-                                          label: translate(operatorKey(operator))
-                                        }))}
-                                      />
-                                      <ConditionValueEditor
-                                        source={source}
-                                        condition={page.displayCondition}
-                                        onChange={(condition) =>
-                                          updatePage(page.id, (current) => ({
-                                            ...current,
-                                            displayCondition: condition
-                                          }))
-                                        }
-                                        translate={translate}
-                                        components={components}
-                                      />
-                                    </>
-                                  ) : null}
-                                </div>
+                                <BuilderPageConditionEditor
+                                  className={builderClass("form-engine-builder__condition") ?? ""}
+                                  fieldClassName={builderClass("form-engine-builder__field") ?? ""}
+                                  schema={schema}
+                                  page={page}
+                                  components={components}
+                                  translate={translate}
+                                  readOnly={readOnly}
+                                  onChange={(condition) =>
+                                    updatePage(page.id, (current) => {
+                                      const { displayCondition: _condition, ...rest } = current;
+                                      return condition === undefined
+                                        ? rest
+                                        : { ...current, displayCondition: condition };
+                                    })
+                                  }
+                                />
                               ) : null}
                             </Fieldset>
                           );
