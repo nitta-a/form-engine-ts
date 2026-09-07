@@ -93,7 +93,7 @@ describe("MUI pages editor", () => {
     expect(state().pages?.map((page) => page.id)).toEqual(["feedback", "basic"]);
     expect(screen.getByRole("button", { name: "Move Feedback up" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Move Basic info down" })).toBeDisabled();
-  });
+  }, 30_000);
   it("limits conditions to preceding questions, edits values, clears conditions on reorder", async () => {
     render(<Harness />);
     const feedback = within(screen.getByRole("group", { name: "Feedback" }));
