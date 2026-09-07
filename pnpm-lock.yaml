@@ -68,6 +68,9 @@ importers:
       '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@form-engine-ts/custom-survey-client':
+        specifier: workspace:*
+        version: link:../../packages/custom-survey-client
       '@form-engine-ts/mui':
         specifier: workspace:*
         version: link:../../packages/mui

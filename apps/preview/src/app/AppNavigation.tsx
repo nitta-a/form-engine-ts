@@ -1,9 +1,9 @@
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 import type { KeyboardEvent, ReactNode } from "react";
 
-export type AppTabId = "builder" | "mui" | "comparison" | "respondent" | "analytics";
+export type AppTabId = "content" | "builder" | "mui" | "comparison" | "respondent" | "analytics";
 
-export const appTabs: readonly AppTabId[] = ["builder", "mui", "comparison", "respondent", "analytics"];
+export const appTabs: readonly AppTabId[] = ["content", "builder", "mui", "comparison", "respondent", "analytics"];
 
 export interface AppNavigationProps {
   readonly locale: string;
@@ -56,7 +56,7 @@ export function AppNavigation({ locale, activeTab, onLocaleChange, onTabChange, 
               onClick={() => onTabChange(tab)}
               onKeyDown={(event) => handleTabKeyDown(event, tab)}
             >
-              {translate(`preview.${tab}`)}
+              {tab === "content" ? (locale.startsWith("ja") ? "フォーム一覧" : "Forms") : translate(`preview.${tab}`)}
             </button>
           ))}
         </div>

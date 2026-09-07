@@ -214,3 +214,46 @@ cursors instead of looping indefinitely. Publish transition validation also reje
 records, and an unexpected current record with typed errors.
 
 See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme) for the complete schema and API guide.
+
+## Survey, poll and quiz content modes
+
+`FormContentMode`, `CustomFormMetadata`, `PollMetadata`, `QuizMetadata` and
+`QuizFieldMetadata` are optional metadata contracts. `getFormContentMode(metadata)`
+returns `survey` for absent or unrecognized modes. Existing schema validation and
+storage contracts are unchanged; call `validateContentMode(schema)` explicitly at
+save/publish and respondent-entry boundaries in addition to base validation.
+
+```ts
+import { createInitialSchemaByMode, getContentModePolicy } from "@form-engine-ts/core";
+
+const schema = createInitialSchemaByMode("poll", {
+  id: "lunch-vote", title: "Lunch", locale: "en"
+});
+const policy = getContentModePolicy("poll", { maxOptionsPerField: 8 });
+```
+
+Presets are deterministic: version 1, default ID `form-draft` (supply a unique ID
+before persistence), no survey questions, or one required radio question with two
+options for poll/quiz. An empty survey is an editing draft and still fails the
+existing base validator until a question is added. Quiz presets intentionally have
+no correct answer. Poll allows `radio` / `multi-select` and exactly one question;
+quiz allows `radio`. Mode policy intersects allowed types and never raises a host
+limit. Its enforcement is opt-in through the existing builder `policy` prop.
+
+`contentMetadataToJson` copies JSON metadata and rejects undefined, non-finite,
+cyclic and non-JSON data. `readPollMetadata`, `readQuizMetadata` and
+`readQuizFieldMetadata` provide typed reads; unknown metadata stays in the original
+schema. Store correct answers at `field.metadata.quiz.correctOptionId`.
+`evaluateQuiz(schema, answers)` rejects invalid quizzes, scores visible questions,
+uses 1 point by default and 0 for unanswered questions, and returns optional `passed`
+when `passingScore` is configured. Scores and thresholds are finite, non-negative
+numbers; the threshold cannot exceed the sum of configured points. Hidden questions
+are excluded from the earned and available score; the configured passing threshold
+is absolute and is not adjusted for visibility.
+
+`canShowPollResults(poll, { submitted, closed, canViewResults })` implements all four
+policies. `private` never exposes results to respondents, and authorization gates
+every policy. `PollRuntimeAdapter<TSummary>` injects result loading (with AbortSignal)
+and vote eligibility. The host must enforce authorization and atomic one-vote
+persistence; metadata and client-side checks alone are not server enforcement.
+Quiz answers are intentionally delivered to the browser for learning/entertainment.

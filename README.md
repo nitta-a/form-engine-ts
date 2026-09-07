@@ -598,3 +598,26 @@ Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補�
 ライブラリはdriver非依存を維持しているため、データベース接続、production migration、credential、cache storageの
 管理は呼び出し側が担当します。Builderの並び替えにはアクセシブルな上下ボタンを使用し、memory adapterは
 JavaScript processまたはbrowser pageの再読み込み時にリセットされます。
+
+## Survey / Poll / Quiz demo
+
+The preview's **Forms** tab provides a shared Memory/LocalStorage library, mode
+filter (`?mode=survey|poll|quiz`), creation cards, the existing SurveyEditor with
+mode-specific settings, and inline respondent results. Save a valid schema before
+opening the answer screen. An empty survey stays an editing draft until its first
+question is saved. Poll results support all four visibility policies and independent
+aggregation retries; quiz supports immediate and post-submit feedback. Demo controls
+simulate closing, result access and request failures. One-vote identity is scoped to
+this browser and form, across versions; clearing browser data resets it. Production
+hosts must enforce identity/access at persistence. Existing workspaces remain available.
+
+## アンケート・投票・クイズのデモ
+
+preview の **フォーム一覧** から、共通の Memory / LocalStorage 保存領域で種別フィルタ
+（`?mode=survey|poll|quiz`）、新規作成、既存 SurveyEditor による編集、回答・結果表示を
+操作できます。有効なスキーマを保存してから回答画面を開きます。空のアンケートは最初の
+設問を保存するまで編集中のドラフトとして保持します。投票は公開タイミング4種類と集計だけの
+再試行、クイズは選択直後・送信後の解説に対応します。締切・閲覧権限・通信失敗をデモ操作で
+切り替えられます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
+ブラウザーデータを削除するとリセットされます。本番の識別・権限制御は保存処理で強制してください。
+既存デモの各ワークスペースも引き続き利用できます。

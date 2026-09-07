@@ -7,6 +7,14 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^@form-engine-ts\/mui$/,
+        replacement: fileURLToPath(new URL("../../packages/mui/src/index.ts", import.meta.url))
+      },
+      {
+        find: /^@form-engine-ts\/custom-survey-client$/,
+        replacement: fileURLToPath(new URL("../../packages/custom-survey-client/src/index.ts", import.meta.url))
+      },
+      {
         find: /^@form-engine-ts\/core$/,
         replacement: fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url))
       },

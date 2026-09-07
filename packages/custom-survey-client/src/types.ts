@@ -260,6 +260,7 @@ export interface SurveyEditorOperationState {
 }
 
 export interface SurveyEditorRenderProps {
+  readonly onChange?: (schema: FormSchema) => void;
   readonly schema: FormSchema;
   readonly sourceLocale: string;
   readonly targetLocale: string;
@@ -284,6 +285,7 @@ export interface SurveyEditorSlots {
 
 export interface SurveyEditorProps
   extends Omit<FormBuilderProps, "schema" | "onChange" | "locale" | "translationAdapter" | "translator" | "slots"> {
+  readonly builderSlots?: FormBuilderProps["slots"];
   readonly schema: FormSchema;
   readonly adapter: SurveyEditorAdapter;
   readonly onChange?: (schema: FormSchema) => void;

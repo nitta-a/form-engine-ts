@@ -419,3 +419,14 @@ implementation boundaries, not application-owned deep-import contracts.
 Deprecated compatibility names are `useSurveyEditor`, `translate`/`save`,
 `qualityCheck`, `duplicate`, `delete`, and `setStatus`. They remain available
 for v7.2/v7.3 migration and should not be used in new Maker code.
+
+## Content mode editor slots
+
+`SurveyEditor` accepts optional `builderSlots` separately from its existing `slots`.
+This forwards FormBuilder slots without replacing the editor or its save/translation
+pipeline. Configuration slot render props also expose optional `onChange(schema)`
+for metadata updates. Combine these with Core's `getContentModePolicy`, and validate
+with `validateContentMode` inside the save adapter. Basic schema validation remains
+unchanged. `SurveyDefinition` conversion preserves mode, quiz field metadata and
+unknown JSON metadata in both directions; radio still maps to `single-choice` with
+`selectionStyle: "radio"`.

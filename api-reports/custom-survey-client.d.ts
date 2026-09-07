@@ -198,6 +198,7 @@ interface SurveyEditorOperationState {
     readonly report?: TranslationReport;
 }
 interface SurveyEditorRenderProps {
+    readonly onChange?: (schema: FormSchema) => void;
     readonly schema: FormSchema;
     readonly sourceLocale: string;
     readonly targetLocale: string;
@@ -219,6 +220,7 @@ interface SurveyEditorSlots {
     readonly validationPolicy?: (props: SurveyEditorRenderProps) => ReactNode;
 }
 interface SurveyEditorProps extends Omit<FormBuilderProps, "schema" | "onChange" | "locale" | "translationAdapter" | "translator" | "slots"> {
+    readonly builderSlots?: FormBuilderProps["slots"];
     readonly schema: FormSchema;
     readonly adapter: SurveyEditorAdapter;
     readonly onChange?: (schema: FormSchema) => void;

@@ -274,6 +274,8 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
   readonly fieldEditorControls?: FieldEditorControlsConfig;
   readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
   readonly slots?: Pick<FormBuilderSlots, "fieldTypeSelect" | "fieldEditorHeader">;
+  readonly fieldEditorAfter?: FormBuilderSlots["fieldEditorAfter"];
+  readonly optionEditorAfter?: FormBuilderSlots["optionEditorAfter"];
 }
 
 export interface FieldTypeSelectSlotProps {
@@ -557,6 +559,8 @@ export interface FormBuilderSubmissionSettingsOptions {
 }
 
 export interface FormBuilderSlots {
+  readonly fieldEditorAfter?: ComponentType<BuilderFieldEditorSlotProps>;
+  readonly optionEditorAfter?: ComponentType<BuilderOptionEditorSlotProps>;
   readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;
   readonly fieldEditor?: ComponentType<BuilderFieldEditorSlotProps>;
   readonly fieldTypeSelect?: ComponentType<FieldTypeSelectSlotProps>;

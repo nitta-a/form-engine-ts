@@ -169,3 +169,19 @@ mutating the defaults.
 `MuiFormBuilder` supplies options through `MuiFormBuilderContext` to module-stable adapter and slot component types.
 Controlled schema updates therefore preserve input focus and uncontrolled MUI state such as an open localization
 accordion even when the parent passes inline option objects.
+
+## Poll and quiz UI
+
+`ContentModeSettings` edits result visibility, strict-one-vote preference, explanation
+timing and optional passing score. It accepts `schema`, `onChange`, `locale` and
+`readOnly`. `QuizOptionEditor` and `QuizFieldEditor` fit the additive builder slots
+`optionEditorAfter` and `fieldEditorAfter`, including the standard MUI field editor.
+They edit a single correct option, explanation and points without replacing the
+normal question/option controls. Deleted correct options require explicit reselection.
+Keep `createMuiBuilderProps` results stable across renders to preserve editor focus.
+
+`QuizResultView` accepts Core's `QuizResult`, `locale` (English/Japanese) and optional
+`showScore` (default true). Use `showScore={false}` for immediate feedback and render
+the final result from the renderer completion snapshot. Existing
+`MuiSurveyResponseSummary` renders poll percentages from mapped analytics; use the
+React `usePollResults` hook to gate and refresh aggregation requests.

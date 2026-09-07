@@ -59,6 +59,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
   const OptionEditor = createMuiOptionEditorSlot(options);
   return function MuiFieldEditor({
     schema,
+    onChange,
     field,
     index,
     currentLocale,
@@ -69,6 +70,8 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     components,
     translate,
     slots,
+    fieldEditorAfter: FieldEditorAfter,
+    optionEditorAfter: OptionEditorAfter,
     fieldEditorControls,
     fieldTypeOptions: fieldTypeOptionsConfig
   }: BuilderFieldEditorSlotProps) {
@@ -420,18 +423,33 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
             <Stack data-mui-slot="options" spacing={resolved.dense ? 1 : 2}>
               <Typography variant="subtitle2">{translate("builder.options")}</Typography>
               {field.options.map((option, optionIndex) => (
-                <OptionEditor
-                  key={option.id}
-                  schema={schema}
-                  field={field}
-                  option={option}
-                  index={optionIndex}
-                  currentLocale={currentLocale}
-                  translate={translate}
-                  readOnly={readOnly || controls.options === "readOnly"}
-                  actions={actions}
-                  components={components}
-                />
+                <Stack key={option.id}>
+                  <OptionEditor
+                    schema={schema}
+                    field={field}
+                    option={option}
+                    index={optionIndex}
+                    currentLocale={currentLocale}
+                    translate={translate}
+                    readOnly={readOnly || controls.options === "readOnly"}
+                    actions={actions}
+                    components={components}
+                  />
+                  {OptionEditorAfter === undefined ? null : (
+                    <OptionEditorAfter
+                      schema={schema}
+                      field={field}
+                      option={option}
+                      index={optionIndex}
+                      currentLocale={currentLocale}
+                      translate={translate}
+                      readOnly={readOnly || controls.options === "readOnly"}
+                      actions={actions}
+                      components={components}
+                      {...(onChange === undefined ? {} : { onChange })}
+                    />
+                  )}
+                </Stack>
               ))}
               <Button
                 action="addOption"
@@ -447,6 +465,19 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               </Button>
             </Stack>
           ) : null}
+          {FieldEditorAfter === undefined ? null : (
+            <FieldEditorAfter
+              schema={schema}
+              field={field}
+              index={index}
+              currentLocale={currentLocale}
+              translate={translate}
+              readOnly={readOnly}
+              actions={actions}
+              components={components}
+              {...(onChange === undefined ? {} : { onChange })}
+            />
+          )}
         </Stack>
       </Card>
     );

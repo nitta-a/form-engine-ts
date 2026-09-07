@@ -267,3 +267,23 @@ a local `onSubmit` adapter. `submissionController` remains as a deprecated compa
 and option labels.
 `submissionConfirmation` can configure title, message, button labels, finding display (`full`, `masked`, `type`, or
 `hidden`), visibility, and recheck behavior (`always`, `on-change`, or `once`).
+
+## Content mode composition
+
+Pass Core's `getContentModePolicy(mode, hostPolicy)` to `FormBuilder` or
+`useFormBuilder` to constrain both controls and actions. `addFieldDisabledReason`
+provides a tooltip and visible status text when adding a question is unavailable.
+`slots.optionEditorAfter` and `slots.fieldEditorAfter` append controls to the default
+editors. Custom field editor replacements receive these slots and must render them;
+the MUI field editor supports them. Slot props expose `onChange` for metadata edits.
+
+`usePollResults({ schema, adapter, submitted, closed, canViewResults,
+submissionRevision })` returns `enabled`, `loading`, `data`, `error` and `reload`.
+It does not load unauthorized/private results, aborts obsolete requests, hides data
+from a previous schema/adapter, and refetches after submission revision changes.
+Keep the adapter reference stable. The host remains responsible for enforcing access
+in `loadResults` and vote eligibility atomically when persisting submissions.
+
+Use the existing `FormRenderer.slots.renderCompletion` `schema` and `answers`
+snapshot for final quiz evaluation. Immediate feedback can observe `useForm().values`;
+changing a choice updates feedback, while final scoring uses submitted answers.

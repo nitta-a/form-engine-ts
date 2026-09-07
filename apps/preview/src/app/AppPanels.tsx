@@ -6,6 +6,7 @@ import { BuilderPanel } from "../builder/BuilderPanel";
 import { BuilderPreviewProvider } from "../builder/BuilderPreviewContext";
 import { MuiPanel } from "../builder/MuiPanel";
 import { TranslationComparisonPanel } from "../comparison/TranslationComparisonPanel";
+import { ContentLibrary } from "../content/ContentLibrary";
 import { RespondentPanel } from "../respondent/RespondentPanel";
 import { RespondentPreviewProvider } from "../respondent/RespondentPreviewContext";
 import type { AppTabId } from "./AppNavigation";
@@ -20,6 +21,9 @@ export interface AppPanelsProps {
 export function AppPanels({ activeTab, schema, locale, submit }: AppPanelsProps) {
   return (
     <>
+      <div id="panel-content" role="tabpanel" aria-labelledby="tab-content" hidden={activeTab !== "content"}>
+        {activeTab === "content" ? <ContentLibrary /> : null}
+      </div>
       <BuilderPreviewProvider>
         <div id="panel-builder" role="tabpanel" aria-labelledby="tab-builder" hidden={activeTab !== "builder"}>
           {activeTab === "builder" ? <BuilderPanel /> : null}

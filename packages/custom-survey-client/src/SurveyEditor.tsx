@@ -179,6 +179,7 @@ export function SurveyEditor(props: SurveyEditorProps): React.JSX.Element {
     targetLocale,
     render,
     slots,
+    builderSlots,
     saveLabel = "Save",
     translateLabel = "Translate",
     ...builderOptions
@@ -193,6 +194,7 @@ export function SurveyEditor(props: SurveyEditorProps): React.JSX.Element {
   });
   const renderedProps: SurveyEditorRenderProps = {
     schema: editor.schema,
+    onChange: editor.onChange,
     sourceLocale: editor.sourceLocale,
     targetLocale: editor.targetLocale,
     state: editor.state,
@@ -215,6 +217,7 @@ export function SurveyEditor(props: SurveyEditorProps): React.JSX.Element {
         {...builderOptions}
         schema={editor.schema}
         onChange={editor.onChange}
+        {...(builderSlots === undefined ? {} : { slots: builderSlots })}
         {...(locale === undefined ? {} : { locale })}
       />
       {slots?.responseSettings?.(renderedProps)}

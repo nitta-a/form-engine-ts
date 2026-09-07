@@ -1,5 +1,6 @@
 export * from "./aggregation";
 export * from "./analytics";
+export * from "./contentMode";
 /** @deprecated Install `@form-engine-ts/legacy` for migration-only answers contracts. */
 export * from "./errors";
 export * from "./events";

@@ -907,6 +907,7 @@ export interface FormBuilderFeatures {
 }
 
 export interface FormBuilderProps {
+  readonly addFieldDisabledReason?: string;
   readonly schema: FormSchema;
   readonly onChange: (newSchema: FormSchema) => void;
   readonly locale?: string;
@@ -948,6 +949,7 @@ export function FormBuilder({
   translationOptions,
   onTranslationReport,
   policy,
+  addFieldDisabledReason,
   idFactory,
   factories,
   className = "",
@@ -992,6 +994,8 @@ export function FormBuilder({
   const ToolbarSlot = slots?.toolbar;
   const FieldEditorSlot = slots?.fieldEditor;
   const OptionEditorSlot = slots?.optionEditor;
+  const OptionEditorAfter = slots?.optionEditorAfter;
+  const FieldEditorAfter = slots?.fieldEditorAfter;
   const PagesSlot = slots?.pages;
   const LocalizationSlot = slots?.localization;
   const TranslationActionsSlot = slots?.translationActions;
@@ -1893,6 +1897,8 @@ export function FormBuilder({
                         currentLocale={editingLocale}
                         translate={translate}
                         {...(slots === undefined ? {} : { slots })}
+                        {...(FieldEditorAfter === undefined ? {} : { fieldEditorAfter: FieldEditorAfter })}
+                        {...(OptionEditorAfter === undefined ? {} : { optionEditorAfter: OptionEditorAfter })}
                         {...(policy === undefined ? {} : { policy })}
                         {...(features === undefined ? {} : { features })}
                         {...(fieldEditorControls === undefined ? {} : { fieldEditorControls })}
@@ -1900,6 +1906,7 @@ export function FormBuilder({
                         readOnly={readOnly}
                         actions={actions}
                         components={components}
+                        onChange={onChange}
                       />
                     );
                   }
@@ -2309,6 +2316,20 @@ export function FormBuilder({
                                     components={components}
                                   />
                                 )}
+                                {OptionEditorAfter === undefined ? null : (
+                                  <OptionEditorAfter
+                                    schema={schema}
+                                    field={field}
+                                    option={option}
+                                    index={optionIndex}
+                                    currentLocale={editingLocale}
+                                    translate={translate}
+                                    readOnly={readOnly || controls.options === "readOnly"}
+                                    actions={actions}
+                                    components={components}
+                                    onChange={onChange}
+                                  />
+                                )}
                               </div>
                             ) : (
                               <OptionEditorSlot
@@ -2397,20 +2418,38 @@ export function FormBuilder({
                           ) : null}
                         </div>
                       ) : null}
+                      {FieldEditorAfter === undefined ? null : (
+                        <FieldEditorAfter
+                          schema={schema}
+                          field={field}
+                          index={index}
+                          currentLocale={editingLocale}
+                          translate={translate}
+                          readOnly={readOnly}
+                          actions={actions}
+                          components={components}
+                          onChange={onChange}
+                        />
+                      )}
                     </Fieldset>
                   );
                 })}
               </div>
             </BuilderSectionGroup>
             <BuilderSectionGroup name="addQuestion">
-              <Button
-                className={builderClass("form-engine-builder__add")}
-                action="addField"
-                disabled={initialFieldType === null || maxFieldsReached}
-                onClick={addField}
-              >
-                {translate(BUILDER_TRANSLATION_KEYS.ADD_FIELD)}
-              </Button>
+              <span title={maxFieldsReached || initialFieldType === null ? addFieldDisabledReason : undefined}>
+                <Button
+                  className={builderClass("form-engine-builder__add")}
+                  action="addField"
+                  disabled={initialFieldType === null || maxFieldsReached}
+                  onClick={addField}
+                >
+                  {translate(BUILDER_TRANSLATION_KEYS.ADD_FIELD)}
+                </Button>
+              </span>
+              {(maxFieldsReached || initialFieldType === null) && addFieldDisabledReason ? (
+                <small role="status">{addFieldDisabledReason}</small>
+              ) : null}
             </BuilderSectionGroup>
           </OrderedBuilderSections>
         </Fieldset>
