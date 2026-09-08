@@ -2,20 +2,32 @@ import type { ChoiceGroupSlotProps } from "@form-engine-ts/react";
 import { FormControl, FormHelperText, FormLabel, Paper } from "@mui/material";
 
 export function MuiChoiceGroupSlot({
+  field,
   title,
   description,
   required,
   error,
   disabled,
   children,
-  className
+  className,
+  quizResult
 }: ChoiceGroupSlotProps) {
   return (
     <Paper
       className={className}
+      data-field-id={field.id}
+      data-field-type={field.type}
+      data-quiz-result={quizResult}
       variant="outlined"
       sx={{
-        borderColor: error === undefined ? "divider" : "error.main",
+        borderColor:
+          quizResult === "correct"
+            ? "success.main"
+            : quizResult === "incorrect"
+              ? "error.main"
+              : error === undefined
+                ? "divider"
+                : "error.main",
         borderRadius: 2,
         mb: 2,
         p: 2

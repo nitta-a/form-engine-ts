@@ -8,6 +8,7 @@ import {
   FormSubmissionError,
   type FormValue,
   type FormValues,
+  getFormContentMode,
   isFormSubmissionSerializedError,
   selectVisibleAnswers,
   type TranslationAdapter,
@@ -41,6 +42,7 @@ import type {
   ChoiceGroupSlotProps,
   FieldError,
   FormRendererAppearance,
+  FormRendererClassNames,
   FormRendererFieldConfig,
   FormRendererMessages,
   FormRendererSlotProps,
@@ -62,6 +64,11 @@ import type {
 
 const isChoiceFieldType = (type: FieldType): boolean =>
   type === "radio" || type === "checkbox" || type === "multi-select" || type === "select";
+
+function joinClassNames(...names: readonly (string | undefined)[]): string | undefined {
+  const value = names.filter((name): name is string => name !== undefined && name.length > 0).join(" ");
+  return value.length === 0 ? undefined : value;
+}
 
 export function resolveChoiceFieldLayout(
   type: FieldType,
@@ -86,6 +93,7 @@ export interface FieldComponentProps {
   readonly helpId: string;
   readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
   readonly a11y?: FormRendererFieldConfig["a11y"];
+  readonly classNames?: FormRendererClassNames;
 }
 
 export type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
@@ -128,12 +136,12 @@ function FieldMessage({ props }: { readonly props: FieldComponentProps }) {
   return (
     <>
       {props.field.description === undefined && props.a11y?.customDescription === undefined ? null : (
-        <div id={props.helpId} className="fe-help">
+        <div id={props.helpId} className={joinClassNames("fe-help", props.classNames?.help)}>
           {props.a11y?.customDescription ?? props.field.description}
         </div>
       )}
       {props.error === undefined ? null : (
-        <div id={props.errorId} className="fe-error">
+        <div id={props.errorId} className={joinClassNames("fe-error", props.classNames?.error)}>
           {props.translate(props.error.messageKey, props.error.params)}
         </div>
       )}
@@ -149,7 +157,7 @@ function requiredIndicator(required: boolean, a11y: FieldComponentProps["a11y"])
 
 function GroupedChoiceDescription({ props }: { readonly props: FieldComponentProps }) {
   return props.field.description === undefined ? null : (
-    <div id={props.helpId} className="fe-field-description">
+    <div id={props.helpId} className={joinClassNames("fe-field-description", props.classNames?.help)}>
       {props.field.description}
     </div>
   );
@@ -157,7 +165,7 @@ function GroupedChoiceDescription({ props }: { readonly props: FieldComponentPro
 
 function GroupedChoiceError({ props }: { readonly props: FieldComponentProps }) {
   return props.error === undefined ? null : (
-    <div id={props.errorId} className="fe-field-error" role="alert">
+    <div id={props.errorId} className={joinClassNames("fe-field-error", props.classNames?.error)} role="alert">
       {props.translate(props.error.messageKey, props.error.params)}
     </div>
   );
@@ -170,7 +178,9 @@ function ChoiceGroupFrame({
   slotProps,
   renderChoiceGroup,
   disabled,
-  readOnly
+  readOnly,
+  submitStatus,
+  submittedValue
 }: {
   readonly props: FieldComponentProps;
   readonly children: ReactNode;
@@ -179,12 +189,17 @@ function ChoiceGroupFrame({
   readonly renderChoiceGroup?: FormRendererSlots["renderChoiceGroup"] | undefined;
   readonly disabled?: boolean | undefined;
   readonly readOnly?: boolean | undefined;
+  readonly submitStatus?: FormSubmitStatus | undefined;
+  readonly submittedValue?: unknown;
 }) {
   const { field, error, translate } = props;
   const groupError: FieldError | undefined =
     error === undefined ? undefined : { ...error, message: translate(error.messageKey, error.params) };
   const groupProps: ChoiceGroupSlotProps = {
     field,
+    value: props.value,
+    ...(submittedValue === undefined ? {} : { submittedValue }),
+    ...(submitStatus === undefined ? {} : { submitStatus }),
     title: field.title,
     ...(field.description === undefined ? {} : { description: field.description }),
     ...(field.required === undefined ? {} : { required: field.required }),
@@ -199,11 +214,14 @@ function ChoiceGroupFrame({
     <fieldset
       className={className}
       data-field-id={field.id}
+      data-field-type={field.type}
       disabled={disabled}
       aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
       style={slotProps?.style}
     >
-      <legend className="fe-choice-legend">
+      <legend
+        className={joinClassNames("fe-choice-legend", props.classNames?.fieldLabel, props.classNames?.choiceLegend)}
+      >
         {field.title}
         <RequiredMark required={field.required} className="fe-required-badge" />
       </legend>
@@ -221,6 +239,8 @@ function DefaultField({
   renderChoiceGroup,
   disabled,
   readOnly,
+  submitStatus,
+  submittedValue,
   ...props
 }: FieldComponentProps & {
   readonly groupedChoiceFields: boolean;
@@ -229,14 +249,20 @@ function DefaultField({
   readonly renderChoiceGroup?: FormRendererSlots["renderChoiceGroup"] | undefined;
   readonly disabled?: boolean | undefined;
   readonly readOnly?: boolean | undefined;
+  readonly submitStatus?: FormSubmitStatus | undefined;
+  readonly submittedValue?: unknown;
 }) {
   const { field, value, setValue, inputId, error, translate } = props;
   const isGroupedChoiceField =
     isChoiceFieldType(field.type) &&
     resolveChoiceFieldLayout(field.type, appearance, groupedChoiceFields) === "grouped";
-  const choiceGroupClassName = ["fe-choice-group", `fe-field--${field.type}`, choiceGroupSlotProps?.className]
-    .filter((item): item is string => item !== undefined && item.length > 0)
-    .join(" ");
+  const choiceGroupClassName =
+    joinClassNames(
+      "fe-choice-group",
+      `fe-field--${field.type}`,
+      props.classNames?.choiceGroup,
+      choiceGroupSlotProps?.className
+    ) ?? "fe-choice-group";
   const ariaProps = {
     "aria-label": props.a11y?.ariaLabel,
     "aria-describedby":
@@ -257,11 +283,14 @@ function DefaultField({
           renderChoiceGroup={renderChoiceGroup}
           disabled={disabled}
           readOnly={readOnly}
+          submitStatus={submitStatus}
+          submittedValue={submittedValue}
         >
-          <div className="fe-choice-options">
-            <label className="fe-choice-option" htmlFor={inputId}>
+          <div className={joinClassNames("fe-choice-options", props.classNames?.choiceOptions)}>
+            <label className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)} htmlFor={inputId}>
               <input
                 id={inputId}
+                className={props.classNames?.fieldInput}
                 name={field.id}
                 type="checkbox"
                 checked={value === true}
@@ -281,11 +310,16 @@ function DefaultField({
       );
     }
     return (
-      <div className="fe-field fe-field--checkbox" data-field-id={field.id}>
-        <label className="fe-check-label" htmlFor={inputId}>
+      <div
+        className={joinClassNames("fe-field fe-field--checkbox", props.classNames?.field)}
+        data-field-id={field.id}
+        data-field-type={field.type}
+      >
+        <label className={joinClassNames("fe-check-label", props.classNames?.choiceOption)} htmlFor={inputId}>
           <input
             {...ariaProps}
             id={inputId}
+            className={props.classNames?.fieldInput}
             name={field.id}
             type="checkbox"
             checked={value === true}
@@ -313,15 +347,22 @@ function DefaultField({
           renderChoiceGroup={renderChoiceGroup}
           disabled={disabled}
           readOnly={readOnly}
+          submitStatus={submitStatus}
+          submittedValue={submittedValue}
         >
-          <div className="fe-choice-options">
+          <div className={joinClassNames("fe-choice-options", props.classNames?.choiceOptions)}>
             {field.options.map((option, index) => {
               const optionId = `${inputId}-${index}`;
               const checked = isRadio ? value === option.id : selected.includes(option.id);
               return (
-                <label className="fe-choice-option" htmlFor={optionId} key={option.id}>
+                <label
+                  className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)}
+                  htmlFor={optionId}
+                  key={option.id}
+                >
                   <input
                     id={optionId}
+                    className={props.classNames?.fieldInput}
                     name={field.id}
                     type={isRadio ? "radio" : "checkbox"}
                     value={option.id}
@@ -375,21 +416,27 @@ function DefaultField({
       const labelId = `${inputId}-label`;
       return (
         <fieldset
-          className="fe-field fe-field--radio"
+          className={joinClassNames("fe-field fe-field--radio", props.classNames?.field)}
           data-field-id={field.id}
+          data-field-type={field.type}
           aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
         >
-          <legend id={labelId} className="fe-label">
+          <legend id={labelId} className={joinClassNames("fe-label", props.classNames?.fieldLabel)}>
             {field.title}
             {requiredIndicator(field.required, props.a11y)}
           </legend>
           {field.options.map((option, index) => {
             const optionId = `${inputId}-${index}`;
             return (
-              <label className="fe-check-label" htmlFor={optionId} key={option.id}>
+              <label
+                className={joinClassNames("fe-check-label", props.classNames?.choiceOption)}
+                htmlFor={optionId}
+                key={option.id}
+              >
                 <input
                   {...ariaProps}
                   id={optionId}
+                  className={props.classNames?.fieldInput}
                   name={field.id}
                   type="radio"
                   value={option.id}
@@ -408,11 +455,12 @@ function DefaultField({
     }
     return (
       <fieldset
-        className={`fe-field fe-field--${field.type}`}
+        className={joinClassNames(`fe-field fe-field--${field.type}`, props.classNames?.field)}
         data-field-id={field.id}
+        data-field-type={field.type}
         aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
       >
-        <legend className="fe-label">
+        <legend className={joinClassNames("fe-label", props.classNames?.fieldLabel)}>
           {field.title}
           {requiredIndicator(field.required, props.a11y)}
         </legend>
@@ -420,9 +468,14 @@ function DefaultField({
           const optionId = `${inputId}-${index}`;
           const checked = field.type === "radio" ? value === option.id : selected.includes(option.id);
           return (
-            <label className="fe-check-label" htmlFor={optionId} key={option.id}>
+            <label
+              className={joinClassNames("fe-check-label", props.classNames?.choiceOption)}
+              htmlFor={optionId}
+              key={option.id}
+            >
               <input
                 id={optionId}
+                className={props.classNames?.fieldInput}
                 name={field.id}
                 type={field.type === "radio" ? "radio" : "checkbox"}
                 value={option.id}
@@ -455,11 +508,12 @@ function DefaultField({
     const max = field.max ?? 5;
     return (
       <fieldset
-        className="fe-field fe-field--rating"
+        className={joinClassNames("fe-field fe-field--rating", props.classNames?.field)}
         data-field-id={field.id}
+        data-field-type={field.type}
         aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
       >
-        <legend className="fe-label">
+        <legend className={joinClassNames("fe-label", props.classNames?.fieldLabel)}>
           {field.title}
           {requiredIndicator(field.required, props.a11y)}
         </legend>
@@ -467,9 +521,14 @@ function DefaultField({
           {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((rating) => {
             const optionId = `${inputId}-${rating}`;
             return (
-              <label className="fe-rating-label" htmlFor={optionId} key={rating}>
+              <label
+                className={joinClassNames("fe-rating-label", props.classNames?.choiceOption)}
+                htmlFor={optionId}
+                key={rating}
+              >
                 <input
                   id={optionId}
+                  className={props.classNames?.fieldInput}
                   name={field.id}
                   type="radio"
                   value={rating}
@@ -490,7 +549,7 @@ function DefaultField({
   }
 
   const label = (
-    <label className="fe-label" htmlFor={inputId}>
+    <label className={joinClassNames("fe-label", props.classNames?.fieldLabel)} htmlFor={inputId}>
       {field.title}
       {requiredIndicator(field.required, props.a11y)}
     </label>
@@ -510,6 +569,7 @@ function DefaultField({
         {...ariaProps}
         {...textConstraints}
         id={inputId}
+        className={props.classNames?.fieldInput}
         name={field.id}
         required={field.required}
         placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
@@ -523,6 +583,7 @@ function DefaultField({
         {...ariaProps}
         {...textConstraints}
         id={inputId}
+        className={props.classNames?.fieldInput}
         name={field.id}
         type="number"
         required={field.required}
@@ -539,6 +600,7 @@ function DefaultField({
       <select
         {...ariaProps}
         id={inputId}
+        className={props.classNames?.fieldInput}
         name={field.id}
         aria-label={isGroupedChoiceField ? (props.a11y?.ariaLabel ?? field.title) : props.a11y?.ariaLabel}
         required={field.required}
@@ -560,6 +622,7 @@ function DefaultField({
       <input
         {...ariaProps}
         id={inputId}
+        className={props.classNames?.fieldInput}
         name={field.id}
         type="text"
         required={field.required}
@@ -578,13 +641,19 @@ function DefaultField({
         renderChoiceGroup={renderChoiceGroup}
         disabled={disabled}
         readOnly={readOnly}
+        submitStatus={submitStatus}
+        submittedValue={submittedValue}
       >
-        <div className="fe-choice-options">{control}</div>
+        <div className={joinClassNames("fe-choice-options", props.classNames?.choiceOptions)}>{control}</div>
       </ChoiceGroupFrame>
     );
   }
   return (
-    <div className={`fe-field fe-field--${field.type}`} data-field-id={field.id}>
+    <div
+      className={joinClassNames(`fe-field fe-field--${field.type}`, props.classNames?.field)}
+      data-field-id={field.id}
+      data-field-type={field.type}
+    >
       {label}
       {control}
       {(field.type === "text" || field.type === "textarea") && field.maxLength !== undefined
@@ -593,7 +662,7 @@ function DefaultField({
             current: typeof value === "string" ? value.length : 0,
             max: field.maxLength
           }) ?? (
-            <div className="fe-character-count" aria-live="polite">
+            <div className={joinClassNames("fe-character-count", props.classNames?.characterCount)} aria-live="polite">
               {typeof value === "string" ? value.length : 0} / {field.maxLength}
             </div>
           ))
@@ -620,6 +689,7 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly submissionConfirmationRenderMode?: SubmissionConfirmationRenderMode;
   readonly showHiddenFieldsInSummary?: boolean;
   readonly fieldsClassName?: string;
+  readonly classNames?: FormRendererClassNames;
   /** @deprecated Use successRenderMode="replace" instead. */
   readonly hideFormOnSuccess?: boolean;
   readonly successMessageKey?: string;
@@ -860,6 +930,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   submissionConfirmationRenderMode,
   showHiddenFieldsInSummary = false,
   fieldsClassName,
+  classNames,
   hideFormOnSuccess = false,
   submissionGuards = [],
   receiptStore: providedReceiptStore,
@@ -1340,7 +1411,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     };
     return (
       slots.renderSubmitButton?.(submitButtonProps) ?? (
-        <button className="fe-submit" type="submit" disabled={submitButtonProps.disabled}>
+        <button
+          className={joinClassNames("fe-submit", classNames?.submitButton)}
+          type="submit"
+          disabled={submitButtonProps.disabled}
+        >
           {submitState === "submitting" ? <span className="fe-spinner" aria-hidden="true" /> : null}
           {submitState === "submitting"
             ? resolveMessage("submittingButton")
@@ -1372,7 +1447,13 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     onReset: form.reset
   };
   const completionRegion = (
-    <div ref={completionRef} className="fe-completion" role="status" aria-live="polite" tabIndex={-1}>
+    <div
+      ref={completionRef}
+      className={joinClassNames("fe-completion", classNames?.completion)}
+      role="status"
+      aria-live="polite"
+      tabIndex={-1}
+    >
       {slots.renderCompletion?.(completionProps) ?? <div>{completionMessage}</div>}
       {slots.renderSubmittedValues?.({ items: activeCompletionData.submittedItems, schema: form.schema })}
     </div>
@@ -1464,7 +1545,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   if (!receiptLoaded) return null;
   if (receipt !== null) {
     return (
-      <div className={`fe-form fe-already-submitted ${className}`.trim()}>
+      <div
+        className={`fe-form fe-already-submitted ${className}`.trim()}
+        data-mode={getFormContentMode(form.schema.metadata)}
+        data-submit-status={submitState}
+      >
         {slots.renderAlreadySubmitted?.({
           receipt,
           ...(receiptStore === undefined ? {} : { onReset: () => void resetReceipt() })
@@ -1485,7 +1570,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
 
   if (form.submitStatus === "success" && isReplaceMode) {
     return (
-      <div className={`fe-form ${className}`.trim()}>
+      <div
+        className={`fe-form ${className}`.trim()}
+        data-mode={getFormContentMode(form.schema.metadata)}
+        data-submit-status={submitState}
+      >
         {completionRegion}
         {afterFormRegion}
       </div>
@@ -1493,15 +1582,25 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   }
 
   if (confirmation !== null && confirmationRenderMode === "replace") {
-    return <div className={`fe-form ${className}`.trim()}>{confirmationContent}</div>;
+    return (
+      <div
+        className={`fe-form ${className}`.trim()}
+        data-mode={getFormContentMode(form.schema.metadata)}
+        data-submit-status={submitState}
+      >
+        {confirmationContent}
+      </div>
+    );
   }
 
   return (
     <>
       <form
         ref={formRef}
-        className={`fe-form ${className}`.trim()}
+        className={joinClassNames("fe-form", className, classNames?.form)}
         noValidate
+        data-mode={getFormContentMode(form.schema.metadata)}
+        data-submit-status={submitState}
         onSubmit={handleSubmit}
         aria-hidden={confirmation !== null && confirmationRenderMode === "dialog" ? true : undefined}
       >
@@ -1509,9 +1608,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           title: form.schema.title,
           ...(form.schema.description === undefined ? {} : { description: form.schema.description })
         }) ?? (
-          <header className="fe-header">
-            <h1>{form.schema.title}</h1>
-            {form.schema.description === undefined ? null : <p>{form.schema.description}</p>}
+          <header className={joinClassNames("fe-header", classNames?.header)}>
+            <h1 className={classNames?.headerTitle}>{form.schema.title}</h1>
+            {form.schema.description === undefined ? null : (
+              <p className={classNames?.headerDescription}>{form.schema.description}</p>
+            )}
             {pages === undefined ? null : (
               <div className="fe-progress">
                 <div
@@ -1541,10 +1642,14 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               pageIndex: activeVisibleIndex,
               totalPages: visiblePageIndexes.length
             }) ?? (
-              <div className="fe-page-header">
-                {activePage.title === undefined ? null : <h2 className="fe-page-title">{activePage.title}</h2>}
+              <div className={joinClassNames("fe-page-header", classNames?.pageHeader)}>
+                {activePage.title === undefined ? null : (
+                  <h2 className={joinClassNames("fe-page-title", classNames?.pageTitle)}>{activePage.title}</h2>
+                )}
                 {activePage.description === undefined ? null : (
-                  <p className="fe-page-description">{activePage.description}</p>
+                  <p className={joinClassNames("fe-page-description", classNames?.pageDescription)}>
+                    {activePage.description}
+                  </p>
                 )}
               </div>
             ))}
@@ -1565,7 +1670,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                 ...(slots.renderCharacterCount === undefined
                   ? {}
                   : { renderCharacterCount: slots.renderCharacterCount }),
-                ...(fieldConfig?.[field.id]?.a11y === undefined ? {} : { a11y: fieldConfig[field.id]?.a11y })
+                ...(fieldConfig?.[field.id]?.a11y === undefined ? {} : { a11y: fieldConfig[field.id]?.a11y }),
+                ...(classNames === undefined ? {} : { classNames })
               };
               if (slots.renderField !== undefined) {
                 return (
@@ -1591,12 +1697,16 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   choiceGroupSlotProps={slotProps?.choiceGroup}
                   renderChoiceGroup={slots.renderChoiceGroup}
                   disabled={interactionLocked}
+                  submitStatus={submitState}
+                  {...(submitState === "success" && activeCompletionData.answers[field.id] !== undefined
+                    ? { submittedValue: activeCompletionData.answers[field.id] }
+                    : {})}
                 />
               ) : (
                 <Component key={field.id} {...props} />
               );
             });
-          const fieldClassName = `fe-fields${fieldsClassName === undefined ? "" : ` ${fieldsClassName}`}`;
+          const fieldClassName = joinClassNames("fe-fields", fieldsClassName, classNames?.fields) ?? "fe-fields";
           return (
             slots.renderFields?.({ children: fieldChildren, className: fieldClassName }) ?? (
               <div className={fieldClassName}>{fieldChildren}</div>
@@ -1625,7 +1735,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {renderSubmitButton()}
           </>
         ) : (
-          <div className="form-step-navigation">
+          <div className={joinClassNames("form-step-navigation", classNames?.navigation)}>
             {slots.renderNavigation?.({
               currentPage: activeVisibleIndex,
               totalPages: visiblePageIndexes.length,
@@ -1639,7 +1749,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               <>
                 {canPrev ? (
                   <button
-                    className="btn-prev"
+                    className={joinClassNames("btn-prev", classNames?.previousButton)}
                     type="button"
                     disabled={interactionLocked}
                     onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
@@ -1648,7 +1758,12 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   </button>
                 ) : null}
                 {canNext ? (
-                  <button className="btn-next" type="button" disabled={interactionLocked} onClick={handleNext}>
+                  <button
+                    className={joinClassNames("btn-next", classNames?.nextButton)}
+                    type="button"
+                    disabled={interactionLocked}
+                    onClick={handleNext}
+                  >
                     {form.translate("form.next")}
                   </button>
                 ) : null}
@@ -1657,7 +1772,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {canNext ? null : renderSubmitButton()}
           </div>
         )}
-        <div className="fe-status" aria-live="polite">
+        <div className={joinClassNames("fe-status", classNames?.status)} aria-live="polite">
           {form.submitStatus === "success" ? completionRegion : null}
           {form.submitStatus === "error" && form.submitError !== null
             ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??

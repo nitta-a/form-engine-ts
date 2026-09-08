@@ -9,7 +9,7 @@ import {
   readPollMetadata
 } from "@form-engine-ts/core";
 import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
-import { FormProvider } from "@form-engine-ts/react";
+import { ContentRenderer, type ContentRendererClassNames, FormProvider } from "@form-engine-ts/react";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 import { Alert, Button, Checkbox, FormControlLabel, Stack } from "@mui/material";
 import { useMemo, useRef, useState } from "react";
@@ -34,25 +34,78 @@ function AnswerBody(
     readonly closed: boolean;
     readonly canViewResults: boolean;
     readonly revision: number;
+    readonly rendererKind: "mui" | "tailwind";
   }
 ) {
+  const contentModeOptions = {
+    poll: {
+      adapter: props.adapter,
+      closed: props.closed,
+      canViewResults: props.canViewResults,
+      submissionRevision: props.revision
+    }
+  };
+  if (props.rendererKind === "mui") {
+    return (
+      <MuiContentRenderer
+        i18n={{ locale: props.locale }}
+        contentModeOptions={contentModeOptions}
+        slots={{
+          renderSubmitError: ({ error, onRetry }) => (
+            <Alert severity="error">
+              {error.message}
+              <Button onClick={onRetry}>{props.locale.startsWith("ja") ? "再送信" : "Retry submission"}</Button>
+            </Alert>
+          )
+        }}
+      />
+    );
+  }
+  const classNames: ContentRendererClassNames = {
+    form: "mx-auto grid max-w-2xl gap-6 rounded-xl bg-white p-6 shadow-sm",
+    header: "grid gap-2",
+    headerTitle: "text-2xl font-bold text-slate-900",
+    headerDescription: "text-slate-600",
+    pageHeader: "grid gap-1",
+    pageTitle: "text-xl font-semibold text-slate-900",
+    fields: "grid gap-5",
+    field: "grid gap-2",
+    fieldLabel: "font-medium text-slate-800",
+    fieldInput:
+      "rounded-md border border-slate-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200",
+    choiceGroup: "grid gap-3 rounded-lg border border-slate-200 p-4",
+    choiceLegend: "font-medium text-slate-800",
+    choiceOptions: "grid gap-2",
+    choiceOption: "flex items-center gap-2 rounded-md p-2 hover:bg-slate-50",
+    help: "text-sm text-slate-500",
+    error: "text-sm text-red-700",
+    navigation: "flex flex-wrap gap-3",
+    previousButton: "rounded-md border border-slate-300 px-4 py-2",
+    nextButton: "rounded-md bg-slate-800 px-4 py-2 text-white",
+    submitButton: "rounded-md bg-blue-600 px-4 py-2 font-medium text-white",
+    status: "grid gap-3",
+    completion: "rounded-lg bg-emerald-50 p-4 text-emerald-900",
+    pollResults: "grid gap-3 rounded-lg border border-slate-200 p-4",
+    pollResultOption: "grid gap-1",
+    pollResultProgress: "w-full accent-blue-600",
+    quizQuestionCorrect: "border-emerald-500 bg-emerald-50",
+    quizQuestionIncorrect: "border-red-500 bg-red-50",
+    quizFeedback: "rounded-md border p-3 text-sm",
+    quizStatus: "font-semibold",
+    quizSummary: "rounded-lg bg-slate-50 p-4"
+  };
   return (
-    <MuiContentRenderer
-      i18n={{ locale: props.locale }}
-      contentModeOptions={{
-        poll: {
-          adapter: props.adapter,
-          closed: props.closed,
-          canViewResults: props.canViewResults,
-          submissionRevision: props.revision
-        }
-      }}
+    <ContentRenderer
+      contentModeOptions={contentModeOptions}
+      classNames={classNames}
       slots={{
         renderSubmitError: ({ error, onRetry }) => (
-          <Alert severity="error">
-            {error.message}
-            <Button onClick={onRetry}>{props.locale.startsWith("ja") ? "再送信" : "Retry submission"}</Button>
-          </Alert>
+          <div className="rounded-md border border-red-300 bg-red-50 p-3 text-red-800" role="alert">
+            <span>{error.message}</span>{" "}
+            <button className="underline" type="button" onClick={onRetry}>
+              {props.locale.startsWith("ja") ? "再送信" : "Retry submission"}
+            </button>
+          </div>
         )
       }}
     />
@@ -64,6 +117,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
   const [failResults, setFailResults] = useState(false);
   const [failSubmit, setFailSubmit] = useState(false);
   const [revision, setRevision] = useState(0);
+  const [rendererKind, setRendererKind] = useState<"mui" | "tailwind">("mui");
   const submitting = useRef(false);
   const ja = locale.startsWith("ja");
   const mode = getFormContentMode(schema.metadata);
@@ -89,6 +143,27 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
   );
   return (
     <Stack spacing={2}>
+      <fieldset className="renderer-demo-controls">
+        <legend>{ja ? "回答UI" : "Answer UI"}</legend>
+        <label>
+          <input
+            type="radio"
+            name={`renderer-${schema.id}`}
+            checked={rendererKind === "mui"}
+            onChange={() => setRendererKind("mui")}
+          />{" "}
+          MUI
+        </label>
+        <label>
+          <input
+            type="radio"
+            name={`renderer-${schema.id}`}
+            checked={rendererKind === "tailwind"}
+            onChange={() => setRendererKind("tailwind")}
+          />{" "}
+          Tailwind
+        </label>
+      </fieldset>
       {mode === "poll" ? (
         <>
           <FormControlLabel
@@ -146,6 +221,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
           closed={closed}
           canViewResults={canViewResults}
           revision={revision}
+          rendererKind={rendererKind}
         />
       </FormProvider>
     </Stack>

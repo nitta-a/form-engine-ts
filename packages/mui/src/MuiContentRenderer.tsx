@@ -1,21 +1,22 @@
-import {
-  type BaseSubmissionMetadata,
-  evaluateQuiz,
-  type FormAnalytics,
+import type {
+  BaseSubmissionMetadata,
+  FormAnalytics,
   getContentModeDiagnostics,
-  getFormContentMode,
-  type PollRuntimeAdapter,
-  readQuizMetadata
+  PollRuntimeAdapter,
+  QuizQuestionResult,
+  QuizResult
 } from "@form-engine-ts/core";
 import {
+  ContentRenderer,
+  type ContentRendererClassNames,
+  type ContentRendererProps,
+  type ContentRendererSlots,
   FormEngineI18nProvider,
-  FormRenderer,
   type FormRendererProps,
-  type FormRendererSlots,
   type FormSubmissionMetadata,
   type TypedFormRendererProps
 } from "@form-engine-ts/react";
-import { Alert } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import { muiContentTranslation } from "./contentTranslation";
 import { MuiFormBuilderContext } from "./context";
@@ -48,80 +49,110 @@ interface MuiContentRendererOwnProps {
   readonly contentModeOptions?: MuiContentRendererOptions;
   readonly muiOptions?: MuiAdapterOptions;
   readonly i18n?: MuiFormEngineI18nOptions;
+  readonly classNames?: ContentRendererClassNames;
+  readonly slots?: ContentRendererSlots;
 }
 
 export type MuiContentRendererProps = FormRendererProps & MuiContentRendererOwnProps;
 export type TypedMuiContentRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> =
   TypedFormRendererProps<TMeta> & MuiContentRendererOwnProps;
 
-interface ContentModeAfterFormProps {
-  readonly schema: Parameters<NonNullable<FormRendererSlots["renderAfterForm"]>>[0]["schema"];
-  readonly answers: Readonly<Record<string, unknown>>;
-  readonly submitStatus: Parameters<NonNullable<FormRendererSlots["renderAfterForm"]>>[0]["submitStatus"];
-  readonly locale: string;
-  readonly options: MuiContentRendererOptions | undefined;
-  readonly i18n: MuiFormEngineI18nOptions | undefined;
-}
-
-function InvalidQuiz({
+function MuiQuizFeedback({
+  question,
   locale,
-  options,
-  issues,
   i18n
 }: {
+  readonly question: QuizQuestionResult;
   readonly locale: string;
-  readonly options: MuiQuizRendererOptions | undefined;
-  readonly issues: ReturnType<typeof getContentModeDiagnostics>;
-  readonly i18n: MuiFormEngineI18nOptions | undefined;
+  readonly i18n?: MuiFormEngineI18nOptions;
 }) {
-  if (options?.renderInvalid !== undefined) return <>{options.renderInvalid(issues)}</>;
   const { translate: t } = muiContentTranslation(locale, i18n);
-  return <Alert severity="error">{t("content.results.invalidQuiz")}</Alert>;
+  return (
+    <Stack spacing={0.5} aria-live="polite" role="status" sx={{ mt: 1 }}>
+      <Stack direction="row" spacing={0.5} alignItems="center">
+        <Typography
+          component="span"
+          aria-hidden="true"
+          color={question.correct ? "success.main" : "error.main"}
+          fontWeight="bold"
+        >
+          {question.correct ? "✓" : "!"}
+        </Typography>
+        <Typography component="span" color={question.correct ? "success.main" : "error.main"} fontWeight="bold">
+          {t(question.correct ? "content.results.correct" : "content.results.incorrect")}
+        </Typography>
+      </Stack>
+      <Typography variant="body2">
+        {t("content.results.correctOption")}: {question.correctOption}
+      </Typography>
+      {question.explanation === undefined ? null : <Typography variant="body2">{question.explanation}</Typography>}
+      <Typography variant="body2">
+        {question.earned} / {question.points}
+      </Typography>
+    </Stack>
+  );
 }
 
-function ContentModeAfterForm({ schema, answers, submitStatus, locale, options, i18n }: ContentModeAfterFormProps) {
-  const mode = getFormContentMode(schema.metadata);
-  if (mode === "poll" && options?.poll !== undefined) {
-    return (
-      <MuiPollResults
-        schema={schema}
-        adapter={options.poll.adapter}
-        submitted={submitStatus === "success"}
-        closed={options.poll.closed}
-        canViewResults={options.poll.canViewResults}
-        {...(options.poll.submissionRevision === undefined
-          ? {}
-          : { submissionRevision: options.poll.submissionRevision })}
-        locale={locale}
-        {...(i18n === undefined ? {} : { i18n })}
-        {...(options.poll.slots === undefined ? {} : { slots: options.poll.slots })}
-        {...(options.poll.slotProps === undefined ? {} : { slotProps: options.poll.slotProps })}
-      />
-    );
-  }
-  if (
-    mode !== "quiz" ||
-    options?.quiz?.showImmediateFeedback === false ||
-    readQuizMetadata(schema.metadata).showExplanation !== "immediate" ||
-    submitStatus === "success"
-  )
-    return null;
-  const issues = getContentModeDiagnostics(schema);
-  if (issues.length > 0) return <InvalidQuiz locale={locale} options={options?.quiz} issues={issues} i18n={i18n} />;
-  const result = evaluateQuiz(schema, answers);
-  const questions = result.questions.filter((question) => answers[question.fieldId] !== undefined);
-  if (questions.length === 0) return null;
+function MuiQuizSummary({
+  result,
+  locale,
+  i18n,
+  options
+}: {
+  readonly result: QuizResult;
+  readonly locale: string;
+  readonly i18n?: MuiFormEngineI18nOptions;
+  readonly options?: MuiQuizRendererOptions;
+}) {
   return (
-    <div aria-live="polite">
-      <QuizResultView
-        {...options?.quiz?.resultViewProps}
-        result={{ ...result, questions }}
-        locale={locale}
-        {...(i18n === undefined ? {} : { i18n })}
-        showScore={false}
-      />
-    </div>
+    <QuizResultView
+      {...options?.resultViewProps}
+      result={{
+        ...result,
+        questions: options?.resultViewProps?.slots?.question === undefined ? [] : result.questions
+      }}
+      locale={locale}
+      {...(i18n === undefined ? {} : { i18n })}
+    />
   );
+}
+
+function MuiPollResultsSlot(
+  props: Parameters<NonNullable<ContentRendererSlots["renderPollResults"]>>[0] & {
+    readonly options: MuiPollRendererOptions;
+    readonly i18n?: MuiFormEngineI18nOptions;
+  }
+) {
+  const { options, i18n, ...poll } = props;
+  return (
+    <MuiPollResults
+      schema={poll.schema}
+      submitted={poll.submitted}
+      adapter={options.adapter}
+      closed={options.closed}
+      canViewResults={options.canViewResults}
+      {...(options.submissionRevision === undefined ? {} : { submissionRevision: options.submissionRevision })}
+      {...(i18n === undefined ? {} : { i18n })}
+      {...(options.slots === undefined ? {} : { slots: options.slots })}
+      {...(options.slotProps === undefined ? {} : { slotProps: options.slotProps })}
+    />
+  );
+}
+
+function MuiInvalidQuiz({
+  issues,
+  locale,
+  i18n,
+  renderInvalid
+}: {
+  readonly issues: ReturnType<typeof getContentModeDiagnostics>;
+  readonly locale: string;
+  readonly i18n?: MuiFormEngineI18nOptions;
+  readonly renderInvalid?: MuiQuizRendererOptions["renderInvalid"];
+}) {
+  if (renderInvalid !== undefined) return <>{renderInvalid(issues)}</>;
+  const { translate: t } = muiContentTranslation(locale, i18n);
+  return <Alert severity="error">{t("content.results.invalidQuiz")}</Alert>;
 }
 
 function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(
@@ -132,46 +163,75 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
     "schema" in rendererProps
       ? (rendererProps.locale ?? rendererProps.schema.defaultLocale ?? "en")
       : (i18n?.locale ?? "en");
-  const resolvedSlots: FormRendererSlots = {
+  const quizOptions = contentModeOptions?.quiz;
+  const pollOptions = contentModeOptions?.poll;
+  const contentSlots = slots;
+  const resolvedSlots: ContentRendererSlots = {
     ...slots,
     renderChoiceGroup: slots?.renderChoiceGroup ?? MuiChoiceGroupSlot,
-    renderCompletion:
-      slots?.renderCompletion ??
-      ((completion) => {
-        if (getFormContentMode(completion.schema.metadata) !== "quiz") return <div>{completion.message}</div>;
-        const issues = getContentModeDiagnostics(completion.schema);
-        return (
-          <>
-            <div>{completion.message}</div>
-            {issues.length > 0 ? (
-              <InvalidQuiz locale={locale} options={contentModeOptions?.quiz} issues={issues} i18n={i18n} />
-            ) : (
-              <QuizResultView
-                {...contentModeOptions?.quiz?.resultViewProps}
-                result={evaluateQuiz(completion.schema, completion.answers)}
-                locale={locale}
-                {...(i18n === undefined ? {} : { i18n })}
-              />
-            )}
-          </>
-        );
-      }),
-    renderAfterForm:
-      slots?.renderAfterForm ??
-      ((state) => (
-        <ContentModeAfterForm
-          schema={state.schema}
-          answers={state.answers}
-          submitStatus={state.submitStatus}
+    renderQuizFeedback:
+      contentSlots?.renderQuizFeedback ??
+      ((feedback) => (
+        <MuiQuizFeedback question={feedback.question} locale={locale} {...(i18n === undefined ? {} : { i18n })} />
+      )),
+    renderQuizSummary:
+      contentSlots?.renderQuizSummary ??
+      ((summary) => (
+        <MuiQuizSummary
+          result={summary.result}
           locale={locale}
-          options={contentModeOptions}
-          i18n={i18n}
+          {...(i18n === undefined ? {} : { i18n })}
+          {...(quizOptions === undefined ? {} : { options: quizOptions })}
         />
-      ))
+      )),
+    renderInvalidQuiz:
+      contentSlots?.renderInvalidQuiz ??
+      ((issues) => (
+        <MuiInvalidQuiz
+          issues={issues}
+          locale={locale}
+          {...(i18n === undefined ? {} : { i18n })}
+          {...(quizOptions?.renderInvalid === undefined ? {} : { renderInvalid: quizOptions.renderInvalid })}
+        />
+      )),
+    ...(pollOptions === undefined || contentSlots?.renderPollResults !== undefined
+      ? {}
+      : {
+          renderPollResults: (poll) => (
+            <MuiPollResultsSlot {...poll} options={pollOptions} {...(i18n === undefined ? {} : { i18n })} />
+          )
+        })
+  };
+  const contentMode = {
+    ...(quizOptions === undefined
+      ? {}
+      : {
+          quiz: {
+            ...(quizOptions.showImmediateFeedback === undefined
+              ? {}
+              : { showImmediateFeedback: quizOptions.showImmediateFeedback })
+          }
+        }),
+    ...(pollOptions === undefined
+      ? {}
+      : {
+          poll: {
+            adapter: pollOptions.adapter,
+            closed: pollOptions.closed,
+            canViewResults: pollOptions.canViewResults,
+            ...(pollOptions.submissionRevision === undefined
+              ? {}
+              : { submissionRevision: pollOptions.submissionRevision })
+          }
+        })
   };
   const content = (
     <MuiFormBuilderContext.Provider value={{ options: muiOptions ?? {} }}>
-      <FormRenderer {...(rendererProps as FormRendererProps)} slots={resolvedSlots} />
+      <ContentRenderer
+        {...(rendererProps as ContentRendererProps)}
+        contentModeOptions={contentMode}
+        slots={resolvedSlots}
+      />
     </MuiFormBuilderContext.Provider>
   );
   if (i18n === undefined) return content;

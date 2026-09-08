@@ -1,12 +1,13 @@
 import { contentMetadataToJson, createInitialSchemaByMode } from "@form-engine-ts/core";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import App from "../app/App";
 import { ContentAnswer } from "./ContentAnswer";
 
 describe("content mode demo", () => {
+  afterEach(cleanup);
   beforeEach(() => {
     localStorage.clear();
     window.history.replaceState(null, "", "/");
@@ -81,5 +82,22 @@ describe("content mode demo", () => {
     await user.click(screen.getByRole("button", { name: "Send response" }));
     await waitFor(() => expect(screen.getByText("Submission failed")).toBeVisible());
     expect(screen.queryByText("Submitted.")).not.toBeInTheDocument();
+  });
+  it("switches between MUI and Tailwind without losing the answer", async () => {
+    const user = userEvent.setup();
+    const preset = createInitialSchemaByMode("quiz", { title: "Quiz", locale: "en" });
+    const schema = {
+      ...preset,
+      metadata: { mode: "quiz", quiz: { showExplanation: "after_submit" } },
+      fields: preset.fields.map((field) => ({
+        ...field,
+        metadata: contentMetadataToJson({ quiz: { correctOptionId: "option-1" } })
+      }))
+    };
+    const { container } = render(<ContentAnswer schema={schema} locale="en" storage={createMemoryStorageAdapter()} />);
+    await user.click(screen.getByRole("radio", { name: "Option 2" }));
+    await user.click(screen.getByRole("radio", { name: "Tailwind" }));
+    expect(screen.getByRole("radio", { name: "Option 2" })).toBeChecked();
+    expect(container.querySelector("form")).toHaveClass("mx-auto");
   });
 });

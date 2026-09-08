@@ -1,11 +1,20 @@
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: [
+      {
+        find: /^@form-engine-ts\/mui\/builder$/,
+        replacement: fileURLToPath(new URL("../../packages/mui/src/builder.ts", import.meta.url))
+      },
+      {
+        find: /^@form-engine-ts\/mui\/renderer$/,
+        replacement: fileURLToPath(new URL("../../packages/mui/src/renderer.ts", import.meta.url))
+      },
       {
         find: /^@form-engine-ts\/mui$/,
         replacement: fileURLToPath(new URL("../../packages/mui/src/index.ts", import.meta.url))

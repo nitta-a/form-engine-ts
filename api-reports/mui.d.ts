@@ -1,4 +1,4 @@
-import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, FormRendererProps, FormSubmissionMetadata, TypedFormRendererProps, BuilderFieldEditorSlotProps, BuilderOptionEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderPagesSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonAppearance, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
+import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, FormRendererProps, ContentRendererClassNames, ContentRendererSlots, FormSubmissionMetadata, TypedFormRendererProps, BuilderFieldEditorSlotProps, BuilderOptionEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderPagesSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonAppearance, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
 export { InputBoxStyleOptions, TargetSpecificLayoutConfig, TranslationLayoutOptions, TranslationTargetKind, TranslationWorkspaceAppearance } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
@@ -346,6 +346,8 @@ interface MuiContentRendererOwnProps {
     readonly contentModeOptions?: MuiContentRendererOptions;
     readonly muiOptions?: MuiAdapterOptions;
     readonly i18n?: MuiFormEngineI18nOptions;
+    readonly classNames?: ContentRendererClassNames;
+    readonly slots?: ContentRendererSlots;
 }
 type MuiContentRendererProps = FormRendererProps & MuiContentRendererOwnProps;
 type TypedMuiContentRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> = TypedFormRendererProps<TMeta> & MuiContentRendererOwnProps;
@@ -436,7 +438,7 @@ declare const MuiFieldEditorSlot: NonNullable<FormBuilderSlots["fieldEditor"]>;
 declare function createMuiLocalizationSlot(options?: MuiAdapterOptions): ComponentType<BuilderLocalizationSlotProps>;
 declare const MuiLocalizationSlot: NonNullable<FormBuilderSlots["localization"]>;
 
-declare function MuiChoiceGroupSlot({ title, description, required, error, disabled, children, className }: ChoiceGroupSlotProps): react.JSX.Element;
+declare function MuiChoiceGroupSlot({ field, title, description, required, error, disabled, children, className, quizResult }: ChoiceGroupSlotProps): react.JSX.Element;
 
 declare function createMuiOptionEditorSlot(options?: MuiAdapterOptions): ComponentType<BuilderOptionEditorSlotProps>;
 declare const MuiOptionEditorSlot: NonNullable<FormBuilderSlots["optionEditor"]>;

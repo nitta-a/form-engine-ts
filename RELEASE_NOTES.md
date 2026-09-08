@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v7.12.0 — 2026-09-09
+
+- Added the framework-neutral `ContentRenderer` for Survey, Poll, and Quiz respondent flows.
+- Added inline quiz correctness feedback with accessible status messaging, answer-field state classes, and score/pass summaries.
+- Added typed class-name and slot customization for Tailwind and other host design systems while preserving the MUI adapter.
+- Added a MUI/Tailwind respondent-renderer switch and shared-state demo to the preview app.
+- Aligned all public packages to version 7.12.0.
+
 ### v7.11.0 — 2026-09-08
 
 - Added reusable Core response-summary domain APIs and localized content-mode translation contracts.

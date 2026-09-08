@@ -893,8 +893,39 @@ export interface FormFieldsSlotProps {
   readonly className?: string;
 }
 
+export interface FormRendererClassNames {
+  readonly form?: string;
+  readonly header?: string;
+  readonly headerTitle?: string;
+  readonly headerDescription?: string;
+  readonly pageHeader?: string;
+  readonly pageTitle?: string;
+  readonly pageDescription?: string;
+  readonly fields?: string;
+  readonly field?: string;
+  readonly fieldLabel?: string;
+  readonly fieldInput?: string;
+  readonly choiceGroup?: string;
+  readonly choiceLegend?: string;
+  readonly choiceOptions?: string;
+  readonly choiceOption?: string;
+  readonly help?: string;
+  readonly error?: string;
+  readonly characterCount?: string;
+  readonly navigation?: string;
+  readonly previousButton?: string;
+  readonly nextButton?: string;
+  readonly submitButton?: string;
+  readonly status?: string;
+  readonly completion?: string;
+}
+
 export interface ChoiceGroupSlotProps {
   readonly field: Question;
+  readonly value?: unknown;
+  readonly submittedValue?: unknown;
+  readonly submitStatus?: FormSubmitStatus;
+  readonly quizResult?: "correct" | "incorrect";
   readonly title: string;
   readonly description?: string;
   readonly required?: boolean;

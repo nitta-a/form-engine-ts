@@ -291,6 +291,41 @@ changing a choice updates feedback, while final scoring uses submitted answers.
 optional response after the form. Adapter packages can use it for live feedback or
 results without replacing field rendering or submission behavior.
 
+### Headless respondent renderer
+
+`ContentRenderer` combines survey, poll and quiz respondent flows without a MUI or
+Tailwind dependency. Its typed `classNames` add utility classes while retaining
+`fe-*` classes, and slots can replace fields, feedback, summaries and poll results.
+
+```tsx
+import { ContentRenderer } from "@form-engine-ts/react";
+
+<ContentRenderer
+  schema={schema}
+  onSubmit={saveSubmission}
+  classNames={{
+    form: "mx-auto max-w-xl space-y-6",
+    fieldInput: "rounded border px-3 py-2",
+    quizQuestionCorrect: "border-green-600",
+    quizQuestionIncorrect: "border-red-600"
+  }}
+/>
+```
+
+Quiz feedback appears inside each answer field with text, an icon and `aria-live`.
+The completion area contains only the submission message, total score and pass status.
+`PollResults`/`PollResultView`, `QuizQuestionFeedback` and `QuizResultSummary` are
+also exported. Hosts remain responsible for persistence, authorization and vote
+eligibility.
+
+### Headless回答 renderer
+
+`ContentRenderer` はアンケート・投票・クイズの回答フローを共通化したMUI非依存の
+rendererです。`classNames`でTailwind utility classを追加でき、既存の`fe-*` classは
+残ります。クイズの正誤は回答欄内に文字・アイコン・`aria-live`付きで表示し、完了領域には
+送信メッセージ、合計点、合否だけを表示します。保存・認可・一人一票の原子性はホスト側で
+強制してください。
+
 ### Reusing page condition controls in custom builder slots
 
 `BuilderPageConditionEditor` and `BuilderPageConditionEditorProps` expose the default page-condition controls.

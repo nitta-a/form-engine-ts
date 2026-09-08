@@ -379,3 +379,24 @@
 .fe-sensitive-value {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+.fe-choice-group[data-quiz-result="correct"] {
+  border-color: #16803c;
+}
+.fe-choice-group[data-quiz-result="incorrect"] {
+  border-color: #b42318;
+}
+.fe-quiz-feedback {
+  margin-top: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.4rem;
+  padding: 0.65rem 0.75rem;
+}
+.fe-quiz-feedback[data-quiz-result="correct"] {
+  color: #146c2e;
+  background: #effaf1;
+}
+.fe-quiz-feedback[data-quiz-result="incorrect"] {
+  color: #a32116;
+  background: #fff4f2;
+}

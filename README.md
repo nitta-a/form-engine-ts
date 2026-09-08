@@ -56,9 +56,9 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.11.0** (2026-09-08). All public packages are currently aligned to version `7.11.0`.
-This release adds localized content-mode settings, a framework-neutral basic-settings slot, and customizable MUI quiz
-and poll controls. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
+The latest release is **v7.12.0** (2026-09-09). All public packages are currently aligned to version `7.12.0`.
+This release adds the headless `ContentRenderer` for Survey, Poll, and Quiz respondent screens, inline quiz feedback,
+and MUI/Tailwind preview switching. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
 
@@ -369,8 +369,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.11.0**（2026-09-08）です。公開パッケージはすべてバージョン `7.11.0` に揃えています。
-本リリースでは、ローカライズ可能なフォーム種別設定、framework-neutralな基本設定slot、カスタマイズ可能なMUIのクイズ・投票設定を追加しました。
+最新版は **v7.12.0**（2026-09-09）です。公開パッケージはすべてバージョン `7.12.0` に揃えています。
+本リリースでは、Survey・Poll・Quizの回答画面向けheadless `ContentRenderer`、回答欄内のクイズ正誤表示、MUI/Tailwind切替previewを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -611,6 +611,10 @@ this browser and form, across versions; clearing browser data resets it. Product
 hosts must enforce identity/access at persistence. Existing workspaces remain available.
 Published consumers can use the focused MUI `/builder`, `/renderer`, `/survey-summary`
 and `/survey-domain` subpaths while the v7 root export remains compatible.
+For a design-system-neutral respondent screen, import `ContentRenderer` from
+`@form-engine-ts/react` and pass typed `classNames`/slots; the preview demonstrates
+the same Provider and submission state rendered with MUI or Tailwind. Persistence and
+authorization remain host responsibilities.
 
 ## アンケート・投票・クイズのデモ
 
@@ -623,5 +627,9 @@ preview の **フォーム一覧** から、共通の Memory / LocalStorage 保�
 切り替えられます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
 ブラウザーデータを削除するとリセットされます。本番の識別・権限制御は保存処理で強制してください。
 既存デモの各ワークスペースも引き続き利用できます。
+MUIに依存しない回答画面は`@form-engine-ts/react`の`ContentRenderer`を使い、
+型付き`classNames`とslotでTailwind等の見た目を組み立てられます。previewでは同じ
+Provider・回答値・送信状態をMUI/Tailwindで切り替えて確認できます。保存と認可は
+ホスト側の責務です。
 公開パッケージではv7のroot export互換性を維持しながら、MUIの`/builder`、`/renderer`、
 `/survey-summary`、`/survey-domain`を用途別にimportできます。

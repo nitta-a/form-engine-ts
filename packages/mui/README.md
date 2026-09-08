@@ -238,6 +238,10 @@ Keep `createMuiBuilderProps` results stable across renders to preserve editor fo
 
 `MuiContentRenderer` composes the MUI choice group, immediate/final quiz feedback and
 poll result loading around the existing React renderer. Explicit renderer slots win.
+The shared mode, submission and result logic is provided by React's headless
+`ContentRenderer`; this adapter supplies MUI field, feedback, summary and poll-result
+slots. Tailwind or other design systems can use `ContentRenderer` directly with typed
+`classNames`.
 
 ```tsx
 import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
@@ -257,6 +261,9 @@ import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
 states. The host still enforces voter identity, closing and access atomically when it
 persists or loads data.
 
+The default MUI quiz completion shows only score/pass. Existing result props and an
+explicit question slot remain available for legacy custom result content.
+
 Use `@form-engine-ts/mui/builder`, `/renderer`, `/survey-summary` or `/survey-domain`
 to import only the intended surface. The root export remains compatible in v7.
 `/builder` and `/renderer` contain no runtime import from `custom-survey-client`;
@@ -273,6 +280,9 @@ a future major can make that peer optional and require `/survey-domain` for the 
 
 日本語: 回答側は`@form-engine-ts/mui/renderer`の`MuiContentRenderer`を使うと、
 クイズの即時解説・送信後採点と投票結果の公開条件・読込・エラー・再試行をまとめて構成できます。
+判定・送信・結果取得はReactのheadless `ContentRenderer`に集約し、MUI adapterは
+field・feedback・summary・poll result slotだけを提供します。TailwindなどMUI以外では
+`@form-engine-ts/react`の`ContentRenderer`へ型付き`classNames`を渡してください。
 明示したrenderer slotが自動表示より優先されます。本人確認、締切判定、閲覧認可、一人一票の重複防止は
 保存・読込を行うホスト側で強制してください。Creatorだけを使う場合は`/builder`、回答側は`/renderer`、
 集計済みサマリーは`/survey-summary`、survey client連携は`/survey-domain`から個別にimportできます。

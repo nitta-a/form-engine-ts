@@ -4,12 +4,14 @@ import {
   type FormAnalytics,
   type FormSchema
 } from "@form-engine-ts/core";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MuiContentRenderer } from "../src/MuiContentRenderer";
 import { MuiPollResults, MuiPollResultView } from "../src/MuiPollResults";
 import { QuizResultView } from "../src/QuizResultView";
+
+afterEach(cleanup);
 
 function quizSchema(showExplanation: "after_submit" | "immediate" = "immediate"): FormSchema {
   const schema = createInitialSchemaByMode("quiz", { title: "Quiz", locale: "en" });
