@@ -220,8 +220,9 @@ See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme
 `FormContentMode`, `CustomFormMetadata`, `PollMetadata`, `QuizMetadata` and
 `QuizFieldMetadata` are optional metadata contracts. `getFormContentMode(metadata)`
 returns `survey` for absent or unrecognized modes. Existing schema validation and
-storage contracts are unchanged; call `validateContentMode(schema)` explicitly at
-save/publish and respondent-entry boundaries in addition to base validation.
+storage contracts are unchanged. `getContentModeDiagnostics(schema)` returns stable
+issue codes for localized UIs; `validateContentMode(schema)` retains its original
+path/message result for save, publish and respondent-entry checks.
 
 ```ts
 import { createInitialSchemaByMode, getContentModePolicy } from "@form-engine-ts/core";
@@ -238,12 +239,16 @@ options for poll/quiz. An empty survey is an editing draft and still fails the
 existing base validator until a question is added. Quiz presets intentionally have
 no correct answer. Poll allows `radio` / `multi-select` and exactly one question;
 quiz allows `radio`. Mode policy intersects allowed types and never raises a host
-limit. Its enforcement is opt-in through the existing builder `policy` prop.
+limit. React's low-level builder applies it through `policy`; `MuiFormBuilder`
+applies it automatically for poll/quiz unless `contentModeOptions.applyPolicy` is false.
 
 `contentMetadataToJson` copies JSON metadata and rejects undefined, non-finite,
 cyclic and non-JSON data. `readPollMetadata`, `readQuizMetadata` and
 `readQuizFieldMetadata` provide typed reads; unknown metadata stays in the original
 schema. Store correct answers at `field.metadata.quiz.correctOptionId`.
+`ResponseSummaryData` and related neutral contracts describe display-ready analytics.
+`toResponseSummary(summary, schemaOrVersion, locale)` resolves localized form,
+question and option labels without a React or application-domain dependency.
 `evaluateQuiz(schema, answers)` rejects invalid quizzes, scores visible questions,
 uses 1 point by default and 0 for unanswered questions, and returns optional `passed`
 when `passingScore` is configured. Scores and thresholds are finite, non-negative

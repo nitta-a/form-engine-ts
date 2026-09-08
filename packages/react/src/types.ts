@@ -691,6 +691,13 @@ export interface FormCompletionSlotProps {
   readonly onReset?: () => void;
 }
 
+export interface FormAfterFormSlotProps {
+  readonly schema: FormSchema;
+  readonly answers: Readonly<Record<string, unknown>>;
+  readonly submitStatus: FormSubmitStatus;
+  readonly response?: SubmitResponse;
+}
+
 export interface FormServerErrorPayload {
   readonly fieldErrors?: Readonly<Record<string, string>>;
   readonly formError?: string;
@@ -929,6 +936,7 @@ export interface FormRendererSlots {
   readonly renderSubmitButton?: (props: RenderSubmitButtonProps) => ReactNode;
   readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
   readonly renderCompletion?: (props: FormCompletionSlotProps & { readonly message: string }) => ReactNode;
+  readonly renderAfterForm?: (props: FormAfterFormSlotProps) => ReactNode;
   readonly renderSubmittedValues?: (props: {
     readonly items: readonly FormSubmittedAnswerItem[];
     readonly schema: FormSchema;

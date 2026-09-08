@@ -4,6 +4,7 @@ import {
   contentMetadataToJson,
   createInitialSchemaByMode,
   evaluateQuiz,
+  getContentModeDiagnostics,
   getContentModePolicy,
   getFormContentMode,
   validateContentMode
@@ -66,6 +67,9 @@ describe("content modes", () => {
   it("validates count and score boundaries without changing the base validator", () => {
     const poll = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
     expect(validateContentMode({ ...poll, fields: [] })).toHaveLength(1);
+    expect(getContentModeDiagnostics({ ...poll, fields: [] })).toEqual([
+      { path: "fields", code: "poll_field_count", message: "Polls require exactly one question." }
+    ]);
     const quiz = createInitialSchemaByMode("quiz", { title: "Quiz", locale: "en" });
     expect(
       validateContentMode({ ...quiz, metadata: { mode: "quiz", quiz: { passingScore: -1 } } }).some(

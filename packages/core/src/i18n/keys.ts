@@ -17,6 +17,19 @@ export type KnownBuilderTranslationKey =
   | "builder.content.correctAnswer"
   | "builder.content.explanation"
   | "builder.content.points"
+  | "builder.content.validationTitle"
+  | "builder.content.validation.poll_field_count"
+  | "builder.content.validation.quiz_field_count"
+  | "builder.content.validation.unsupported_field_type"
+  | "builder.content.validation.options_minimum"
+  | "builder.content.validation.correct_option_missing"
+  | "builder.content.validation.points_type"
+  | "builder.content.validation.explanation_type"
+  | "builder.content.validation.points_range"
+  | "builder.content.validation.poll_result_visibility"
+  | "builder.content.validation.poll_strict_one_vote"
+  | "builder.content.validation.quiz_explanation_timing"
+  | "builder.content.validation.quiz_passing_score"
   | "builder.formTitle"
   | "builder.formDescription"
   | "builder.completionMessage"
@@ -179,6 +192,20 @@ export type RendererTranslationKey =
   | "validation.step"
   | "validation.unknownField";
 
+export type ContentResultTranslationKey =
+  | "content.results.totalScore"
+  | "content.results.passed"
+  | "content.results.notPassed"
+  | "content.results.correct"
+  | "content.results.incorrect"
+  | "content.results.correctOption"
+  | "content.results.pollResults"
+  | "content.results.votes"
+  | "content.results.loading"
+  | "content.results.retry"
+  | "content.results.loadError"
+  | "content.results.invalidQuiz";
+
 export type TranslationWorkspaceTranslationKey =
   | "workspace.title"
   | "workspace.status.missing"
@@ -243,6 +270,7 @@ export type TranslationComparisonTranslationKey =
 export type FormEngineTranslationKey =
   | KnownBuilderTranslationKey
   | RendererTranslationKey
+  | ContentResultTranslationKey
   | TranslationWorkspaceTranslationKey
   | TranslationWorkspaceDetailedKey
   | TranslationComparisonTranslationKey;

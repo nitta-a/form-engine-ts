@@ -56,7 +56,7 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.10.0** (2026-09-08). All public packages are currently aligned to version `7.10.0`.
+The latest release is **v7.11.0** (2026-09-08). All public packages are currently aligned to version `7.11.0`.
 This release adds localized content-mode settings, a framework-neutral basic-settings slot, and customizable MUI quiz
 and poll controls. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
@@ -369,7 +369,7 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.10.0**（2026-09-08）です。公開パッケージはすべてバージョン `7.10.0` に揃えています。
+最新版は **v7.11.0**（2026-09-08）です。公開パッケージはすべてバージョン `7.11.0` に揃えています。
 本リリースでは、ローカライズ可能なフォーム種別設定、framework-neutralな基本設定slot、カスタマイズ可能なMUIのクイズ・投票設定を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
@@ -601,22 +601,27 @@ JavaScript processまたはbrowser pageの再読み込み時にリセットさ�
 ## Survey / Poll / Quiz demo
 
 The preview's **Forms** tab provides a shared Memory/LocalStorage library, mode
-filter (`?mode=survey|poll|quiz`), creation cards, the existing SurveyEditor with
-mode-specific settings, and inline respondent results. Save a valid schema before
+filter (`?mode=survey|poll|quiz`), creation cards, the integrated `MuiFormBuilder` with
+mode-specific policy and validation, and `MuiContentRenderer` respondent results. Save a valid schema before
 opening the answer screen. An empty survey stays an editing draft until its first
 question is saved. Poll results support all four visibility policies and independent
 aggregation retries; quiz supports immediate and post-submit feedback. Demo controls
 simulate closing, result access and request failures. One-vote identity is scoped to
 this browser and form, across versions; clearing browser data resets it. Production
 hosts must enforce identity/access at persistence. Existing workspaces remain available.
+Published consumers can use the focused MUI `/builder`, `/renderer`, `/survey-summary`
+and `/survey-domain` subpaths while the v7 root export remains compatible.
 
 ## アンケート・投票・クイズのデモ
 
 preview の **フォーム一覧** から、共通の Memory / LocalStorage 保存領域で種別フィルタ
-（`?mode=survey|poll|quiz`）、新規作成、既存 SurveyEditor による編集、回答・結果表示を
+（`?mode=survey|poll|quiz`）、新規作成、mode別制約・検証を統合した`MuiFormBuilder`による編集、
+`MuiContentRenderer`による回答・結果表示を
 操作できます。有効なスキーマを保存してから回答画面を開きます。空のアンケートは最初の
 設問を保存するまで編集中のドラフトとして保持します。投票は公開タイミング4種類と集計だけの
 再試行、クイズは選択直後・送信後の解説に対応します。締切・閲覧権限・通信失敗をデモ操作で
 切り替えられます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
 ブラウザーデータを削除するとリセットされます。本番の識別・権限制御は保存処理で強制してください。
 既存デモの各ワークスペースも引き続き利用できます。
+公開パッケージではv7のroot export互換性を維持しながら、MUIの`/builder`、`/renderer`、
+`/survey-summary`、`/survey-domain`を用途別にimportできます。

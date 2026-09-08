@@ -1,21 +1,18 @@
 import {
   aggregateResponses,
   createSubmission,
-  evaluateQuiz,
   type FormAnalytics,
   type FormSchema,
   type FormStorageAdapter,
   getFormContentMode,
   type PollRuntimeAdapter,
-  readPollMetadata,
-  readQuizMetadata
+  readPollMetadata
 } from "@form-engine-ts/core";
-import { MuiChoiceGroupSlot, QuizResultView } from "@form-engine-ts/mui";
-import { FormProvider, FormRenderer, useForm } from "@form-engine-ts/react";
+import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
+import { FormProvider } from "@form-engine-ts/react";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 import { Alert, Button, Checkbox, FormControlLabel, Stack } from "@mui/material";
 import { useMemo, useRef, useState } from "react";
-import { PollResults } from "./PollResults";
 
 function browserIdentity(formId: string) {
   const key = `form-engine-preview_identity:${formId}`;
@@ -39,48 +36,26 @@ function AnswerBody(
     readonly revision: number;
   }
 ) {
-  const form = useForm();
-  const mode = getFormContentMode(props.schema.metadata);
-  const immediate =
-    mode === "quiz" &&
-    readQuizMetadata(props.schema.metadata).showExplanation === "immediate" &&
-    form.submitStatus !== "success";
-  const instant = immediate ? evaluateQuiz(props.schema, form.values) : undefined;
   return (
-    <>
-      <FormRenderer
-        slots={{
-          renderChoiceGroup: MuiChoiceGroupSlot,
-          renderSubmitError: ({ error, onRetry }) => (
-            <Alert severity="error">
-              {error.message}
-              <Button onClick={onRetry}>{props.locale.startsWith("ja") ? "再送信" : "Retry submission"}</Button>
-            </Alert>
-          ),
-          renderCompletion: ({ answers, message }) => (
-            <>
-              <p>{message}</p>
-              {mode === "quiz" ? (
-                <QuizResultView result={evaluateQuiz(props.schema, answers)} locale={props.locale} />
-              ) : null}
-            </>
-          )
-        }}
-      />
-      {instant === undefined ? null : (
-        <div aria-live="polite">
-          <QuizResultView
-            showScore={false}
-            result={{
-              ...instant,
-              questions: instant.questions.filter((question) => form.values[question.fieldId] !== undefined)
-            }}
-            locale={props.locale}
-          />
-        </div>
-      )}
-      {mode === "poll" ? <PollResults {...props} submitted={form.submitStatus === "success"} /> : null}
-    </>
+    <MuiContentRenderer
+      i18n={{ locale: props.locale }}
+      contentModeOptions={{
+        poll: {
+          adapter: props.adapter,
+          closed: props.closed,
+          canViewResults: props.canViewResults,
+          submissionRevision: props.revision
+        }
+      }}
+      slots={{
+        renderSubmitError: ({ error, onRetry }) => (
+          <Alert severity="error">
+            {error.message}
+            <Button onClick={onRetry}>{props.locale.startsWith("ja") ? "再送信" : "Retry submission"}</Button>
+          </Alert>
+        )
+      }}
+    />
   );
 }
 export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {

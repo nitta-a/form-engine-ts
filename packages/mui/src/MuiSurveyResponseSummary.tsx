@@ -1,12 +1,10 @@
-import {
-  type SurveyClientAsyncState,
-  type SurveyResponseSummaryData,
-  type SurveyResponseSummaryDomainInputProps,
-  type SurveyResponseSummaryDomainLabels,
-  type SurveyResponseSummaryLanguageOption,
-  type SurveyResponseSummaryQuestion,
-  type SurveyResponseSummarySkipReason,
-  useSurveyResponseSummaryDomain
+import type {
+  SurveyClientAsyncState,
+  SurveyResponseSummaryData,
+  SurveyResponseSummaryDomainLabels,
+  SurveyResponseSummaryLanguageOption,
+  SurveyResponseSummaryQuestion,
+  SurveyResponseSummarySkipReason
 } from "@form-engine-ts/custom-survey-client";
 import {
   Alert,
@@ -78,12 +76,6 @@ export interface MuiSurveyResponseSummaryDataProps<
   readonly slots?: MuiSurveyResponseSummarySlots<TSkipReason>;
   readonly slotProps?: MuiSurveyResponseSummarySlotProps;
   readonly className?: string;
-}
-
-export interface MuiSurveyResponseSummaryDomainProps<TSummary, TVersion>
-  extends Omit<SurveyResponseSummaryDomainInputProps<TSummary, TVersion>, "slots" | "variant"> {
-  readonly slots?: MuiSurveyResponseSummarySlots<unknown>;
-  readonly slotProps?: MuiSurveyResponseSummarySlotProps;
 }
 
 function clampPercentage(value: number | null): number | null {
@@ -401,24 +393,4 @@ export function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = Su
       )}
     </Stack>
   );
-}
-
-export function MuiSurveyResponseSummaryDomain<TSummary, TVersion>(
-  props: MuiSurveyResponseSummaryDomainProps<TSummary, TVersion>
-): React.JSX.Element {
-  const { slots, slotProps, ...domainOptions } = props;
-  const controller = useSurveyResponseSummaryDomain(domainOptions);
-  const summaryProps: MuiSurveyResponseSummaryDataProps<TSummary, unknown> = {
-    data: controller.data,
-    languageOptions: controller.languageOptions,
-    selectedLanguage: controller.selectedLanguage,
-    onLanguageChange: controller.setLanguage,
-    summaryState: props.summaryState ?? controller.summaryState,
-    ...(props.labels === undefined ? {} : { labels: props.labels }),
-    ...(props.locale === undefined ? {} : { locale: props.locale }),
-    ...(slots === undefined ? {} : { slots }),
-    ...(slotProps === undefined ? {} : { slotProps }),
-    ...(props.className === undefined ? {} : { className: props.className })
-  };
-  return <MuiSurveyResponseSummary {...summaryProps} />;
 }

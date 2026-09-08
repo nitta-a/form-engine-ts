@@ -1,9 +1,9 @@
 import { createInitialSchemaByMode, type FormSchema } from "@form-engine-ts/core";
 import type { BuilderTextInputProps } from "@form-engine-ts/react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MuiTextInputAdapter } from "../src/adapters/TextInput";
 import { MuiFormBuilder, type MuiFormBuilderProps } from "../src/MuiFormBuilder";
 
@@ -214,5 +214,103 @@ describe("MuiFormBuilder content integration", () => {
     answer.focus();
     await userEvent.keyboard(" ");
     expect(answer).toBeChecked();
+  });
+  it("applies poll policy and a radio default while allowing an explicit policy opt-out", async () => {
+    const poll = { ...createInitialSchemaByMode("poll", { title: "Poll", locale: "en" }), fields: [] };
+    const { unmount } = render(<Editor initial={poll} />);
+    await userEvent.click(screen.getByRole("button", { name: "Add question" }));
+    expect(current().fields[0]?.type).toBe("radio");
+    expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
+    unmount();
+
+    render(<Editor initial={poll} contentModeOptions={{ applyPolicy: false }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Add question" }));
+    expect(screen.getByRole("combobox", { name: "Type" })).toBeInTheDocument();
+  });
+  it("reports validation state and supports a custom summary", () => {
+    const onValidationChange = vi.fn();
+    render(
+      <Editor
+        contentModeOptions={{
+          onValidationChange,
+          renderValidationSummary: (state) => <p>Custom validation: {state.issues.length}</p>
+        }}
+      />
+    );
+    expect(screen.getByText("Custom validation: 1")).toBeInTheDocument();
+    expect(onValidationChange).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "quiz", valid: false, issues: expect.any(Array) })
+    );
+  });
+  it("controls each content setting independently", () => {
+    render(
+      <Editor
+        contentModeOptions={{
+          showSelector: true,
+          controls: {
+            mode: "readOnly",
+            showExplanation: "hidden",
+            passingScore: "readOnly",
+            correctAnswer: "hidden",
+            explanation: "readOnly",
+            points: "hidden"
+          }
+        }}
+      />
+    );
+    expect(screen.getByRole("combobox", { name: "Content type" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.queryByLabelText("Explanation timing")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Passing score")).toBeDisabled();
+    expect(screen.queryByRole("radio", { name: /Correct answer/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Explanation")).toBeDisabled();
+    expect(screen.queryByLabelText("Points")).not.toBeInTheDocument();
+  });
+  it("controls poll settings independently", () => {
+    render(
+      <Editor
+        initial={createInitialSchemaByMode("poll", { title: "Poll", locale: "en" })}
+        contentModeOptions={{
+          controls: { resultVisibility: "hidden", strictOneVotePerUser: "readOnly" }
+        }}
+      />
+    );
+    expect(screen.queryByLabelText("Result visibility")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "One vote per user" })).toBeDisabled();
+  });
+  it("allows controls.mode to enable the selector without showSelector", () => {
+    render(<Editor contentModeOptions={{ controls: { mode: "editable" } }} />);
+    expect(screen.getByRole("combobox", { name: "Content type" })).toBeInTheDocument();
+  });
+  it("suppresses policy issues that duplicate content mode diagnostics", async () => {
+    const initial = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    const firstField = initial.fields.at(0);
+    if (firstField === undefined) throw new Error("Expected an initial poll question.");
+    const secondField = { ...firstField, id: "question-2", title: "Question 2" };
+    const onValidationChange = vi.fn();
+    render(
+      <Editor
+        initial={{ ...initial, fields: [...initial.fields, secondField] }}
+        contentModeOptions={{ onValidationChange }}
+      />
+    );
+    await waitFor(() => expect(onValidationChange).toHaveBeenCalled());
+    const state = onValidationChange.mock.lastCall?.[0];
+    expect(state.issues.filter((issue: { code: string }) => issue.code === "poll_field_count")).toHaveLength(1);
+    expect(state.issues.filter((issue: { code: string }) => issue.code === "max_fields_exceeded")).toHaveLength(0);
+  });
+  it("reports validation state for survey mode without adding a summary", async () => {
+    const onValidationChange = vi.fn();
+    render(
+      <Editor
+        initial={createInitialSchemaByMode("survey", { title: "Survey", locale: "en" })}
+        contentModeOptions={{ onValidationChange }}
+      />
+    );
+    await waitFor(() => expect(onValidationChange).toHaveBeenCalledWith(expect.objectContaining({ mode: "survey" })));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("can hide the default validation summary", () => {
+    render(<Editor contentModeOptions={{ validation: "hidden" }} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

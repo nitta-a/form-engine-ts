@@ -1,10 +1,12 @@
 import { createContext, useContext } from "react";
+import type { MuiContentModeOptions, MuiFormBuilderValidationState } from "./contentModeTypes";
 import type { MuiAdapterOptions } from "./types";
 import { resolveMuiAdapterOptions } from "./types";
 
 export interface MuiFormBuilderContextValue {
   readonly options: MuiAdapterOptions;
-  readonly showContentModeSelector?: boolean;
+  readonly contentModeOptions?: MuiContentModeOptions;
+  readonly validationState?: MuiFormBuilderValidationState;
 }
 
 export const MuiFormBuilderContext = createContext<MuiFormBuilderContextValue>({ options: {} });

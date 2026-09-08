@@ -61,7 +61,7 @@ with `LinearProgress`, and renders numeric/rating or checkbox statistics as card
 domain adapter and summary aggregate shape, so no application-side question mapping is required:
 
 ```tsx
-import { MuiSurveyResponseSummaryDomain } from "@form-engine-ts/mui";
+import { MuiSurveyResponseSummaryDomain } from "@form-engine-ts/mui/survey-domain";
 
 <MuiSurveyResponseSummaryDomain
   summary={summary}
@@ -79,7 +79,7 @@ styling. The existing non-MUI summary components and their default renderer are 
 optional to consumers that do not install `@form-engine-ts/mui`.
 
 ```tsx
-import { MuiFormBuilder } from "@form-engine-ts/mui";
+import { MuiFormBuilder } from "@form-engine-ts/mui/builder";
 
 <MuiFormBuilder
   schema={schema}
@@ -178,7 +178,7 @@ appear automatically without manually wiring additive slots. Missing or unknown 
 
 ```tsx
 import { createInitialSchemaByMode } from "@form-engine-ts/core";
-import { MuiFormBuilder } from "@form-engine-ts/mui";
+import { MuiFormBuilder } from "@form-engine-ts/mui/builder";
 import { useState } from "react";
 
 function Creator() {
@@ -198,8 +198,16 @@ function Creator() {
 ```
 
 `contentModeOptions.showSelector` defaults to `false`; automatic Poll/Quiz editing is always enabled.
+Mode policy, a radio default for new questions and an accessible validation summary are also automatic.
+Set `applyPolicy: false` or `validation: "hidden"` to retain host-managed behavior.
 Switching modes only changes `metadata.mode`, preserving questions, inactive mode settings and unknown metadata.
-The selector does not convert question types or enable mode validation. Those remain host policy decisions.
+Existing incompatible questions are reported and remain editable; switching never converts or deletes them.
+
+`contentModeOptions.controls` sets `mode`, `resultVisibility`, `strictOneVotePerUser`,
+`showExplanation`, `passingScore`, `correctAnswer`, `explanation` and `points` to
+`editable`, `readOnly` or `hidden`. `controls.mode` takes precedence over the legacy
+`showSelector` flag. `renderValidationSummary` replaces only the validation view,
+while `onValidationChange` exposes combined schema/mode validity for save buttons.
 
 Explicit `slots.basicSettingsAfter` replaces the whole additional settings area, including the selector.
 `slots.fieldEditorAfter` and `slots.optionEditorAfter` override the automatic quiz editors independently.
@@ -215,6 +223,9 @@ Labels use `builder.content.*` translation keys, including `builder.content.poin
 日本語: `MuiFormBuilder`単体で投票・クイズの設定と問題を編集できます。
 `contentModeOptions={{ showSelector: true }}`で種別切替を表示し、`i18n={{ locale: "ja" }}`で日本語になります。
 種別切替では質問や各種設定を保持します。個別slotの指定が自動UIより優先されます。
+投票・クイズでは質問形式の制約、追加時のradio既定値、保存可否に使える検証結果も自動適用されます。
+`contentModeOptions.controls`で各設定を編集可・読み取り専用・非表示にでき、
+`onValidationChange`で統合済みの検証状態を受け取れます。
 
 `ContentModeSettings` edits result visibility, strict-one-vote preference, explanation
 timing and optional passing score. It accepts `schema`, `onChange`, `locale`, `readOnly`,
@@ -225,11 +236,48 @@ They edit a single correct option, explanation and points without replacing the
 normal question/option controls. Deleted correct options require explicit reselection.
 Keep `createMuiBuilderProps` results stable across renders to preserve editor focus.
 
-`QuizResultView` accepts Core's `QuizResult`, `locale` (English/Japanese) and optional
-`showScore` (default true). Use `showScore={false}` for immediate feedback and render
-the final result from the renderer completion snapshot. Existing
-`MuiSurveyResponseSummary` renders poll percentages from mapped analytics; use the
-React `usePollResults` hook to gate and refresh aggregation requests.
+`MuiContentRenderer` composes the MUI choice group, immediate/final quiz feedback and
+poll result loading around the existing React renderer. Explicit renderer slots win.
+
+```tsx
+import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
+
+<MuiContentRenderer
+  schema={schema}
+  locale="en"
+  onSubmit={saveSubmission}
+  contentModeOptions={{
+    poll: { adapter: analyticsAdapter, closed, canViewResults, submissionRevision }
+  }}
+/>
+```
+
+`QuizResultView` and `MuiPollResultView` accept labels, slots, slotProps and MUI i18n.
+`MuiPollResults` applies all Core visibility rules and supplies loading, error and retry
+states. The host still enforces voter identity, closing and access atomically when it
+persists or loads data.
+
+Use `@form-engine-ts/mui/builder`, `/renderer`, `/survey-summary` or `/survey-domain`
+to import only the intended surface. The root export remains compatible in v7.
+`/builder` and `/renderer` contain no runtime import from `custom-survey-client`;
+the domain summary subpath keeps that integration explicit.
+The required `custom-survey-client` peer and root domain export remain unchanged in v7;
+a future major can make that peer optional and require `/survey-domain` for the domain adapter.
+
+| Use case | Recommended v7 import | Existing root import |
+| --- | --- | --- |
+| Creator | `@form-engine-ts/mui/builder` | remains supported |
+| Respondent and results | `@form-engine-ts/mui/renderer` | remains supported |
+| Mapped survey summary | `@form-engine-ts/mui/survey-summary` | remains supported |
+| Survey client domain adapter | `@form-engine-ts/mui/survey-domain` | remains supported |
+
+日本語: 回答側は`@form-engine-ts/mui/renderer`の`MuiContentRenderer`を使うと、
+クイズの即時解説・送信後採点と投票結果の公開条件・読込・エラー・再試行をまとめて構成できます。
+明示したrenderer slotが自動表示より優先されます。本人確認、締切判定、閲覧認可、一人一票の重複防止は
+保存・読込を行うホスト側で強制してください。Creatorだけを使う場合は`/builder`、回答側は`/renderer`、
+集計済みサマリーは`/survey-summary`、survey client連携は`/survey-domain`から個別にimportできます。
+v7では必須の`custom-survey-client` peerとrootのdomain exportを維持し、optional peer化と
+domain adapterの`/survey-domain`限定は次のmajorで行う移行方針です。
 
 ## Multi-page editing
 
@@ -240,7 +288,7 @@ existing MUI adapters and respect `readOnly`, feature flags, localization, `muiO
 
 ```tsx
 import type { FormSchema } from "@form-engine-ts/core";
-import { MuiFormBuilder } from "@form-engine-ts/mui";
+import { MuiFormBuilder } from "@form-engine-ts/mui/builder";
 import { useState } from "react";
 
 const initialSchema: FormSchema = {

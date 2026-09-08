@@ -1377,6 +1377,12 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       {slots.renderSubmittedValues?.({ items: activeCompletionData.submittedItems, schema: form.schema })}
     </div>
   );
+  const afterFormRegion = slots.renderAfterForm?.({
+    schema: form.schema,
+    answers: activeCompletionData.answers,
+    submitStatus: form.submitStatus,
+    ...(activeCompletionData.response === undefined ? {} : { response: activeCompletionData.response })
+  });
 
   const confirmationTitle =
     submissionConfirmation?.title ??
@@ -1478,7 +1484,12 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   }
 
   if (form.submitStatus === "success" && isReplaceMode) {
-    return <div className={`fe-form ${className}`.trim()}>{completionRegion}</div>;
+    return (
+      <div className={`fe-form ${className}`.trim()}>
+        {completionRegion}
+        {afterFormRegion}
+      </div>
+    );
   }
 
   if (confirmation !== null && confirmationRenderMode === "replace") {
@@ -1673,6 +1684,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             : null}
         </div>
       </form>
+      {afterFormRegion}
       {confirmation !== null && confirmationRenderMode === "dialog" ? (
         <div className="fe-confirmation-dialog-backdrop" role="dialog" aria-modal="true">
           {confirmationContent}

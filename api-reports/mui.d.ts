@@ -1,11 +1,11 @@
-import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, BuilderFieldEditorSlotProps, BuilderOptionEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderPagesSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonAppearance, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
+import { BuilderActionIconType, FieldPropertyControlMode, QuestionType, FieldEditorControlsConfig, FieldTypeSelectOptionsConfig, LocalizationSummaryContext, UseTranslationWorkspaceOptions, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldsetProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderTextAreaProps, BuilderTextInputProps, FormBuilderComponents, FormBuilderSlots, FormBuilderProps, FormRendererProps, FormSubmissionMetadata, TypedFormRendererProps, BuilderFieldEditorSlotProps, BuilderOptionEditorSlotProps, BuilderLocalizationSlotProps, ChoiceGroupSlotProps, BuilderPagesSlotProps, BuilderToolbarSlotProps, UseTranslationComparisonOptions, TranslationComparisonItemIconProps, TranslationComparisonAppearance, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationComparisonItemRowProps, ConfirmRemoveLocaleSlotProps, TranslationEventPayload, TranslationWorkspaceError, TranslationSlotChangeEvent, TranslationWorkspaceSlots } from '@form-engine-ts/react';
 export { InputBoxStyleOptions, TargetSpecificLayoutConfig, TranslationLayoutOptions, TranslationTargetKind, TranslationWorkspaceAppearance } from '@form-engine-ts/react';
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormSchema, QuizResult, DisplayRule, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus } from '@form-engine-ts/core';
+import { FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormContentMode, ContentModeIssueCode, FormSchema, FormAnalytics, PollRuntimeAdapter, QuizResult, QuizQuestionResult, getContentModeDiagnostics, BaseSubmissionMetadata, DisplayRule, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus } from '@form-engine-ts/core';
 export { TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
-import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, RadioProps, ButtonProps, IconButtonProps, TabsProps, TabProps, CardContentProps, ListProps, ListItemProps, LinearProgressProps } from '@mui/material';
+import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, RadioProps, ButtonProps, IconButtonProps, TypographyProps, ListProps, ListItemProps, LinearProgressProps, AlertProps, CardContentProps, TabsProps, TabProps } from '@mui/material';
 import { SurveyResponseSummarySkipReason, SurveyResponseSummaryData, SurveyResponseSummaryLanguageOption, SurveyClientAsyncState, SurveyResponseSummaryDomainLabels, SurveyResponseSummaryQuestion, SurveyResponseSummaryDomainInputProps } from '@form-engine-ts/custom-survey-client';
 
 type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization" | "submissionSettings";
@@ -181,6 +181,36 @@ interface MuiBuilderOverrides {
 }
 declare function createMuiBuilderProps(options?: MuiAdapterOptions, overrides?: MuiBuilderOverrides): Pick<FormBuilderProps, "components" | "disableDefaultStyles" | "slots">;
 
+interface MuiContentModeControls {
+    readonly mode?: FieldPropertyControlMode;
+    readonly resultVisibility?: FieldPropertyControlMode;
+    readonly strictOneVotePerUser?: FieldPropertyControlMode;
+    readonly showExplanation?: FieldPropertyControlMode;
+    readonly passingScore?: FieldPropertyControlMode;
+    readonly correctAnswer?: FieldPropertyControlMode;
+    readonly explanation?: FieldPropertyControlMode;
+    readonly points?: FieldPropertyControlMode;
+}
+interface MuiFormBuilderValidationIssue {
+    readonly source: "schema" | "contentMode";
+    readonly path: string;
+    readonly code: string | ContentModeIssueCode;
+    readonly message: string;
+}
+interface MuiFormBuilderValidationState {
+    readonly mode: FormContentMode;
+    readonly valid: boolean;
+    readonly issues: readonly MuiFormBuilderValidationIssue[];
+}
+interface MuiContentModeOptions {
+    readonly showSelector?: boolean;
+    readonly applyPolicy?: boolean;
+    readonly validation?: "summary" | "hidden";
+    readonly controls?: MuiContentModeControls;
+    readonly onValidationChange?: (state: MuiFormBuilderValidationState) => void;
+    readonly renderValidationSummary?: (state: MuiFormBuilderValidationState) => ReactNode;
+}
+
 interface ContentModeSettingsProps {
     readonly schema: FormSchema;
     readonly onChange?: (schema: FormSchema) => void;
@@ -188,8 +218,9 @@ interface ContentModeSettingsProps {
     readonly readOnly?: boolean;
     readonly components?: Partial<FormBuilderComponents>;
     readonly translate?: (key: string) => string;
+    readonly controls?: Pick<MuiContentModeControls, "resultVisibility" | "strictOneVotePerUser" | "showExplanation" | "passingScore">;
 }
-declare function ContentModeSettings({ schema, onChange, locale, readOnly, components, translate }: ContentModeSettingsProps): react.JSX.Element | null;
+declare function ContentModeSettings({ schema, onChange, locale, readOnly, components, translate, controls }: ContentModeSettingsProps): react.JSX.Element | null;
 
 declare const muiBuilderComponents: FormBuilderComponents;
 declare function createMuiBuilderComponents(customOverrides?: Partial<FormBuilderComponents>): FormBuilderComponents;
@@ -197,7 +228,8 @@ declare function createMuiBuilderComponents(options?: MuiAdapterOptions, customO
 
 interface MuiFormBuilderContextValue {
     readonly options: MuiAdapterOptions;
-    readonly showContentModeSelector?: boolean;
+    readonly contentModeOptions?: MuiContentModeOptions;
+    readonly validationState?: MuiFormBuilderValidationState;
 }
 declare const MuiFormBuilderContext: react.Context<MuiFormBuilderContextValue>;
 declare function mergeMuiAdapterOptions(base?: MuiAdapterOptions, overrides?: MuiAdapterOptions): MuiAdapterOptions;
@@ -206,9 +238,120 @@ declare function useResolvedMuiAdapterOptions(overrides?: MuiAdapterOptions): Re
 declare function muiDefaultIconResolver(actionType: BuilderActionIconType): ReactNode;
 declare function muiDefaultFieldTypeIcon(type: QuestionType): ReactNode;
 
-interface MuiContentModeOptions {
-    readonly showSelector?: boolean;
+interface MuiPollResultItem {
+    readonly optionId: string;
+    readonly label: string;
+    readonly count: number;
+    readonly percentage: number;
 }
+interface MuiPollResultViewSlots {
+    readonly header?: (analytics: FormAnalytics) => ReactNode;
+    readonly option?: (item: MuiPollResultItem) => ReactNode;
+}
+interface MuiPollResultViewSlotProps {
+    readonly root?: MuiComponentSlotProps<StackProps>;
+    readonly card?: MuiComponentSlotProps<CardProps>;
+    readonly title?: MuiComponentSlotProps<TypographyProps>;
+    readonly list?: MuiComponentSlotProps<ListProps>;
+    readonly option?: MuiComponentSlotProps<ListItemProps>;
+    readonly progress?: MuiComponentSlotProps<LinearProgressProps>;
+    readonly count?: MuiComponentSlotProps<TypographyProps>;
+}
+interface MuiPollResultViewProps {
+    readonly schema: FormSchema;
+    readonly analytics: FormAnalytics;
+    readonly locale?: string;
+    readonly slots?: MuiPollResultViewSlots;
+    readonly slotProps?: MuiPollResultViewSlotProps;
+    readonly i18n?: MuiFormEngineI18nOptions;
+}
+declare function MuiPollResultView({ schema, analytics, locale, slots, slotProps, i18n }: MuiPollResultViewProps): react.JSX.Element;
+interface MuiPollResultsSlots extends MuiPollResultViewSlots {
+    readonly loading?: () => ReactNode;
+    readonly error?: (error: Error, reload: () => void) => ReactNode;
+}
+interface MuiPollResultsSlotProps extends MuiPollResultViewSlotProps {
+    readonly loading?: MuiComponentSlotProps<TypographyProps>;
+    readonly error?: MuiComponentSlotProps<AlertProps>;
+    readonly retry?: MuiComponentSlotProps<ButtonProps>;
+}
+interface MuiPollResultsProps {
+    readonly schema: FormSchema;
+    readonly adapter: PollRuntimeAdapter<FormAnalytics>;
+    readonly submitted: boolean;
+    readonly closed: boolean;
+    readonly canViewResults: boolean;
+    readonly submissionRevision?: number;
+    readonly locale?: string;
+    readonly slots?: MuiPollResultsSlots;
+    readonly slotProps?: MuiPollResultsSlotProps;
+    readonly i18n?: MuiFormEngineI18nOptions;
+}
+declare function MuiPollResults({ schema, adapter, submitted, closed, canViewResults, submissionRevision, locale, slots, slotProps, i18n }: MuiPollResultsProps): string | number | bigint | boolean | Iterable<ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | react.ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | react.JSX.Element | null;
+
+interface QuizResultViewLabels {
+    readonly totalScore: string;
+    readonly passed: string;
+    readonly notPassed: string;
+    readonly correct: string;
+    readonly incorrect: string;
+    readonly correctOption: string;
+}
+interface QuizResultViewSlots {
+    readonly score?: (result: QuizResult) => ReactNode;
+    readonly status?: (passed: boolean) => ReactNode;
+    readonly question?: (question: QuizQuestionResult) => ReactNode;
+}
+interface QuizResultViewSlotProps {
+    readonly root?: MuiComponentSlotProps<StackProps>;
+    readonly score?: MuiComponentSlotProps<TypographyProps>;
+    readonly status?: MuiComponentSlotProps<TypographyProps>;
+    readonly questionCard?: MuiComponentSlotProps<CardProps>;
+    readonly questionContent?: MuiComponentSlotProps<CardContentProps>;
+    readonly questionTitle?: MuiComponentSlotProps<TypographyProps>;
+    readonly questionStatus?: MuiComponentSlotProps<TypographyProps>;
+    readonly correctOption?: MuiComponentSlotProps<TypographyProps>;
+    readonly explanation?: MuiComponentSlotProps<TypographyProps>;
+    readonly points?: MuiComponentSlotProps<TypographyProps>;
+}
+interface QuizResultViewProps {
+    readonly result: QuizResult;
+    readonly locale?: string;
+    readonly showScore?: boolean;
+    readonly labels?: Partial<QuizResultViewLabels>;
+    readonly slots?: QuizResultViewSlots;
+    readonly slotProps?: QuizResultViewSlotProps;
+    readonly i18n?: MuiFormEngineI18nOptions;
+}
+declare function QuizResultView({ result, locale, showScore, labels, slots, slotProps, i18n }: QuizResultViewProps): react.JSX.Element;
+
+interface MuiQuizRendererOptions {
+    readonly showImmediateFeedback?: boolean;
+    readonly resultViewProps?: Omit<QuizResultViewProps, "result" | "locale" | "i18n">;
+    readonly renderInvalid?: (issues: ReturnType<typeof getContentModeDiagnostics>) => ReactNode;
+}
+interface MuiPollRendererOptions {
+    readonly adapter: PollRuntimeAdapter<FormAnalytics>;
+    readonly closed: boolean;
+    readonly canViewResults: boolean;
+    readonly submissionRevision?: number;
+    readonly slots?: MuiPollResultsSlots;
+    readonly slotProps?: MuiPollResultsSlotProps;
+}
+interface MuiContentRendererOptions {
+    readonly quiz?: MuiQuizRendererOptions;
+    readonly poll?: MuiPollRendererOptions;
+}
+interface MuiContentRendererOwnProps {
+    readonly contentModeOptions?: MuiContentRendererOptions;
+    readonly muiOptions?: MuiAdapterOptions;
+    readonly i18n?: MuiFormEngineI18nOptions;
+}
+type MuiContentRendererProps = FormRendererProps & MuiContentRendererOwnProps;
+type TypedMuiContentRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> = TypedFormRendererProps<TMeta> & MuiContentRendererOwnProps;
+declare function MuiContentRenderer(props: MuiContentRendererProps): React.JSX.Element;
+declare function MuiContentRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(props: TypedMuiContentRendererProps<TMeta>): React.JSX.Element;
+
 interface MuiFormBuilderProps extends Omit<FormBuilderProps, "components" | "disableDefaultStyles" | "slots" | "unstyled"> {
     readonly contentModeOptions?: MuiContentModeOptions;
     readonly muiOptions?: MuiAdapterOptions;
@@ -221,7 +364,7 @@ interface MuiFormBuilderProps extends Omit<FormBuilderProps, "components" | "dis
     readonly slots?: Partial<FormBuilderSlots>;
     readonly i18n?: MuiFormEngineI18nOptions;
 }
-declare function MuiFormBuilder({ muiOptions, contentModeOptions, layoutOptions, localizationOptions, localization, submissionSettingsOptions, muiSlotProps, components: customComponents, slots: customSlots, i18n, sectionOrder, ...props }: MuiFormBuilderProps): react.JSX.Element;
+declare function MuiFormBuilder({ muiOptions, contentModeOptions, layoutOptions, localizationOptions, localization, submissionSettingsOptions, muiSlotProps, components: customComponents, slots: customSlots, i18n, sectionOrder, policy, defaultFieldType, ...props }: MuiFormBuilderProps): react.JSX.Element;
 
 type MuiSummaryDataAttributes = {
     readonly [key: `data-${string}`]: string | number | boolean | undefined;
@@ -264,22 +407,16 @@ interface MuiSurveyResponseSummaryDataProps<TCustomData = unknown, TSkipReason =
     readonly slotProps?: MuiSurveyResponseSummarySlotProps;
     readonly className?: string;
 }
+declare function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason>(props: MuiSurveyResponseSummaryDataProps<TCustomData, TSkipReason>): React.JSX.Element;
+
 interface MuiSurveyResponseSummaryDomainProps<TSummary, TVersion> extends Omit<SurveyResponseSummaryDomainInputProps<TSummary, TVersion>, "slots" | "variant"> {
     readonly slots?: MuiSurveyResponseSummarySlots<unknown>;
     readonly slotProps?: MuiSurveyResponseSummarySlotProps;
 }
-declare function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason>(props: MuiSurveyResponseSummaryDataProps<TCustomData, TSkipReason>): React.JSX.Element;
 declare function MuiSurveyResponseSummaryDomain<TSummary, TVersion>(props: MuiSurveyResponseSummaryDomainProps<TSummary, TVersion>): React.JSX.Element;
 
 declare function QuizOptionEditor({ schema, field, option, onChange, currentLocale, readOnly, translate }: BuilderOptionEditorSlotProps): react.JSX.Element;
 declare function QuizFieldEditor({ schema, field, onChange, currentLocale, readOnly, components, translate }: BuilderFieldEditorSlotProps): react.JSX.Element;
-
-interface QuizResultViewProps {
-    readonly result: QuizResult;
-    readonly locale?: string;
-    readonly showScore?: boolean;
-}
-declare function QuizResultView({ result, locale, showScore }: QuizResultViewProps): react.JSX.Element;
 
 interface ConditionEditorProps {
     readonly schema: FormSchema;
@@ -436,4 +573,4 @@ interface TranslationWorkspaceProps {
 }
 declare function TranslationWorkspace(props: TranslationWorkspaceProps): react.JSX.Element;
 
-export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, ContentModeSettings, type ContentModeSettingsProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, type MuiContentModeOptions, MuiContentModeSettingsSlot, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiPagesEditor, type MuiPagesEditorProps, MuiPagesEditorSlot, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, QuizFieldEditor, QuizOptionEditor, QuizResultView, type QuizResultViewProps, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiContentModeSettingsSlot, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiPagesEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };
+export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, ContentModeSettings, type ContentModeSettingsProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, type MuiComponentSlotProps, type MuiContentModeControls, type MuiContentModeOptions, MuiContentModeSettingsSlot, MuiContentRenderer, type MuiContentRendererOptions, type MuiContentRendererProps, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormBuilderValidationIssue, type MuiFormBuilderValidationState, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiPagesEditor, type MuiPagesEditorProps, MuiPagesEditorSlot, type MuiPollRendererOptions, type MuiPollResultItem, MuiPollResultView, type MuiPollResultViewProps, type MuiPollResultViewSlotProps, type MuiPollResultViewSlots, MuiPollResults, type MuiPollResultsProps, type MuiPollResultsSlotProps, type MuiPollResultsSlots, type MuiQuizRendererOptions, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, QuizFieldEditor, QuizOptionEditor, QuizResultView, type QuizResultViewLabels, type QuizResultViewProps, type QuizResultViewSlotProps, type QuizResultViewSlots, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, type TypedMuiContentRendererProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiContentModeSettingsSlot, createMuiErrorMessageAdapter, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiPagesEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

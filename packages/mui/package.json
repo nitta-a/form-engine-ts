@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/mui",
-  "version": "7.10.0",
+  "version": "7.11.0",
   "publishConfig": {
     "access": "public"
   },
@@ -19,6 +19,26 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./builder": {
+      "types": "./dist/builder.d.ts",
+      "import": "./dist/builder.js",
+      "require": "./dist/builder.cjs"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "import": "./dist/renderer.js",
+      "require": "./dist/renderer.cjs"
+    },
+    "./survey-summary": {
+      "types": "./dist/survey-summary.d.ts",
+      "import": "./dist/survey-summary.js",
+      "require": "./dist/survey-summary.cjs"
+    },
+    "./survey-domain": {
+      "types": "./dist/survey-domain.d.ts",
+      "import": "./dist/survey-domain.js",
+      "require": "./dist/survey-domain.cjs"
     }
   },
   "license": "MIT",
@@ -40,7 +60,7 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/custom-survey-client --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom && tsup src/builder.ts src/renderer.ts src/survey-summary.ts src/survey-domain.ts --format esm,cjs --dts --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/custom-survey-client --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"

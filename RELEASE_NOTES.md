@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v7.11.0 — 2026-09-08
+
+- Added reusable Core response-summary domain APIs and localized content-mode translation contracts.
+- Added customizable React form-renderer completion slots while preserving the existing root API.
+- Added focused MUI entry points for the builder, renderer, survey summary, and survey domain, including respondent content and poll-result views.
+- Integrated the MUI builder and renderer flows into the preview's Survey, Poll, and Quiz workspaces.
+- Aligned all public packages to version 7.11.0.
+
 ### v7.10.0 — 2026-09-08
 
 - Added localized content-mode settings for Survey, Poll, and Quiz builders, including optional mode selection.

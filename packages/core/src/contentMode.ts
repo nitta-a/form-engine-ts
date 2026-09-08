@@ -125,29 +125,50 @@ export interface ContentModeIssue {
   readonly path: string;
   readonly message: string;
 }
+export type ContentModeIssueCode =
+  | "poll_field_count"
+  | "quiz_field_count"
+  | "unsupported_field_type"
+  | "options_minimum"
+  | "correct_option_missing"
+  | "points_type"
+  | "explanation_type"
+  | "points_range"
+  | "poll_result_visibility"
+  | "poll_strict_one_vote"
+  | "quiz_explanation_timing"
+  | "quiz_passing_score";
+export interface ContentModeDiagnostic extends ContentModeIssue {
+  readonly code: ContentModeIssueCode;
+}
 /** Opt-in validation, separate from the backwards-compatible base schema validator. */
-export function validateContentMode(schema: FormSchema): readonly ContentModeIssue[] {
+export function getContentModeDiagnostics(schema: FormSchema): readonly ContentModeDiagnostic[] {
   const mode = getFormContentMode(schema.metadata);
-  const issues: ContentModeIssue[] = [];
-  const add = (path: string, message: string) => issues.push({ path, message });
+  const issues: ContentModeDiagnostic[] = [];
+  const add = (path: string, code: ContentModeIssueCode, message: string) => issues.push({ path, code, message });
   if (mode === "survey") return issues;
-  if (mode === "poll" && schema.fields.length !== 1) add("fields", "Polls require exactly one question.");
-  if (mode === "quiz" && schema.fields.length === 0) add("fields", "Quizzes require at least one question.");
+  if (mode === "poll" && schema.fields.length !== 1)
+    add("fields", "poll_field_count", "Polls require exactly one question.");
+  if (mode === "quiz" && schema.fields.length === 0)
+    add("fields", "quiz_field_count", "Quizzes require at least one question.");
   let total = 0;
   for (const field of schema.fields) {
     if (field.type !== "radio" && !(mode === "poll" && field.type === "multi-select"))
-      add(field.id, "Unsupported question type.");
-    if (!("options" in field) || field.options.length < 2) add(field.id, "At least two options are required.");
+      add(field.id, "unsupported_field_type", "Unsupported question type.");
+    if (!("options" in field) || field.options.length < 2)
+      add(field.id, "options_minimum", "At least two options are required.");
     if (mode !== "quiz") continue;
     const quiz = readQuizFieldMetadata(field.metadata);
     if (!("options" in field) || !field.options.some((option) => option.id === quiz.correctOptionId))
-      add(field.id, "Select a correct option.");
+      add(field.id, "correct_option_missing", "Select a correct option.");
     const rawQuiz = record(field.metadata?.quiz);
-    if (rawQuiz.points !== undefined && typeof rawQuiz.points !== "number") add(field.id, "Points must be a number.");
+    if (rawQuiz.points !== undefined && typeof rawQuiz.points !== "number")
+      add(field.id, "points_type", "Points must be a number.");
     if (rawQuiz.explanation !== undefined && typeof rawQuiz.explanation !== "string")
-      add(field.id, "Explanation must be text.");
+      add(field.id, "explanation_type", "Explanation must be text.");
     const points = quiz.points ?? 1;
-    if (!Number.isFinite(points) || points < 0) add(field.id, "Points must be finite and non-negative.");
+    if (!Number.isFinite(points) || points < 0)
+      add(field.id, "points_range", "Points must be finite and non-negative.");
     total += points;
   }
   const raw = record(record(schema.metadata)[mode]);
@@ -156,21 +177,25 @@ export function validateContentMode(schema: FormSchema): readonly ContentModeIss
     raw.resultVisibility !== undefined &&
     !["after_submit", "always", "closed_only", "private"].includes(String(raw.resultVisibility))
   )
-    add("metadata.poll", "Invalid result visibility.");
+    add("metadata.poll", "poll_result_visibility", "Invalid result visibility.");
   if (mode === "poll" && raw.strictOneVotePerUser !== undefined && typeof raw.strictOneVotePerUser !== "boolean")
-    add("metadata.poll", "One-vote setting must be boolean.");
+    add("metadata.poll", "poll_strict_one_vote", "One-vote setting must be boolean.");
   if (mode === "quiz") {
     if (
       raw.showExplanation !== undefined &&
       raw.showExplanation !== "after_submit" &&
       raw.showExplanation !== "immediate"
     )
-      add("metadata.quiz", "Invalid explanation timing.");
+      add("metadata.quiz", "quiz_explanation_timing", "Invalid explanation timing.");
     const score = raw.passingScore;
     if (score !== undefined && (typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > total))
-      add("metadata.quiz.passingScore", "Passing score must be between zero and total points.");
+      add("metadata.quiz.passingScore", "quiz_passing_score", "Passing score must be between zero and total points.");
   }
   return issues;
+}
+/** Opt-in validation, separate from the backwards-compatible base schema validator. */
+export function validateContentMode(schema: FormSchema): readonly ContentModeIssue[] {
+  return getContentModeDiagnostics(schema).map(({ path, message }) => ({ path, message }));
 }
 export interface QuizQuestionResult {
   readonly fieldId: string;

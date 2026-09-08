@@ -1,4 +1,5 @@
 import { JsonValue, TranslationAdapter, FormSchema, TranslationReport, TextAnswerItem, FormResponse, FormField, CanonicalTranslationMetadata, FormAnalytics, QuestionAggregate, FormVersionRecord, FormVersionState, QuestionType, FormEngineTranslator, TranslationSlot } from '@form-engine-ts/core';
+export { ResponseSummaryData, ResponseSummaryInput, ResponseSummaryLabels, ResponseSummaryLanguageAggregate, ResponseSummaryQuestion, ResponseSummarySkipReason } from '@form-engine-ts/core';
 import { FormBuilderProps, useFormBuilder } from '@form-engine-ts/react';
 import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 import { ReactNode } from 'react';

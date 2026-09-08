@@ -287,6 +287,9 @@ in `loadResults` and vote eligibility atomically when persisting submissions.
 Use the existing `FormRenderer.slots.renderCompletion` `schema` and `answers`
 snapshot for final quiz evaluation. Immediate feedback can observe `useForm().values`;
 changing a choice updates feedback, while final scoring uses submitted answers.
+`slots.renderAfterForm` receives the current `schema`, `answers`, `submitStatus` and
+optional response after the form. Adapter packages can use it for live feedback or
+results without replacing field rendering or submission behavior.
 
 ### Reusing page condition controls in custom builder slots
 

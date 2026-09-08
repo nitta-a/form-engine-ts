@@ -1,4 +1,9 @@
-import { getFormContentMode } from "@form-engine-ts/core";
+import {
+  getContentModeDiagnostics,
+  getContentModePolicy,
+  getFormContentMode,
+  validateFormSchema
+} from "@form-engine-ts/core";
 import {
   FormBuilder,
   type FormBuilderComponents,
@@ -7,8 +12,13 @@ import {
   type FormBuilderSlots,
   FormEngineI18nProvider
 } from "@form-engine-ts/react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { muiBuilderComponents } from "./components";
+import type {
+  MuiContentModeOptions,
+  MuiFormBuilderValidationIssue,
+  MuiFormBuilderValidationState
+} from "./contentModeTypes";
 import { MuiFormBuilderContext, mergeMuiAdapterOptions } from "./context";
 import { QuizFieldEditor, QuizOptionEditor } from "./QuizEditorSlots";
 import { MuiContentModeSettingsSlot, muiBuilderSlots } from "./slots";
@@ -24,9 +34,12 @@ import {
   type MuiSubmissionSettingsOptions
 } from "./types";
 
-export interface MuiContentModeOptions {
-  readonly showSelector?: boolean;
-}
+export type {
+  MuiContentModeControls,
+  MuiContentModeOptions,
+  MuiFormBuilderValidationIssue,
+  MuiFormBuilderValidationState
+} from "./contentModeTypes";
 
 export interface MuiFormBuilderProps
   extends Omit<FormBuilderProps, "components" | "disableDefaultStyles" | "slots" | "unstyled"> {
@@ -54,6 +67,8 @@ export function MuiFormBuilder({
   slots: customSlots,
   i18n,
   sectionOrder,
+  policy,
+  defaultFieldType,
   ...props
 }: MuiFormBuilderProps) {
   const contextOptions = useMemo<MuiAdapterOptions>(
@@ -74,12 +89,66 @@ export function MuiFormBuilder({
       }),
     [contextOptions, i18n?.getActionLabel, i18n?.getLocaleLabel]
   );
-  const contextValue = useMemo(
-    () => ({ options: resolvedMuiOptions, showContentModeSelector: contentModeOptions?.showSelector ?? false }),
-    [resolvedMuiOptions, contentModeOptions?.showSelector]
-  );
   const components = useMemo(() => ({ ...muiBuilderComponents, ...customComponents }), [customComponents]);
   const contentMode = getFormContentMode(props.schema.metadata);
+  const resolvedPolicy = useMemo(
+    () =>
+      contentModeOptions?.applyPolicy === false || contentMode === "survey"
+        ? policy
+        : getContentModePolicy(contentMode, policy),
+    [contentMode, contentModeOptions?.applyPolicy, policy]
+  );
+  const validationState = useMemo<MuiFormBuilderValidationState>(() => {
+    const schemaResult = validateFormSchema(
+      props.schema,
+      resolvedPolicy === undefined ? {} : { policy: resolvedPolicy }
+    );
+    const schemaIssues: readonly MuiFormBuilderValidationIssue[] = schemaResult.issues.map((issue) => ({
+      source: "schema",
+      path: issue.path,
+      code: issue.code,
+      message: issue.message
+    }));
+    const contentIssues: readonly MuiFormBuilderValidationIssue[] = getContentModeDiagnostics(props.schema).map(
+      (issue) => ({ source: "contentMode", path: issue.path, code: issue.code, message: issue.message })
+    );
+    const hasContentFieldCountIssue = contentIssues.some(
+      (issue) => issue.code === "poll_field_count" || issue.code === "quiz_field_count"
+    );
+    const hasMatchingContentFieldTypeIssue = (path: string) => {
+      const match = /^fields\[(\d+)]\.type$/.exec(path);
+      if (match === null) return false;
+      const fieldIndex = Number(match[1]);
+      const fieldId = props.schema.fields[fieldIndex]?.id;
+      return contentIssues.some((issue) => issue.code === "unsupported_field_type" && issue.path === fieldId);
+    };
+    const seen = new Set<string>();
+    const issues = [...contentIssues, ...schemaIssues].filter((issue) => {
+      if (issue.source === "schema" && issue.code === "max_fields_exceeded" && hasContentFieldCountIssue) return false;
+      if (
+        issue.source === "schema" &&
+        issue.code === "disallowed_field_type" &&
+        hasMatchingContentFieldTypeIssue(issue.path)
+      )
+        return false;
+      const key = `${issue.path}\u0000${issue.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return { mode: contentMode, valid: issues.length === 0, issues };
+  }, [contentMode, props.schema, resolvedPolicy]);
+  useEffect(() => {
+    contentModeOptions?.onValidationChange?.(validationState);
+  }, [contentModeOptions?.onValidationChange, validationState]);
+  const contextValue = useMemo(
+    () => ({
+      options: resolvedMuiOptions,
+      ...(contentModeOptions === undefined ? {} : { contentModeOptions }),
+      validationState
+    }),
+    [resolvedMuiOptions, contentModeOptions, validationState]
+  );
   const slots = useMemo(() => {
     const automaticQuizSlots: Partial<FormBuilderSlots> =
       contentMode !== "quiz"
@@ -126,6 +195,12 @@ export function MuiFormBuilder({
     <MuiFormBuilderContext.Provider value={contextValue}>
       <FormBuilder
         {...props}
+        {...(resolvedPolicy === undefined ? {} : { policy: resolvedPolicy })}
+        {...(defaultFieldType === undefined
+          ? contentMode === "survey"
+            ? {}
+            : { defaultFieldType: "radio" as const }
+          : { defaultFieldType })}
         components={components}
         disableDefaultStyles
         slots={slots}

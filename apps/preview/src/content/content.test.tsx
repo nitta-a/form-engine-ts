@@ -22,7 +22,7 @@ describe("content mode demo", () => {
     await user.click(dialog.getByRole("button", { name: "Create" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
-    expect(screen.getByText("Polls have exactly one question.")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Result visibility" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Save" }));
     await user.click(screen.getByRole("button", { name: "Open answer screen" }));
     await user.click(screen.getByRole("radio", { name: "Option 1" }));

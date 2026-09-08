@@ -1,3 +1,11 @@
+export type {
+  ResponseSummaryData,
+  ResponseSummaryInput,
+  ResponseSummaryLabels,
+  ResponseSummaryLanguageAggregate,
+  ResponseSummaryQuestion,
+  ResponseSummarySkipReason
+} from "@form-engine-ts/core";
 export * from "./domain";
 export * from "./freeText";
 export * from "./freeTextTranslation";

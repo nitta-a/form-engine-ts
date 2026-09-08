@@ -39,7 +39,7 @@ export type BuilderSectionName =
 
 export type MuiButtonVariant = "contained" | "outlined" | "text";
 
-type MuiComponentSlotProps<T> = Partial<T> & {
+export type MuiComponentSlotProps<T> = Partial<T> & {
   readonly [key: `data-${string}`]: string | number | boolean | undefined;
 };
 
