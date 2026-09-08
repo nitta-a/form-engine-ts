@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # Turborepo
 .turbo/
+
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
