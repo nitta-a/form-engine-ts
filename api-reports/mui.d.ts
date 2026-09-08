@@ -279,6 +279,7 @@ interface MuiPollResultsProps {
     readonly schema: FormSchema;
     readonly adapter: PollRuntimeAdapter<FormAnalytics>;
     readonly submitted: boolean;
+    readonly alreadyVoted?: boolean;
     readonly closed: boolean;
     readonly canViewResults: boolean;
     readonly submissionRevision?: number;
@@ -287,7 +288,7 @@ interface MuiPollResultsProps {
     readonly slotProps?: MuiPollResultsSlotProps;
     readonly i18n?: MuiFormEngineI18nOptions;
 }
-declare function MuiPollResults({ schema, adapter, submitted, closed, canViewResults, submissionRevision, locale, slots, slotProps, i18n }: MuiPollResultsProps): string | number | bigint | boolean | Iterable<ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | react.ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | react.JSX.Element | null;
+declare function MuiPollResults({ schema, adapter, submitted, alreadyVoted, closed, canViewResults, submissionRevision, locale, slots, slotProps, i18n }: MuiPollResultsProps): string | number | bigint | boolean | Iterable<ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | react.ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | react.JSX.Element | null;
 
 interface QuizResultViewLabels {
     readonly totalScore: string;
@@ -334,6 +335,7 @@ interface MuiPollRendererOptions {
     readonly adapter: PollRuntimeAdapter<FormAnalytics>;
     readonly closed: boolean;
     readonly canViewResults: boolean;
+    readonly alreadyVoted?: boolean;
     readonly submissionRevision?: number;
     readonly slots?: MuiPollResultsSlots;
     readonly slotProps?: MuiPollResultsSlotProps;

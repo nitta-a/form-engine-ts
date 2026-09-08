@@ -133,6 +133,7 @@ export interface MuiPollResultsProps {
   readonly schema: FormSchema;
   readonly adapter: PollRuntimeAdapter<FormAnalytics>;
   readonly submitted: boolean;
+  readonly alreadyVoted?: boolean;
   readonly closed: boolean;
   readonly canViewResults: boolean;
   readonly submissionRevision?: number;
@@ -146,6 +147,7 @@ export function MuiPollResults({
   schema,
   adapter,
   submitted,
+  alreadyVoted,
   closed,
   canViewResults,
   submissionRevision,
@@ -158,6 +160,7 @@ export function MuiPollResults({
     schema,
     adapter,
     submitted,
+    ...(alreadyVoted === undefined ? {} : { alreadyVoted }),
     closed,
     canViewResults,
     ...(submissionRevision === undefined ? {} : { submissionRevision })

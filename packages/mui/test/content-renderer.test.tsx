@@ -13,11 +13,17 @@ import { QuizResultView } from "../src/QuizResultView";
 
 afterEach(cleanup);
 
-function quizSchema(showExplanation: "after_submit" | "immediate" = "immediate"): FormSchema {
+function quizSchema(
+  showExplanation: "after_submit" | "immediate" = "immediate",
+  passingScore: number | null = 1
+): FormSchema {
   const schema = createInitialSchemaByMode("quiz", { title: "Quiz", locale: "en" });
   return {
     ...schema,
-    metadata: contentMetadataToJson({ mode: "quiz", quiz: { showExplanation, passingScore: 1 } }),
+    metadata: contentMetadataToJson({
+      mode: "quiz",
+      quiz: passingScore === null ? { showExplanation } : { showExplanation, passingScore }
+    }),
     fields: schema.fields.map((field) => ({
       ...field,
       metadata: contentMetadataToJson({
@@ -56,6 +62,24 @@ describe("MuiContentRenderer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByText("Total score: 2 / 2")).toBeInTheDocument();
     expect(screen.getByText("Passed")).toBeInTheDocument();
+  });
+
+  it("omits score and pass status when no passing score is configured", async () => {
+    render(
+      <MuiContentRenderer schema={quizSchema("after_submit", null)} locale="en" onSubmit={async () => undefined} />
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Submitted.")).toBeInTheDocument();
+    expect(screen.queryByText(/Total score:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Passed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not passed")).not.toBeInTheDocument();
+  });
+
+  it("hides score by default in the standalone result view without a passing score", () => {
+    render(<QuizResultView result={{ score: 2, total: 2, questions: [] }} />);
+    expect(screen.queryByText(/Total score:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Passed")).not.toBeInTheDocument();
   });
 
   it("renders an invalid quiz without throwing", async () => {
@@ -101,8 +125,9 @@ describe("MuiContentRenderer", () => {
     expect(loadResults).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect(await screen.findByText("Poll results")).toBeInTheDocument();
-    expect(screen.getByText("3 votes (75%)")).toBeInTheDocument();
+    const firstResult = await screen.findByText("3 votes (75%)");
+    expect(firstResult.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
+    expect(screen.queryByRole("heading", { name: "Poll results" })).not.toBeInTheDocument();
     expect(loadResults).toHaveBeenCalledOnce();
   });
 
@@ -127,6 +152,53 @@ describe("MuiContentRenderer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
     await waitFor(() => expect(screen.getByText("Submitted.")).toBeInTheDocument());
     expect(loadResults).not.toHaveBeenCalled();
+  });
+
+  it("loads after-submit results immediately for an existing vote", async () => {
+    const initial = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    const schema = {
+      ...initial,
+      metadata: contentMetadataToJson({ mode: "poll", poll: { resultVisibility: "after_submit" } })
+    };
+    const loadResults = vi.fn(async () => pollAnalytics(schema));
+    render(
+      <MuiContentRenderer
+        schema={schema}
+        locale="en"
+        onSubmit={async () => undefined}
+        contentModeOptions={{
+          poll: {
+            adapter: { loadResults, canVote: async () => false },
+            closed: false,
+            canViewResults: true,
+            alreadyVoted: true
+          }
+        }}
+      />
+    );
+    const result = await screen.findByText("3 votes (75%)");
+    expect(result.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
+    expect(loadResults).toHaveBeenCalledOnce();
+  });
+
+  it("keeps an explicit aggregate poll result override after the form", async () => {
+    const schema = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    const loadResults = vi.fn(async () => pollAnalytics(schema));
+    render(
+      <MuiContentRenderer
+        schema={schema}
+        locale="en"
+        onSubmit={async () => undefined}
+        contentModeOptions={{
+          poll: { adapter: { loadResults, canVote: async () => true }, closed: false, canViewResults: true }
+        }}
+        slots={{ renderPollResults: () => <p>Legacy poll result</p> }}
+      />
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Legacy poll result")).toBeInTheDocument();
+    expect(screen.queryByText("3 votes (75%)")).not.toBeInTheDocument();
   });
 
   it("respects explicit renderer slots", async () => {
@@ -169,6 +241,27 @@ describe("MUI content result views", () => {
     await userEvent.click(screen.getByRole("button", { name: "Retry results" }));
     expect(await screen.findByText("Poll results")).toBeInTheDocument();
     expect(loadResults).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads standalone after-submit results for an existing vote", async () => {
+    const initial = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    const schema = {
+      ...initial,
+      metadata: contentMetadataToJson({ mode: "poll", poll: { resultVisibility: "after_submit" } })
+    };
+    const loadResults = vi.fn(async () => pollAnalytics(schema));
+    render(
+      <MuiPollResults
+        schema={schema}
+        adapter={{ loadResults, canVote: async () => false }}
+        submitted={false}
+        alreadyVoted
+        closed={false}
+        canViewResults
+      />
+    );
+    expect(await screen.findByText("Poll results")).toBeInTheDocument();
+    expect(loadResults).toHaveBeenCalledOnce();
   });
 
   it("loads closed-only results after closing and reloads for a new revision", async () => {

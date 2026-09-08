@@ -255,6 +255,8 @@ when `passingScore` is configured. Scores and thresholds are finite, non-negativ
 numbers; the threshold cannot exceed the sum of configured points. Hidden questions
 are excluded from the earned and available score; the configured passing threshold
 is absolute and is not adjusted for visibility.
+When `passingScore` is omitted, callers can use the score for internal evaluation while
+respondent-facing result components should omit total-score and pass/fail summaries.
 
 `canShowPollResults(poll, { submitted, closed, canViewResults })` implements all four
 policies. `private` never exposes results to respondents, and authorization gates

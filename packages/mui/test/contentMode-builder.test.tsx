@@ -88,6 +88,19 @@ describe("MuiFormBuilder content integration", () => {
     await userEvent.clear(screen.getByLabelText("Passing score"));
     expect(current().metadata?.quiz).not.toHaveProperty("passingScore");
   });
+  it("allows the passing score threshold to be enabled and disabled", async () => {
+    render(<Editor initial={{ ...quiz, metadata: { mode: "quiz", quiz: { extra: "keep" } } }} />);
+    const toggle = screen.getByRole("checkbox", { name: "Set a passing score" });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByLabelText("Passing score")).toHaveValue(null);
+    await userEvent.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(screen.getByLabelText("Passing score")).not.toBeDisabled();
+    expect(current().metadata?.quiz).toMatchObject({ extra: "keep", passingScore: 0 });
+    await userEvent.click(toggle);
+    expect(toggle).not.toBeChecked();
+    expect(current().metadata?.quiz).not.toHaveProperty("passingScore");
+  });
   it("switches modes without replacing questions or inactive settings", async () => {
     render(
       <Editor
@@ -148,6 +161,7 @@ describe("MuiFormBuilder content integration", () => {
     render(<Editor locale="ja" />);
     expect(screen.getByLabelText("配点")).toBeInTheDocument();
     expect(screen.getByLabelText("合格ライン点数")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "合格ラインを設定" })).toBeInTheDocument();
   });
   it("honors components, MUI options and slotProps", () => {
     function Input(props: BuilderTextInputProps) {

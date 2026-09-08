@@ -29,7 +29,16 @@ describe("content mode demo", () => {
     await user.click(screen.getByRole("radio", { name: "Option 1" }));
     await user.click(screen.getByRole("button", { name: "Send response" }));
     await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
-    expect(screen.getAllByRole("progressbar")[0]).toHaveAttribute("aria-valuenow", "100");
+    const [firstProgress] = screen.getAllByRole("progressbar");
+    if (firstProgress === undefined) throw new Error("Expected first poll result progress bar");
+    expect(firstProgress).toHaveAttribute("aria-valuenow", "100");
+    expect(firstProgress.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
+    expect(screen.queryByText("Poll results")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Tailwind" }));
+    await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
+    const [tailwindProgress] = screen.getAllByRole("progressbar");
+    if (tailwindProgress === undefined) throw new Error("Expected Tailwind poll result progress bar");
+    expect(tailwindProgress.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
     await user.click(screen.getByRole("button", { name: "Back to list" }));
     await user.click(screen.getByRole("tab", { name: "Quiz" }));
     expect(window.location.search).toBe("?mode=quiz");
@@ -59,7 +68,7 @@ describe("content mode demo", () => {
     expect(screen.queryByText("A useful fact")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Send response" }));
     await waitFor(() => expect(screen.getByText("A useful fact")).toBeVisible());
-    expect(screen.getByText("Total score: 1 / 1")).toBeVisible();
+    expect(screen.queryByText("Total score: 1 / 1")).not.toBeInTheDocument();
   });
   it("supports immediate feedback and keeps submission errors separate", async () => {
     const user = userEvent.setup();

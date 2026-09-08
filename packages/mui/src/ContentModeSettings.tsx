@@ -106,18 +106,33 @@ export function ContentModeSettings({
             />
           )}
           {controls?.passingScore === "hidden" ? null : (
-            <TextInput
-              type="number"
-              label={t("builder.content.passingScore")}
-              value={quiz.passingScore === undefined ? "" : String(quiz.passingScore)}
-              disabled={readOnly || controls?.passingScore === "readOnly"}
-              onChange={(value) => {
-                if (controls?.passingScore === "readOnly") return;
-                const { passingScore: _removed, ...rest } = quiz;
-                if (value === "") update(rest);
-                else if (Number.isFinite(Number(value))) update({ ...rest, passingScore: Number(value) });
-              }}
-            />
+            <>
+              <Checkbox
+                label={t("builder.content.enablePassingScore")}
+                disabled={readOnly || controls?.passingScore === "readOnly"}
+                checked={quiz.passingScore !== undefined}
+                onChange={(checked) => {
+                  if (controls?.passingScore === "readOnly") return;
+                  if (checked) update({ ...quiz, passingScore: quiz.passingScore ?? 0 });
+                  else {
+                    const { passingScore: _removed, ...rest } = quiz;
+                    update(rest);
+                  }
+                }}
+              />
+              <TextInput
+                type="number"
+                label={t("builder.content.passingScore")}
+                value={quiz.passingScore === undefined ? "" : String(quiz.passingScore)}
+                disabled={readOnly || controls?.passingScore === "readOnly"}
+                onChange={(value) => {
+                  if (controls?.passingScore === "readOnly") return;
+                  const { passingScore: _removed, ...rest } = quiz;
+                  if (value === "") update(rest);
+                  else if (Number.isFinite(Number(value))) update({ ...rest, passingScore: Number(value) });
+                }}
+              />
+            </>
           )}
         </>
       )}

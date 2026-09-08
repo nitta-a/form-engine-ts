@@ -1087,6 +1087,11 @@ interface ChoiceGroupSlotProps {
     readonly children: ReactNode;
     readonly className?: string;
 }
+interface ChoiceOptionAfterSlotProps {
+    readonly field: Question;
+    readonly option: FieldOption;
+    readonly checked: boolean;
+}
 interface FormRendererSlotProps {
     readonly choiceGroup?: {
         readonly className?: string;
@@ -1144,6 +1149,7 @@ interface FormRendererSlots {
         readonly current: number;
         readonly max: number;
     }) => ReactNode;
+    readonly renderChoiceOptionAfter?: (props: ChoiceOptionAfterSlotProps) => ReactNode;
     readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
 interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
@@ -1399,6 +1405,29 @@ interface PollResultLabels {
     readonly retry: string;
     readonly loadError: string;
 }
+interface PollResultItem {
+    readonly optionId: string;
+    readonly label: string;
+    readonly count: number;
+    readonly percentage: number;
+    readonly checked?: boolean;
+}
+interface PollResultOptionProps {
+    readonly item: PollResultItem;
+    readonly locale: string;
+    readonly labels: Pick<PollResultLabels, "votes">;
+    readonly classNames: Pick<ContentRendererClassNames, "pollResultOption" | "pollResultProgress" | "pollResultCount">;
+}
+interface PollResultsLoadingProps {
+    readonly locale: string;
+    readonly label: string;
+}
+interface PollResultsErrorProps {
+    readonly error: Error;
+    readonly onRetry: () => void;
+    readonly locale: string;
+    readonly labels: Pick<PollResultLabels, "retry" | "loadError">;
+}
 interface QuizQuestionFeedbackProps {
     readonly question: QuizQuestionResult;
     readonly locale?: string;
@@ -1420,15 +1449,17 @@ interface PollResultViewProps {
     readonly labels?: Partial<PollResultLabels>;
     readonly classNames?: Pick<ContentRendererClassNames, "pollResults" | "pollResultOption" | "pollResultProgress" | "pollResultCount">;
 }
+declare function PollResultOption({ item, locale, labels, classNames }: PollResultOptionProps): react.JSX.Element;
 declare function PollResultView({ schema, analytics, locale, labels, classNames }: PollResultViewProps): react.JSX.Element;
 interface PollResultsProps extends Omit<PollResultViewProps, "analytics"> {
     readonly adapter: PollRuntimeAdapter<FormAnalytics>;
     readonly submitted: boolean;
+    readonly alreadyVoted?: boolean;
     readonly closed: boolean;
     readonly canViewResults: boolean;
     readonly submissionRevision?: number;
 }
-declare function PollResults({ schema, adapter, submitted, closed, canViewResults, submissionRevision, locale, labels, classNames }: PollResultsProps): react.JSX.Element | null;
+declare function PollResults({ schema, adapter, submitted, alreadyVoted, closed, canViewResults, submissionRevision, locale, labels, classNames }: PollResultsProps): react.JSX.Element | null;
 interface ContentRendererOptions {
     readonly quiz?: {
         readonly showImmediateFeedback?: boolean;
@@ -1439,12 +1470,16 @@ interface ContentRendererOptions {
         readonly adapter: PollRuntimeAdapter<FormAnalytics>;
         readonly closed: boolean;
         readonly canViewResults: boolean;
+        readonly alreadyVoted?: boolean;
         readonly submissionRevision?: number;
         readonly labels?: Partial<PollResultLabels>;
     };
 }
 interface ContentRendererSlots extends FormRendererSlots {
     readonly renderPollResults?: (props: PollResultsProps) => ReactNode;
+    readonly renderPollResultOption?: (props: PollResultOptionProps) => ReactNode;
+    readonly renderPollResultsLoading?: (props: PollResultsLoadingProps) => ReactNode;
+    readonly renderPollResultsError?: (props: PollResultsErrorProps) => ReactNode;
     readonly renderQuizFeedback?: (props: QuizQuestionFeedbackProps) => ReactNode;
     readonly renderQuizSummary?: (props: QuizResultSummaryProps) => ReactNode;
     readonly renderInvalidQuiz?: (issues: ReturnType<typeof getContentModeDiagnostics>) => ReactNode;
@@ -1512,6 +1547,7 @@ declare function useField(fieldId: string): FieldState;
 interface UsePollResultsProps<T> extends PollAccessContext {
     readonly schema: FormSchema;
     readonly adapter: PollRuntimeAdapter<T>;
+    readonly alreadyVoted?: boolean;
     readonly submissionRevision?: number;
 }
 declare function usePollResults<T>(props: UsePollResultsProps<T>): {
@@ -1562,4 +1598,4 @@ interface FormEngineI18nProviderProps {
 declare function FormEngineI18nProvider({ locale, fallbackLocale, messages, customCatalogs, customDictionary, onMissingKey, strict, translator: customTranslator, children }: FormEngineI18nProviderProps): react.JSX.Element;
 declare function useFormEngineI18n(): FormEngineI18nContextValue;
 
-export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderBasicSettingsSlotProps, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, BuilderPageConditionEditor, type BuilderPageConditionEditorProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, ContentRenderer, type ContentRendererClassNames, type ContentRendererOptions, type ContentRendererProps, type ContentRendererSlots, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, type FormAfterFormSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererClassNames, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type PollResultLabels, PollResultView, type PollResultViewProps, PollResults, type PollResultsProps, type QuizFeedbackLabels, QuizQuestionFeedback, type QuizQuestionFeedbackProps, QuizResultSummary, type QuizResultSummaryProps, type QuizSummaryLabels, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdentity, type SubmissionIdentityOptions, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedContentRendererProps, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UsePollResultsProps, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, createSubmissionIdentity, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, usePollResults, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, validateLocalePipeline };
+export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderBasicSettingsSlotProps, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, BuilderPageConditionEditor, type BuilderPageConditionEditorProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ChoiceOptionAfterSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, ContentRenderer, type ContentRendererClassNames, type ContentRendererOptions, type ContentRendererProps, type ContentRendererSlots, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, type FormAfterFormSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererClassNames, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type PollResultItem, type PollResultLabels, PollResultOption, type PollResultOptionProps, PollResultView, type PollResultViewProps, PollResults, type PollResultsErrorProps, type PollResultsLoadingProps, type PollResultsProps, type QuizFeedbackLabels, QuizQuestionFeedback, type QuizQuestionFeedbackProps, QuizResultSummary, type QuizResultSummaryProps, type QuizSummaryLabels, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdentity, type SubmissionIdentityOptions, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedContentRendererProps, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UsePollResultsProps, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, createSubmissionIdentity, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, usePollResults, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, validateLocalePipeline };

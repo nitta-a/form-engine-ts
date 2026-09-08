@@ -14,13 +14,16 @@ import {
   FormEngineI18nProvider,
   type FormRendererProps,
   type FormSubmissionMetadata,
+  type PollResultOptionProps,
+  type PollResultsErrorProps,
+  type PollResultsLoadingProps,
   type TypedFormRendererProps
 } from "@form-engine-ts/react";
-import { Alert, Stack, Typography } from "@mui/material";
+import { Alert, Button, LinearProgress, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import { muiContentTranslation } from "./contentTranslation";
 import { MuiFormBuilderContext } from "./context";
-import { MuiPollResults, type MuiPollResultsSlotProps, type MuiPollResultsSlots } from "./MuiPollResults";
+import type { MuiPollResultsSlotProps, MuiPollResultsSlots } from "./MuiPollResults";
 import { QuizResultView, type QuizResultViewProps } from "./QuizResultView";
 import { MuiChoiceGroupSlot } from "./slots";
 import type { MuiAdapterOptions, MuiFormEngineI18nOptions } from "./types";
@@ -35,6 +38,7 @@ export interface MuiPollRendererOptions {
   readonly adapter: PollRuntimeAdapter<FormAnalytics>;
   readonly closed: boolean;
   readonly canViewResults: boolean;
+  readonly alreadyVoted?: boolean;
   readonly submissionRevision?: number;
   readonly slots?: MuiPollResultsSlots;
   readonly slotProps?: MuiPollResultsSlotProps;
@@ -104,6 +108,7 @@ function MuiQuizSummary({
   readonly i18n?: MuiFormEngineI18nOptions;
   readonly options?: MuiQuizRendererOptions;
 }) {
+  if (result.passed === undefined && options?.resultViewProps?.showScore !== true) return null;
   return (
     <QuizResultView
       {...options?.resultViewProps}
@@ -117,25 +122,66 @@ function MuiQuizSummary({
   );
 }
 
-function MuiPollResultsSlot(
-  props: Parameters<NonNullable<ContentRendererSlots["renderPollResults"]>>[0] & {
-    readonly options: MuiPollRendererOptions;
-    readonly i18n?: MuiFormEngineI18nOptions;
-  }
-) {
-  const { options, i18n, ...poll } = props;
+function MuiPollResultOption({
+  item,
+  locale,
+  options,
+  i18n
+}: PollResultOptionProps & {
+  readonly options: MuiPollRendererOptions;
+  readonly i18n?: MuiFormEngineI18nOptions;
+}) {
+  const { locale: resolvedLocale, translate: t } = muiContentTranslation(locale, i18n);
+  const resultItem = { ...item };
+  if (options.slots?.option !== undefined) return <>{options.slots.option(resultItem)}</>;
   return (
-    <MuiPollResults
-      schema={poll.schema}
-      submitted={poll.submitted}
-      adapter={options.adapter}
-      closed={options.closed}
-      canViewResults={options.canViewResults}
-      {...(options.submissionRevision === undefined ? {} : { submissionRevision: options.submissionRevision })}
-      {...(i18n === undefined ? {} : { i18n })}
-      {...(options.slots === undefined ? {} : { slots: options.slots })}
-      {...(options.slotProps === undefined ? {} : { slotProps: options.slotProps })}
-    />
+    <Stack component="span" spacing={0.5} sx={{ flex: 1, minWidth: 0 }} data-poll-result-option>
+      <LinearProgress
+        {...options.slotProps?.progress}
+        variant="determinate"
+        value={item.percentage}
+        aria-label={`${item.label}: ${item.percentage}%`}
+      />
+      <Typography {...options.slotProps?.count} component={options.slotProps?.count?.component ?? "span"}>
+        {new Intl.NumberFormat(resolvedLocale).format(item.count)} {t("content.results.votes")} (
+        {new Intl.NumberFormat(resolvedLocale).format(item.percentage)}%)
+      </Typography>
+    </Stack>
+  );
+}
+
+function MuiPollResultsLoading({
+  options,
+  props
+}: {
+  readonly options: MuiPollRendererOptions;
+  readonly props: PollResultsLoadingProps;
+}) {
+  return (
+    options.slots?.loading?.() ?? (
+      <Typography {...options.slotProps?.loading} role="status">
+        {props.label}
+      </Typography>
+    )
+  );
+}
+
+function MuiPollResultsError({
+  options,
+  props
+}: {
+  readonly options: MuiPollRendererOptions;
+  readonly props: PollResultsErrorProps;
+}) {
+  return (
+    options.slots?.error?.(props.error, props.onRetry) ?? (
+      <Alert {...options.slotProps?.error} severity="error" role="alert">
+        {props.error.message || props.labels.loadError}{" "}
+        <Button {...options.slotProps?.retry} type="button" onClick={props.onRetry}>
+          {props.labels.retry}
+        </Button>
+      </Alert>
+    )
   );
 }
 
@@ -194,11 +240,25 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
           {...(quizOptions?.renderInvalid === undefined ? {} : { renderInvalid: quizOptions.renderInvalid })}
         />
       )),
-    ...(pollOptions === undefined || contentSlots?.renderPollResults !== undefined
+    ...(pollOptions === undefined || contentSlots?.renderPollResultOption !== undefined
       ? {}
       : {
-          renderPollResults: (poll) => (
-            <MuiPollResultsSlot {...poll} options={pollOptions} {...(i18n === undefined ? {} : { i18n })} />
+          renderPollResultOption: (poll: PollResultOptionProps) => (
+            <MuiPollResultOption {...poll} options={pollOptions} {...(i18n === undefined ? {} : { i18n })} />
+          )
+        }),
+    ...(pollOptions === undefined || contentSlots?.renderPollResultsLoading !== undefined
+      ? {}
+      : {
+          renderPollResultsLoading: (poll: PollResultsLoadingProps) => (
+            <MuiPollResultsLoading options={pollOptions} props={poll} />
+          )
+        }),
+    ...(pollOptions === undefined || contentSlots?.renderPollResultsError !== undefined
+      ? {}
+      : {
+          renderPollResultsError: (poll: PollResultsErrorProps) => (
+            <MuiPollResultsError options={pollOptions} props={poll} />
           )
         })
   };
@@ -219,6 +279,7 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
             adapter: pollOptions.adapter,
             closed: pollOptions.closed,
             canViewResults: pollOptions.canViewResults,
+            ...(pollOptions.alreadyVoted === undefined ? {} : { alreadyVoted: pollOptions.alreadyVoted }),
             ...(pollOptions.submissionRevision === undefined
               ? {}
               : { submissionRevision: pollOptions.submissionRevision })

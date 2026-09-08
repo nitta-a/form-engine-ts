@@ -14,11 +14,16 @@ import {
   readQuizFieldMetadata,
   readQuizMetadata
 } from "@form-engine-ts/core";
-import type { ReactNode } from "react";
+import { createContext, createElement, Fragment, type ReactNode, useContext } from "react";
 import { useForm } from "./context";
 import { usePollResults } from "./hooks/usePollResults";
 import { FormRenderer, type FormRendererProps, type TypedFormRendererProps } from "./renderer";
-import type { ChoiceGroupSlotProps, FormRendererClassNames, FormRendererSlots } from "./types";
+import type {
+  ChoiceGroupSlotProps,
+  ChoiceOptionAfterSlotProps,
+  FormRendererClassNames,
+  FormRendererSlots
+} from "./types";
 
 export interface ContentRendererClassNames extends FormRendererClassNames {
   readonly pollResults?: string;
@@ -54,6 +59,33 @@ export interface PollResultLabels {
   readonly loading: string;
   readonly retry: string;
   readonly loadError: string;
+}
+
+export interface PollResultItem {
+  readonly optionId: string;
+  readonly label: string;
+  readonly count: number;
+  readonly percentage: number;
+  readonly checked?: boolean;
+}
+
+export interface PollResultOptionProps {
+  readonly item: PollResultItem;
+  readonly locale: string;
+  readonly labels: Pick<PollResultLabels, "votes">;
+  readonly classNames: Pick<ContentRendererClassNames, "pollResultOption" | "pollResultProgress" | "pollResultCount">;
+}
+
+export interface PollResultsLoadingProps {
+  readonly locale: string;
+  readonly label: string;
+}
+
+export interface PollResultsErrorProps {
+  readonly error: Error;
+  readonly onRetry: () => void;
+  readonly locale: string;
+  readonly labels: Pick<PollResultLabels, "retry" | "loadError">;
 }
 
 export interface QuizQuestionFeedbackProps {
@@ -114,6 +146,7 @@ export interface QuizResultSummaryProps {
 }
 
 export function QuizResultSummary({ result, locale = "en", labels, className }: QuizResultSummaryProps) {
+  if (result.passed === undefined) return createElement(Fragment);
   const catalog = locale.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
   const resolved: QuizSummaryLabels = {
     totalScore: labels?.totalScore ?? catalog["content.results.totalScore"],
@@ -125,7 +158,7 @@ export function QuizResultSummary({ result, locale = "en", labels, className }: 
       <p>
         {resolved.totalScore}: {result.score} / {result.total}
       </p>
-      {result.passed === undefined ? null : <p>{result.passed ? resolved.passed : resolved.notPassed}</p>}
+      <p>{result.passed ? resolved.passed : resolved.notPassed}</p>
     </section>
   );
 }
@@ -141,7 +174,7 @@ export interface PollResultViewProps {
   >;
 }
 
-function pollItems(schema: FormSchema, analytics: FormAnalytics) {
+function pollItems(schema: FormSchema, analytics: FormAnalytics): readonly PollResultItem[] {
   const field = schema.fields[0];
   const aggregate = analytics.questions.find(
     (question): question is ChoiceQuestionAggregate =>
@@ -152,11 +185,42 @@ function pollItems(schema: FormSchema, analytics: FormAnalytics) {
   return field.options.map((option) => {
     const item = aggregate.options.find((candidate) => candidate.id === option.id);
     return {
-      ...option,
+      optionId: option.id,
+      label: option.label,
       count: item?.count ?? 0,
       percentage: Math.min(100, Math.max(0, item?.percentageOfSubmissions ?? 0))
     };
   });
+}
+
+function pollResultItem(
+  schema: FormSchema,
+  analytics: FormAnalytics,
+  optionId: string,
+  checked: boolean
+): PollResultItem | undefined {
+  const item = pollItems(schema, analytics).find((candidate) => candidate.optionId === optionId);
+  return item === undefined ? undefined : { ...item, checked };
+}
+
+export function PollResultOption({ item, locale, labels, classNames }: PollResultOptionProps) {
+  const number = new Intl.NumberFormat(locale);
+  return (
+    <span
+      className={["fe-poll-result-option", classNames.pollResultOption].filter(Boolean).join(" ")}
+      data-poll-result-option
+    >
+      <progress
+        className={classNames.pollResultProgress}
+        value={item.percentage}
+        max={100}
+        aria-label={`${item.label}: ${item.percentage}%`}
+      />
+      <span className={classNames.pollResultCount}>
+        {number.format(item.count)} {labels.votes} ({number.format(item.percentage)}%)
+      </span>
+    </span>
+  );
 }
 
 export function PollResultView({ schema, analytics, locale = "en", labels, classNames = {} }: PollResultViewProps) {
@@ -174,7 +238,7 @@ export function PollResultView({ schema, analytics, locale = "en", labels, class
       <h2>{resolved.title}</h2>
       <ul>
         {pollItems(schema, analytics).map((item) => (
-          <li className={classNames.pollResultOption} key={item.id}>
+          <li className={classNames.pollResultOption} key={item.optionId}>
             <span>{item.label}</span>
             <progress
               className={classNames.pollResultProgress}
@@ -195,6 +259,7 @@ export function PollResultView({ schema, analytics, locale = "en", labels, class
 export interface PollResultsProps extends Omit<PollResultViewProps, "analytics"> {
   readonly adapter: PollRuntimeAdapter<FormAnalytics>;
   readonly submitted: boolean;
+  readonly alreadyVoted?: boolean;
   readonly closed: boolean;
   readonly canViewResults: boolean;
   readonly submissionRevision?: number;
@@ -204,6 +269,7 @@ export function PollResults({
   schema,
   adapter,
   submitted,
+  alreadyVoted,
   closed,
   canViewResults,
   submissionRevision,
@@ -215,6 +281,7 @@ export function PollResults({
     schema,
     adapter,
     submitted,
+    ...(alreadyVoted === undefined ? {} : { alreadyVoted }),
     closed,
     canViewResults,
     ...(submissionRevision === undefined ? {} : { submissionRevision })
@@ -252,6 +319,7 @@ export interface ContentRendererOptions {
     readonly adapter: PollRuntimeAdapter<FormAnalytics>;
     readonly closed: boolean;
     readonly canViewResults: boolean;
+    readonly alreadyVoted?: boolean;
     readonly submissionRevision?: number;
     readonly labels?: Partial<PollResultLabels>;
   };
@@ -259,6 +327,9 @@ export interface ContentRendererOptions {
 
 export interface ContentRendererSlots extends FormRendererSlots {
   readonly renderPollResults?: (props: PollResultsProps) => ReactNode;
+  readonly renderPollResultOption?: (props: PollResultOptionProps) => ReactNode;
+  readonly renderPollResultsLoading?: (props: PollResultsLoadingProps) => ReactNode;
+  readonly renderPollResultsError?: (props: PollResultsErrorProps) => ReactNode;
   readonly renderQuizFeedback?: (props: QuizQuestionFeedbackProps) => ReactNode;
   readonly renderQuizSummary?: (props: QuizResultSummaryProps) => ReactNode;
   readonly renderInvalidQuiz?: (issues: ReturnType<typeof getContentModeDiagnostics>) => ReactNode;
@@ -291,18 +362,151 @@ function questionResult(field: ChoiceGroupSlotProps["field"], answer: unknown): 
   };
 }
 
+interface PollResultsContextValue {
+  readonly schema: FormSchema;
+  readonly result: ReturnType<typeof usePollResults<FormAnalytics>>;
+  readonly locale: string;
+  readonly labels: PollResultLabels;
+  readonly classNames: ContentRendererClassNames;
+  readonly renderOption?: ContentRendererSlots["renderPollResultOption"];
+}
+
+const PollResultsContext = createContext<PollResultsContextValue | undefined>(undefined);
+
+function ContentPollResultOption({ option, checked }: ChoiceOptionAfterSlotProps) {
+  const context = useContext(PollResultsContext);
+  if (context === undefined || !context.result.enabled || context.result.loading || context.result.data === undefined)
+    return null;
+  const item = pollResultItem(context.schema, context.result.data, option.id, checked) ?? {
+    optionId: option.id,
+    label: option.label,
+    count: 0,
+    percentage: 0,
+    checked
+  };
+  const props: PollResultOptionProps = {
+    item,
+    locale: context.locale,
+    labels: { votes: context.labels.votes },
+    classNames: context.classNames
+  };
+  return context.renderOption?.(props) ?? <PollResultOption {...props} />;
+}
+
+function renderChoiceGroup(props: ChoiceGroupSlotProps, custom: ContentRendererSlots["renderChoiceGroup"]) {
+  if (custom !== undefined) return <>{custom(props)}</>;
+  return (
+    <fieldset
+      className={props.className}
+      data-field-id={props.field.id}
+      data-field-type={props.field.type}
+      data-quiz-result={props.quizResult}
+    >
+      <legend>{props.title}</legend>
+      {props.description === undefined ? null : <p>{props.description}</p>}
+      {props.children}
+      {props.error === undefined ? null : <p role="alert">{props.error.message}</p>}
+    </fieldset>
+  );
+}
+
+function PollChoiceGroup({
+  props,
+  options,
+  custom,
+  classNames,
+  renderOption,
+  renderLoading,
+  renderError
+}: {
+  readonly props: ChoiceGroupSlotProps;
+  readonly options: NonNullable<ContentRendererOptions["poll"]>;
+  readonly custom: ContentRendererSlots["renderChoiceGroup"];
+  readonly classNames: ContentRendererClassNames;
+  readonly renderOption?: ContentRendererSlots["renderPollResultOption"];
+  readonly renderLoading?: ContentRendererSlots["renderPollResultsLoading"];
+  readonly renderError?: ContentRendererSlots["renderPollResultsError"];
+}) {
+  const form = useForm();
+  const result = usePollResults({
+    schema: form.schema,
+    adapter: options.adapter,
+    submitted: props.submitStatus === "success",
+    ...(options.alreadyVoted === undefined ? {} : { alreadyVoted: options.alreadyVoted }),
+    closed: options.closed,
+    canViewResults: options.canViewResults,
+    ...(options.submissionRevision === undefined ? {} : { submissionRevision: options.submissionRevision })
+  });
+  const catalog = form.locale.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
+  const labels: PollResultLabels = {
+    title: options.labels?.title ?? catalog["content.results.pollResults"],
+    votes: options.labels?.votes ?? catalog["content.results.votes"],
+    loading: options.labels?.loading ?? catalog["content.results.loading"],
+    retry: options.labels?.retry ?? catalog["content.results.retry"],
+    loadError: options.labels?.loadError ?? catalog["content.results.loadError"]
+  };
+  const contextValue: PollResultsContextValue = {
+    schema: form.schema,
+    result,
+    locale: form.locale,
+    labels,
+    classNames,
+    renderOption
+  };
+  let status: ReactNode = null;
+  if (result.enabled && result.loading) {
+    const loadingProps: PollResultsLoadingProps = { locale: form.locale, label: labels.loading };
+    status = renderLoading?.(loadingProps) ?? <p role="status">{labels.loading}</p>;
+  } else if (result.enabled && result.error !== undefined) {
+    const errorProps: PollResultsErrorProps = {
+      error: result.error,
+      onRetry: result.reload,
+      locale: form.locale,
+      labels: { retry: labels.retry, loadError: labels.loadError }
+    };
+    status = renderError?.(errorProps) ?? (
+      <div role="alert">
+        <p>{labels.loadError}</p>
+        <button type="button" onClick={result.reload}>
+          {labels.retry}
+        </button>
+      </div>
+    );
+  }
+  return renderChoiceGroup(
+    {
+      ...props,
+      children: (
+        <>
+          <PollResultsContext.Provider value={contextValue}>{props.children}</PollResultsContext.Provider>
+          {status}
+        </>
+      )
+    },
+    custom
+  );
+}
+
 function ContentChoiceGroup({
   props,
   options,
   custom,
   renderFeedback,
-  classNames
+  classNames,
+  inlinePollResults,
+  renderOption,
+  renderLoading,
+  renderError
 }: {
   readonly props: ChoiceGroupSlotProps;
   readonly options: ContentRendererOptions | undefined;
   readonly custom: ContentRendererSlots["renderChoiceGroup"];
   readonly renderFeedback?: ContentRendererSlots["renderQuizFeedback"];
   readonly classNames: ContentRendererClassNames;
+  readonly inlinePollResults: boolean;
+  readonly renderOption?: ContentRendererSlots["renderPollResultOption"];
+  readonly renderLoading?: ContentRendererSlots["renderPollResultsLoading"];
+  readonly renderError?: ContentRendererSlots["renderPollResultsError"];
 }) {
   const form = useForm();
   const mode = getFormContentMode(form.schema.metadata);
@@ -354,20 +558,19 @@ function ContentChoiceGroup({
       : {}),
     children
   };
-  if (custom !== undefined) return <>{custom(nextProps)}</>;
-  return (
-    <fieldset
-      className={nextProps.className}
-      data-field-id={props.field.id}
-      data-field-type={props.field.type}
-      data-quiz-result={nextProps.quizResult}
-    >
-      <legend>{props.title}</legend>
-      {props.description === undefined ? null : <p>{props.description}</p>}
-      {children}
-      {props.error === undefined ? null : <p role="alert">{props.error.message}</p>}
-    </fieldset>
-  );
+  if (mode === "poll" && options?.poll !== undefined && inlinePollResults)
+    return (
+      <PollChoiceGroup
+        props={nextProps}
+        options={options.poll}
+        custom={custom}
+        classNames={classNames}
+        renderOption={renderOption}
+        renderLoading={renderLoading}
+        renderError={renderError}
+      />
+    );
+  return renderChoiceGroup(nextProps, custom);
 }
 
 function InvalidContent({
@@ -387,8 +590,15 @@ function InvalidContent({
 function ContentRendererImplementation(props: ContentRendererProps | TypedContentRendererProps) {
   const { contentModeOptions, classNames = {}, slots = {}, ...rendererProps } = props;
   const appearance = rendererProps.appearance;
+  const inlinePollResults = slots.renderPollResults === undefined && slots.renderAfterForm === undefined;
   const standardSlots: FormRendererSlots = {
     ...slots,
+    renderChoiceOptionAfter: (optionProps) => (
+      <>
+        {slots.renderChoiceOptionAfter?.(optionProps)}
+        {inlinePollResults ? <ContentPollResultOption {...optionProps} /> : null}
+      </>
+    ),
     renderChoiceGroup: (choiceProps) => (
       <ContentChoiceGroup
         props={choiceProps}
@@ -396,6 +606,10 @@ function ContentRendererImplementation(props: ContentRendererProps | TypedConten
         custom={slots.renderChoiceGroup}
         renderFeedback={slots.renderQuizFeedback}
         classNames={classNames}
+        inlinePollResults={inlinePollResults}
+        renderOption={slots.renderPollResultOption}
+        renderLoading={slots.renderPollResultsLoading}
+        renderError={slots.renderPollResultsError}
       />
     )
   };
@@ -410,7 +624,7 @@ function ContentRendererImplementation(props: ContentRendererProps | TypedConten
         locale,
         classNames
       };
-      return slots.renderPollResults?.(pollProps) ?? <PollResults {...pollProps} />;
+      return slots.renderPollResults?.(pollProps) ?? null;
     }
     if (mode !== "quiz") return null;
     const issues = getContentModeDiagnostics(state.schema);

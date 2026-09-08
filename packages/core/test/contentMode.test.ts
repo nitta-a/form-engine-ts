@@ -47,6 +47,8 @@ describe("content modes", () => {
     };
     expect(evaluateQuiz(schema, { "question-1": "option-2" })).toMatchObject({ score: 2, total: 2, passed: true });
     expect(evaluateQuiz(schema, {})).toMatchObject({ score: 0, passed: false });
+    const noThreshold = { ...schema, metadata: contentMetadataToJson({ mode: "quiz", quiz: {} }) };
+    expect(evaluateQuiz(noThreshold, { "question-1": "option-2" })).not.toHaveProperty("passed");
     const hidden = {
       ...schema,
       fields: [

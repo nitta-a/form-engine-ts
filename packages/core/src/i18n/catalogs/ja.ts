@@ -27,6 +27,7 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "builder.content.strictOneVotePerUser": "一人一票",
   "builder.content.showExplanation": "解説表示タイミング",
   "builder.content.immediate": "選択直後",
+  "builder.content.enablePassingScore": "合格ラインを設定",
   "builder.content.passingScore": "合格ライン点数",
   "builder.content.correctAnswer": "正解",
   "builder.content.explanation": "解説",

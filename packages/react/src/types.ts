@@ -936,6 +936,12 @@ export interface ChoiceGroupSlotProps {
   readonly className?: string;
 }
 
+export interface ChoiceOptionAfterSlotProps {
+  readonly field: Question;
+  readonly option: FieldOption;
+  readonly checked: boolean;
+}
+
 export interface FormRendererSlotProps {
   readonly choiceGroup?: {
     readonly className?: string;
@@ -984,6 +990,7 @@ export interface FormRendererSlots {
     readonly current: number;
     readonly max: number;
   }) => ReactNode;
+  readonly renderChoiceOptionAfter?: (props: ChoiceOptionAfterSlotProps) => ReactNode;
   readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
 

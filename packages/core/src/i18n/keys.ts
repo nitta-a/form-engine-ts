@@ -13,6 +13,7 @@ export type KnownBuilderTranslationKey =
   | "builder.content.strictOneVotePerUser"
   | "builder.content.showExplanation"
   | "builder.content.immediate"
+  | "builder.content.enablePassingScore"
   | "builder.content.passingScore"
   | "builder.content.correctAnswer"
   | "builder.content.explanation"

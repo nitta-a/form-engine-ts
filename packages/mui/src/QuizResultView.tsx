@@ -54,12 +54,13 @@ export interface QuizResultViewProps {
 export function QuizResultView({
   result,
   locale = "en",
-  showScore = true,
+  showScore,
   labels,
   slots = {},
   slotProps = {},
   i18n
 }: QuizResultViewProps) {
+  const resolvedShowScore = showScore ?? result.passed !== undefined;
   const { translate: t } = muiContentTranslation(locale, i18n);
   const resolvedLabels: QuizResultViewLabels = {
     totalScore: labels?.totalScore ?? t("content.results.totalScore"),
@@ -71,14 +72,14 @@ export function QuizResultView({
   };
   return (
     <Stack {...slotProps.root} spacing={slotProps.root?.spacing ?? 2}>
-      {showScore
+      {resolvedShowScore
         ? (slots.score?.(result) ?? (
             <Typography {...slotProps.score}>
               {resolvedLabels.totalScore}: {result.score} / {result.total}
             </Typography>
           ))
         : null}
-      {!showScore || result.passed === undefined
+      {!resolvedShowScore || result.passed === undefined
         ? null
         : (slots.status?.(result.passed) ?? (
             <Typography {...slotProps.status}>

@@ -160,6 +160,12 @@
   display: flex;
   gap: 0.5rem;
 }
+.fe-poll-result-option {
+  display: grid;
+  flex: 1;
+  gap: 0.25rem;
+  min-width: 0;
+}
 .fe-field-description {
   color: #667085;
   font-size: 0.875rem;

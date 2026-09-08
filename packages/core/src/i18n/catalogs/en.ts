@@ -15,6 +15,7 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "builder.content.strictOneVotePerUser": "One vote per user",
   "builder.content.showExplanation": "Explanation timing",
   "builder.content.immediate": "Immediately",
+  "builder.content.enablePassingScore": "Set a passing score",
   "builder.content.passingScore": "Passing score",
   "builder.content.correctAnswer": "Correct answer",
   "builder.content.explanation": "Explanation",

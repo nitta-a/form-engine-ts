@@ -10,13 +10,19 @@ import { useEffect, useState } from "react";
 export interface UsePollResultsProps<T> extends PollAccessContext {
   readonly schema: FormSchema;
   readonly adapter: PollRuntimeAdapter<T>;
+  readonly alreadyVoted?: boolean;
   readonly submissionRevision?: number;
 }
 export function usePollResults<T>(props: UsePollResultsProps<T>) {
-  const { schema, adapter, submitted, closed, canViewResults, submissionRevision = 0 } = props;
+  const { schema, adapter, submitted, alreadyVoted = false, closed, canViewResults, submissionRevision = 0 } = props;
+  const effectiveSubmitted = submitted || alreadyVoted;
   const enabled =
     getFormContentMode(schema.metadata) === "poll" &&
-    canShowPollResults(readPollMetadata(schema.metadata), { submitted, closed, canViewResults });
+    canShowPollResults(readPollMetadata(schema.metadata), {
+      submitted: effectiveSubmitted,
+      closed,
+      canViewResults
+    });
   const [retry, setRetry] = useState(0);
   const [state, setState] = useState<{
     schema: FormSchema;

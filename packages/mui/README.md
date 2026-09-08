@@ -226,9 +226,12 @@ Labels use `builder.content.*` translation keys, including `builder.content.poin
 投票・クイズでは質問形式の制約、追加時のradio既定値、保存可否に使える検証結果も自動適用されます。
 `contentModeOptions.controls`で各設定を編集可・読み取り専用・非表示にでき、
 `onValidationChange`で統合済みの検証状態を受け取れます。
+「合格ラインを設定」をオフにすると閾値なしとなり、回答画面では合計点と合否を表示しません。
 
 `ContentModeSettings` edits result visibility, strict-one-vote preference, explanation
-timing and optional passing score. It accepts `schema`, `onChange`, `locale`, `readOnly`,
+timing and an optional passing score threshold. Enable “Set a passing score” to configure
+the threshold; when disabled, the answer view omits total score and pass/fail status.
+It accepts `schema`, `onChange`, `locale`, `readOnly`,
 and optional builder `components` / `translate` overrides. `QuizOptionEditor` and
 `QuizFieldEditor` fit the additive builder slots
 `optionEditorAfter` and `fieldEditorAfter`, including the standard MUI field editor.
@@ -237,7 +240,10 @@ normal question/option controls. Deleted correct options require explicit resele
 Keep `createMuiBuilderProps` results stable across renders to preserve editor focus.
 
 `MuiContentRenderer` composes the MUI choice group, immediate/final quiz feedback and
-poll result loading around the existing React renderer. Explicit renderer slots win.
+poll result loading around the existing React renderer. Poll results appear inside
+each choice row with MUI progress bars and counts; `renderPollResultOption`,
+`renderPollResultsLoading`, and `renderPollResultsError` remain available for
+custom inline rendering. Explicit renderer slots win.
 The shared mode, submission and result logic is provided by React's headless
 `ContentRenderer`; this adapter supplies MUI field, feedback, summary and poll-result
 slots. Tailwind or other design systems can use `ContentRenderer` directly with typed
@@ -251,14 +257,16 @@ import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
   locale="en"
   onSubmit={saveSubmission}
   contentModeOptions={{
-    poll: { adapter: analyticsAdapter, closed, canViewResults, submissionRevision }
+    poll: { adapter: analyticsAdapter, alreadyVoted, closed, canViewResults, submissionRevision }
   }}
 />
 ```
 
 `QuizResultView` and `MuiPollResultView` accept labels, slots, slotProps and MUI i18n.
 `MuiPollResults` applies all Core visibility rules and supplies loading, error and retry
-states. The host still enforces voter identity, closing and access atomically when it
+states as a standalone aggregate view. An explicit `renderPollResults` slot can retain
+an aggregate result after the form. The optional `alreadyVoted` flag lets a host show
+`after_submit` results immediately for a previously persisted vote. The host still enforces voter identity, closing and access atomically when it
 persists or loads data.
 
 The default MUI quiz completion shows only score/pass. Existing result props and an
@@ -281,7 +289,10 @@ a future major can make that peer optional and require `/survey-domain` for the 
 日本語: 回答側は`@form-engine-ts/mui/renderer`の`MuiContentRenderer`を使うと、
 クイズの即時解説・送信後採点と投票結果の公開条件・読込・エラー・再試行をまとめて構成できます。
 判定・送信・結果取得はReactのheadless `ContentRenderer`に集約し、MUI adapterは
-field・feedback・summary・poll result slotだけを提供します。TailwindなどMUI以外では
+field・feedback・summary・poll result slotだけを提供します。投票結果は各選択肢の
+入力行に進捗バー・票数・割合として表示されます。ホストが`alreadyVoted`を渡すと、
+再訪時も送信なしで`after_submit`の結果を同じ入力行へ表示できます。`renderPollResultOption`、
+`renderPollResultsLoading`、`renderPollResultsError`で差し替えられます。TailwindなどMUI以外では
 `@form-engine-ts/react`の`ContentRenderer`へ型付き`classNames`を渡してください。
 明示したrenderer slotが自動表示より優先されます。本人確認、締切判定、閲覧認可、一人一票の重複防止は
 保存・読込を行うホスト側で強制してください。Creatorだけを使う場合は`/builder`、回答側は`/renderer`、

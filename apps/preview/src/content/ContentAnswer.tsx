@@ -12,7 +12,7 @@ import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
 import { ContentRenderer, type ContentRendererClassNames, FormProvider } from "@form-engine-ts/react";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 import { Alert, Button, Checkbox, FormControlLabel, Stack } from "@mui/material";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function browserIdentity(formId: string) {
   const key = `form-engine-preview_identity:${formId}`;
@@ -21,6 +21,14 @@ function browserIdentity(formId: string) {
   const value = crypto.randomUUID();
   localStorage.setItem(key, value);
   return value;
+}
+
+async function hasBrowserVote(storage: FormStorageAdapter, schema: FormSchema) {
+  const voter = browserIdentity(schema.id);
+  const records = await storage.listSchemas();
+  const versions = records.filter((item) => item.id === schema.id);
+  const groups = await Promise.all(versions.map((item) => storage.listSubmissions(item.id, item.version)));
+  return groups.flat().some((item) => item.metadata?.voter === voter);
 }
 
 export interface ContentAnswerProps {
@@ -33,6 +41,7 @@ function AnswerBody(
     readonly adapter: PollRuntimeAdapter<FormAnalytics>;
     readonly closed: boolean;
     readonly canViewResults: boolean;
+    readonly alreadyVoted?: boolean;
     readonly revision: number;
     readonly rendererKind: "mui" | "tailwind";
   }
@@ -42,6 +51,7 @@ function AnswerBody(
       adapter: props.adapter,
       closed: props.closed,
       canViewResults: props.canViewResults,
+      ...(props.alreadyVoted === undefined ? {} : { alreadyVoted: props.alreadyVoted }),
       submissionRevision: props.revision
     }
   };
@@ -76,7 +86,7 @@ function AnswerBody(
     choiceGroup: "grid gap-3 rounded-lg border border-slate-200 p-4",
     choiceLegend: "font-medium text-slate-800",
     choiceOptions: "grid gap-2",
-    choiceOption: "flex items-center gap-2 rounded-md p-2 hover:bg-slate-50",
+    choiceOption: "grid grid-cols-[auto_1fr] items-center gap-2 rounded-md p-2 hover:bg-slate-50",
     help: "text-sm text-slate-500",
     error: "text-sm text-red-700",
     navigation: "flex flex-wrap gap-3",
@@ -86,7 +96,7 @@ function AnswerBody(
     status: "grid gap-3",
     completion: "rounded-lg bg-emerald-50 p-4 text-emerald-900",
     pollResults: "grid gap-3 rounded-lg border border-slate-200 p-4",
-    pollResultOption: "grid gap-1",
+    pollResultOption: "col-start-2 grid gap-1",
     pollResultProgress: "w-full accent-blue-600",
     quizQuestionCorrect: "border-emerald-500 bg-emerald-50",
     quizQuestionIncorrect: "border-red-500 bg-red-50",
@@ -116,11 +126,34 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
   const [canViewResults, setCanViewResults] = useState(true);
   const [failResults, setFailResults] = useState(false);
   const [failSubmit, setFailSubmit] = useState(false);
+  const [alreadyVoted, setAlreadyVoted] = useState<boolean | undefined>(undefined);
   const [revision, setRevision] = useState(0);
   const [rendererKind, setRendererKind] = useState<"mui" | "tailwind">("mui");
   const submitting = useRef(false);
   const ja = locale.startsWith("ja");
   const mode = getFormContentMode(schema.metadata);
+  const strictOneVotePerUser = readPollMetadata(schema.metadata).strictOneVotePerUser === true;
+  useEffect(() => {
+    let active = true;
+    if (mode !== "poll" || !strictOneVotePerUser) {
+      setAlreadyVoted(false);
+      return () => {
+        active = false;
+      };
+    }
+    setAlreadyVoted(undefined);
+    void hasBrowserVote(storage, schema).then(
+      (voted) => {
+        if (active) setAlreadyVoted(voted);
+      },
+      () => {
+        if (active) setAlreadyVoted(false);
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [mode, schema, storage, strictOneVotePerUser]);
   const adapter = useMemo<PollRuntimeAdapter<FormAnalytics>>(
     () => ({
       loadResults: async (current, signal) => {
@@ -132,11 +165,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
       canVote: async (current) => {
         if (closed) return false;
         if (!readPollMetadata(current.metadata).strictOneVotePerUser) return true;
-        const voter = browserIdentity(current.id);
-        const records = await storage.listSchemas();
-        const versions = records.filter((item) => item.id === current.id);
-        const groups = await Promise.all(versions.map((item) => storage.listSubmissions(item.id, item.version)));
-        return !groups.flat().some((item) => item.metadata?.voter === voter);
+        return !(await hasBrowserVote(storage, current));
       }
     }),
     [storage, closed, failResults, ja]
@@ -207,6 +236,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
               metadata: { source: "preview", voter: browserIdentity(schema.id) }
             });
             await storage.saveSubmission(submission);
+            setAlreadyVoted(true);
             setRevision((current) => current + 1);
           } finally {
             submitting.current = false;
@@ -220,6 +250,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
           adapter={adapter}
           closed={closed}
           canViewResults={canViewResults}
+          {...(alreadyVoted === undefined ? {} : { alreadyVoted })}
           revision={revision}
           rendererKind={rendererKind}
         />

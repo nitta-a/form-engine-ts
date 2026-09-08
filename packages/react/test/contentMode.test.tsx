@@ -1,4 +1,9 @@
-import { createInitialSchemaByMode, getContentModePolicy, type PollRuntimeAdapter } from "@form-engine-ts/core";
+import {
+  contentMetadataToJson,
+  createInitialSchemaByMode,
+  getContentModePolicy,
+  type PollRuntimeAdapter
+} from "@form-engine-ts/core";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useFormBuilder } from "../src/hooks/useFormBuilder";
@@ -31,6 +36,23 @@ describe("content mode controllers", () => {
     rerender({ submitted: true, canViewResults: false });
     expect(result.current.data).toBeUndefined();
     expect(loadResults).toHaveBeenCalledTimes(2);
+  });
+  it.each([
+    ["always", true],
+    ["after_submit", true],
+    ["closed_only", false],
+    ["private", false]
+  ] as const)("treats an existing vote as submitted only for %s", (resultVisibility, enabled) => {
+    const initial = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    const schema = {
+      ...initial,
+      metadata: contentMetadataToJson({ mode: "poll", poll: { resultVisibility } })
+    };
+    const adapter: PollRuntimeAdapter<number> = { loadResults: async () => 1, canVote: async () => false };
+    const { result } = renderHook(() =>
+      usePollResults({ schema, adapter, submitted: false, alreadyVoted: true, closed: false, canViewResults: true })
+    );
+    expect(result.current.enabled).toBe(enabled);
   });
   it("ignores a late response when the selected form changes", async () => {
     let resolveFirst: ((value: number) => void) | undefined;

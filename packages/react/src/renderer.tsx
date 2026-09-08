@@ -241,6 +241,7 @@ function DefaultField({
   readOnly,
   submitStatus,
   submittedValue,
+  renderChoiceOptionAfter,
   ...props
 }: FieldComponentProps & {
   readonly groupedChoiceFields: boolean;
@@ -251,6 +252,7 @@ function DefaultField({
   readonly readOnly?: boolean | undefined;
   readonly submitStatus?: FormSubmitStatus | undefined;
   readonly submittedValue?: unknown;
+  readonly renderChoiceOptionAfter?: FormRendererSlots["renderChoiceOptionAfter"];
 }) {
   const { field, value, setValue, inputId, error, translate } = props;
   const isGroupedChoiceField =
@@ -405,6 +407,7 @@ function DefaultField({
                     }}
                   />
                   <span>{option.label}</span>
+                  {renderChoiceOptionAfter?.({ field, option, checked })}
                 </label>
               );
             })}
@@ -446,6 +449,7 @@ function DefaultField({
                   onChange={() => setValue(option.id)}
                 />
                 <span>{option.label}</span>
+                {renderChoiceOptionAfter?.({ field, option, checked: value === option.id })}
               </label>
             );
           })}
@@ -495,6 +499,7 @@ function DefaultField({
                 }}
               />
               <span>{option.label}</span>
+              {renderChoiceOptionAfter?.({ field, option, checked })}
             </label>
           );
         })}
@@ -1696,6 +1701,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   appearance={appearance}
                   choiceGroupSlotProps={slotProps?.choiceGroup}
                   renderChoiceGroup={slots.renderChoiceGroup}
+                  renderChoiceOptionAfter={slots.renderChoiceOptionAfter}
                   disabled={interactionLocked}
                   submitStatus={submitState}
                   {...(submitState === "success" && activeCompletionData.answers[field.id] !== undefined

@@ -59,6 +59,30 @@ describe("poll publication and vote persistence", () => {
     await user.click(screen.getByRole("button", { name: "Retry submission" }));
     expect(await storage.listSubmissions(schema.id, schema.version)).toHaveLength(1);
   });
+  it("shows persisted results on remount without resubmitting", async () => {
+    const user = userEvent.setup();
+    const storage = createMemoryStorageAdapter();
+    const schema = {
+      ...createInitialSchemaByMode("poll", { title: "Poll", locale: "en" }),
+      metadata: { mode: "poll", poll: { resultVisibility: "after_submit", strictOneVotePerUser: true } }
+    };
+    await storage.saveSchema(schema);
+    const first = render(<ContentAnswer schema={schema} locale="en" storage={storage} />);
+    await user.click(screen.getByRole("radio", { name: "Option 1" }));
+    await user.click(screen.getByRole("button", { name: "Send response" }));
+    await waitFor(() => expect(screen.getByText("Submitted.")).toBeVisible());
+    first.unmount();
+    render(<ContentAnswer schema={schema} locale="en" storage={storage} />);
+    await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
+    expect(screen.getByText("1 votes (100%)")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Poll results" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Option 2" }));
+    await user.click(screen.getByLabelText("Tailwind"));
+    expect(screen.getByRole("radio", { name: "Option 2" })).toBeChecked();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    await user.click(screen.getByLabelText("MUI"));
+    expect(screen.getByRole("radio", { name: "Option 2" })).toBeChecked();
+  });
   it("keeps a successful submission when results fail and recovers without resubmitting", async () => {
     const user = userEvent.setup();
     const storage = createMemoryStorageAdapter();
