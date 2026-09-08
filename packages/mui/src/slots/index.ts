@@ -7,6 +7,7 @@ import { createMuiPagesEditorSlot, MuiPagesEditorSlot } from "./PagesEditor";
 import { createMuiToolbarSlot, MuiToolbarSlot } from "./Toolbar";
 
 export * from "./ConditionEditor";
+export * from "./ContentModeSettings";
 export * from "./FieldEditor";
 export * from "./Localization";
 export * from "./MuiChoiceGroupSlot";

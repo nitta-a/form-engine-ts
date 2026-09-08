@@ -4,10 +4,12 @@ import {
   type ConditionOperator,
   DEFAULT_FIELD_TYPE_DEFINITIONS,
   type DisplayCondition,
+  EN_MESSAGES,
   type FieldType,
   type FormField,
   type FormPolicy,
   type FormSchema,
+  JA_MESSAGES,
   type JsonValue,
   type PopulateTranslationOptions,
   populateSchemaTranslations,
@@ -923,6 +925,7 @@ export function FormBuilder({
   const builderClass = (value: string): string | undefined => (defaultStylesDisabled ? undefined : value);
   const { Button, Checkbox, ErrorMessage, Fieldset, IconButton, Section, Select, TextArea, TextInput } = components;
   const ToolbarSlot = slots?.toolbar;
+  const BasicSettingsAfter = slots?.basicSettingsAfter;
   const FieldEditorSlot = slots?.fieldEditor;
   const OptionEditorSlot = slots?.optionEditor;
   const OptionEditorAfter = slots?.optionEditorAfter;
@@ -953,7 +956,7 @@ export function FormBuilder({
       key,
       BUILDER_TRANSLATION_ALIASES[key] === undefined ? [] : [BUILDER_TRANSLATION_ALIASES[key]],
       resolvedTranslator,
-      BUILDER_DEFAULTS,
+      key.startsWith("builder.content.") ? (locale.startsWith("ja") ? JA_MESSAGES : EN_MESSAGES) : BUILDER_DEFAULTS,
       params,
       locale
     );
@@ -1342,6 +1345,17 @@ export function FormBuilder({
                     />
                   </div>
                 </div>
+                {BasicSettingsAfter === undefined ? null : (
+                  <BasicSettingsAfter
+                    schema={schema}
+                    locale={locale}
+                    readOnly={readOnly}
+                    actions={actions}
+                    components={components}
+                    translate={translate}
+                    {...(onChange === undefined ? {} : { onChange })}
+                  />
+                )}
               </Section>
             </BuilderSectionGroup>
             <BuilderSectionGroup name="submissionSettings">

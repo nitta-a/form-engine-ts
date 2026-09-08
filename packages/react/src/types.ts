@@ -261,6 +261,10 @@ export interface BuilderToolbarSlotProps extends BuilderSlotBaseProps {
   readonly onRemove: () => void;
 }
 
+export interface BuilderBasicSettingsSlotProps extends BuilderSlotBaseProps {
+  readonly locale: string;
+}
+
 export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
   readonly field: FormField;
   readonly index: number;
@@ -559,6 +563,7 @@ export interface FormBuilderSubmissionSettingsOptions {
 }
 
 export interface FormBuilderSlots {
+  readonly basicSettingsAfter?: ComponentType<BuilderBasicSettingsSlotProps>;
   readonly fieldEditorAfter?: ComponentType<BuilderFieldEditorSlotProps>;
   readonly optionEditorAfter?: ComponentType<BuilderOptionEditorSlotProps>;
   readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;

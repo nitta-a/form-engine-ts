@@ -22,6 +22,7 @@ import type {
   IconButtonProps,
   MenuProps,
   PaperProps,
+  RadioProps,
   SelectProps,
   StackProps,
   TextFieldProps
@@ -130,6 +131,7 @@ export interface MuiSlotProps {
   readonly select?: MuiComponentSlotProps<SelectProps>;
   readonly selectMenu?: Partial<MenuProps>;
   readonly checkbox?: MuiComponentSlotProps<CheckboxProps>;
+  readonly radio?: MuiComponentSlotProps<RadioProps>;
   readonly button?: MuiComponentSlotProps<ButtonProps>;
   readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
 }
@@ -143,6 +145,7 @@ export interface MuiBuilderSlotProps {
   readonly select?: MuiComponentSlotProps<SelectProps>;
   readonly selectMenu?: Partial<MenuProps>;
   readonly checkbox?: MuiComponentSlotProps<CheckboxProps>;
+  readonly radio?: MuiComponentSlotProps<RadioProps>;
   readonly button?: MuiComponentSlotProps<ButtonProps>;
   readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
 }

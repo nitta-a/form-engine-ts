@@ -4,6 +4,7 @@ import { resolveMuiAdapterOptions } from "./types";
 
 export interface MuiFormBuilderContextValue {
   readonly options: MuiAdapterOptions;
+  readonly showContentModeSelector?: boolean;
 }
 
 export const MuiFormBuilderContext = createContext<MuiFormBuilderContextValue>({ options: {} });

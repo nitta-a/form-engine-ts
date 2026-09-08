@@ -295,3 +295,14 @@ Pass `schema`, `page`, the slot's `components` and `translate`, optional `readOn
 It restricts source choices to preceding pages and shares the default builder's operator/value behavior. It renders
 through injected builder primitives, so adapters such as MUI can reuse it without importing vendor UI into React.
 Apply its result using `actions.updatePage`; remove the `displayCondition` property when the result is `undefined`.
+
+### Additional basic settings
+
+`slots.basicSettingsAfter` optionally renders inside the basic settings section, after the common controls.
+Its exported `BuilderBasicSettingsSlotProps` provides `schema`, optional `onChange`, UI `locale`, `readOnly`,
+`actions`, resolved `components`, and `translate`. No content is added when the slot is omitted.
+This framework-neutral extension lets adapters add settings without replacing the standard builder.
+Custom slots must respect `readOnly` before emitting schema updates.
+
+日本語: `slots.basicSettingsAfter`で基本設定の末尾へUIを追加できます。
+`BuilderBasicSettingsSlotProps`からschema・更新コールバック・表示言語・readOnly・共通部品・翻訳を受け取ります。

@@ -161,8 +161,8 @@ and custom `renderOption`/`renderValue` callbacks, label-only or rich option dis
 size, variant, and width settings. Without a custom renderer, icons appear beside labels in the menu and in the selected
 value. The standard
 MUI field editor supplies icons for every field type and accepts `slots.fieldTypeSelect` and `slots.fieldEditorHeader`
-for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `button`, and
-`iconButton` MUI props in addition to the layout props.
+for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `radio`,
+`button`, and `iconButton` MUI props in addition to the layout props.
 `fieldEditorOptions.fieldTypeOptions` can explicitly order, sort, or transform the generated type choices without
 mutating the defaults.
 
@@ -172,9 +172,54 @@ accordion even when the parent passes inline option objects.
 
 ## Poll and quiz UI
 
+`MuiFormBuilder` automatically reads `schema.metadata.mode` through Core's `getFormContentMode`.
+Poll settings appear inside basic settings; quiz settings, correct-answer radios, explanation and points
+appear automatically without manually wiring additive slots. Missing or unknown modes retain the Survey UI.
+
+```tsx
+import { createInitialSchemaByMode } from "@form-engine-ts/core";
+import { MuiFormBuilder } from "@form-engine-ts/mui";
+import { useState } from "react";
+
+function Creator() {
+  // Use "poll" for a poll, "quiz" for a quiz, or "survey" for a survey.
+  const [schema, setSchema] = useState(() =>
+    createInitialSchemaByMode("quiz", { title: "My quiz", locale: "en" })
+  );
+  return (
+    <MuiFormBuilder
+      schema={schema}
+      onChange={setSchema}
+      contentModeOptions={{ showSelector: true }}
+      i18n={{ locale: "en" }}
+    />
+  );
+}
+```
+
+`contentModeOptions.showSelector` defaults to `false`; automatic Poll/Quiz editing is always enabled.
+Switching modes only changes `metadata.mode`, preserving questions, inactive mode settings and unknown metadata.
+The selector does not convert question types or enable mode validation. Those remain host policy decisions.
+
+Explicit `slots.basicSettingsAfter` replaces the whole additional settings area, including the selector.
+`slots.fieldEditorAfter` and `slots.optionEditorAfter` override the automatic quiz editors independently.
+Pass a component returning `null` to suppress a default. Custom `fieldEditor` implementations receive these
+additive slots through their existing props and remain responsible for rendering them.
+Low-level `createMuiBuilderProps` / `createMuiBuilderSlots` composition keeps its existing manual behavior,
+so applications that already render settings elsewhere do not acquire duplicate controls.
+
+Integrated controls respect `readOnly`, `components`, MUI options and applicable `muiSlotProps`.
+Labels use `builder.content.*` translation keys, including `builder.content.points` and
+`builder.content.mode`, and can be overridden with `i18n.messages`. English and Japanese are included.
+
+日本語: `MuiFormBuilder`単体で投票・クイズの設定と問題を編集できます。
+`contentModeOptions={{ showSelector: true }}`で種別切替を表示し、`i18n={{ locale: "ja" }}`で日本語になります。
+種別切替では質問や各種設定を保持します。個別slotの指定が自動UIより優先されます。
+
 `ContentModeSettings` edits result visibility, strict-one-vote preference, explanation
-timing and optional passing score. It accepts `schema`, `onChange`, `locale` and
-`readOnly`. `QuizOptionEditor` and `QuizFieldEditor` fit the additive builder slots
+timing and optional passing score. It accepts `schema`, `onChange`, `locale`, `readOnly`,
+and optional builder `components` / `translate` overrides. `QuizOptionEditor` and
+`QuizFieldEditor` fit the additive builder slots
 `optionEditorAfter` and `fieldEditorAfter`, including the standard MUI field editor.
 They edit a single correct option, explanation and points without replacing the
 normal question/option controls. Deleted correct options require explicit reselection.

@@ -146,7 +146,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               actions={actions}
               components={components}
             />
-            <Typography variant="subtitle1" fontWeight="bold">
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: resolved.dense ? 0.5 : 1 }}>
               {field.title}
             </Typography>
           </>

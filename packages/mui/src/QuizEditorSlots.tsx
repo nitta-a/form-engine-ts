@@ -1,6 +1,9 @@
 import { contentMetadataToJson, type FormSchema, readQuizFieldMetadata } from "@form-engine-ts/core";
 import type { BuilderFieldEditorSlotProps, BuilderOptionEditorSlotProps } from "@form-engine-ts/react";
-import { FormControlLabel, Radio, Stack, TextField } from "@mui/material";
+import { FormControlLabel, Radio, Stack } from "@mui/material";
+
+import { contentTranslation } from "./contentTranslation";
+import { useResolvedMuiAdapterOptions } from "./context";
 
 function updateQuiz(schema: FormSchema, fieldId: string, quiz: object): FormSchema {
   return {
@@ -20,45 +23,68 @@ export function QuizOptionEditor({
   option,
   onChange,
   currentLocale,
-  readOnly
+  readOnly,
+  translate
 }: BuilderOptionEditorSlotProps) {
   const quiz = readQuizFieldMetadata(field.metadata);
+  const t = contentTranslation(currentLocale, translate);
+  const resolved = useResolvedMuiAdapterOptions();
+  const radioSlotProps = resolved.muiSlotProps?.radio;
+  const radioInputProps = radioSlotProps?.inputProps;
   return (
     <FormControlLabel
-      label={currentLocale.startsWith("ja") ? "正解" : "Correct answer"}
+      label={t("builder.content.correctAnswer")}
       control={
         <Radio
+          {...radioSlotProps}
+          size={radioSlotProps?.size ?? resolved.size}
           name={`quiz-correct-${field.id}`}
           checked={quiz.correctOptionId === option.id}
           disabled={readOnly}
           inputProps={{
-            "aria-label": `${currentLocale.startsWith("ja") ? "正解" : "Correct answer"}: ${option.label}`
+            ...radioInputProps,
+            "aria-label": `${t("builder.content.correctAnswer")}: ${option.label}`
           }}
-          onChange={() => onChange?.(updateQuiz(schema, field.id, { ...quiz, correctOptionId: option.id }))}
+          onChange={() => {
+            if (!readOnly) onChange?.(updateQuiz(schema, field.id, { ...quiz, correctOptionId: option.id }));
+          }}
         />
       }
     />
   );
 }
-export function QuizFieldEditor({ schema, field, onChange, currentLocale, readOnly }: BuilderFieldEditorSlotProps) {
+export function QuizFieldEditor({
+  schema,
+  field,
+  onChange,
+  currentLocale,
+  readOnly,
+  components,
+  translate
+}: BuilderFieldEditorSlotProps) {
   const quiz = readQuizFieldMetadata(field.metadata);
-  const ja = currentLocale.startsWith("ja");
-  const update = (value: object) => onChange?.(updateQuiz(schema, field.id, value));
+  const t = contentTranslation(currentLocale, translate);
+  const resolved = useResolvedMuiAdapterOptions();
+  const { TextArea, TextInput } = components;
+  const update = (value: object) => {
+    if (!readOnly) onChange?.(updateQuiz(schema, field.id, value));
+  };
   return (
-    <Stack spacing={2}>
-      <TextField
-        label={ja ? "解説" : "Explanation"}
-        multiline
+    <Stack {...resolved.muiSlotProps?.stack} spacing={resolved.dense ? 1 : 2}>
+      <TextArea
+        label={t("builder.content.explanation")}
         value={quiz.explanation ?? ""}
         disabled={readOnly}
-        onChange={(event) => update({ ...quiz, explanation: event.target.value })}
+        onChange={(value) => update({ ...quiz, explanation: value })}
       />
-      <TextField
-        label={ja ? "配点" : "Points"}
+      <TextInput
+        label={t("builder.content.points")}
         type="number"
-        value={quiz.points ?? 1}
+        value={String(quiz.points ?? 1)}
         disabled={readOnly}
-        onChange={(event) => update({ ...quiz, points: Number(event.target.value) })}
+        onChange={(value) => {
+          if (Number.isFinite(Number(value))) update({ ...quiz, points: Number(value) });
+        }}
       />
     </Stack>
   );

@@ -56,9 +56,9 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.9.0** (2026-09-08). All public packages are currently aligned to version `7.9.0`.
-This release adds quiz/content-mode authoring and response flows, multi-page builder management, reusable page-condition
-controls, and MUI page-editor slots. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
+The latest release is **v7.10.0** (2026-09-08). All public packages are currently aligned to version `7.10.0`.
+This release adds localized content-mode settings, a framework-neutral basic-settings slot, and customizable MUI quiz
+and poll controls. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
 
@@ -369,8 +369,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.9.0**（2026-09-08）です。公開パッケージはすべてバージョン `7.9.0` に揃えています。
-本リリースでは、Survey定義とFormSchemaの共通変換、標準Rendererのアクセシビリティ回帰検査、revision競合時のMapping再試行・再読み込み、AbortSignal連携付きの共有翻訳テキストmetadata codecを追加しました。
+最新版は **v7.10.0**（2026-09-08）です。公開パッケージはすべてバージョン `7.10.0` に揃えています。
+本リリースでは、ローカライズ可能なフォーム種別設定、framework-neutralな基本設定slot、カスタマイズ可能なMUIのクイズ・投票設定を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

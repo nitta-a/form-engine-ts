@@ -1,3 +1,4 @@
+import { getFormContentMode } from "@form-engine-ts/core";
 import {
   FormBuilder,
   type FormBuilderComponents,
@@ -9,7 +10,8 @@ import {
 import { useMemo } from "react";
 import { muiBuilderComponents } from "./components";
 import { MuiFormBuilderContext, mergeMuiAdapterOptions } from "./context";
-import { muiBuilderSlots } from "./slots";
+import { QuizFieldEditor, QuizOptionEditor } from "./QuizEditorSlots";
+import { MuiContentModeSettingsSlot, muiBuilderSlots } from "./slots";
 import {
   DEFAULT_MUI_SECTION_ORDER,
   MUI_LOCALIZATION_SECTION_ORDERS,
@@ -22,8 +24,13 @@ import {
   type MuiSubmissionSettingsOptions
 } from "./types";
 
+export interface MuiContentModeOptions {
+  readonly showSelector?: boolean;
+}
+
 export interface MuiFormBuilderProps
   extends Omit<FormBuilderProps, "components" | "disableDefaultStyles" | "slots" | "unstyled"> {
+  readonly contentModeOptions?: MuiContentModeOptions;
   readonly muiOptions?: MuiAdapterOptions;
   readonly layoutOptions?: MuiLayoutOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
@@ -37,6 +44,7 @@ export interface MuiFormBuilderProps
 
 export function MuiFormBuilder({
   muiOptions,
+  contentModeOptions,
   layoutOptions,
   localizationOptions,
   localization,
@@ -66,9 +74,27 @@ export function MuiFormBuilder({
       }),
     [contextOptions, i18n?.getActionLabel, i18n?.getLocaleLabel]
   );
-  const contextValue = useMemo(() => ({ options: resolvedMuiOptions }), [resolvedMuiOptions]);
+  const contextValue = useMemo(
+    () => ({ options: resolvedMuiOptions, showContentModeSelector: contentModeOptions?.showSelector ?? false }),
+    [resolvedMuiOptions, contentModeOptions?.showSelector]
+  );
   const components = useMemo(() => ({ ...muiBuilderComponents, ...customComponents }), [customComponents]);
-  const slots = useMemo(() => ({ ...muiBuilderSlots, ...customSlots }), [customSlots]);
+  const contentMode = getFormContentMode(props.schema.metadata);
+  const slots = useMemo(() => {
+    const automaticQuizSlots: Partial<FormBuilderSlots> =
+      contentMode !== "quiz"
+        ? {}
+        : {
+            ...(customSlots?.fieldEditorAfter === undefined ? { fieldEditorAfter: QuizFieldEditor } : {}),
+            ...(customSlots?.optionEditorAfter === undefined ? { optionEditorAfter: QuizOptionEditor } : {})
+          };
+    return {
+      ...muiBuilderSlots,
+      basicSettingsAfter: MuiContentModeSettingsSlot,
+      ...automaticQuizSlots,
+      ...customSlots
+    };
+  }, [contentMode, customSlots]);
   const placement = contextOptions.localizationOptions?.placement;
   const baseSectionOrder =
     sectionOrder ??

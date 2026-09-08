@@ -5,82 +5,97 @@ import {
   readPollMetadata,
   readQuizMetadata
 } from "@form-engine-ts/core";
-import { Checkbox, FormControlLabel, MenuItem, Stack, TextField } from "@mui/material";
+import type { FormBuilderComponents } from "@form-engine-ts/react";
+import { Stack } from "@mui/material";
+import { useId } from "react";
+import { MuiCheckboxAdapter, MuiSelectAdapter, MuiTextInputAdapter } from "./adapters";
+import { contentTranslation } from "./contentTranslation";
+import { useResolvedMuiAdapterOptions } from "./context";
 
 export interface ContentModeSettingsProps {
   readonly schema: FormSchema;
   readonly onChange?: (schema: FormSchema) => void;
   readonly locale?: string;
   readonly readOnly?: boolean;
+  readonly components?: Partial<FormBuilderComponents>;
+  readonly translate?: (key: string) => string;
 }
-export function ContentModeSettings({ schema, onChange, locale = "en", readOnly = false }: ContentModeSettingsProps) {
-  const ja = locale.startsWith("ja");
+export function ContentModeSettings({
+  schema,
+  onChange,
+  locale = "en",
+  readOnly = false,
+  components,
+  translate
+}: ContentModeSettingsProps) {
+  const id = useId();
+  const t = contentTranslation(locale, translate);
+  const resolved = useResolvedMuiAdapterOptions();
+  const Select = components?.Select ?? MuiSelectAdapter;
+  const Checkbox = components?.Checkbox ?? MuiCheckboxAdapter;
+  const TextInput = components?.TextInput ?? MuiTextInputAdapter;
   const mode = getFormContentMode(schema.metadata);
   const poll = readPollMetadata(schema.metadata);
   const quiz = readQuizMetadata(schema.metadata);
   const raw = schema.metadata?.[mode];
   const existing =
     raw !== null && typeof raw === "object" && !Array.isArray(raw) ? Object.fromEntries(Object.entries(raw)) : {};
-  const {
-    resultVisibility: _visibility,
-    strictOneVotePerUser: _strict,
-    showExplanation: _timing,
-    passingScore: _passing,
-    ...unknownSettings
-  } = existing;
-  const update = (settings: object) =>
+  const update = (settings: object) => {
+    if (readOnly) return;
+    const previous = { ...existing };
+    if (mode === "quiz") delete previous.passingScore;
     onChange?.({
       ...schema,
-      metadata: contentMetadataToJson({ ...schema.metadata, [mode]: { ...unknownSettings, ...settings } })
+      metadata: contentMetadataToJson({ ...schema.metadata, [mode]: { ...previous, ...settings } })
     });
+  };
   if (mode === "survey") return null;
   return (
-    <Stack spacing={2}>
+    <Stack {...resolved.muiSlotProps?.stack} spacing={resolved.dense ? 1 : 2}>
       {mode === "poll" ? (
         <>
-          <TextField
-            select
-            label={ja ? "結果公開タイミング" : "Result visibility"}
+          <Select
+            id={`${id}-visibility`}
+            label={t("builder.content.resultVisibility")}
             value={poll.resultVisibility}
             disabled={readOnly}
-            onChange={(event) => update({ ...poll, resultVisibility: event.target.value })}
-          >
-            <MenuItem value="after_submit">{ja ? "送信後" : "After submission"}</MenuItem>
-            <MenuItem value="always">{ja ? "常に公開" : "Always"}</MenuItem>
-            <MenuItem value="closed_only">{ja ? "締切後" : "After closing"}</MenuItem>
-            <MenuItem value="private">{ja ? "非公開" : "Private"}</MenuItem>
-          </TextField>
-          <FormControlLabel
-            label={ja ? "一人一票" : "One vote per user"}
-            control={
-              <Checkbox
-                disabled={readOnly}
-                checked={poll.strictOneVotePerUser ?? false}
-                onChange={(_, checked) => update({ ...poll, strictOneVotePerUser: checked })}
-              />
-            }
+            options={[
+              { value: "after_submit", label: t("builder.content.after_submit") },
+              { value: "always", label: t("builder.content.always") },
+              { value: "closed_only", label: t("builder.content.closed_only") },
+              { value: "private", label: t("builder.content.private") }
+            ]}
+            onChange={(value) => update({ ...poll, resultVisibility: value })}
+          />
+          <Checkbox
+            label={t("builder.content.strictOneVotePerUser")}
+            disabled={readOnly}
+            checked={poll.strictOneVotePerUser ?? false}
+            onChange={(checked) => update({ ...poll, strictOneVotePerUser: checked })}
           />
         </>
       ) : (
         <>
-          <TextField
-            select
-            label={ja ? "解説表示タイミング" : "Explanation timing"}
+          <Select
+            id={`${id}-timing`}
+            label={t("builder.content.showExplanation")}
             value={quiz.showExplanation}
             disabled={readOnly}
-            onChange={(event) => update({ ...quiz, showExplanation: event.target.value })}
-          >
-            <MenuItem value="after_submit">{ja ? "送信後" : "After submission"}</MenuItem>
-            <MenuItem value="immediate">{ja ? "選択直後" : "Immediately"}</MenuItem>
-          </TextField>
-          <TextField
+            options={[
+              { value: "after_submit", label: t("builder.content.after_submit") },
+              { value: "immediate", label: t("builder.content.immediate") }
+            ]}
+            onChange={(value) => update({ ...quiz, showExplanation: value })}
+          />
+          <TextInput
             type="number"
-            label={ja ? "合格ライン点数" : "Passing score"}
-            value={quiz.passingScore ?? ""}
+            label={t("builder.content.passingScore")}
+            value={quiz.passingScore === undefined ? "" : String(quiz.passingScore)}
             disabled={readOnly}
-            onChange={(event) => {
+            onChange={(value) => {
               const { passingScore: _removed, ...rest } = quiz;
-              update(event.target.value === "" ? rest : { ...rest, passingScore: Number(event.target.value) });
+              if (value === "") update(rest);
+              else if (Number.isFinite(Number(value))) update({ ...rest, passingScore: Number(value) });
             }}
           />
         </>

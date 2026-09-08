@@ -5,6 +5,14 @@ current release and usage information.
 
 ## Latest release
 
+### v7.10.0 — 2026-09-08
+
+- Added localized content-mode settings for Survey, Poll, and Quiz builders, including optional mode selection.
+- Added the framework-neutral `basicSettingsAfter` builder slot with resolved components and translation access.
+- Added customizable MUI controls for Poll and Quiz settings, including radio slot props and read-only handling.
+- Preserved unknown metadata and inactive mode settings when switching content modes.
+- Aligned all public packages to version 7.10.0.
+
 ### v7.9.0 — 2026-09-08
 
 - Added Core content-mode primitives for quiz authoring, immediate feedback, grading, poll publication, and poll result aggregation.
