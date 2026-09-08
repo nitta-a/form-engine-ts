@@ -1,4 +1,4 @@
-import type { QuizQuestionResult, QuizResult } from "@form-engine-ts/core";
+import type { FormSchema, QuizEvaluationResult, QuizQuestionEvaluation } from "@form-engine-ts/core";
 import {
   Card,
   CardContent,
@@ -20,12 +20,14 @@ export interface QuizResultViewLabels {
   readonly correct: string;
   readonly incorrect: string;
   readonly correctOption: string;
+  readonly reward?: string;
 }
 
 export interface QuizResultViewSlots {
-  readonly score?: (result: QuizResult) => ReactNode;
+  readonly score?: (evaluation: QuizEvaluationResult) => ReactNode;
   readonly status?: (passed: boolean) => ReactNode;
-  readonly question?: (question: QuizQuestionResult) => ReactNode;
+  readonly question?: (question: QuizQuestionEvaluation) => ReactNode;
+  readonly reward?: (reward: NonNullable<QuizEvaluationResult["reward"]>) => ReactNode;
 }
 
 export interface QuizResultViewSlotProps {
@@ -39,28 +41,41 @@ export interface QuizResultViewSlotProps {
   readonly correctOption?: MuiComponentSlotProps<TypographyProps>;
   readonly explanation?: MuiComponentSlotProps<TypographyProps>;
   readonly points?: MuiComponentSlotProps<TypographyProps>;
+  readonly reward?: MuiComponentSlotProps<CardProps>;
+  readonly rewardContent?: MuiComponentSlotProps<CardContentProps>;
 }
 
 export interface QuizResultViewProps {
-  readonly result: QuizResult;
+  readonly evaluation: QuizEvaluationResult;
+  readonly schema?: FormSchema;
   readonly locale?: string;
-  readonly showScore?: boolean;
   readonly labels?: Partial<QuizResultViewLabels>;
   readonly slots?: QuizResultViewSlots;
   readonly slotProps?: QuizResultViewSlotProps;
   readonly i18n?: MuiFormEngineI18nOptions;
 }
 
+function optionLabel(schema: FormSchema | undefined, questionId: string, optionId: string | undefined): string {
+  if (optionId === undefined) return "";
+  const field = schema?.fields.find((candidate) => candidate.id === questionId);
+  return field !== undefined && "options" in field
+    ? (field.options.find((option) => option.id === optionId)?.label ?? optionId)
+    : optionId;
+}
+
+function rewardTitle(type: NonNullable<QuizEvaluationResult["reward"]>["type"]): string {
+  return type === "coupon" ? "Coupon" : type === "badge" ? "Badge" : "Reward";
+}
+
 export function QuizResultView({
-  result,
+  evaluation,
+  schema,
   locale = "en",
-  showScore,
   labels,
   slots = {},
   slotProps = {},
   i18n
 }: QuizResultViewProps) {
-  const resolvedShowScore = showScore ?? result.passed !== undefined;
   const { translate: t } = muiContentTranslation(locale, i18n);
   const resolvedLabels: QuizResultViewLabels = {
     totalScore: labels?.totalScore ?? t("content.results.totalScore"),
@@ -68,49 +83,62 @@ export function QuizResultView({
     notPassed: labels?.notPassed ?? t("content.results.notPassed"),
     correct: labels?.correct ?? t("content.results.correct"),
     incorrect: labels?.incorrect ?? t("content.results.incorrect"),
-    correctOption: labels?.correctOption ?? t("content.results.correctOption")
+    correctOption: labels?.correctOption ?? t("content.results.correctOption"),
+    reward: labels?.reward ?? "Reward"
   };
   return (
     <Stack {...slotProps.root} spacing={slotProps.root?.spacing ?? 2}>
-      {resolvedShowScore
-        ? (slots.score?.(result) ?? (
-            <Typography {...slotProps.score}>
-              {resolvedLabels.totalScore}: {result.score} / {result.total}
-            </Typography>
-          ))
-        : null}
-      {!resolvedShowScore || result.passed === undefined
+      {slots.score?.(evaluation) ?? (
+        <Typography {...slotProps.score}>
+          {resolvedLabels.totalScore}: {evaluation.totalScore} / {evaluation.maxPossibleScore}
+        </Typography>
+      )}
+      {evaluation.isPassed === undefined
         ? null
-        : (slots.status?.(result.passed) ?? (
+        : (slots.status?.(evaluation.isPassed) ?? (
             <Typography {...slotProps.status}>
-              {result.passed ? resolvedLabels.passed : resolvedLabels.notPassed}
+              {evaluation.isPassed ? resolvedLabels.passed : resolvedLabels.notPassed}
             </Typography>
           ))}
-      {result.questions.map((question) => (
-        <Fragment key={question.fieldId}>
+      {evaluation.questions.map((question) => (
+        <Fragment key={question.questionId}>
           {slots.question?.(question) ?? (
             <Card {...slotProps.questionCard}>
               <CardContent {...slotProps.questionContent}>
                 <Typography {...slotProps.questionTitle} component={slotProps.questionTitle?.component ?? "h3"}>
-                  {question.title}
+                  {schema?.fields.find((field) => field.id === question.questionId)?.title ?? question.questionId}
                 </Typography>
                 <Typography {...slotProps.questionStatus}>
-                  {question.correct ? resolvedLabels.correct : resolvedLabels.incorrect}
+                  {question.isCorrect ? resolvedLabels.correct : resolvedLabels.incorrect}
                 </Typography>
-                <Typography {...slotProps.correctOption}>
-                  {resolvedLabels.correctOption}: {question.correctOption}
-                </Typography>
-                {question.explanation ? (
+                {question.correctOptionId === undefined ? null : (
+                  <Typography {...slotProps.correctOption}>
+                    {resolvedLabels.correctOption}: {optionLabel(schema, question.questionId, question.correctOptionId)}
+                  </Typography>
+                )}
+                {question.explanation === undefined ? null : (
                   <Typography {...slotProps.explanation}>{question.explanation}</Typography>
-                ) : null}
+                )}
                 <Typography {...slotProps.points}>
-                  {question.earned} / {question.points}
+                  {question.scoreEarned} / {question.maxScore}
                 </Typography>
               </CardContent>
             </Card>
           )}
         </Fragment>
       ))}
+      {evaluation.reward === undefined
+        ? null
+        : (slots.reward?.(evaluation.reward) ?? (
+            <Card {...slotProps.reward} data-quiz-reward>
+              <CardContent {...slotProps.rewardContent}>
+                <Typography component="h3">{resolvedLabels.reward}</Typography>
+                <Typography>{rewardTitle(evaluation.reward.type)}</Typography>
+                {evaluation.reward.code === undefined ? null : <Typography>{evaluation.reward.code}</Typography>}
+                {evaluation.reward.message === undefined ? null : <Typography>{evaluation.reward.message}</Typography>}
+              </CardContent>
+            </Card>
+          ))}
     </Stack>
   );
 }

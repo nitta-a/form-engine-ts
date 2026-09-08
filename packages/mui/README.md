@@ -262,15 +262,19 @@ import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
 />
 ```
 
-`QuizResultView` and `MuiPollResultView` accept labels, slots, slotProps and MUI i18n.
+`QuizResultView` accepts a `QuizEvaluationResult` directly, plus an optional schema
+used only for question and option labels. This lets local and server-side judging
+share the same view; a server `reward` is rendered in the reward area. `MuiPollResultView`
+accepts labels, slots, slotProps and MUI i18n.
 `MuiPollResults` applies all Core visibility rules and supplies loading, error and retry
 states as a standalone aggregate view. An explicit `renderPollResults` slot can retain
 an aggregate result after the form. The optional `alreadyVoted` flag lets a host show
 `after_submit` results immediately for a previously persisted vote. The host still enforces voter identity, closing and access atomically when it
 persists or loads data.
 
-The default MUI quiz completion shows only score/pass. Existing result props and an
-explicit question slot remain available for legacy custom result content.
+The default MUI quiz completion shows the evaluation score and question results;
+pass/fail is shown when the evaluation contains `isPassed`. Explicit result and
+question slots remain available for custom content.
 
 Use `@form-engine-ts/mui/builder`, `/renderer`, `/survey-summary` or `/survey-domain`
 to import only the intended surface. The root export remains compatible in v7.

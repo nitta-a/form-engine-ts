@@ -4,7 +4,7 @@ import {
   type FormAnalytics,
   type FormSchema
 } from "@form-engine-ts/core";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -69,6 +69,39 @@ describe("ContentRenderer", () => {
     const result = await screen.findByText("3 votes (75%)");
     expect(result.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
     expect(screen.queryByRole("heading", { name: "Poll results" })).not.toBeInTheDocument();
+  });
+
+  it("applies an optimistic poll result while submission is pending", async () => {
+    const user = userEvent.setup();
+    const poll = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    let resolveSubmit: (() => void) | undefined;
+    render(
+      <ContentRenderer
+        schema={poll}
+        onSubmit={() => new Promise<void>((resolve) => (resolveSubmit = resolve))}
+        contentModeOptions={{
+          poll: {
+            adapter: {
+              loadResults: async () => ({
+                formId: poll.id,
+                formVersion: poll.version,
+                submissionCount: 0,
+                questions: []
+              }),
+              canVote: async () => true
+            },
+            closed: false,
+            canViewResults: true
+          }
+        }}
+      />
+    );
+    await user.click(screen.getByRole("radio", { name: "Option 1" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("1 votes (100%)")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Option 1: 100%" })).toHaveAttribute("value", "100");
+    resolveSubmit?.();
+    await waitFor(() => expect(screen.getByText("Submitted.")).toBeInTheDocument());
   });
 
   it("keeps poll loading errors and retry inside the choice group", async () => {
@@ -217,13 +250,13 @@ describe("ContentRenderer", () => {
     expect(screen.getAllByText("Because it is correct.").length).toBe(1);
   });
 
-  it("omits score and pass status when no passing score is configured", async () => {
+  it("shows the score without pass status when no passing score is configured", async () => {
     const user = userEvent.setup();
     render(<ContentRenderer schema={schema("after_submit", "en", null)} onSubmit={() => undefined} />);
     await user.click(screen.getByRole("radio", { name: "Option 1" }));
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByText("Submitted.")).toBeInTheDocument();
-    expect(screen.queryByText(/Total score:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Total score: 2 / 2")).toBeInTheDocument();
     expect(screen.queryByText("Passed")).not.toBeInTheDocument();
     expect(screen.queryByText("Not passed")).not.toBeInTheDocument();
   });

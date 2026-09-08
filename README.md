@@ -56,7 +56,7 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.13.0** (2026-09-09). All public packages are currently aligned to version `7.13.0`.
+The latest release is **v7.14.0** (2026-09-09). All public packages are currently aligned to version `7.14.0`.
 This release adds inline poll results inside each answer input row, including results shown on initial render for
 previously identified voters, while retaining the headless `ContentRenderer` and MUI/Tailwind preview switching.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
@@ -372,8 +372,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.13.0**（2026-09-09）です。公開パッケージはすべてバージョン `7.13.0` に揃えています。
-本リリースでは、各回答INPUT行内の投票結果表示と、投票済み回答者への初期表示を追加しました。headless `ContentRenderer`とMUI/Tailwind切替previewも引き続き利用できます。
+最新版は **v7.14.0**（2026-09-09）です。公開パッケージはすべてバージョン `7.14.0` に揃えています。
+本リリースでは、各回答INPUT行内の投票結果表示、投票済み回答者への初期表示、送信直後の楽観的集計反映を追加しました。headless `ContentRenderer`とMUI/Tailwind切替previewも引き続き利用できます。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -609,8 +609,8 @@ filter (`?mode=survey|poll|quiz`), creation cards, the integrated `MuiFormBuilde
 mode-specific policy and validation, and `MuiContentRenderer` respondent results. Save a valid schema before
 opening the answer screen. An empty survey stays an editing draft until its first
 question is saved. Poll results support all four visibility policies and independent
-aggregation retries and are shown inside each answer input row. When the host identifies a previous vote,
-`after_submit` results can be shown on the initial render without resubmitting; quiz supports immediate and post-submit feedback. Demo controls
+aggregation retries and are shown inside each answer input row. The selected vote is reflected optimistically while the aggregate request is pending. When the host identifies a previous vote,
+`after_submit` results can be shown on the initial render without resubmitting; quiz supports immediate and post-submit feedback, local or server evaluation, and rewards. Core validation rejects mode-invalid schemas before persistence. Demo controls
 simulate closing, result access and request failures. One-vote identity is scoped to
 this browser and form, across versions; clearing browser data resets it. Production
 hosts must enforce identity/access at persistence. Existing workspaces remain available.
@@ -628,7 +628,7 @@ preview の **フォーム一覧** から、共通の Memory / LocalStorage 保�
 `MuiContentRenderer`による回答・結果表示を
 操作できます。有効なスキーマを保存してから回答画面を開きます。空のアンケートは最初の
 設問を保存するまで編集中のドラフトとして保持します。投票は公開タイミング4種類と集計だけの
-再試行に対応し、結果は各回答INPUT行の中に進捗・票数・割合として表示します。投票済みの回答者には、`after_submit`でも再送信なしに初期表示から結果を表示します。クイズは選択直後・送信後の解説に対応します。締切・閲覧権限・通信失敗をデモ操作で
+再試行に対応し、結果は各回答INPUT行の中に進捗・票数・割合として表示します。投票直後は集計取得を待たずに選択肢へ楽観的に反映します。投票済みの回答者には、`after_submit`でも再送信なしに初期表示から結果を表示します。クイズは選択直後・送信後の解説、ローカル／サーバー判定、特典表示に対応します。Coreはmode固有の不正なスキーマを保存前に拒否します。締切・閲覧権限・通信失敗をデモ操作で
 切り替えられます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
 ブラウザーデータを削除するとリセットされます。本番の識別・権限制御は保存処理で強制してください。
 既存デモの各ワークスペースも引き続き利用できます。

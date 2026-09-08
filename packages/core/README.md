@@ -219,10 +219,12 @@ See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme
 
 `FormContentMode`, `CustomFormMetadata`, `PollMetadata`, `QuizMetadata` and
 `QuizFieldMetadata` are optional metadata contracts. `getFormContentMode(metadata)`
-returns `survey` for absent or unrecognized modes. Existing schema validation and
-storage contracts are unchanged. `getContentModeDiagnostics(schema)` returns stable
-issue codes for localized UIs; `validateContentMode(schema)` retains its original
-path/message result for save, publish and respondent-entry checks.
+returns `survey` for absent or unrecognized modes. `validateFormSchema` now also
+enforces mode-specific structure: polls have exactly one radio/multi-select question
+with at least two options, and every quiz choice question must reference an existing
+correct option. `getContentModeDiagnostics(schema)` returns stable issue codes for
+localized UIs; `validateContentMode(schema)` retains its path/message result for
+editor and respondent diagnostics.
 
 ```ts
 import { createInitialSchemaByMode, getContentModePolicy } from "@form-engine-ts/core";
@@ -235,9 +237,10 @@ const policy = getContentModePolicy("poll", { maxOptionsPerField: 8 });
 
 Presets are deterministic: version 1, default ID `form-draft` (supply a unique ID
 before persistence), no survey questions, or one required radio question with two
-options for poll/quiz. An empty survey is an editing draft and still fails the
-existing base validator until a question is added. Quiz presets intentionally have
-no correct answer. Poll allows `radio` / `multi-select` and exactly one question;
+options for poll/quiz. An empty survey is an editing draft and still fails the base
+validator until a question is added. Quiz presets include `option-1` as a valid
+correct answer so they can be validated and rendered immediately. Poll allows
+`radio` / `multi-select` and exactly one question;
 quiz allows `radio`. Mode policy intersects allowed types and never raises a host
 limit. React's low-level builder applies it through `policy`; `MuiFormBuilder`
 applies it automatically for poll/quiz unless `contentModeOptions.applyPolicy` is false.
@@ -249,7 +252,11 @@ schema. Store correct answers at `field.metadata.quiz.correctOptionId`.
 `ResponseSummaryData` and related neutral contracts describe display-ready analytics.
 `toResponseSummary(summary, schemaOrVersion, locale)` resolves localized form,
 question and option labels without a React or application-domain dependency.
-`evaluateQuiz(schema, answers)` rejects invalid quizzes, scores visible questions,
+`evaluateQuizLocally(schema, answers)` rejects invalid quizzes and returns the
+transport-neutral `QuizEvaluationResult` used by respondent renderers. It scores
+visible questions, includes optional explanations and rewards supplied by a server.
+`evaluateQuiz(schema, answers)` remains a legacy-shaped adapter over the local result.
+Both reject invalid quizzes, score visible questions,
 uses 1 point by default and 0 for unanswered questions, and returns optional `passed`
 when `passingScore` is configured. Scores and thresholds are finite, non-negative
 numbers; the threshold cannot exceed the sum of configured points. Hidden questions

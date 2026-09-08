@@ -3,7 +3,7 @@ export { InputBoxStyleOptions, TargetSpecificLayoutConfig, TranslationLayoutOpti
 import * as react from 'react';
 import { ReactNode, ComponentType, ReactElement } from 'react';
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormContentMode, ContentModeIssueCode, FormSchema, FormAnalytics, PollRuntimeAdapter, QuizResult, QuizQuestionResult, getContentModeDiagnostics, BaseSubmissionMetadata, DisplayRule, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus } from '@form-engine-ts/core';
+import { FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormContentMode, ContentModeIssueCode, FormSchema, FormAnalytics, PollRuntimeAdapter, QuizEvaluationResult, QuizQuestionEvaluation, getContentModeDiagnostics, BaseSubmissionMetadata, DisplayRule, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus } from '@form-engine-ts/core';
 export { TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, RadioProps, ButtonProps, IconButtonProps, TypographyProps, ListProps, ListItemProps, LinearProgressProps, AlertProps, CardContentProps, TabsProps, TabProps } from '@mui/material';
 import { SurveyResponseSummarySkipReason, SurveyResponseSummaryData, SurveyResponseSummaryLanguageOption, SurveyClientAsyncState, SurveyResponseSummaryDomainLabels, SurveyResponseSummaryQuestion, SurveyResponseSummaryDomainInputProps } from '@form-engine-ts/custom-survey-client';
@@ -297,11 +297,13 @@ interface QuizResultViewLabels {
     readonly correct: string;
     readonly incorrect: string;
     readonly correctOption: string;
+    readonly reward?: string;
 }
 interface QuizResultViewSlots {
-    readonly score?: (result: QuizResult) => ReactNode;
+    readonly score?: (evaluation: QuizEvaluationResult) => ReactNode;
     readonly status?: (passed: boolean) => ReactNode;
-    readonly question?: (question: QuizQuestionResult) => ReactNode;
+    readonly question?: (question: QuizQuestionEvaluation) => ReactNode;
+    readonly reward?: (reward: NonNullable<QuizEvaluationResult["reward"]>) => ReactNode;
 }
 interface QuizResultViewSlotProps {
     readonly root?: MuiComponentSlotProps<StackProps>;
@@ -314,21 +316,23 @@ interface QuizResultViewSlotProps {
     readonly correctOption?: MuiComponentSlotProps<TypographyProps>;
     readonly explanation?: MuiComponentSlotProps<TypographyProps>;
     readonly points?: MuiComponentSlotProps<TypographyProps>;
+    readonly reward?: MuiComponentSlotProps<CardProps>;
+    readonly rewardContent?: MuiComponentSlotProps<CardContentProps>;
 }
 interface QuizResultViewProps {
-    readonly result: QuizResult;
+    readonly evaluation: QuizEvaluationResult;
+    readonly schema?: FormSchema;
     readonly locale?: string;
-    readonly showScore?: boolean;
     readonly labels?: Partial<QuizResultViewLabels>;
     readonly slots?: QuizResultViewSlots;
     readonly slotProps?: QuizResultViewSlotProps;
     readonly i18n?: MuiFormEngineI18nOptions;
 }
-declare function QuizResultView({ result, locale, showScore, labels, slots, slotProps, i18n }: QuizResultViewProps): react.JSX.Element;
+declare function QuizResultView({ evaluation, schema, locale, labels, slots, slotProps, i18n }: QuizResultViewProps): react.JSX.Element;
 
 interface MuiQuizRendererOptions {
     readonly showImmediateFeedback?: boolean;
-    readonly resultViewProps?: Omit<QuizResultViewProps, "result" | "locale" | "i18n">;
+    readonly resultViewProps?: Omit<QuizResultViewProps, "evaluation" | "schema" | "locale" | "i18n">;
     readonly renderInvalid?: (issues: ReturnType<typeof getContentModeDiagnostics>) => ReactNode;
 }
 interface MuiPollRendererOptions {

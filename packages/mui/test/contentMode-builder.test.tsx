@@ -243,15 +243,20 @@ describe("MuiFormBuilder content integration", () => {
   });
   it("reports validation state and supports a custom summary", () => {
     const onValidationChange = vi.fn();
+    const invalid = {
+      ...quiz,
+      fields: quiz.fields.map(({ metadata: _metadata, ...field }) => field)
+    };
     render(
       <Editor
+        initial={invalid}
         contentModeOptions={{
           onValidationChange,
           renderValidationSummary: (state) => <p>Custom validation: {state.issues.length}</p>
         }}
       />
     );
-    expect(screen.getByText("Custom validation: 1")).toBeInTheDocument();
+    expect(screen.getByText("Custom validation: 2")).toBeInTheDocument();
     expect(onValidationChange).toHaveBeenCalledWith(
       expect.objectContaining({ mode: "quiz", valid: false, issues: expect.any(Array) })
     );

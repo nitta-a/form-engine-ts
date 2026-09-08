@@ -2,19 +2,20 @@ import {
   type BaseSubmissionMetadata,
   type ChoiceQuestionAggregate,
   EN_MESSAGES,
-  evaluateQuiz,
+  evaluateQuizLocally,
   type FormAnalytics,
   type FormSchema,
+  type FormValues,
   getContentModeDiagnostics,
   getFormContentMode,
   JA_MESSAGES,
   type PollRuntimeAdapter,
+  type QuizEvaluationResult,
   type QuizQuestionResult,
-  type QuizResult,
   readQuizFieldMetadata,
   readQuizMetadata
 } from "@form-engine-ts/core";
-import { createContext, createElement, Fragment, type ReactNode, useContext } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useRef } from "react";
 import { useForm } from "./context";
 import { usePollResults } from "./hooks/usePollResults";
 import { FormRenderer, type FormRendererProps, type TypedFormRendererProps } from "./renderer";
@@ -51,6 +52,7 @@ export interface QuizSummaryLabels {
   readonly totalScore: string;
   readonly passed: string;
   readonly notPassed: string;
+  readonly reward?: string;
 }
 
 export interface PollResultLabels {
@@ -139,26 +141,38 @@ export function QuizQuestionFeedback({ question, locale = "en", labels, classNam
 }
 
 export interface QuizResultSummaryProps {
-  readonly result: QuizResult;
+  readonly evaluation: QuizEvaluationResult;
+  readonly schema: FormSchema;
   readonly locale?: string;
   readonly labels?: Partial<QuizSummaryLabels>;
   readonly className?: string;
 }
 
-export function QuizResultSummary({ result, locale = "en", labels, className }: QuizResultSummaryProps) {
-  if (result.passed === undefined) return createElement(Fragment);
+export function QuizResultSummary({ evaluation, schema, locale = "en", labels, className }: QuizResultSummaryProps) {
   const catalog = locale.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
   const resolved: QuizSummaryLabels = {
     totalScore: labels?.totalScore ?? catalog["content.results.totalScore"],
     passed: labels?.passed ?? catalog["content.results.passed"],
     notPassed: labels?.notPassed ?? catalog["content.results.notPassed"]
   };
+  const questionLabel = (questionId: string) =>
+    schema?.fields.find((field) => field.id === questionId)?.title ?? questionId;
   return (
     <section className={["fe-quiz-summary", className].filter(Boolean).join(" ")} data-quiz-summary>
       <p>
-        {resolved.totalScore}: {result.score} / {result.total}
+        {resolved.totalScore}: {evaluation.totalScore} / {evaluation.maxPossibleScore}
       </p>
-      <p>{result.passed ? resolved.passed : resolved.notPassed}</p>
+      {evaluation.isPassed === undefined ? null : <p>{evaluation.isPassed ? resolved.passed : resolved.notPassed}</p>}
+      {evaluation.questions.map((question) => (
+        <p key={question.questionId}>
+          {questionLabel(question.questionId)}: {question.scoreEarned} / {question.maxScore}
+        </p>
+      ))}
+      {evaluation.reward === undefined ? null : (
+        <p data-quiz-reward>
+          {resolved.reward ?? "Reward"}: {evaluation.reward.message ?? evaluation.reward.code ?? evaluation.reward.type}
+        </p>
+      )}
     </section>
   );
 }
@@ -364,7 +378,7 @@ function questionResult(field: ChoiceGroupSlotProps["field"], answer: unknown): 
 
 interface PollResultsContextValue {
   readonly schema: FormSchema;
-  readonly result: ReturnType<typeof usePollResults<FormAnalytics>>;
+  readonly result: ReturnType<typeof usePollResults>;
   readonly locale: string;
   readonly labels: PollResultLabels;
   readonly classNames: ContentRendererClassNames;
@@ -375,8 +389,7 @@ const PollResultsContext = createContext<PollResultsContextValue | undefined>(un
 
 function ContentPollResultOption({ option, checked }: ChoiceOptionAfterSlotProps) {
   const context = useContext(PollResultsContext);
-  if (context === undefined || !context.result.enabled || context.result.loading || context.result.data === undefined)
-    return null;
+  if (context === undefined || !context.result.enabled || context.result.data === undefined) return null;
   const item = pollResultItem(context.schema, context.result.data, option.id, checked) ?? {
     optionId: option.id,
     label: option.label,
@@ -431,12 +444,60 @@ function PollChoiceGroup({
   const result = usePollResults({
     schema: form.schema,
     adapter: options.adapter,
-    submitted: props.submitStatus === "success",
+    submitted: props.submitStatus === "submitting" || props.submitStatus === "success",
     ...(options.alreadyVoted === undefined ? {} : { alreadyVoted: options.alreadyVoted }),
     closed: options.closed,
     canViewResults: options.canViewResults,
     ...(options.submissionRevision === undefined ? {} : { submissionRevision: options.submissionRevision })
   });
+  const optimisticVoteKey = useRef<string | undefined>(undefined);
+  const optimisticData = useRef<ReturnType<typeof usePollResults>["data"]>(undefined);
+  const previousSubmitStatus = useRef(props.submitStatus);
+  const submittedAnswer =
+    props.submittedValue !== undefined ? props.submittedValue : (props.value ?? form.values[props.field.id]);
+  useEffect(() => {
+    if (props.submitStatus === "error") {
+      const hadOptimisticVote = optimisticVoteKey.current !== undefined;
+      optimisticVoteKey.current = undefined;
+      optimisticData.current = undefined;
+      if (hadOptimisticVote && result.enabled) result.reload();
+      return;
+    }
+    if (props.submitStatus !== "submitting" && props.submitStatus !== "success") {
+      optimisticVoteKey.current = undefined;
+      optimisticData.current = undefined;
+      return;
+    }
+    const wasSubmitting = previousSubmitStatus.current === "submitting";
+    previousSubmitStatus.current = props.submitStatus;
+    if (props.submitStatus === "success" && wasSubmitting) {
+      optimisticVoteKey.current = undefined;
+      optimisticData.current = undefined;
+      result.reload();
+      return;
+    }
+    if (props.submitStatus === "success") return;
+    const selectedOptionIds = Array.isArray(submittedAnswer)
+      ? submittedAnswer.filter((value): value is string => typeof value === "string")
+      : typeof submittedAnswer === "string"
+        ? [submittedAnswer]
+        : [];
+    const key = selectedOptionIds.join("\u0000");
+    if (optimisticVoteKey.current !== key) {
+      optimisticVoteKey.current = key;
+      optimisticData.current = undefined;
+      result.applyOptimisticVote(selectedOptionIds);
+      return;
+    }
+    if (result.data !== undefined && optimisticData.current !== result.data) {
+      if (optimisticData.current !== undefined) {
+        optimisticData.current = undefined;
+        result.applyOptimisticVote(selectedOptionIds);
+        return;
+      }
+      optimisticData.current = result.data;
+    }
+  }, [props.submitStatus, result.applyOptimisticVote, result.data, result.enabled, result.reload, submittedAnswer]);
   const catalog = form.locale.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
   const labels: PollResultLabels = {
     title: options.labels?.title ?? catalog["content.results.pollResults"],
@@ -631,9 +692,10 @@ function ContentRendererImplementation(props: ContentRendererProps | TypedConten
     if (issues.length > 0)
       return <InvalidContent issues={issues} renderInvalid={slots.renderInvalidQuiz} locale={locale} />;
     if (state.submitStatus !== "success") return null;
-    const result = evaluateQuiz(state.schema, state.answers);
+    const evaluation = state.response?.quizEvaluation ?? evaluateQuizLocally(state.schema, state.answers as FormValues);
     const summaryProps: QuizResultSummaryProps = {
-      result,
+      evaluation,
+      schema: state.schema,
       locale,
       ...(contentModeOptions?.quiz?.summaryLabels === undefined
         ? {}

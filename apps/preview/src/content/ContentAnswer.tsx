@@ -1,6 +1,7 @@
 import {
   aggregateResponses,
   createSubmission,
+  evaluateQuizLocally,
   type FormAnalytics,
   type FormSchema,
   type FormStorageAdapter,
@@ -238,6 +239,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
             await storage.saveSubmission(submission);
             setAlreadyVoted(true);
             setRevision((current) => current + 1);
+            if (mode === "quiz") return { quizEvaluation: evaluateQuizLocally(schema, values) };
           } finally {
             submitting.current = false;
           }

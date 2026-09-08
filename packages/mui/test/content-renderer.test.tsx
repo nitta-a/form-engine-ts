@@ -64,49 +64,64 @@ describe("MuiContentRenderer", () => {
     expect(screen.getByText("Passed")).toBeInTheDocument();
   });
 
-  it("omits score and pass status when no passing score is configured", async () => {
+  it("shows the score without pass status when no passing score is configured", async () => {
     render(
       <MuiContentRenderer schema={quizSchema("after_submit", null)} locale="en" onSubmit={async () => undefined} />
     );
     await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByText("Submitted.")).toBeInTheDocument();
-    expect(screen.queryByText(/Total score:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Total score: 2 / 2")).toBeInTheDocument();
     expect(screen.queryByText("Passed")).not.toBeInTheDocument();
     expect(screen.queryByText("Not passed")).not.toBeInTheDocument();
   });
 
-  it("hides score by default in the standalone result view without a passing score", () => {
-    render(<QuizResultView result={{ score: 2, total: 2, questions: [] }} />);
-    expect(screen.queryByText(/Total score:/)).not.toBeInTheDocument();
+  it("shows score in the standalone result view without a passing score", () => {
+    render(<QuizResultView evaluation={{ totalScore: 2, maxPossibleScore: 2, questions: [] }} />);
+    expect(screen.getByText("Total score: 2 / 2")).toBeInTheDocument();
     expect(screen.queryByText("Passed")).not.toBeInTheDocument();
   });
 
-  it("renders an invalid quiz without throwing", async () => {
+  it("renders a server evaluation and reward from the submit response", async () => {
+    const evaluation = {
+      totalScore: 0,
+      maxPossibleScore: 2,
+      isPassed: false,
+      questions: [
+        {
+          questionId: "question-1",
+          isCorrect: false,
+          correctOptionId: "option-1",
+          explanation: "Server explanation",
+          scoreEarned: 0,
+          maxScore: 2
+        }
+      ],
+      reward: { type: "coupon" as const, code: "SAVE-20", message: "20% off" }
+    };
     render(
       <MuiContentRenderer
-        schema={createInitialSchemaByMode("quiz", { title: "Invalid", locale: "en" })}
+        schema={quizSchema("after_submit")}
         locale="en"
-        onSubmit={async () => undefined}
+        onSubmit={async () => ({ quizEvaluation: evaluation })}
       />
     );
-    await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Option 2" }));
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("The quiz configuration is invalid.");
+    expect(await screen.findByText("SAVE-20")).toBeInTheDocument();
+    expect(screen.getByText("Server explanation")).toBeInTheDocument();
+    expect(screen.getByText("Total score: 0 / 2")).toBeInTheDocument();
   });
 
-  it("delegates invalid quiz rendering to the custom error slot", async () => {
-    render(
-      <MuiContentRenderer
-        schema={createInitialSchemaByMode("quiz", { title: "Invalid", locale: "en" })}
-        locale="en"
-        onSubmit={async () => undefined}
-        contentModeOptions={{ quiz: { renderInvalid: (issues) => <p>Invalid issues: {issues.length}</p> } }}
-      />
+  it("rejects an invalid quiz schema before rendering", () => {
+    const initial = createInitialSchemaByMode("quiz", { title: "Invalid", locale: "en" });
+    const invalid = {
+      ...initial,
+      fields: initial.fields.map(({ metadata: _metadata, ...field }) => field)
+    };
+    expect(() => render(<MuiContentRenderer schema={invalid} locale="en" onSubmit={async () => undefined} />)).toThrow(
+      "correct option"
     );
-    await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
-    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect(await screen.findByText("Invalid issues: 1")).toBeInTheDocument();
   });
 
   it("loads poll results only when the visibility rule allows it", async () => {
@@ -310,19 +325,18 @@ describe("MUI content result views", () => {
   it("customizes quiz labels, slots and slotProps", () => {
     render(
       <QuizResultView
-        result={{
-          score: 1,
-          total: 2,
-          passed: false,
+        evaluation={{
+          totalScore: 1,
+          maxPossibleScore: 2,
+          isPassed: false,
           questions: [
             {
-              fieldId: "q1",
-              title: "Question",
-              correct: false,
-              correctOption: "Answer",
+              questionId: "q1",
+              isCorrect: false,
+              correctOptionId: "answer",
               explanation: "Why",
-              points: 2,
-              earned: 1
+              maxScore: 2,
+              scoreEarned: 1
             }
           ]
         }}
@@ -333,7 +347,7 @@ describe("MUI content result views", () => {
     );
     expect(screen.getByText("Custom score")).toBeInTheDocument();
     expect(screen.getByTestId("quiz-status")).toHaveTextContent("Try again");
-    expect(screen.getByText("Question").closest(".MuiCard-root")).toHaveClass("MuiPaper-outlined");
+    expect(screen.getByText("q1").closest(".MuiCard-root")).toHaveClass("MuiPaper-outlined");
   });
 
   it("uses custom translations and clamps poll progress", () => {

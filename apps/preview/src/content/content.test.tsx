@@ -24,6 +24,7 @@ describe("content mode demo", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Result visibility" })).toBeVisible();
+    await user.click(screen.getByRole("checkbox", { name: "One vote per user" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
     await user.click(screen.getByRole("button", { name: "Open answer screen" }));
     await user.click(screen.getByRole("radio", { name: "Option 1" }));
@@ -39,6 +40,11 @@ describe("content mode demo", () => {
     const [tailwindProgress] = screen.getAllByRole("progressbar");
     if (tailwindProgress === undefined) throw new Error("Expected Tailwind poll result progress bar");
     expect(tailwindProgress.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
+    await user.click(screen.getByRole("button", { name: "Back to list" }));
+    await user.click(screen.getByRole("button", { name: /Lunch vote/ }));
+    await user.click(screen.getByRole("button", { name: "Open answer screen" }));
+    await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
+    expect(screen.queryByText("Poll results")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back to list" }));
     await user.click(screen.getByRole("tab", { name: "Quiz" }));
     expect(window.location.search).toBe("?mode=quiz");
@@ -67,8 +73,8 @@ describe("content mode demo", () => {
     await user.click(screen.getByRole("radio", { name: "Option 2" }));
     expect(screen.queryByText("A useful fact")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Send response" }));
-    await waitFor(() => expect(screen.getByText("A useful fact")).toBeVisible());
-    expect(screen.queryByText("Total score: 1 / 1")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText("A useful fact")).toHaveLength(2));
+    expect(screen.getByText("Total score: 1 / 1")).toBeInTheDocument();
   });
   it("supports immediate feedback and keeps submission errors separate", async () => {
     const user = userEvent.setup();

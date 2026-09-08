@@ -1,3 +1,4 @@
+import { getFormContentMode, validateContentModeConstraints } from "./contentMode";
 import { canonicalLocaleOrRaw, normalizeLocale } from "./locale";
 import { collectSchemaLocales } from "./policy";
 import { validateSchemaStructure } from "./sanitization";
@@ -937,6 +938,14 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
     }
   }
   if (Array.isArray(input.fields)) {
+    const contentMode = getFormContentMode(input.metadata);
+    if (contentMode !== "survey") {
+      const contentSchema = {
+        ...(input as unknown as FormSchema),
+        fields: input.fields.filter((field): field is FormField => isRecord(field) && isNonEmptyString(field.id))
+      } as FormSchema;
+      issues.push(...validateContentModeConstraints(contentSchema).issues);
+    }
     const policyIssues: SchemaIssue[] = [];
     try {
       validatePolicy(input as unknown as FormSchema, options.policy ?? {}, policyIssues);

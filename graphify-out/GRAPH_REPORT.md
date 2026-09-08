@@ -1,16 +1,16 @@
 # Graph Report - form-engine-ts  (2026-09-09)
 
 ## Corpus Check
-- 404 files · ~253,138 words
+- 404 files · ~255,224 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4437 nodes · 8847 edges · 257 communities (206 shown, 43 thin omitted)
+- 4456 nodes · 8908 edges · 258 communities (205 shown, 45 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 64 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f95a33cd`
+- Built from commit: `a562ab0b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,10 +18,10 @@
 - core.d.ts
 - react.d.ts
 - custom-survey-client.d.ts
-- react/src/index.ts
+- core/src/index.ts
 - storage-azure-table/src/index.ts
 - responseSummary.tsx
-- mui/src/types.ts
+- useResolvedMuiAdapterOptions
 - builder.tsx
 - react/src/types.ts
 - mui.d.ts
@@ -30,21 +30,21 @@
 - core/src/pagination.ts
 - renderer.tsx
 - custom-survey-client/src/types.ts
-- validation.ts
+- v11.test.ts
 - freeText.tsx
-- AsyncTranslationAdapter
+- TranslationComparisonWorkspace.tsx
 - crud.ts
-- ContentLibrary.tsx
+- PreviewWorkspaceContext.tsx
 - core/src/translation.ts
 - contentRenderer.tsx
 - check-public-api.mjs
 - paths
 - MuiContentRenderer.tsx
 - controller.ts
-- Select.tsx
+- FieldEditor.tsx
 - v28.test.tsx
-- useTranslationWorkspace.ts
-- core/src/index.ts
+- TranslationAdapter
+- src/ContentModeSettings.tsx
 - core/src/submission.ts
 - react/src/submission.ts
 - preview/package.json
@@ -78,7 +78,7 @@
 - zod/package.json
 - domain.ts
 - errors.ts
-- validateFormSchema
+- src/schema.ts
 - What You Must Do When Invoked
 - analytics.ts
 - custom-survey-client/src/index.ts
@@ -93,11 +93,11 @@
 - translator.ts
 - translator-google-v3/src/index.ts
 - FormStorageAdapter
-- TranslationReport
+- mui/src/types.ts
 - tasks
 - BuilderPanel.tsx
 - SurveyWorkflowPanel.tsx
-- mongodb.test.ts
+- legacy/src/index.ts
 - devDependencies
 - sanitization.ts
 - src/provider.tsx
@@ -107,13 +107,13 @@
 - ExtensibleNode
 - JsonValue
 - 日本語の履歴
-- AppPanels.tsx
+- FormValues
 - dependencies
 - translator-mock/src/index.ts
 - scripts
 - TargetLocaleSelector.tsx
 - TypedFormStorageAdapter
-- exportResponsesToCsv
+- contentMode.ts
 - mui/package.json
 - ConditionEditor.tsx
 - assertValidFormSchema
@@ -121,7 +121,7 @@
 - translator-azure/src/index.ts
 - translator-google/src/index.ts
 - translator-i18next/src/index.ts
-- textMetadata.ts
+- custom-survey-client/src/translation.ts
 - useTranslationComparison.ts
 - devDependencies
 - Repository Guide for Coding Agents
@@ -132,35 +132,35 @@
 - storage-postgres/src/index.ts
 - translator-cache.d.ts
 - zod.d.ts
-- App.tsx
+- @testing-library/user-event
 - v3 to v4 migration guide
-- IncrementalResponseAccumulator
+- storage-sqlite/src/index.ts
 - devDependencies
-- custom-survey-client/src/translation.ts
+- QuizResultView.tsx
 - peerDependencies
-- postgres.test.ts
+- FormRenderer
 - translator-deepl/src/index.ts
 - ComponentBaseProps
 - translator-google-v3.d.ts
 - graphify reference: extra exports and benchmark
-- src/schema.ts
-- populateSchemaTranslations
-- i18n.ts
+- collectSchemaLocales
+- FormAnalytics
+- MuiFormEngineI18nOptions
 - FieldOption
 - English
 - 日本語
 - SurveyDefinitionQuestionBase
-- BuilderSlotBaseProps
+- submission.zod.ts
 - SubmissionAttemptStore
-- PreviewWorkspaceContext.tsx
-- pipeResponsesToCsvStream
+- ContentAnswer.tsx
+- RespondentPreviewContext.tsx
 - compilerOptions
 - form-engine-ts
 - UnifiedSubmissionStorageAdapter
 - SurveyVersionOperationRequest
 - legacy.d.ts
 - @form-engine-ts/core
-- BaseSubmissionMetadata
+- pages-editor.test.tsx
 - scripts
 - ResponseAccumulator
 - repository
@@ -170,8 +170,8 @@
 - translator-i18next.d.ts
 - scripts
 - graphify reference: query, path, explain
-- ResponseAccumulator
-- FormVersionRecord
+- IncrementalResponseAccumulator
+- react/src/index.ts
 - peerDependencies
 - BaseQuestionAggregate
 - NodeWritableStream
@@ -188,7 +188,7 @@
 - storage-localstorage/tsconfig.json
 - storage-memory/tsconfig.json
 - storage-mongodb/tsconfig.json
-- scripts
+- MuiPollResults.tsx
 - storage-postgres/tsconfig.json
 - storage-sqlite/tsconfig.json
 - storage/tsconfig.json
@@ -206,7 +206,7 @@
 - graphify reference: add a URL and watch a folder
 - graphify reference: commit hook and native CLAUDE.md integration
 - graphify reference: incremental update and cluster-only
-- analytics-boundaries.test.ts
+- storage-memory/src/index.ts
 - repository
 - @form-engine-ts/mui
 - @form-engine-ts/storage-azure-table
@@ -214,7 +214,7 @@
 - @form-engine-ts/storage-localstorage
 - @form-engine-ts/storage-memory
 - @form-engine-ts/storage-mongodb
-- repository
+- SubmissionIdentity
 - @form-engine-ts/storage-postgres
 - @form-engine-ts/storage-sqlite
 - @form-engine-ts/translator-azure
@@ -234,9 +234,9 @@
 - bugs
 - graphify reference: GitHub clone and cross-repo merge
 - graphify reference: transcribe video and audio
-- v28.test.ts
-- devDependencies
-- peerDependenciesMeta
+- AzureTableClientLike
+- StorageLike
+- storage-sqlite.d.ts
 - @form-engine-ts/storage
 - ContentModeDiagnostic
 - FormSubmissionSerializedError
@@ -256,131 +256,132 @@
 - publishConfig
 - bugs
 - publishConfig
-- ContentRendererClassNames
-- FormRendererSlots
-- ScopedSubmissionControllerState
-- TargetSpecificLayoutConfig
+- v2.test.tsx
+- FormField
+- localization-ux.test.tsx
+- FormRendererPresentationProps
+- ContentModeConstraintIssue
 - extraction-spec.md
 - legacy/README.md
 - styles.d.ts
 - privacy/README.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `FormSchema` - 256 edges
+1. `FormSchema` - 263 edges
 2. `JsonValue` - 64 edges
 3. `FormSubmission` - 47 edges
 4. `TranslationAdapter` - 46 edges
 5. `Latest release` - 45 edges
-6. `FormField` - 41 edges
-7. `AsyncTranslationAdapter` - 40 edges
-8. `FormAnalytics` - 40 edges
-9. `FormPolicy` - 38 edges
-10. `FormValues` - 38 edges
+6. `FormAnalytics` - 44 edges
+7. `FormField` - 42 edges
+8. `FormValues` - 40 edges
+9. `AsyncTranslationAdapter` - 40 edges
+10. `FormPolicy` - 38 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `MuiQuizRendererOptions` --references--> `getContentModeDiagnostics()`  [EXTRACTED]
-  api-reports/mui.d.ts → packages/core/src/contentMode.ts
-- `FormEngineI18nContextValue` --references--> `FormEngineTranslator`  [EXTRACTED]
-  api-reports/react.d.ts → packages/core/src/i18n/translator.ts
 - `SurveyTranslationAdapter` --inherits--> `TranslationAdapter`  [EXTRACTED]
   api-reports/custom-survey-client.d.ts → packages/core/src/types.ts
-- `SurveySchemaTextMetadataCodec` --references--> `JsonValue`  [EXTRACTED]
-  api-reports/custom-survey-client.d.ts → packages/core/src/types.ts
-- `SurveyEngineText` --references--> `JsonValue`  [EXTRACTED]
-  api-reports/custom-survey-client.d.ts → packages/core/src/types.ts
+- `SurveyEditorOperationState` --references--> `TranslationReport`  [EXTRACTED]
+  api-reports/custom-survey-client.d.ts → packages/core/src/translation.ts
+- `MuiLocalizationSlotOptions` --references--> `UseTranslationWorkspaceOptions`  [EXTRACTED]
+  api-reports/mui.d.ts → packages/react/src/hooks/useTranslationWorkspace.ts
+- `MuiAdapterOptions` --references--> `BuilderActionIconType`  [EXTRACTED]
+  api-reports/mui.d.ts → packages/react/src/types.ts
+- `ResolvedMuiAdapterOptions` --references--> `BuilderActionIconType`  [EXTRACTED]
+  api-reports/mui.d.ts → packages/react/src/types.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (257 total, 43 thin omitted)
+## Communities (258 total, 45 thin omitted)
 
 ### Community 0 - "core.d.ts"
 Cohesion: 0.01
-Nodes (157): AccumulatorReport, AccumulatorResponse, AccumulatorSkipReason, AggregationReport, AggregationSkipReason, AnswerValidationResult, BaseSubmissionMetadata, BuilderTranslationKey (+149 more)
+Nodes (160): AccumulatorReport, AccumulatorResponse, AccumulatorSkipReason, AggregationReport, AggregationSkipReason, AnswerValidationResult, BaseSubmissionMetadata, BuilderTranslationKey (+152 more)
 
 ### Community 1 - "react.d.ts"
 Cohesion: 0.02
-Nodes (101): BeforeSubmit, BuilderActionContext, BuilderActionError, BuilderActionIconType, BuilderActionResult, BuilderFieldsetProps, BuilderIdKind, BuilderPolicy (+93 more)
+Nodes (113): BeforeSubmit, BuilderActionContext, BuilderActionError, BuilderActionIconType, BuilderActionResult, BuilderFieldsetProps, BuilderIdKind, BuilderPolicy (+105 more)
 
 ### Community 2 - "custom-survey-client.d.ts"
 Cohesion: 0.02
-Nodes (129): AsyncTranslationAdapter, CreateSurveyTextMetadataCodecOptions, CreateSurveyTranslationAdapterOptions, CreateSurveyTranslationMetadataOptions, DirectFreeTextTranslationOptions, EditorRenderProps, FormSchemaToSurveyDefinitionOptions, FreeTextAnswerDomainAdapter (+121 more)
+Nodes (131): AsyncTranslationAdapter, CreateSurveyTextMetadataCodecOptions, CreateSurveyTranslationAdapterOptions, CreateSurveyTranslationMetadataOptions, DirectFreeTextTranslationOptions, EditorRenderProps, FormSchemaToSurveyDefinitionOptions, FreeTextAnswerDomainAdapter (+123 more)
 
-### Community 3 - "react/src/index.ts"
-Cohesion: 0.08
-Nodes (26): MuiFormEngineI18nOptions, FormEngineI18nProviderProps, FormEngineMessages, FormEngineTranslator, TranslationMissingKeyEvent, TranslationWorkspaceCustomDictionary, MuiFormEngineI18nOptions, schema (+18 more)
+### Community 3 - "core/src/index.ts"
+Cohesion: 0.07
+Nodes (20): AzureTranslatorOptions, DeeplTranslatorOptions, GoogleTranslatorOptions, AggregationReport, AggregationSkipReason, asAsyncAdapter(), CustomLocaleValidator, useTranslationWorkspace() (+12 more)
 
 ### Community 4 - "storage-azure-table/src/index.ts"
 Cohesion: 0.06
 Nodes (48): assertCanonicalSubmissionEntity(), AzureTableClientLike, AzureTableEntityIterator, AzureTableEntityPage, AzureTableFieldMapping, AzureTableListOptions, AzureTablePageSettings, AzureTableSubmissionCodec (+40 more)
 
 ### Community 5 - "responseSummary.tsx"
-Cohesion: 0.10
-Nodes (37): isSurveySummaryInput(), mapSurveyResponseSummary(), SurveyResponseSummaryMappingRequest, toSurveyResponseSummaryFromDomain(), clampPercentage(), defaultQuestion(), defaultSkipReasons(), defaultSummaryLabels (+29 more)
+Cohesion: 0.11
+Nodes (36): isSurveySummaryInput(), mapSurveyResponseSummary(), SurveyResponseSummaryMappingRequest, toSurveyResponseSummaryFromDomain(), clampPercentage(), defaultQuestion(), defaultSkipReasons(), defaultSummaryLabels (+28 more)
 
-### Community 6 - "mui/src/types.ts"
-Cohesion: 0.06
-Nodes (69): createMuiButtonAdapter(), MuiButtonAdapter, createMuiCheckboxAdapter(), createMuiErrorMessageAdapter(), MuiErrorMessageAdapter, createMuiFieldsetAdapter(), MuiFieldsetAdapter, createMuiIconButtonAdapter() (+61 more)
+### Community 6 - "useResolvedMuiAdapterOptions"
+Cohesion: 0.10
+Nodes (30): createMuiButtonAdapter(), MuiButtonAdapter, createMuiCheckboxAdapter(), createMuiErrorMessageAdapter(), MuiErrorMessageAdapter, createMuiFieldsetAdapter(), MuiFieldsetAdapter, createMuiIconButtonAdapter() (+22 more)
 
 ### Community 7 - "builder.tsx"
 Cohesion: 0.05
-Nodes (46): SurveyEditorProps, ConditionValue, SurveyEditorProps, BUILDER_DEFAULTS, BuilderButton(), BuilderCheckbox(), BuilderErrorMessage(), BuilderIconButton() (+38 more)
+Nodes (52): SurveyEditorProps, ConditionValue, DisplayCondition, SurveyEditorProps, BUILDER_DEFAULTS, BuilderButton(), BuilderCheckbox(), BuilderErrorMessage() (+44 more)
 
 ### Community 8 - "react/src/types.ts"
-Cohesion: 0.08
-Nodes (32): BuilderActionResult, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderIconButtonProps, BuilderSectionProps, BuilderSelectProps, BuilderSlotActions (+24 more)
+Cohesion: 0.06
+Nodes (49): MuiPagesEditorProps, MuiPagesEditorProps, BuilderActionResult, BuilderBasicSettingsSlotProps, BuilderButtonProps, BuilderCheckboxProps, BuilderErrorMessageProps, BuilderFieldEditorSlotProps (+41 more)
 
 ### Community 9 - "mui.d.ts"
-Cohesion: 0.04
-Nodes (71): AddLocaleDropdownProps, BuilderSectionName, ContentModeSettingsProps, LocaleOptionItem, LocalizationSectionPlacement, MuiAdapterOptions, MuiBuilderOverrides, MuiBuilderSlotProps (+63 more)
+Cohesion: 0.05
+Nodes (43): AddLocaleDropdownProps, BuilderSectionName, ContentModeSettingsProps, LocaleOptionItem, LocalizationSectionPlacement, MuiAdapterOptions, MuiBuilderSlotProps, MuiButtonVariant (+35 more)
 
 ### Community 10 - "FormSubmission"
-Cohesion: 0.06
-Nodes (35): AzureTableClientLike, AzureTableEntityIterator, AzureTableEntityPage, AzureTableFieldMapping, AzureTableListOptions, AzureTablePageSettings, AzureTableStorageAdapter, AzureTableStorageOptions (+27 more)
+Cohesion: 0.07
+Nodes (41): AzureTableEntityIterator, AzureTableEntityPage, AzureTableFieldMapping, AzureTableListOptions, AzureTablePageSettings, AzureTableStorageAdapter, AzureTableStorageOptions, AzureTableSubmissionCodec (+33 more)
 
 ### Community 11 - "core/src/types.ts"
 Cohesion: 0.06
-Nodes (37): DEFAULT_FIELD_TYPE_DEFINITIONS, BuilderTranslationKey, CreateSubmissionOptions, BaseField, BaseFieldConstraintRule, BaseQuestionAggregate, CheckboxField, CheckboxQuestionAggregate (+29 more)
+Nodes (33): DEFAULT_FIELD_TYPE_DEFINITIONS, BuilderTranslationKey, CreateSubmissionOptions, BaseField, BaseFieldConstraintRule, BaseQuestionAggregate, CheckboxField, CheckboxQuestionAggregate (+25 more)
 
 ### Community 12 - "core/src/pagination.ts"
 Cohesion: 0.09
-Nodes (41): asFormResponse(), compareRangeValue(), CursorPagingOptions, decodeBase64(), decodeCursorPayload(), decodeStorageSubmissionCursor(), decodeStorageTextAnswerCursor(), decodeSubmissionCursor() (+33 more)
+Nodes (38): asFormResponse(), compareRangeValue(), CursorPagingOptions, decodeBase64(), decodeCursorPayload(), decodeStorageSubmissionCursor(), decodeStorageTextAnswerCursor(), decodeSubmissionCursor() (+30 more)
 
 ### Community 13 - "renderer.tsx"
-Cohesion: 0.08
-Nodes (43): RespondentPreviewContextValue, FieldType, FormEngineI18nProviderScopeContext, buildSubmittedItems(), ChoiceGroupFrame(), ContextFormRenderer(), createControllerSubmitHandler(), DEFAULT_RENDERER_MESSAGES (+35 more)
+Cohesion: 0.07
+Nodes (43): FieldType, FormEngineI18nProviderScopeContext, buildSubmittedItems(), ChoiceGroupFrame(), ContextFormRenderer(), createControllerSubmitHandler(), DEFAULT_RENDERER_MESSAGES, DefaultField() (+35 more)
 
 ### Community 14 - "custom-survey-client/src/types.ts"
 Cohesion: 0.05
-Nodes (46): EditorRenderProps, FreeTextAnswerSource, FreeTextItemStatus, FreeTextTranslationOutcomeStatus, FreeTextTranslationRequest, FreeTextTranslationResult, FreeTextTranslationStatus, SurveyEditorActionsAdapter (+38 more)
+Nodes (50): UseSurveyVersionOperationsOptions, FormVersionState, EditorRenderProps, FreeTextAnswerSource, FreeTextItemStatus, FreeTextTranslationOutcomeStatus, FreeTextTranslationRequest, FreeTextTranslationResult (+42 more)
 
-### Community 15 - "validation.ts"
-Cohesion: 0.11
-Nodes (31): SubmissionPipelineOptions, getTranslationStatus(), resolveLocalizedSchema(), ValidationCode, addIssue(), DEFAULT_MESSAGES, FormSubmissionValidatorResult, isEmpty() (+23 more)
+### Community 15 - "v11.test.ts"
+Cohesion: 0.23
+Nodes (10): AnalyticsPanel(), calculateCrossTabulation(), bytesToHex(), dispatchWebhook(), FormEvent, FormEventType, signPayload(), WebhookConfig (+2 more)
 
 ### Community 16 - "freeText.tsx"
 Cohesion: 0.09
-Nodes (43): CreateFreeTextTranslationControllerOptions, FreeTextAnswerTranslationSlots, FreeTextTranslationOutcome, TranslateFreeTextAnswersOptions, SubmissionConfirmationSlotProps, TextAnswerItem, defaultItem(), findingsFor() (+35 more)
+Nodes (42): CreateFreeTextTranslationControllerOptions, FreeTextAnswerTranslationSlots, FreeTextTranslationOutcome, TranslateFreeTextAnswersOptions, SubmissionConfirmationSlotProps, defaultItem(), findingsFor(), FreeTextAnswerTranslations() (+34 more)
 
-### Community 17 - "AsyncTranslationAdapter"
-Cohesion: 0.09
-Nodes (41): TranslationComparisonWorkspaceProps, TranslationComparisonStatusDisplayOptions, TranslationWorkspaceSlots, AzureTranslatorOptions, DeeplTranslatorOptions, GoogleTranslatorOptions, TranslationStatus, AsyncTranslationAdapter (+33 more)
+### Community 17 - "TranslationComparisonWorkspace.tsx"
+Cohesion: 0.13
+Nodes (32): TranslationLocaleActionsProps, ComparisonContent(), comparisonLayoutTarget(), resolveComparisonLayout(), TranslationWorkspaceContent(), TranslationWorkspaceDialog(), TranslationWorkspaceDialogProps, comparisonItemFromSlot() (+24 more)
 
 ### Community 18 - "crud.ts"
 Cohesion: 0.06
 Nodes (41): assertAtomicResult(), isMappingArray(), isMappingResponse(), isSurveyMappingRevisionConflict(), moveMapping(), mutationResult(), normalizeError(), RetryOperation (+33 more)
 
-### Community 19 - "ContentLibrary.tsx"
+### Community 19 - "PreviewWorkspaceContext.tsx"
 Cohesion: 0.21
-Nodes (11): MuiFormBuilderValidationState, ContentEditor(), ContentLibrary(), ContentLibraryBody(), modes, readFilter(), useContentLibrary(), StorageSwitch() (+3 more)
+Nodes (9): ContentEditor(), ContentEditorProps, ContentLibrary(), modes, StorageSwitch(), StorageSwitchProps, PreviewWorkspaceContext, StorageKind (+1 more)
 
 ### Community 20 - "core/src/translation.ts"
-Cohesion: 0.09
-Nodes (33): collectTranslationSlots(), computeSourceTextHash(), createSlot(), defaultTranslationMetadataMigrator(), getTranslationStatusWithManualOverride(), isJsonValue(), isManualTranslationMetadata(), isTranslationMetadataProperty() (+25 more)
+Cohesion: 0.08
+Nodes (39): normalizeLocale(), collectTranslationSlots(), computeSourceTextHash(), createSlot(), defaultTranslationMetadataMigrator(), getTranslationStatusWithManualOverride(), isJsonValue(), isManualTranslationMetadata() (+31 more)
 
 ### Community 21 - "contentRenderer.tsx"
-Cohesion: 0.07
-Nodes (43): MuiContentRendererOwnProps, UsePollResultsProps, canShowPollResults(), ContentModeDiagnostic, ContentModeIssue, CustomFormMetadata, evaluateQuiz(), getContentModeDiagnostics() (+35 more)
+Cohesion: 0.10
+Nodes (21): QuizQuestionFeedbackProps, canShowPollResults(), QuizQuestionResult, PollChoiceGroup(), pollItems(), PollResultItem, PollResultLabels, PollResults() (+13 more)
 
 ### Community 22 - "check-public-api.mjs"
 Cohesion: 0.11
@@ -391,48 +392,48 @@ Cohesion: 0.04
 Nodes (44): compilerOptions, allowImportingTsExtensions, esModuleInterop, exactOptionalPropertyTypes, forceConsistentCasingInFileNames, ignoreDeprecations, isolatedModules, jsx (+36 more)
 
 ### Community 24 - "MuiContentRenderer.tsx"
-Cohesion: 0.06
-Nodes (50): MuiPollRendererOptions, MuiPollResultsProps, MuiPollResultViewProps, QuizResultViewProps, QuizResultViewSlots, ContentRendererOptions, PollResultsProps, PollResultViewProps (+42 more)
+Cohesion: 0.10
+Nodes (21): MuiContentRendererOwnProps, muiContentTranslation(), MuiContentRenderer(), MuiContentRendererOptions, MuiContentRendererOwnProps, MuiContentRendererProps, MuiInvalidQuiz(), MuiPollResultOption() (+13 more)
 
 ### Community 25 - "controller.ts"
 Cohesion: 0.10
-Nodes (35): failedResult(), issueKey(), normalizeCheckStatus(), normalizeError(), notify(), SurveyQualityCheckEventHandler, useSurveyQualityController(), mapSeverity() (+27 more)
+Nodes (36): failedResult(), issueKey(), normalizeCheckStatus(), normalizeError(), notify(), SurveyQualityCheckEventHandler, useSurveyQualityController(), mapSeverity() (+28 more)
 
-### Community 26 - "Select.tsx"
-Cohesion: 0.33
-Nodes (6): createMuiSelectAdapter(), groupSelectOptions(), MuiSelectAdapter(), normalizeOptions(), SelectOptionGroup, BuilderSelectOption
+### Community 26 - "FieldEditor.tsx"
+Cohesion: 0.10
+Nodes (32): MuiBuilderOverrides, MuiFormBuilderProps, createMuiBuilderProps(), MuiBuilderOverrides, createMuiBuilderComponents(), isAdapterOptions(), muiBuilderComponents, mergeMuiAdapterOptions() (+24 more)
 
 ### Community 27 - "v28.test.tsx"
-Cohesion: 0.08
-Nodes (23): browserStorage(), createLocalStorageSubmissionReceiptStore(), parseReceipt(), receiptKey(), SubmissionReceipt, SubmissionReceiptQuery, submissionReceiptQueryKey(), SubmissionReceiptStore (+15 more)
+Cohesion: 0.11
+Nodes (20): browserStorage(), createLocalStorageSubmissionReceiptStore(), parseReceipt(), receiptKey(), SubmissionReceiptQuery, submissionReceiptQueryKey(), SubmissionReceiptStore, useSubmissionReceipts() (+12 more)
 
-### Community 28 - "useTranslationWorkspace.ts"
-Cohesion: 0.10
-Nodes (34): MuiLocalizationSlotOptions, TranslationWorkspaceProps, FormBuilderOptions, LocaleValidationContext, TranslationEventPayload, TranslationSlotRowProps, UseTranslationComparisonOptions, UseTranslationWorkspaceOptions (+26 more)
+### Community 28 - "TranslationAdapter"
+Cohesion: 0.13
+Nodes (40): TranslationComparisonWorkspaceProps, TranslationWorkspaceProps, FormBuilderProps, TranslationComparisonHeaderProps, UseTranslationComparisonOptions, UseTranslationComparisonResult, UseTranslationWorkspaceOptions, UseTranslationWorkspaceResult (+32 more)
 
-### Community 29 - "core/src/index.ts"
-Cohesion: 0.06
-Nodes (33): AggregationReport, AggregationSkipReason, contentMetadataToJson(), createInitialSchemaByMode(), getContentModePolicy(), MuiTextInputAdapter, contentTranslation(), MuiFormBuilder() (+25 more)
+### Community 29 - "src/ContentModeSettings.tsx"
+Cohesion: 0.12
+Nodes (23): contentMetadataToJson(), createInitialSchemaByMode(), getContentModePolicy(), readPollMetadata(), validateContentMode(), MuiCheckboxAdapter, MuiTextInputAdapter, ContentModeSettings() (+15 more)
 
 ### Community 30 - "core/src/submission.ts"
-Cohesion: 0.08
-Nodes (29): createFormSubmissionSchema(), FormSubmissionMetadataSchema, FormSubmissionWireSchema, FormSubmissionWireSchemaType, StrictFormSubmissionWireSchema, StrictFormSubmissionWireSchemaType, assertValidFormSubmission(), assertValidFormSubmissionInternal() (+21 more)
+Cohesion: 0.10
+Nodes (24): assertValidFormSubmission(), assertValidFormSubmissionInternal(), assertValidFormSubmissionWith(), canonicalSubmissionValue(), cloneValues(), createSubmissionPayloadHash, hashFormSubmissionPayload(), isFormSchema() (+16 more)
 
 ### Community 31 - "react/src/submission.ts"
-Cohesion: 0.09
-Nodes (28): CreateSubmissionControllerOptions, SubmissionIdentityOptions, SubmissionIdFormat, StrictFormSubmission, attemptKey(), browserStorage(), createLocalStorageSubmissionAttemptStore(), parseAttempt() (+20 more)
+Cohesion: 0.08
+Nodes (33): CreateSubmissionControllerOptions, SubmissionIdentityOptions, createSubmissionId(), generatedUlid(), generatedUuid(), SubmissionIdFormat, StrictFormSubmission, attemptKey() (+25 more)
 
 ### Community 32 - "preview/package.json"
 Cohesion: 0.11
 Nodes (18): @emotion/react, @emotion/styled, @form-engine-ts/core, @form-engine-ts/custom-survey-client, @form-engine-ts/react, @mui/icons-material, @mui/material, react (+10 more)
 
 ### Community 33 - "QuestionType"
-Cohesion: 0.15
+Cohesion: 0.14
 Nodes (20): BuilderFactories, BuilderPageConditionEditorProps, FieldTypeSelectOptionsConfig, FieldTypeSelectOptionsContext, FieldTypeSelectSlotProps, FormBuilderComponents, FormBuilderResult, FormSubmittedAnswerItem (+12 more)
 
 ### Community 34 - "versioning.ts"
 Cohesion: 0.10
-Nodes (31): DomainApiDemo(), createResponseAccumulator(), SchemaIssue, applyTransitionPlan(), assertVersionMutable(), CloneVersionOptions, cloneVersionToDraft(), commitVersionTransition() (+23 more)
+Nodes (29): DomainApiDemo(), createResponseAccumulator(), applyTransitionPlan(), assertVersionMutable(), cloneVersionToDraft(), commitVersionTransition(), CommitVersionTransitionOptions, createCloneTransitionPlan() (+21 more)
 
 ### Community 35 - "storage-d1/package.json"
 Cohesion: 0.05
@@ -448,11 +449,11 @@ Nodes (31): assertFiniteNumber(), assertMetadata(), assertNonEmptyString(), asse
 
 ### Community 38 - "react/package.json"
 Cohesion: 0.05
-Nodes (39): bugs, url, dependencies, @form-engine-ts/core, @form-engine-ts/privacy, devDependencies, axe-core, exports (+31 more)
+Nodes (38): bugs, url, dependencies, @form-engine-ts/core, @form-engine-ts/privacy, devDependencies, axe-core, exports (+30 more)
 
 ### Community 39 - "storage-mongodb/src/index.ts"
-Cohesion: 0.13
-Nodes (28): assertTransitionPlan(), assertVersionRecord(), cloneJson(), collectionName(), createConfiguredIndexes(), createMongoDbStorage(), customIndexDescriptions(), duplicateIndexName() (+20 more)
+Cohesion: 0.07
+Nodes (41): StorageCommitError, VersionedFormStorageAdapter, VersionTransitionPlan, FormVersionRecord, VersionTransitionEvent, assertTransitionPlan(), assertVersionRecord(), cloneJson() (+33 more)
 
 ### Community 40 - "versionOperations.ts"
 Cohesion: 0.11
@@ -467,8 +468,8 @@ Cohesion: 0.06
 Nodes (32): bugs, url, dependencies, @form-engine-ts/core, devDependencies, mongodb, exports, files (+24 more)
 
 ### Community 43 - "FormSchema"
-Cohesion: 0.05
-Nodes (46): SurveyEditorActionsAdapter, SurveyEditorAdapter, SurveyEditorDomainAdapter, SurveyEditorQuestionRequest, SurveyEditorTranslateRequest, SurveyResponseSummaryDomainAdapter, SurveyResponseSummaryMapperAdapter, SurveySchemaDomainAdapter (+38 more)
+Cohesion: 0.08
+Nodes (25): SurveyEditorActionsAdapter, SurveyEditorAdapter, SurveyEditorDomainAdapter, SurveyEditorQuestionRequest, SurveyEditorTranslateRequest, SurveyResponseSummaryDomainAdapter, SurveyResponseSummaryMapperAdapter, SurveySchemaDomainAdapter (+17 more)
 
 ### Community 44 - "translator-i18next/package.json"
 Cohesion: 0.06
@@ -483,20 +484,20 @@ Cohesion: 0.07
 Nodes (28): bugs, url, dependencies, zod, exports, files, homepage, zod (+20 more)
 
 ### Community 47 - "pipeline.ts"
-Cohesion: 0.10
-Nodes (20): createSubmissionPipeline(), executeSubmissionPipeline(), isFormValue(), isRecord(), normalizeCodecFailure(), runSubmissionPipeline(), storageError(), SubmissionCodec (+12 more)
+Cohesion: 0.11
+Nodes (19): createSubmissionPipeline(), executeSubmissionPipeline(), isFormValue(), isRecord(), normalizeCodecFailure(), runSubmissionPipeline(), storageError(), SubmissionCodec (+11 more)
 
 ### Community 48 - "storage-d1/src/index.ts"
-Cohesion: 0.07
-Nodes (35): assertSuccessful(), boundStatement(), cloneJson(), createD1Storage(), D1DatabaseLike, D1PreparedStatementLike, D1ResultLike, D1StorageOptions (+27 more)
+Cohesion: 0.12
+Nodes (20): assertSuccessful(), boundStatement(), cloneJson(), createD1Storage(), D1DatabaseLike, D1PreparedStatementLike, D1ResultLike, D1StorageOptions (+12 more)
 
 ### Community 49 - "custom-survey-client/package.json"
 Cohesion: 0.09
 Nodes (21): exports, files, homepage, @form-engine-ts/core, @form-engine-ts/privacy, @form-engine-ts/react, react, react-dom (+13 more)
 
 ### Community 50 - "useFormBuilder.ts"
-Cohesion: 0.12
-Nodes (18): HeadlessBuilderDemo(), transformFieldType(), applyFieldConstraintDefaults(), BuilderIdKind, BuilderPolicy, BuilderTextTarget, CHOICE_TYPES, DEFAULT_PREFIXES (+10 more)
+Cohesion: 0.10
+Nodes (20): DEFAULT_OPTION, transformFieldType(), applyFieldConstraintDefaults(), BuilderIdKind, BuilderPolicy, BuilderTextTarget, CHOICE_TYPES, DEFAULT_PREFIXES (+12 more)
 
 ### Community 51 - "privacy/package.json"
 Cohesion: 0.07
@@ -539,32 +540,32 @@ Cohesion: 0.06
 Nodes (33): bugs, url, dependencies, @form-engine-ts/core, devDependencies, zod, exports, files (+25 more)
 
 ### Community 61 - "domain.ts"
-Cohesion: 0.14
-Nodes (22): toFreeTextAnswerItemsFromDomain(), useFreeTextDomainAnswerTranslation(), useSurveyEditorDomain(), defaultToolbar(), initialState(), normalizeError(), SurveyEditor(), translateSurveyPreview() (+14 more)
+Cohesion: 0.13
+Nodes (23): toFreeTextAnswerItemsFromDomain(), useFreeTextDomainAnswerTranslation(), useSurveyEditorDomain(), defaultToolbar(), initialState(), normalizeError(), SurveyEditor(), translateSurveyPreview() (+15 more)
 
 ### Community 62 - "errors.ts"
 Cohesion: 0.15
 Nodes (21): createTrpcSubmissionErrorFormatter(), createTrpcSubmissionErrorIntegration(), deserializeSubmissionError(), deserializeSubmissionErrorFromTrpc(), findTrpcSubmissionErrorPayload(), FormSubmissionError, FormSubmissionSerializedError, getTrpcSubmissionErrorData() (+13 more)
 
-### Community 63 - "validateFormSchema"
-Cohesion: 0.42
-Nodes (16): isNonEmptyString(), isRecord(), issue(), rejectLegacyProperties(), validateDisplayCondition(), validateDisplayConditionGroup(), validateDisplayRule(), validateExtensibleNode() (+8 more)
+### Community 63 - "src/schema.ts"
+Cohesion: 0.26
+Nodes (22): CONDITION_OPERATORS, FIELD_TYPES, isNonEmptyString(), isRecord(), issue(), rejectLegacyProperties(), TextEntry, validateDisplayCondition() (+14 more)
 
 ### Community 64 - "What You Must Do When Invoked"
 Cohesion: 0.08
 Nodes (24): For /graphify add and --watch, For /graphify query, For the commit hook and native CLAUDE.md integration, For --update and --cluster-only, /graphify, Honesty Rules, Interpreter guard for subcommands, Part A - Structural extraction for code files (+16 more)
 
 ### Community 65 - "analytics.ts"
-Cohesion: 0.12
-Nodes (22): AccumulatorReport, AccumulatorResponse, AccumulatorSkipReason, aggregateField(), calculateChoiceDistribution(), ChoiceDistributionEntry, CsvColumnContext, CsvColumnDef (+14 more)
+Cohesion: 0.05
+Nodes (59): AccumulatorReport, AccumulatorResponse, AccumulatorSkipReason, aggregateField(), asFormResponse(), calculateChoiceDistribution(), calculateNumericSummary(), ChoiceDistributionEntry (+51 more)
 
 ### Community 66 - "custom-survey-client/src/index.ts"
 Cohesion: 0.13
-Nodes (17): SurveyResponseSummaryQuestion, clampPercentage(), questionData(), ResponseSummaryData, ResponseSummaryInput, ResponseSummaryLabels, ResponseSummaryLanguageAggregate, ResponseSummaryQuestion (+9 more)
+Nodes (18): SurveyResponseSummaryQuestion, clampPercentage(), questionData(), ResponseSummaryData, ResponseSummaryInput, ResponseSummaryLabels, ResponseSummaryLanguageAggregate, ResponseSummaryQuestion (+10 more)
 
 ### Community 67 - "context.tsx"
-Cohesion: 0.13
-Nodes (25): SurveyEditorQuestionAdapter, FieldComponentProps, FieldState, FormContextValue, AnswerValidationResult, FormField, FormValue, ValidationIssue (+17 more)
+Cohesion: 0.12
+Nodes (19): defaultAttemptId(), FormContext, FormProvider(), FormProviderProps, isServerErrorPayload(), issuesByField(), SubmitStatus, TypedFormContextValue (+11 more)
 
 ### Community 68 - "MuiSurveyResponseSummary.tsx"
 Cohesion: 0.12
@@ -591,8 +592,8 @@ Cohesion: 0.10
 Nodes (20): engines, node, react, react-dom, @testing-library/jest-dom, @testing-library/react, @types/react, @types/react-dom (+12 more)
 
 ### Community 74 - "storage-postgres/package.json"
-Cohesion: 0.09
-Nodes (22): bugs, url, dependencies, @form-engine-ts/core, exports, files, homepage, @form-engine-ts/core (+14 more)
+Cohesion: 0.05
+Nodes (37): bugs, url, dependencies, @form-engine-ts/core, devDependencies, pg, @types/pg, exports (+29 more)
 
 ### Community 75 - "translator.ts"
 Cohesion: 0.14
@@ -606,33 +607,33 @@ Nodes (18): BatchSplitLimits, createGoogleV3Translator(), endpoint(), GlossaryRe
 Cohesion: 0.11
 Nodes (4): FormStorageAdapter, PagedSubmissionStorageAdapter, StorageAdapter, VersionedFormStorageAdapter
 
-### Community 78 - "TranslationReport"
-Cohesion: 0.16
-Nodes (22): SurveyEditorOperationState, TranslateSurveySchemaOptions, TranslateSurveySchemaResult, FormBuilderProps, LocaleSelectorProps, TranslationComparisonHeaderProps, TranslationComparisonLocaleSelectorProps, TranslationWorkspaceHeaderProps (+14 more)
+### Community 78 - "mui/src/types.ts"
+Cohesion: 0.11
+Nodes (26): MuiFieldEditorOptions, ContentModeSettingsProps, MuiContentModeControls, MuiFormBuilderValidationIssue, MuiFormBuilderProps, MuiInlineLocalizationWorkspace(), MuiStandardLocalization(), normalizeLocaleOptions() (+18 more)
 
 ### Community 79 - "tasks"
 Cohesion: 0.11
 Nodes (18): dependsOn, outputs, dependsOn, outputs, cache, persistent, globalPassThroughEnv, $schema (+10 more)
 
 ### Community 80 - "BuilderPanel.tsx"
-Cohesion: 0.19
-Nodes (11): BuilderPanel(), PreviewAiTranslationActions(), previewBuilderComponents, BuilderPreviewContext, BuilderPreviewContextValue, TranslationOverwrite, useBuilderPreview(), MuiPanel() (+3 more)
+Cohesion: 0.14
+Nodes (16): BuilderPanel(), HeadlessBuilderDemo(), PreviewAiTranslationActions(), previewBuilderComponents, BuilderPreviewContext, BuilderPreviewContextValue, BuilderPreviewProvider(), TranslationOverwrite (+8 more)
 
 ### Community 81 - "SurveyWorkflowPanel.tsx"
 Cohesion: 0.14
 Nodes (16): normalizeError(), SurveyWorkflowAdapter, SurveyWorkflowControlled(), SurveyWorkflowControlledProps, SurveyWorkflowPanel(), SurveyWorkflowPanelProps, SurveyWorkflowPanelSlots, SurveyWorkflowState (+8 more)
 
-### Community 82 - "mongodb.test.ts"
-Cohesion: 0.13
-Nodes (11): AzureTableEntityCodec, AzureTableLegacyCodec, AzureTableLegacyEntity, LegacyAnswerArrayEntity, LegacyArrayAzureTableCodec, LegacyFormSubmission, createDbStub(), matches() (+3 more)
+### Community 82 - "legacy/src/index.ts"
+Cohesion: 0.22
+Nodes (6): AzureTableEntityCodec, AzureTableLegacyCodec, AzureTableLegacyEntity, LegacyAnswerArrayEntity, LegacyArrayAzureTableCodec, LegacyFormSubmission
 
 ### Community 83 - "devDependencies"
 Cohesion: 0.12
 Nodes (17): devDependencies, @biomejs/biome, jsdom, react, react-dom, @testing-library/jest-dom, @testing-library/react, @testing-library/user-event (+9 more)
 
 ### Community 84 - "sanitization.ts"
-Cohesion: 0.21
-Nodes (17): normalizeLocale(), cyclicQuestionIds(), displayRuleSourceIds(), normalizedLocaleList(), registeredEntries(), sanitizeFieldConstraints(), sanitizeFieldLocales(), sanitizeNodeLocales() (+9 more)
+Cohesion: 0.22
+Nodes (16): cyclicQuestionIds(), displayRuleSourceIds(), normalizedLocaleList(), registeredEntries(), sanitizeFieldConstraints(), sanitizeFieldLocales(), sanitizeNodeLocales(), sanitizeOptionLocales() (+8 more)
 
 ### Community 85 - "src/provider.tsx"
 Cohesion: 0.18
@@ -655,24 +656,24 @@ Cohesion: 0.12
 Nodes (16): BaseField, CheckboxField, CreateSubmissionOptions, CsvColumnContext, ExtensibleNode, FieldOption, FormPage, FormResponse (+8 more)
 
 ### Community 90 - "JsonValue"
-Cohesion: 0.13
-Nodes (15): FreeTextAnswerItem, FreeTextTranslationItemState, FreeTextTranslationOutcomeItem, QualityCheckResult, QualityIssue, SurveyDefinition, SurveyDefinitionOption, SurveyEngineText (+7 more)
+Cohesion: 0.12
+Nodes (16): FreeTextAnswerItem, FreeTextTranslationItemState, FreeTextTranslationOutcomeItem, QualityCheckResult, QualityIssue, SurveyDefinition, SurveyDefinitionOption, SurveyEngineText (+8 more)
 
 ### Community 91 - "日本語の履歴"
 Cohesion: 0.12
 Nodes (16): v1.1.1セキュリティ対応、v2拡張、v2.9耐障害性API, v2.9.6 — 2026-08-26, v3.1.0 — 2026-08-27, v3.2.0 — 2026-08-27, v3.3.0 — 2026-08-27, v4.0.0 — 2026-08-27, v4.1.0 — 2026-08-27, v4.3.2 — 2026-08-27 (+8 more)
 
-### Community 92 - "AppPanels.tsx"
-Cohesion: 0.16
-Nodes (16): AppNavigation(), AppNavigationProps, AppTabId, appTabs, AppPanels(), BuilderPreviewProvider(), previewTranslationAdapter, TranslationComparisonPanel() (+8 more)
+### Community 92 - "FormValues"
+Cohesion: 0.23
+Nodes (12): FormProviderProps, SubmissionControllerOptions, AppNavigation(), AppNavigationProps, AppTabId, appTabs, AppPanels(), AppPanelsProps (+4 more)
 
 ### Community 93 - "dependencies"
 Cohesion: 0.14
 Nodes (14): dependencies, @emotion/react, @emotion/styled, @form-engine-ts/core, @form-engine-ts/custom-survey-client, @form-engine-ts/mui, @form-engine-ts/react, @form-engine-ts/storage-localstorage (+6 more)
 
 ### Community 94 - "translator-mock/src/index.ts"
-Cohesion: 0.11
-Nodes (21): AnalyticsDetails(), AnalyticsPanel(), formatNumber(), ResetResponsesControl(), ResetResponsesControlProps, calculateCrossTabulation(), bytesToHex(), dispatchWebhook() (+13 more)
+Cohesion: 0.18
+Nodes (13): AnalyticsDetails(), formatNumber(), ResetResponsesControl(), ResetResponsesControlProps, previewMuiTheme, createMockAsyncTranslationAdapter(), createMockTranslationAdapter(), mockCatalogs (+5 more)
 
 ### Community 95 - "scripts"
 Cohesion: 0.14
@@ -686,25 +687,25 @@ Nodes (12): AddLocaleDropdown(), AddLocaleDropdownProps, optionLabel(), optionLo
 Cohesion: 0.15
 Nodes (3): TypedFormStorageAdapter, TypedPagedSubmissionStorageAdapter, TypedStorageAdapter
 
-### Community 98 - "exportResponsesToCsv"
-Cohesion: 0.19
-Nodes (11): asFormResponse(), escapeCsvCell(), exportResponsesToCsv(), exportResponsesToCsvStream(), generateCsvChunks(), serializeUnknown(), serializeValue(), submissionWithMetadata() (+3 more)
+### Community 98 - "contentMode.ts"
+Cohesion: 0.15
+Nodes (25): ContentLibraryBody(), readFilter(), useContentLibrary(), addConstraintIssue(), ContentModeConstraintCode, ContentModeDiagnostic, ContentModeIssue, ContentModeValidationResult (+17 more)
 
 ### Community 99 - "mui/package.json"
 Cohesion: 0.09
 Nodes (22): files, homepage, @emotion/react, @emotion/styled, @form-engine-ts/core, @form-engine-ts/custom-survey-client, @form-engine-ts/react, @mui/icons-material (+14 more)
 
 ### Community 100 - "ConditionEditor.tsx"
-Cohesion: 0.21
-Nodes (13): ConditionEditorProps, ConditionOperator, DisplayConditionGroup, DisplayRule, FieldDisplayCondition, ConditionEditor(), ConditionEditorProps, conditionGroup() (+5 more)
+Cohesion: 0.23
+Nodes (12): ConditionEditorProps, ConditionOperator, DisplayConditionGroup, DisplayRule, ConditionEditor(), ConditionEditorProps, conditionGroup(), conditionValue() (+4 more)
 
 ### Community 101 - "assertValidFormSchema"
-Cohesion: 0.14
-Nodes (19): assertValidFormSchema(), cloneSchema(), createZodFormCodec(), createZodFormSchema(), CreateZodFormSchemaOptions, FieldById, FieldIds, FieldsForSchema (+11 more)
+Cohesion: 0.09
+Nodes (32): FormContextValue, assertValidFormSchema(), AnswerValidationResult, FormValue, ValidationCode, addIssue(), DEFAULT_MESSAGES, FormSubmissionValidatorResult (+24 more)
 
 ### Community 102 - "v22.test.tsx"
-Cohesion: 0.36
-Nodes (7): CustomActions(), CustomButton(), CustomTextArea(), CustomTextInput(), Harness(), schema, TranslationActions()
+Cohesion: 0.22
+Nodes (10): adapter, schema, translateBatch(), CustomActions(), CustomButton(), CustomTextArea(), CustomTextInput(), Harness() (+2 more)
 
 ### Community 103 - "translator-azure/src/index.ts"
 Cohesion: 0.29
@@ -718,13 +719,13 @@ Nodes (11): apiErrorMessage(), createGoogleTranslator(), decodeHtmlEntities(), G
 Cohesion: 0.22
 Nodes (6): createAdapter(), createI18nextTranslationAdapter(), createI18nextTranslator(), I18nextAdapterOptions, I18nextInstance, I18nextTranslatorOptions
 
-### Community 106 - "textMetadata.ts"
-Cohesion: 0.27
-Nodes (11): normalizeTranslationMetadata(), createSurveySchemaDomainAdapter(), canonicalSource(), createSurveyTextMetadataCodec(), isJsonValue(), isManual(), isRecord(), jsonMetadata() (+3 more)
+### Community 106 - "custom-survey-client/src/translation.ts"
+Cohesion: 0.13
+Nodes (20): normalizeTranslationMetadata(), createSurveySchemaDomainAdapter(), canonicalSource(), createSurveyTextMetadataCodec(), isJsonValue(), isManual(), isRecord(), jsonMetadata() (+12 more)
 
 ### Community 107 - "useTranslationComparison.ts"
-Cohesion: 0.26
-Nodes (11): TranslationComparisonItem, TranslationSlotChangeEvent, CanonicalTranslationMetadata, canonicalMetadata(), comparisonItem(), getNodeTitle(), optionParentId(), summaryFor() (+3 more)
+Cohesion: 0.16
+Nodes (17): TranslationComparisonItem, TranslationComparisonStatusDisplayOptions, TranslationSlotChangeEvent, TranslationWorkspaceSlots, CanonicalTranslationMetadata, TranslationStatus, TranslationComparisonViewResult, canonicalMetadata() (+9 more)
 
 ### Community 108 - "devDependencies"
 Cohesion: 0.17
@@ -740,7 +741,7 @@ Nodes (4): D1DatabaseLike, D1PreparedStatementLike, D1ResultLike, D1StorageOptio
 
 ### Community 111 - "composite.test.tsx"
 Cohesion: 0.12
-Nodes (17): useSurveyTranslation(), SurveyVersionPanel(), SurveyEditorAdapter, SurveyVersionActionAdapter, SurveyVersionAdapter, composeSurveyVersionActions(), Consumer(), DomainAnswer (+9 more)
+Nodes (16): useSurveyTranslation(), SurveyEditorAdapter, SurveyVersionActionAdapter, SurveyVersionAdapter, composeSurveyVersionActions(), Consumer(), DomainAnswer, DomainSummary (+8 more)
 
 ### Community 112 - "@form-engine-ts/custom-survey-client"
 Cohesion: 0.18
@@ -751,8 +752,8 @@ Cohesion: 0.18
 Nodes (10): Additional basic settings, Choice field layout, Content mode composition, @form-engine-ts/react, Headless builder and renderer lifecycle, Headless respondent renderer, Headless回答 renderer, Install (+2 more)
 
 ### Community 114 - "storage-postgres/src/index.ts"
-Cohesion: 0.36
-Nodes (10): cloneJson(), isFormValue(), isRecord(), parseJson(), parseSchemaRow(), parseSubmission(), parseSubmissionRow(), PostgresStorageOptions (+2 more)
+Cohesion: 0.16
+Nodes (15): cloneJson(), createPostgresStorage(), identifier(), isFormValue(), isRecord(), parseJson(), parseSchemaRow(), parseSubmission() (+7 more)
 
 ### Community 115 - "translator-cache.d.ts"
 Cohesion: 0.22
@@ -762,33 +763,33 @@ Nodes (6): MemoryTranslationCache, MemoryTranslationCacheOptions, TranslationCac
 Cohesion: 0.20
 Nodes (9): CreateZodFormSchemaOptions, FieldById, FieldIds, FieldsForSchema, FormValuesForSchema, OptionalFieldIds, RequiredFieldIds, ValueForField (+1 more)
 
-### Community 117 - "App.tsx"
-Cohesion: 0.36
-Nodes (5): App(), clearPreviewStorage(), submitCompleteResponse(), AppContent(), root
+### Community 117 - "@testing-library/user-event"
+Cohesion: 0.27
+Nodes (7): App(), clearPreviewStorage(), submitCompleteResponse(), AppContent(), root, schema, @testing-library/user-event
 
 ### Community 118 - "v3 to v4 migration guide"
 Cohesion: 0.20
 Nodes (8): Builder field constraints, MongoDB storage options, MUI adapter context, Translation adapters, Translation key names, Typed Select options, v3 to v4 migration guide, v3 to v4 migration guide
 
-### Community 119 - "IncrementalResponseAccumulator"
-Cohesion: 0.31
-Nodes (5): IncrementalResponseAccumulator, isAnswerRecord(), responseIdentifier(), responseProblem(), responseValues()
+### Community 119 - "storage-sqlite/src/index.ts"
+Cohesion: 0.15
+Nodes (15): cloneJson(), createSqliteStorage(), identifier(), isFormValue(), isRecord(), parseJson(), parseSchemaRow(), parseSubmission() (+7 more)
 
 ### Community 120 - "devDependencies"
 Cohesion: 0.20
 Nodes (10): devDependencies, @form-engine-ts/core, @form-engine-ts/privacy, @form-engine-ts/react, react, react-dom, @testing-library/jest-dom, @testing-library/react (+2 more)
 
-### Community 121 - "custom-survey-client/src/translation.ts"
-Cohesion: 0.27
-Nodes (9): createSurveyTranslationMetadata(), CreateSurveyTranslationMetadataOptions, SurveyTranslationMetadataPolicy, SurveyTranslationMetadataSource, translateSurveySchema(), TranslateSurveySchemaOptions, TranslateSurveySchemaResult, AsyncTranslationAdapter (+1 more)
+### Community 121 - "QuizResultView.tsx"
+Cohesion: 0.16
+Nodes (16): QuizResultViewProps, QuizResultViewSlots, QuizResultSummaryProps, SubmitResponse, QuizEvaluationResult, QuizQuestionEvaluation, MuiQuizRendererOptions, optionLabel() (+8 more)
 
 ### Community 122 - "peerDependencies"
 Cohesion: 0.20
 Nodes (10): peerDependencies, @emotion/react, @emotion/styled, @form-engine-ts/core, @form-engine-ts/custom-survey-client, @form-engine-ts/react, @mui/icons-material, @mui/material (+2 more)
 
-### Community 123 - "postgres.test.ts"
-Cohesion: 0.22
-Nodes (5): createPostgresStorage(), identifier(), PostgresClientLike, schema, pg
+### Community 123 - "FormRenderer"
+Cohesion: 0.12
+Nodes (7): FormRenderer(), RenderSubmitButtonProps, schema, schema, schema, schema, summarySchema
 
 ### Community 124 - "translator-deepl/src/index.ts"
 Cohesion: 0.33
@@ -806,21 +807,21 @@ Nodes (7): BatchSplitLimits, GlossaryResolver, GoogleV3GlossaryConfig, GoogleV3T
 Cohesion: 0.22
 Nodes (8): graphify reference: extra exports and benchmark, Step 6b - Wiki (only if --wiki flag), Step 7 - Neo4j export (only if --neo4j or --neo4j-push flag), Step 7a - FalkorDB export (only if --falkordb or --falkordb-push flag), Step 7b - SVG export (only if --svg flag), Step 7c - GraphML export (only if --graphml flag), Step 7d - MCP server (only if --mcp flag), Step 8 - Token reduction benchmark (only if total_words > 5000)
 
-### Community 128 - "src/schema.ts"
-Cohesion: 0.28
-Nodes (12): canonicalLocaleOrRaw(), CollectedLocales, collectRecordKeys(), collectSchemaLocales(), addRequiredTranslationIssues(), collectSchemaText(), CONDITION_OPERATORS, FIELD_TYPES (+4 more)
+### Community 128 - "collectSchemaLocales"
+Cohesion: 0.22
+Nodes (11): canonicalLocaleOrRaw(), CollectedLocales, collectRecordKeys(), collectSchemaLocales(), addRequiredTranslationIssues(), collectSchemaText(), fieldConstraintIssue(), localeRecordEntry() (+3 more)
 
-### Community 129 - "populateSchemaTranslations"
-Cohesion: 0.14
-Nodes (10): populateSchemaTranslations(), throwIfAborted(), translateBatch(), schema, policy, issueCodes(), schema, adapter (+2 more)
+### Community 129 - "FormAnalytics"
+Cohesion: 0.26
+Nodes (14): MuiPollRendererOptions, MuiPollResultsProps, ContentRendererOptions, PollResultsProps, UsePollResultsProps, PollAccessContext, PollRuntimeAdapter, FormAnalytics (+6 more)
 
-### Community 130 - "i18n.ts"
-Cohesion: 0.33
-Nodes (7): BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, BuilderTranslationKey, formatTemplate(), isResolvedAdapterResult(), isTranslationUnresolved(), resolveTranslation()
+### Community 130 - "MuiFormEngineI18nOptions"
+Cohesion: 0.38
+Nodes (11): MuiFormEngineI18nOptions, FormEngineI18nProviderProps, FormEngineMessages, FormEngineTranslator, TranslationMissingKeyEvent, TranslationWorkspaceCustomDictionary, MuiFormEngineI18nOptions, defaultTranslator (+3 more)
 
 ### Community 131 - "FieldOption"
-Cohesion: 0.20
-Nodes (10): BuilderOptionEditorSlotProps, ChoiceGroupSlotProps, ChoiceOptionAfterSlotProps, FieldEditorHeaderSlotProps, DEFAULT_OPTION, FieldOption, Question, ChoiceGroupSlotProps (+2 more)
+Cohesion: 0.13
+Nodes (16): BuilderBasicSettingsSlotProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, BuilderOptionEditorSlotProps, BuilderPagesSlotProps, BuilderSlotBaseProps, BuilderToolbarSlotProps, BuilderTranslationActionsSlotProps (+8 more)
 
 ### Community 132 - "English"
 Cohesion: 0.22
@@ -834,17 +835,17 @@ Nodes (9): SSRとMVPの範囲, アダプターの契約, フォームの定義�
 Cohesion: 0.25
 Nodes (8): SurveyDefinitionCheckboxQuestion, SurveyDefinitionChoiceQuestion, SurveyDefinitionMultiSelectQuestion, SurveyDefinitionNumberQuestion, SurveyDefinitionQuestionBase, SurveyDefinitionRatingQuestion, SurveyDefinitionSingleChoiceQuestion, SurveyDefinitionTextQuestion
 
-### Community 135 - "BuilderSlotBaseProps"
-Cohesion: 0.29
-Nodes (7): BuilderBasicSettingsSlotProps, BuilderFieldEditorSlotProps, BuilderLocalizationSlotProps, BuilderPagesSlotProps, BuilderSlotBaseProps, BuilderToolbarSlotProps, BuilderTranslationActionsSlotProps
+### Community 135 - "submission.zod.ts"
+Cohesion: 0.21
+Nodes (8): createFormSubmissionSchema(), FormSubmissionMetadataSchema, FormSubmissionWireSchema, FormSubmissionWireSchemaType, StrictFormSubmissionWireSchema, StrictFormSubmissionWireSchemaType, fromFormSubmissionWire(), toFormSubmissionWire()
 
-### Community 137 - "PreviewWorkspaceContext.tsx"
-Cohesion: 0.15
-Nodes (15): browserIdentity(), ContentAnswer(), hasBrowserVote(), PreviewWorkspaceContext, PreviewWorkspaceProvider(), customerFeedbackSchema, aggregateResponses(), readPollMetadata() (+7 more)
+### Community 137 - "ContentAnswer.tsx"
+Cohesion: 0.24
+Nodes (9): browserIdentity(), ContentAnswer(), hasBrowserVote(), PreviewWorkspaceProvider(), aggregateResponses(), createSubmission(), schema, validValues (+1 more)
 
-### Community 138 - "pipeResponsesToCsvStream"
-Cohesion: 0.46
-Nodes (4): isWebWritableStream(), NodeWritableStream, pipeResponsesToCsvStream(), writeNodeChunk()
+### Community 138 - "RespondentPreviewContext.tsx"
+Cohesion: 0.20
+Nodes (9): RespondentPanel(), ChoiceFieldLayout, RespondentPreviewContext, RespondentPreviewContextValue, RespondentPreviewProvider(), useRespondentPreview(), MuiChoiceGroupSlot(), schema (+1 more)
 
 ### Community 139 - "compilerOptions"
 Cohesion: 0.22
@@ -866,9 +867,9 @@ Nodes (6): AzureTableEntityCodec, AzureTableLegacyCodec, AzureTableLegacyEntity,
 Cohesion: 0.29
 Nodes (6): @form-engine-ts/core, Install, Multi-step, localization, analytics, and events, Quick start, Survey, poll and quiz content modes, Versioning, incremental analytics, and paged storage
 
-### Community 145 - "BaseSubmissionMetadata"
-Cohesion: 0.27
-Nodes (6): isSubmissionUlid(), BaseSubmissionMetadata, Metadata, Metadata, iterateTypedSubmissionPages(), SurveyMetadata
+### Community 145 - "pages-editor.test.tsx"
+Cohesion: 0.20
+Nodes (5): muiBuilderSlots, createMuiPagesEditorSlot(), MuiPagesEditor, MuiPagesEditorSlot, schema
 
 ### Community 146 - "scripts"
 Cohesion: 0.40
@@ -883,8 +884,8 @@ Cohesion: 0.50
 Nodes (4): ./renderer, import, require, types
 
 ### Community 150 - "FormStorageAdapter"
-Cohesion: 0.08
-Nodes (6): StorageLike, SqliteExecutor, SqliteStorageOptions, ContentAnswerProps, FormStorageAdapter, StorageAdapter
+Cohesion: 0.17
+Nodes (3): ContentAnswerProps, FormStorageAdapter, StorageAdapter
 
 ### Community 151 - "UseSurveyEditorResult"
 Cohesion: 0.67
@@ -902,9 +903,9 @@ Nodes (6): scripts, build, check, dev, test, typecheck
 Cohesion: 0.33
 Nodes (5): For /graphify explain, For /graphify path, graphify reference: query, path, explain, Step 0 — Constrained query expansion (REQUIRED before traversal), Step 1 — Traversal
 
-### Community 156 - "FormVersionRecord"
-Cohesion: 0.16
-Nodes (9): UseSurveyVersionOperationsOptions, VersionedFormStorageAdapter, FormVersionRecord, FormVersionState, draft, published, schema, UseSurveyVersionOperationsOptions (+1 more)
+### Community 156 - "react/src/index.ts"
+Cohesion: 0.22
+Nodes (6): schema, choiceSchema, FormEngineI18nProvider(), schema, schema, axe-core
 
 ### Community 157 - "peerDependencies"
 Cohesion: 0.33
@@ -962,9 +963,9 @@ Nodes (5): compilerOptions, types, extends, include, ../../tsconfig.base.json
 Cohesion: 0.33
 Nodes (5): compilerOptions, types, extends, include, ../../tsconfig.base.json
 
-### Community 173 - "scripts"
-Cohesion: 0.40
-Nodes (5): scripts, build, check, test, typecheck
+### Community 173 - "MuiPollResults.tsx"
+Cohesion: 0.31
+Nodes (9): getPollItems(), MuiPollResultItem, MuiPollResultsSlotProps, MuiPollResultsSlots, MuiPollResultView(), MuiPollResultViewProps, MuiPollResultViewSlotProps, MuiPollResultViewSlots (+1 more)
 
 ### Community 174 - "storage-postgres/tsconfig.json"
 Cohesion: 0.33
@@ -1022,6 +1023,10 @@ Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify refer
 Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
+### Community 191 - "storage-memory/src/index.ts"
+Cohesion: 0.33
+Nodes (5): cloneJson(), cloneSchema(), cloneSubmission(), cloneValue(), cloneValues()
+
 ### Community 192 - "repository"
 Cohesion: 0.50
 Nodes (4): repository, directory, type, url
@@ -1049,10 +1054,6 @@ Nodes (3): @form-engine-ts/storage-memory, Install, Quick start
 ### Community 198 - "@form-engine-ts/storage-mongodb"
 Cohesion: 0.50
 Nodes (3): @form-engine-ts/storage-mongodb, Install, Quick start
-
-### Community 199 - "repository"
-Cohesion: 0.50
-Nodes (4): repository, directory, type, url
 
 ### Community 200 - "@form-engine-ts/storage-postgres"
 Cohesion: 0.50
@@ -1106,37 +1107,33 @@ Nodes (3): CsvExportOptions, MetadataCsvExportOptions, StreamCsvOptions
 Cohesion: 0.67
 Nodes (3): DomainSurveyVersionOperationRequest, DomainSurveyVersionPublishRequest, DomainSurveyVersionQualityIssueDecisionRequest
 
-### Community 220 - "devDependencies"
-Cohesion: 0.67
-Nodes (3): devDependencies, pg, @types/pg
+### Community 242 - "FormField"
+Cohesion: 0.27
+Nodes (11): SurveyEditorQuestionAdapter, ContentRendererSlots, FieldComponentProps, FieldState, FormRendererSlots, FormField, ValidationError, ValidationIssue (+3 more)
 
-### Community 221 - "peerDependenciesMeta"
+### Community 244 - "FormRendererPresentationProps"
 Cohesion: 0.67
-Nodes (3): peerDependenciesMeta, pg, optional
-
-### Community 242 - "FormRendererSlots"
-Cohesion: 0.67
-Nodes (3): ContentRendererSlots, FormRendererSlots, ValidationError
+Nodes (3): FormRendererPresentationProps, StandaloneFormRendererProps, SubmissionProtectionProps
 
 ## Knowledge Gaps
-- **1877 isolated node(s):** `AggregationSkipReason`, `AggregationReport`, `KnownBuilderTranslationKey`, `BuilderTranslationKey`, `RendererTranslationKey` (+1872 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2189 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **43 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1882 isolated node(s):** `AggregationSkipReason`, `AggregationReport`, `KnownBuilderTranslationKey`, `BuilderTranslationKey`, `RendererTranslationKey` (+1877 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2194 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **45 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `FormSchema` connect `FormSchema` to `src/schema.ts`, `react.d.ts`, `custom-survey-client.d.ts`, `populateSchemaTranslations`, `react/src/index.ts`, `responseSummary.tsx`, `mui/src/types.ts`, `builder.tsx`, `BuilderSlotBaseProps`, `mui.d.ts`, `FormSubmission`, `PreviewWorkspaceContext.tsx`, `core/src/types.ts`, `core/src/pagination.ts`, `SurveyVersionOperationRequest`, `validation.ts`, `freeText.tsx`, `AsyncTranslationAdapter`, `custom-survey-client/src/types.ts`, `ContentLibrary.tsx`, `core/src/translation.ts`, `contentRenderer.tsx`, `FormStorageAdapter`, `UseSurveyEditorResult`, `MuiContentRenderer.tsx`, `storage-azure-table/src/index.ts`, `v28.test.tsx`, `useTranslationWorkspace.ts`, `FormVersionRecord`, `core/src/index.ts`, `react/src/submission.ts`, `core/src/submission.ts`, `QuestionType`, `versioning.ts`, `surveyDefinition.ts`, `storage-mongodb/src/index.ts`, `react/src/types.ts`, `pipeline.ts`, `storage-d1/src/index.ts`, `useFormBuilder.ts`, `SurveyResponseSummaryProps`, `domain.ts`, `analytics-boundaries.test.ts`, `analytics.ts`, `custom-survey-client/src/index.ts`, `context.tsx`, `MuiSurveyResponseSummary.tsx`, `renderer.tsx`, `TranslationReport`, `BuilderPanel.tsx`, `mongodb.test.ts`, `sanitization.ts`, `privacy/src/index.ts`, `storage-localstorage/src/index.ts`, `v28.test.ts`, `AppPanels.tsx`, `translator-mock/src/index.ts`, `TargetLocaleSelector.tsx`, `exportResponsesToCsv`, `ConditionEditor.tsx`, `assertValidFormSchema`, `v22.test.tsx`, `useTranslationComparison.ts`, `composite.test.tsx`, `FormRendererSlots`, `storage-postgres/src/index.ts`, `zod.d.ts`, `IncrementalResponseAccumulator`, `custom-survey-client/src/translation.ts`, `postgres.test.ts`?**
-  _High betweenness centrality (0.125) - this node is a cross-community bridge._
-- **Why does `@testing-library/user-event` connect `core/src/index.ts` to `context.tsx`, `mui/src/types.ts`, `builder.tsx`, `package.json`, `PreviewWorkspaceContext.tsx`, `FormSchema`, `App.tsx`, `v28.test.tsx`?**
-  _High betweenness centrality (0.032) - this node is a cross-community bridge._
-- **Why does `@azure/data-tables` connect `storage-azure-table/src/index.ts` to `storage-azure-table/package.json`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
+- **Why does `FormSchema` connect `FormSchema` to `react.d.ts`, `custom-survey-client.d.ts`, `core/src/index.ts`, `storage-azure-table/src/index.ts`, `responseSummary.tsx`, `useResolvedMuiAdapterOptions`, `builder.tsx`, `react/src/types.ts`, `mui.d.ts`, `FormSubmission`, `core/src/types.ts`, `core/src/pagination.ts`, `renderer.tsx`, `custom-survey-client/src/types.ts`, `v11.test.ts`, `freeText.tsx`, `TranslationComparisonWorkspace.tsx`, `PreviewWorkspaceContext.tsx`, `core/src/translation.ts`, `contentRenderer.tsx`, `MuiContentRenderer.tsx`, `v28.test.tsx`, `TranslationAdapter`, `src/ContentModeSettings.tsx`, `core/src/submission.ts`, `react/src/submission.ts`, `QuestionType`, `versioning.ts`, `surveyDefinition.ts`, `storage-mongodb/src/index.ts`, `pipeline.ts`, `storage-d1/src/index.ts`, `useFormBuilder.ts`, `domain.ts`, `src/schema.ts`, `analytics.ts`, `custom-survey-client/src/index.ts`, `context.tsx`, `MuiSurveyResponseSummary.tsx`, `mui/src/types.ts`, `BuilderPanel.tsx`, `sanitization.ts`, `privacy/src/index.ts`, `storage-localstorage/src/index.ts`, `FormValues`, `translator-mock/src/index.ts`, `TargetLocaleSelector.tsx`, `contentMode.ts`, `ConditionEditor.tsx`, `assertValidFormSchema`, `v22.test.tsx`, `custom-survey-client/src/translation.ts`, `useTranslationComparison.ts`, `composite.test.tsx`, `storage-postgres/src/index.ts`, `zod.d.ts`, `@testing-library/user-event`, `storage-sqlite/src/index.ts`, `QuizResultView.tsx`, `FormRenderer`, `collectSchemaLocales`, `FormAnalytics`, `FieldOption`, `ContentAnswer.tsx`, `RespondentPreviewContext.tsx`, `SurveyVersionOperationRequest`, `pages-editor.test.tsx`, `FormStorageAdapter`, `UseSurveyEditorResult`, `IncrementalResponseAccumulator`, `react/src/index.ts`, `MuiPollResults.tsx`, `SurveyResponseSummaryProps`, `storage-memory/src/index.ts`, `SubmissionIdentity`, `v2.test.tsx`, `FormField`, `localization-ux.test.tsx`, `FormRendererPresentationProps`?**
+  _High betweenness centrality (0.117) - this node is a cross-community bridge._
+- **Why does `@testing-library/user-event` connect `@testing-library/user-event` to `context.tsx`, `useResolvedMuiAdapterOptions`, `builder.tsx`, `v28.test.tsx`, `package.json`, `ContentAnswer.tsx`, `RespondentPreviewContext.tsx`, `pages-editor.test.tsx`, `v2.test.tsx`, `localization-ux.test.tsx`, `FormRenderer`, `react/src/index.ts`, `src/ContentModeSettings.tsx`?**
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+- **Why does `@vitejs/plugin-react` connect `vite.config.ts` to `package.json`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **What connects `AggregationSkipReason`, `AggregationReport`, `KnownBuilderTranslationKey` to the rest of the system?**
-  _1877 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1882 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `core.d.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.012658227848101266 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.012422360248447204 - nodes in this community are weakly interconnected._
 - **Should `react.d.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.020190254319549603 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.018630647414997672 - nodes in this community are weakly interconnected._
 - **Should `custom-survey-client.d.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.015384615384615385 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.015151515151515152 - nodes in this community are weakly interconnected._

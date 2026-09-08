@@ -1,10 +1,11 @@
 import type {
   BaseSubmissionMetadata,
   FormAnalytics,
+  FormSchema,
   getContentModeDiagnostics,
   PollRuntimeAdapter,
-  QuizQuestionResult,
-  QuizResult
+  QuizEvaluationResult,
+  QuizQuestionResult
 } from "@form-engine-ts/core";
 import {
   ContentRenderer,
@@ -30,7 +31,7 @@ import type { MuiAdapterOptions, MuiFormEngineI18nOptions } from "./types";
 
 export interface MuiQuizRendererOptions {
   readonly showImmediateFeedback?: boolean;
-  readonly resultViewProps?: Omit<QuizResultViewProps, "result" | "locale" | "i18n">;
+  readonly resultViewProps?: Omit<QuizResultViewProps, "evaluation" | "schema" | "locale" | "i18n">;
   readonly renderInvalid?: (issues: ReturnType<typeof getContentModeDiagnostics>) => ReactNode;
 }
 
@@ -98,24 +99,23 @@ function MuiQuizFeedback({
 }
 
 function MuiQuizSummary({
-  result,
+  evaluation,
+  schema,
   locale,
   i18n,
   options
 }: {
-  readonly result: QuizResult;
+  readonly evaluation: QuizEvaluationResult;
+  readonly schema: FormSchema;
   readonly locale: string;
   readonly i18n?: MuiFormEngineI18nOptions;
   readonly options?: MuiQuizRendererOptions;
 }) {
-  if (result.passed === undefined && options?.resultViewProps?.showScore !== true) return null;
   return (
     <QuizResultView
       {...options?.resultViewProps}
-      result={{
-        ...result,
-        questions: options?.resultViewProps?.slots?.question === undefined ? [] : result.questions
-      }}
+      evaluation={evaluation}
+      schema={schema}
       locale={locale}
       {...(i18n === undefined ? {} : { i18n })}
     />
@@ -224,7 +224,8 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
       contentSlots?.renderQuizSummary ??
       ((summary) => (
         <MuiQuizSummary
-          result={summary.result}
+          evaluation={summary.evaluation}
+          schema={summary.schema}
           locale={locale}
           {...(i18n === undefined ? {} : { i18n })}
           {...(quizOptions === undefined ? {} : { options: quizOptions })}

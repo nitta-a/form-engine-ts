@@ -278,7 +278,10 @@ editors. Custom field editor replacements receive these slots and must render th
 the MUI field editor supports them. Slot props expose `onChange` for metadata edits.
 
 `usePollResults({ schema, adapter, submitted, alreadyVoted, closed, canViewResults,
-submissionRevision })` returns `enabled`, `loading`, `data`, `error` and `reload`.
+submissionRevision })` returns `enabled`, `loading`, `data`, `error`, `reload` and
+`applyOptimisticVote`. The hook is specialized to Core's `FormAnalytics`; a vote can
+be reflected locally before the delayed aggregate response arrives, then replaced by
+the server value when loading completes.
 `alreadyVoted` is an optional host-provided boolean for a previously persisted vote;
 for `after_submit` polls it is treated like a successful submission when deciding
 whether to load results.
@@ -322,8 +325,10 @@ import { ContentRenderer } from "@form-engine-ts/react";
 ```
 
 Quiz feedback appears inside each answer field with text, an icon and `aria-live`.
-When a passing score is configured, the completion area contains the submission message,
-total score and pass status; without a passing score it contains only the submission message.
+The completion area contains the submission message and the score returned by
+`QuizEvaluationResult`; pass/fail is shown when a passing threshold is configured.
+`SubmitResponse.quizEvaluation` can carry a server-side evaluation (including rewards)
+and takes precedence over local evaluation.
 `PollResults`/`PollResultView`, `QuizQuestionFeedback` and `QuizResultSummary` are
 also exported. Hosts remain responsible for persistence, authorization and vote
 eligibility.
@@ -332,9 +337,10 @@ eligibility.
 
 `ContentRenderer` はアンケート・投票・クイズの回答フローを共通化したMUI非依存の
 rendererです。`classNames`でTailwind utility classを追加でき、既存の`fe-*` classは
-残ります。クイズの正誤は回答欄内に文字・アイコン・`aria-live`付きで表示し、完了領域には
-合格ラインを設定した場合は送信メッセージ、合計点、合否を表示し、未設定の場合は送信メッセージだけを表示します。保存・認可・一人一票の原子性はホスト側で
-強制してください。
+残ります。投票の送信直後は集計取得を待たずに選択肢行へ楽観的に票数・割合を反映し、
+クイズの正誤は回答欄内に文字・アイコン・`aria-live`付きで表示します。完了領域には
+`QuizEvaluationResult`の合計点を表示し、閾値がある場合は合否も表示します。保存・認可・
+一人一票の原子性はホスト側で強制してください。
 
 ### Reusing page condition controls in custom builder slots
 

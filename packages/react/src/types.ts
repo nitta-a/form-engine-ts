@@ -13,6 +13,7 @@ import type {
   PopulateTranslationOptions,
   Question,
   QuestionType,
+  QuizEvaluationResult,
   TranslationAdapter,
   TranslationProgress,
   TranslationReport,
@@ -623,6 +624,7 @@ export interface SubmitResponse {
   readonly submissionId?: string;
   readonly submittedAt?: string;
   readonly receiptId?: string;
+  readonly quizEvaluation?: QuizEvaluationResult;
 }
 
 export type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseSubmissionMetadata> =

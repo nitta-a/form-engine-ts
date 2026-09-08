@@ -5,12 +5,14 @@ current release and usage information.
 
 ## Latest release
 
-### v7.13.0 — 2026-09-09
+### v7.14.0 — 2026-09-09
 
 - Added inline poll result bars, localized vote counts, and percentages inside each radio or checkbox answer row.
 - Added the optional `alreadyVoted` renderer API so `after_submit` results can load on initial render for identified voters.
+- Added optimistic poll aggregation while submission and result loading are pending, followed by server-authoritative refresh.
+- Added strict Core validation for mode-specific poll and quiz schemas plus shared local/server quiz evaluation results and rewards.
 - Added preview persistence checks across schema versions and preserved answer state when switching between MUI and Tailwind.
-- Aligned all public packages to version 7.13.0.
+- Aligned all public packages to version 7.14.0.
 
 ### v7.12.0 — 2026-09-09
 

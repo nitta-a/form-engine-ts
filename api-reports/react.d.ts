@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { SubmissionIdFormat, BaseSubmissionMetadata, FormSchema, FormValues, StrictFormSubmission, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, QuestionType, FormField, ChoiceOption, FormPage, DisplayCondition, JsonValue, SchemaIssue, FieldOption, Question, ValidationIssue, ValidationError, TranslationStatus, CanonicalTranslationMetadata, FieldType, FormValue, PollRuntimeAdapter, FormAnalytics, QuizQuestionResult, QuizResult, getContentModeDiagnostics, AnswerValidationResult, PollAccessContext, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent } from '@form-engine-ts/core';
+import { SubmissionIdFormat, BaseSubmissionMetadata, FormSchema, FormValues, StrictFormSubmission, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, QuestionType, FormField, ChoiceOption, FormPage, DisplayCondition, JsonValue, SchemaIssue, FieldOption, Question, ValidationIssue, ValidationError, QuizEvaluationResult, TranslationStatus, CanonicalTranslationMetadata, FieldType, FormValue, PollRuntimeAdapter, FormAnalytics, QuizQuestionResult, getContentModeDiagnostics, AnswerValidationResult, PollAccessContext, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent } from '@form-engine-ts/core';
 export { FormSubmissionError, FormSubmissionSerializedError, QuestionType, SubmissionIdFormat, TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
@@ -822,6 +822,7 @@ interface SubmitResponse {
     readonly submissionId?: string;
     readonly submittedAt?: string;
     readonly receiptId?: string;
+    readonly quizEvaluation?: QuizEvaluationResult;
 }
 type FormSubmissionMetadata<TExtra extends BaseSubmissionMetadata = BaseSubmissionMetadata> = BaseSubmissionMetadata & TExtra;
 interface SubmitContext {
@@ -1397,6 +1398,7 @@ interface QuizSummaryLabels {
     readonly totalScore: string;
     readonly passed: string;
     readonly notPassed: string;
+    readonly reward?: string;
 }
 interface PollResultLabels {
     readonly title: string;
@@ -1436,12 +1438,13 @@ interface QuizQuestionFeedbackProps {
 }
 declare function QuizQuestionFeedback({ question, locale, labels, classNames }: QuizQuestionFeedbackProps): react.JSX.Element;
 interface QuizResultSummaryProps {
-    readonly result: QuizResult;
+    readonly evaluation: QuizEvaluationResult;
+    readonly schema: FormSchema;
     readonly locale?: string;
     readonly labels?: Partial<QuizSummaryLabels>;
     readonly className?: string;
 }
-declare function QuizResultSummary({ result, locale, labels, className }: QuizResultSummaryProps): react.JSX.Element;
+declare function QuizResultSummary({ evaluation, schema, locale, labels, className }: QuizResultSummaryProps): react.JSX.Element;
 interface PollResultViewProps {
     readonly schema: FormSchema;
     readonly analytics: FormAnalytics;
@@ -1544,18 +1547,19 @@ interface FieldState {
 }
 declare function useField(fieldId: string): FieldState;
 
-interface UsePollResultsProps<T> extends PollAccessContext {
+interface UsePollResultsProps extends PollAccessContext {
     readonly schema: FormSchema;
-    readonly adapter: PollRuntimeAdapter<T>;
+    readonly adapter: PollRuntimeAdapter<FormAnalytics>;
     readonly alreadyVoted?: boolean;
     readonly submissionRevision?: number;
 }
-declare function usePollResults<T>(props: UsePollResultsProps<T>): {
+declare function usePollResults(props: UsePollResultsProps): {
     enabled: boolean;
-    data: T | undefined;
+    data: FormAnalytics | undefined;
     error: Error | undefined;
     loading: boolean;
     reload: () => void;
+    applyOptimisticVote: (selectedOptionIds: string | readonly string[]) => void;
 };
 
 declare function useTranslationComparison({ schema, sourceLocale, targetLocale, translationAdapter, readOnly, availableLocales, policy, onChange, onTranslationChange, onTranslationReport, onTranslationError, signal, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, onTranslationStart, onTranslationSuccess, validateLocale, createTranslationMetadata }: UseTranslationComparisonOptions): UseTranslationComparisonResult;

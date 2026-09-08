@@ -1,4 +1,4 @@
-import type { FormPolicy, FormSchema, JsonValue } from "./types";
+import type { FormField, FormPolicy, FormSchema, FormValues, JsonValue, SchemaIssue } from "./types";
 import { calculateFieldVisibility } from "./visibility";
 
 export type FormContentMode = "survey" | "poll" | "quiz";
@@ -20,6 +20,22 @@ export interface CustomFormMetadata {
   readonly poll?: PollMetadata;
   readonly quiz?: QuizMetadata;
   readonly [key: string]: unknown;
+}
+
+export type ContentModeConstraintCode =
+  | "POLL_SINGLE_FIELD_REQUIRED"
+  | "POLL_INVALID_FIELD_TYPE"
+  | "POLL_MIN_OPTIONS_REQUIRED"
+  | "QUIZ_CORRECT_OPTION_MISSING"
+  | "QUIZ_INVALID_CORRECT_OPTION";
+
+export interface ContentModeConstraintIssue extends SchemaIssue {
+  readonly code: ContentModeConstraintCode;
+}
+
+export interface ContentModeValidationResult {
+  readonly valid: boolean;
+  readonly issues: readonly ContentModeConstraintIssue[];
 }
 
 function record(value: unknown): Readonly<Record<string, unknown>> {
@@ -55,6 +71,77 @@ export function readQuizFieldMetadata(metadata: unknown): QuizFieldMetadata {
     ...(typeof explanation === "string" ? { explanation } : {}),
     ...(typeof points === "number" ? { points } : {})
   };
+}
+
+function isChoiceField(
+  field: FormField
+): field is Extract<FormField, { readonly type: "select" | "radio" | "multi-select" }> {
+  return field.type === "select" || field.type === "radio" || field.type === "multi-select";
+}
+
+function addConstraintIssue(
+  issues: ContentModeConstraintIssue[],
+  path: string,
+  code: ContentModeConstraintCode,
+  message: string
+): void {
+  issues.push({ path, code, message });
+}
+
+export function validateContentModeConstraints(schema: FormSchema): ContentModeValidationResult {
+  const mode = getFormContentMode(schema.metadata);
+  const issues: ContentModeConstraintIssue[] = [];
+  if (mode === "survey") return { valid: true, issues };
+
+  if (mode === "poll") {
+    if (schema.fields.length !== 1)
+      addConstraintIssue(issues, "fields", "POLL_SINGLE_FIELD_REQUIRED", "Polls require exactly one question.");
+    schema.fields.forEach((field, index) => {
+      if (field.type !== "radio" && field.type !== "multi-select") {
+        addConstraintIssue(
+          issues,
+          `fields[${index}].type`,
+          "POLL_INVALID_FIELD_TYPE",
+          "Poll questions must use radio or multi-select fields."
+        );
+        return;
+      }
+      const options = Array.isArray(field.options) ? field.options : [];
+      if (options.length < 2)
+        addConstraintIssue(
+          issues,
+          `fields[${index}].options`,
+          "POLL_MIN_OPTIONS_REQUIRED",
+          "Poll questions require at least two options."
+        );
+    });
+  }
+
+  if (mode === "quiz") {
+    schema.fields.forEach((field, index) => {
+      if (!isChoiceField(field)) return;
+      const metadata = readQuizFieldMetadata(field.metadata);
+      if (metadata.correctOptionId.length === 0) {
+        addConstraintIssue(
+          issues,
+          `fields[${index}].metadata.quiz.correctOptionId`,
+          "QUIZ_CORRECT_OPTION_MISSING",
+          "Quiz questions require a correct option."
+        );
+        return;
+      }
+      const options = Array.isArray(field.options) ? field.options : [];
+      if (!options.some((option) => option.id === metadata.correctOptionId))
+        addConstraintIssue(
+          issues,
+          `fields[${index}].metadata.quiz.correctOptionId`,
+          "QUIZ_INVALID_CORRECT_OPTION",
+          "Quiz correctOptionId must reference an existing option."
+        );
+    });
+  }
+
+  return { valid: issues.length === 0, issues };
 }
 /** Explicit JSON boundary: rejects non-JSON values instead of silently dropping them. */
 export function contentMetadataToJson(value: unknown): Readonly<Record<string, JsonValue>> {
@@ -104,7 +191,8 @@ export function createInitialSchemaByMode(
               options: [
                 { id: "option-1", label: ja ? "選択肢1" : "Option 1" },
                 { id: "option-2", label: ja ? "選択肢2" : "Option 2" }
-              ]
+              ],
+              ...(mode === "quiz" ? { metadata: contentMetadataToJson({ quiz: { correctOptionId: "option-1" } }) } : {})
             }
           ]
   };
@@ -155,11 +243,12 @@ export function getContentModeDiagnostics(schema: FormSchema): readonly ContentM
   for (const field of schema.fields) {
     if (field.type !== "radio" && !(mode === "poll" && field.type === "multi-select"))
       add(field.id, "unsupported_field_type", "Unsupported question type.");
-    if (!("options" in field) || field.options.length < 2)
+    const options = "options" in field && Array.isArray(field.options) ? field.options : undefined;
+    if (options === undefined || options.length < 2)
       add(field.id, "options_minimum", "At least two options are required.");
     if (mode !== "quiz") continue;
     const quiz = readQuizFieldMetadata(field.metadata);
-    if (!("options" in field) || !field.options.some((option) => option.id === quiz.correctOptionId))
+    if (options === undefined || !options.some((option) => option.id === quiz.correctOptionId))
       add(field.id, "correct_option_missing", "Select a correct option.");
     const rawQuiz = record(field.metadata?.quiz);
     if (rawQuiz.points !== undefined && typeof rawQuiz.points !== "number")
@@ -212,29 +301,83 @@ export interface QuizResult {
   readonly total: number;
   readonly passed?: boolean;
 }
-export function evaluateQuiz(schema: FormSchema, answers: Readonly<Record<string, unknown>>): QuizResult {
-  if (getFormContentMode(schema.metadata) !== "quiz" || validateContentMode(schema).length > 0)
+
+export interface QuizQuestionEvaluation {
+  readonly questionId: string;
+  readonly isCorrect: boolean;
+  readonly correctOptionId?: string;
+  readonly selectedOptionId?: string;
+  readonly explanation?: string;
+  readonly scoreEarned: number;
+  readonly maxScore: number;
+}
+
+export interface QuizEvaluationResult {
+  readonly totalScore: number;
+  readonly maxPossibleScore: number;
+  readonly isPassed?: boolean;
+  readonly questions: readonly QuizQuestionEvaluation[];
+  readonly reward?: {
+    readonly type: "coupon" | "badge" | "text";
+    readonly code?: string;
+    readonly message?: string;
+  };
+}
+
+export function evaluateQuizLocally(schema: FormSchema, answers: FormValues): QuizEvaluationResult {
+  if (getFormContentMode(schema.metadata) !== "quiz" || !validateContentModeConstraints(schema).valid)
     throw new TypeError("Invalid quiz schema.");
   const visibility = calculateFieldVisibility(schema, answers);
-  const questions: QuizQuestionResult[] = [];
+  const questions: QuizQuestionEvaluation[] = [];
   for (const field of schema.fields) {
-    if (!visibility[field.id] || !("options" in field)) continue;
+    if (!visibility[field.id] || !isChoiceField(field)) continue;
     const { correctOptionId, explanation, points = 1 } = readQuizFieldMetadata(field.metadata);
-    const correct = answers[field.id] === correctOptionId;
+    const answer = answers[field.id];
+    const selectedOptionId = typeof answer === "string" ? answer : undefined;
+    const isCorrect = selectedOptionId === correctOptionId;
     questions.push({
-      fieldId: field.id,
-      title: field.title,
-      correct,
-      correctOption: field.options.find((option) => option.id === correctOptionId)?.label ?? "",
+      questionId: field.id,
+      isCorrect,
+      ...(correctOptionId.length === 0 ? {} : { correctOptionId }),
+      ...(selectedOptionId === undefined ? {} : { selectedOptionId }),
       ...(explanation === undefined ? {} : { explanation }),
-      points,
-      earned: correct ? points : 0
+      scoreEarned: isCorrect ? points : 0,
+      maxScore: points
     });
   }
-  const score = questions.reduce((sum, question) => sum + question.earned, 0);
-  const total = questions.reduce((sum, question) => sum + question.points, 0);
+  const totalScore = questions.reduce((sum, question) => sum + question.scoreEarned, 0);
+  const maxPossibleScore = questions.reduce((sum, question) => sum + question.maxScore, 0);
   const { passingScore } = readQuizMetadata(schema.metadata);
-  return { questions, score, total, ...(passingScore === undefined ? {} : { passed: score >= passingScore }) };
+  return {
+    totalScore,
+    maxPossibleScore,
+    ...(passingScore === undefined ? {} : { isPassed: totalScore >= passingScore }),
+    questions
+  };
+}
+
+export function evaluateQuiz(schema: FormSchema, answers: FormValues): QuizResult {
+  const evaluation = evaluateQuizLocally(schema, answers);
+  return {
+    questions: evaluation.questions.map((question) => {
+      const field = schema.fields.find((candidate) => candidate.id === question.questionId);
+      return {
+        fieldId: question.questionId,
+        title: field?.title ?? question.questionId,
+        correct: question.isCorrect,
+        correctOption:
+          field !== undefined && isChoiceField(field)
+            ? (field.options.find((option) => option.id === question.correctOptionId)?.label ?? "")
+            : "",
+        ...(question.explanation === undefined ? {} : { explanation: question.explanation }),
+        points: question.maxScore,
+        earned: question.scoreEarned
+      };
+    }),
+    score: evaluation.totalScore,
+    total: evaluation.maxPossibleScore,
+    ...(evaluation.isPassed === undefined ? {} : { passed: evaluation.isPassed })
+  };
 }
 export interface PollAccessContext {
   readonly submitted: boolean;
