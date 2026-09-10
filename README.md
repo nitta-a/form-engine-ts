@@ -56,9 +56,9 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.14.0** (2026-09-09). All public packages are currently aligned to version `7.14.0`.
-This release adds inline poll results inside each answer input row, including results shown on initial render for
-previously identified voters, while retaining the headless `ContentRenderer` and MUI/Tailwind preview switching.
+The latest release is **v7.14.1** (2026-09-10). All public packages are currently aligned to version `7.14.1`.
+This release clarifies the translation-language add control by separating the language-selection label from the add
+button label in the MUI translation comparison workspace.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience

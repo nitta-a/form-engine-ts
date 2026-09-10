@@ -290,7 +290,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
           <>
             <TextField
               size="small"
-              label={translate("workspace.header.addLocale")}
+              label={translate("builder.localization.selectLocaleToAdd")}
               value={newLocale}
               onChange={(event) => setNewLocale(event.target.value)}
               disabled={readOnly}
@@ -311,7 +311,7 @@ function ComparisonContent(props: TranslationComparisonWorkspaceProps) {
             <TextField
               select
               size="small"
-              label={translate("workspace.header.addLocale")}
+              label={translate("builder.localization.selectLocaleToAdd")}
               value={newLocale}
               onChange={(event) => setNewLocale(event.target.value)}
               disabled={readOnly || localeCandidates.length === 0}

@@ -58,6 +58,7 @@ describe("TranslationComparisonWorkspace", () => {
 
     expect(screen.getByText(/フォーム/u)).toBeInTheDocument();
     expect(screen.queryByText("form.title")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "追加する言語を選択" })).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole("combobox"));
     fireEvent.click(screen.getByRole("option", { name: "Français" }));
     fireEvent.click(screen.getByRole("button", { name: "翻訳言語を追加" }));
