@@ -22,6 +22,13 @@ describe("FormEngine translator fallback", () => {
     expect(translate("builder.formTitle", { count: 1, total: 2 })).toBe("1/2");
   });
 
+  it("formats localized validation summary counts", () => {
+    const translate = createFormEngineTranslator({ locale: "en" });
+
+    expect(translate("renderer.validationSummary", { count: 1 })).toBe("There is 1 validation error.");
+    expect(translate("renderer.validationSummaryPlural", { count: 2 })).toBe("There are 2 validation errors.");
+  });
+
   it("reports fallback and unresolved keys", () => {
     const events: { key: string; reason: string; resolvedValue: string }[] = [];
     const translate = createFormEngineTranslator({

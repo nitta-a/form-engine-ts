@@ -14,6 +14,16 @@ const schema: FormSchema = {
   ]
 };
 
+const validationSummarySchema: FormSchema = {
+  id: "renderer-validation-summary",
+  version: 1,
+  title: "Validation summary",
+  fields: [
+    { id: "first", type: "text", title: "First", required: true },
+    { id: "second", type: "text", title: "Second", required: true }
+  ]
+};
+
 function createAttemptStore(): SubmissionAttemptStore & { readonly attempts: SubmissionAttempt[]; cleared: number } {
   let attempt: SubmissionAttempt | null = null;
   let cleared = 0;
@@ -80,6 +90,59 @@ describe("FormRenderer submission lifecycle", () => {
     expect(await screen.findByText("Required input")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Second"), "abc");
     expect(screen.getByText("3 / 20")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["ja", { first: "", second: "" }, "2件の入力エラーがあります。"],
+    ["ja", { first: "Ada", second: "" }, "1件の入力エラーがあります。"],
+    ["en", { first: "", second: "" }, "There are 2 validation errors."],
+    ["en", { first: "Ada", second: "" }, "There is 1 validation error."]
+  ] as const)("localizes the validation summary for %s", async (locale, initialValues, expected) => {
+    const user = userEvent.setup();
+    render(
+      <FormRenderer
+        schema={validationSummarySchema}
+        locale={locale}
+        initialValues={initialValues}
+        onSubmit={() => undefined}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: locale === "ja" ? "送信する" : "Submit" }));
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+  });
+
+  it("formats counts in custom validation summary messages", async () => {
+    const user = userEvent.setup();
+    render(
+      <FormRenderer
+        schema={validationSummarySchema}
+        initialValues={{ first: "Ada" }}
+        onSubmit={() => undefined}
+        messages={{
+          validationSummary: "Found {{count}} issue.",
+          validationSummaryPlural: "Found {{count}} issues."
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Found 1 issue.")).toBeInTheDocument();
+  });
+
+  it("keeps the custom validation summary slot in control", async () => {
+    const user = userEvent.setup();
+    render(
+      <FormRenderer
+        schema={validationSummarySchema}
+        onSubmit={() => undefined}
+        slots={{ renderValidationSummary: ({ issues }) => <p>Custom validation: {issues.length}</p> }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByText("Custom validation: 2")).toBeInTheDocument();
+    expect(screen.queryByText("There are 2 validation errors.")).not.toBeInTheDocument();
   });
 
   it("normalizes server payloads, focuses the first schema field, and allows retry", async () => {

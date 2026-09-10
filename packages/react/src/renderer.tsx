@@ -837,6 +837,12 @@ function buildSubmittedItems(
     }));
 }
 
+function formatRendererMessage(template: string, params: Readonly<Record<string, string | number>> = {}): string {
+  return template.replace(/\{\{?(\w+)\}\}?/gu, (token, name: string) =>
+    Object.hasOwn(params, name) ? String(params[name]) : token
+  );
+}
+
 function parseDraft(serialized: string): StoredDraft | null {
   try {
     const value: unknown = JSON.parse(serialized);
@@ -870,6 +876,8 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
     submittingButton: "Submitting...",
     retryButton: "Retry",
     requiredField: "This field is required.",
+    validationSummary: "There is {{count}} validation error.",
+    validationSummaryPlural: "There are {{count}} validation errors.",
     alreadySubmittedTitle: "Already Submitted",
     alreadySubmittedMessage: "Already submitted.",
     serverErrorSummary: "Submission failed. Please check your answers and try again.",
@@ -883,6 +891,8 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
     submittingButton: "送信中...",
     retryButton: "再送信する",
     requiredField: "この項目は必須です",
+    validationSummary: "{{count}}件の入力エラーがあります。",
+    validationSummaryPlural: "{{count}}件の入力エラーがあります。",
     alreadySubmittedTitle: "回答済みです",
     alreadySubmittedMessage: "このアンケートにはすでに回答しています。",
     serverErrorSummary: "送信に失敗しました。内容をご確認の上、再度お試しください。",
@@ -1019,15 +1029,20 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
 
   const resolveMessage = useCallback(
-    (key: keyof FormRendererMessages, fallback?: string): string => {
-      const providerDefault = isProviderValue ? i18n.translator(`renderer.${key}`) : undefined;
+    (
+      key: keyof FormRendererMessages,
+      fallback?: string,
+      params: Readonly<Record<string, string | number>> = {}
+    ): string => {
+      const providerDefault = isProviderValue ? i18n.translator(`renderer.${key}`, params) : undefined;
       const defaultText =
         fallback ??
         (providerDefault === "" ? undefined : providerDefault) ??
         DEFAULT_RENDERER_MESSAGES[form.locale.toLowerCase().startsWith("ja") ? "ja" : "en"][key] ??
         key;
       const configured = messages[key];
-      return messageResolver?.(key, configured ?? defaultText) ?? configured ?? defaultText;
+      const resolved = messageResolver?.(key, configured ?? defaultText) ?? configured ?? defaultText;
+      return formatRendererMessage(resolved, params);
     },
     [form.locale, i18n, isProviderValue, messageResolver, messages]
   );
@@ -1405,6 +1420,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   };
 
   const validationIssues = Object.values(form.errors).filter((issue): issue is ValidationIssue => issue !== undefined);
+  const validationSummaryKey: "validationSummary" | "validationSummaryPlural" =
+    validationIssues.length === 1 ? "validationSummary" : "validationSummaryPlural";
   const canPrev = pages !== undefined && activeVisibleIndex > 0;
   const canNext = pages !== undefined && activeVisibleIndex < visiblePageIndexes.length - 1;
   const renderSubmitButton = () => {
@@ -1725,7 +1742,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           ? null
           : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
               <div className="fe-validation-summary" role="alert">
-                {validationIssues.length} validation error{validationIssues.length === 1 ? "" : "s"}.
+                {resolveMessage(validationSummaryKey, undefined, { count: validationIssues.length })}
               </div>
             ))}
         {pages === undefined ? (

@@ -652,6 +652,8 @@ export interface FormRendererMessages {
   readonly submittingButton?: string;
   readonly retryButton?: string;
   readonly requiredField?: string;
+  readonly validationSummary?: string;
+  readonly validationSummaryPlural?: string;
   readonly alreadySubmittedTitle?: string;
   readonly alreadySubmittedMessage?: string;
   readonly serverErrorSummary?: string;

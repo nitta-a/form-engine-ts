@@ -168,6 +168,8 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "renderer.submittingButton": "Submitting...",
   "renderer.retryButton": "Retry",
   "renderer.requiredField": "This field is required.",
+  "renderer.validationSummary": "There is {{count}} validation error.",
+  "renderer.validationSummaryPlural": "There are {{count}} validation errors.",
   "renderer.alreadySubmittedTitle": "Already Submitted",
   "renderer.alreadySubmittedMessage": "Already submitted.",
   "renderer.serverErrorSummary": "Submission failed. Please check your answers and try again.",

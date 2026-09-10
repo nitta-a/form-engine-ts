@@ -249,7 +249,8 @@ After success, completion rendering receives a typed `FormCompletionSlotProps` s
 optional response, and `submittedItems`. Each summary item includes the field title, raw value, formatted display value,
 visibility, and field metadata. Use `renderSubmittedValues` for a typed summary slot; hidden fields are omitted by default
 and can be included with `showHiddenFieldsInSummary`. Supply `messages` or `messageResolver` to localize standard buttons,
-validation, retry, already-submitted, server-error, and sensitive-data confirmation UI. Server validation can be returned
+validation (including `validationSummary` and `validationSummaryPlural` with `{{count}}`), retry, already-submitted,
+server-error, and sensitive-data confirmation UI. Server validation can be returned
 by throwing `FormSubmissionError` or a payload with `fieldErrors` and `formError`; field messages are mapped back to the
 form, scrolled into view, and focused. Use `submissionConfirmationRenderMode="replace"` or `"dialog"` for alternate
 confirmation presentations, and `fieldsClassName` or `renderFields` to control the fields wrapper.

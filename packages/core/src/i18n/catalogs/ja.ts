@@ -180,6 +180,8 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "renderer.submittingButton": "送信中...",
   "renderer.retryButton": "再送信する",
   "renderer.requiredField": "この項目は必須です。",
+  "renderer.validationSummary": "{{count}}件の入力エラーがあります。",
+  "renderer.validationSummaryPlural": "{{count}}件の入力エラーがあります。",
   "renderer.alreadySubmittedTitle": "回答済みです",
   "renderer.alreadySubmittedMessage": "このアンケートにはすでに回答しています。",
   "renderer.serverErrorSummary": "送信に失敗しました。内容をご確認の上、再度お試しください。",

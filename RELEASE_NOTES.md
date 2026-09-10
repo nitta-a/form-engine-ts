@@ -5,6 +5,12 @@ current release and usage information.
 
 ## Latest release
 
+### v7.14.2 — 2026-09-10
+
+- Added localized validation-summary messages for English and Japanese, including singular/plural forms and `{{count}}` interpolation.
+- Added `validationSummary` and `validationSummaryPlural` overrides to `FormRendererMessages`.
+- Aligned all public packages to version 7.14.2.
+
 ### v7.14.1 — 2026-09-10
 
 - Clarified the MUI translation comparison workspace language-add flow by labeling the selector `追加する言語を選択` and the action button `翻訳言語を追加`.

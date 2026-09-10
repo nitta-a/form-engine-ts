@@ -8,6 +8,8 @@ describe("official i18n catalogs", () => {
       "builder.localization.title",
       "builder.submissionSettings.renderMode",
       "renderer.submitButton",
+      "renderer.validationSummary",
+      "renderer.validationSummaryPlural",
       "workspace.errors.translationFailed"
     ];
 

@@ -158,6 +158,8 @@ export type RendererTranslationKey =
   | "renderer.submittingButton"
   | "renderer.retryButton"
   | "renderer.requiredField"
+  | "renderer.validationSummary"
+  | "renderer.validationSummaryPlural"
   | "renderer.alreadySubmittedTitle"
   | "renderer.alreadySubmittedMessage"
   | "renderer.serverErrorSummary"
