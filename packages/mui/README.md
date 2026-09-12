@@ -73,6 +73,10 @@ import { MuiSurveyResponseSummaryDomain } from "@form-engine-ts/mui/survey-domai
 />;
 ```
 
+When `languageOptions` are provided, the component renders an `All languages` tab before the language tabs. The all-languages
+tab uses the top-level `summary`; use `selectedTab` and `onTabChange` for controlled `{ scope: "all" }` or
+`{ scope: "language", language }` selection.
+
 Use `MuiSurveyResponseSummary` when the application already has a mapped `SurveyResponseSummaryData` value. Both
 components expose `slots.question` / `slots.skipReasons` for application-owned overrides and `slotProps` for MUI
 styling. The existing non-MUI summary components and their default renderer are unchanged. MUI and Emotion remain

@@ -23,8 +23,11 @@ export function MuiSurveyResponseSummaryDomain<TSummary, TVersion>(
     <MuiSurveyResponseSummary
       data={controller.data}
       languageOptions={controller.languageOptions}
+      tabOptions={controller.tabOptions}
       selectedLanguage={controller.selectedLanguage}
       onLanguageChange={controller.setLanguage}
+      selectedTab={controller.selectedTab}
+      onTabChange={controller.setTab}
       summaryState={props.summaryState ?? controller.summaryState}
       {...(props.labels === undefined ? {} : { labels: props.labels })}
       {...(props.locale === undefined ? {} : { locale: props.locale })}

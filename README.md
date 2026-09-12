@@ -56,9 +56,9 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.14.1** (2026-09-10). All public packages are currently aligned to version `7.14.1`.
-This release clarifies the translation-language add control by separating the language-selection label from the add
-button label in the MUI translation comparison workspace.
+The latest release is **v7.15.0** (2026-09-12). All public packages are currently aligned to version `7.15.0`.
+This release adds an all-languages aggregate tab to response summaries, scope-aware tab customization, and the audited
+`esbuild` security update.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -372,8 +372,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.14.2**（2026-09-10）です。公開パッケージはすべてバージョン `7.14.2` に揃えています。
-本リリースでは、バリデーションサマリーを英語・日本語の単数形／複数形でローカライズし、`messages` で上書きできるようにしました。
+最新版は **v7.15.0**（2026-09-12）です。公開パッケージはすべてバージョン `7.15.0` に揃えています。
+本リリースでは、回答サマリーに全言語集計タブ、スコープ対応のタブカスタマイズ、監査で検出された `esbuild` のセキュリティ更新を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

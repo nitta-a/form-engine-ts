@@ -738,6 +738,140 @@ describe("custom survey client", () => {
     expect(result.current.onLanguageChange).toBe(result.current.setLanguage);
   });
 
+  it("shows the all-languages tab first and keeps language loading scoped to language tabs", async () => {
+    type Summary = { readonly answeredCount: number };
+    const summary = { answeredCount: 4 } satisfies Summary;
+    const summaryLoader = vi.fn(async () => ({ answeredCount: 3 }) satisfies Summary);
+    const adapter = {
+      toSummaryInput: ({ answeredCount }: Summary) => ({
+        questions: [
+          {
+            fieldId: "satisfaction",
+            kind: "radio" as const,
+            answeredCount,
+            unansweredCount: 4 - answeredCount,
+            options: []
+          }
+        ]
+      }),
+      toLanguageSummaryInput: ({ summary: current, language }: { summary: Summary; language: string }) => ({
+        questions: [
+          {
+            fieldId: "satisfaction",
+            kind: "radio" as const,
+            answeredCount: language === "ja" ? current.answeredCount : 1,
+            unansweredCount: language === "ja" ? 4 - current.answeredCount : 3,
+            options: []
+          }
+        ]
+      }),
+      toFormSchema: () => schema,
+      sourceLanguage: () => "en",
+      mapLanguages: ({ summary: current }: { summary: Summary }) => [
+        {
+          language: "en",
+          submissionCount: 1,
+          summary: { questions: [] }
+        },
+        {
+          language: "ja",
+          submissionCount: 3,
+          summary: {
+            questions: [
+              {
+                fieldId: "satisfaction",
+                kind: "radio" as const,
+                answeredCount: current.answeredCount,
+                unansweredCount: 4 - current.answeredCount,
+                options: []
+              }
+            ]
+          }
+        }
+      ]
+    };
+    const { result } = renderHook(() =>
+      useSurveyResponseSummaryDomain({
+        summary,
+        version: { id: "version" },
+        domainAdapter: adapter,
+        summaryLoader
+      })
+    );
+
+    expect(result.current.selectedTab).toEqual({ scope: "all" });
+    expect(result.current.tabOptions).toEqual([
+      { scope: "all", count: 4 },
+      { scope: "language", language: "en", count: 1 },
+      { scope: "language", language: "ja", count: 3 }
+    ]);
+    expect(result.current.data.questions[0]?.answeredCount).toBe(4);
+    expect(summaryLoader).not.toHaveBeenCalled();
+
+    await act(async () => result.current.setTab({ scope: "language", language: "ja" }));
+
+    expect(summaryLoader).toHaveBeenCalledWith(expect.objectContaining({ language: "ja" }));
+    await waitFor(() => expect(result.current.data.questions[0]?.answeredCount).toBe(3));
+
+    await act(async () => result.current.setTab({ scope: "all" }));
+
+    expect(result.current.data.questions[0]?.answeredCount).toBe(4);
+    expect(summaryLoader).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes all-languages and language tabs to the scope-aware slot", () => {
+    const summaryTabs = vi.fn(() => null);
+    render(
+      <SurveyResponseSummaryDomain
+        summary={{ answeredCount: 4 }}
+        version={{ id: "version" }}
+        domainAdapter={{
+          toSummaryInput: () => ({ questions: [] }),
+          toFormSchema: () => schema,
+          sourceLanguage: () => "en",
+          mapLanguages: () => [
+            { language: "en", submissionCount: 1, summary: { questions: [] } },
+            { language: "ja", submissionCount: 3, summary: { questions: [] } }
+          ]
+        }}
+        slots={{ summaryTabs }}
+      />
+    );
+
+    expect(summaryTabs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activeTab: { scope: "all" },
+        tabs: [
+          { scope: "all", count: 4 },
+          { scope: "language", language: "en", count: 1 },
+          { scope: "language", language: "ja", count: 3 }
+        ]
+      })
+    );
+  });
+
+  it("prefers the overall submission count when the mapped summary provides one", () => {
+    const { result } = renderHook(() =>
+      useSurveyResponseSummaryDomain({
+        summary: { answeredCount: 7 },
+        version: { id: "version" },
+        domainAdapter: {
+          toSummaryInput: () => ({
+            formId: schema.id,
+            formVersion: schema.version,
+            submissionCount: 7,
+            questions: []
+          }),
+          toFormSchema: () => schema,
+          sourceLanguage: () => "en",
+          mapLanguages: () => [{ language: "en", submissionCount: 1, summary: { questions: [] } }]
+        }
+      })
+    );
+
+    expect(result.current.tabOptions[0]).toEqual({ scope: "all", count: 7 });
+  });
+
   it("loads summaries per language with abort handling and a language cache", async () => {
     type Summary = { readonly answeredCount: number };
     const resolvers = new Map<string, (summary: Summary) => void>();

@@ -6,7 +6,7 @@ import * as _form_engine_ts_core from '@form-engine-ts/core';
 import { FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent, FormEngineTranslator, LocaleOption, FormContentMode, ContentModeIssueCode, FormSchema, FormAnalytics, PollRuntimeAdapter, QuizEvaluationResult, QuizQuestionEvaluation, getContentModeDiagnostics, BaseSubmissionMetadata, DisplayRule, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, TranslationReport, TranslationStatus } from '@form-engine-ts/core';
 export { TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import { CardProps, PaperProps, AccordionProps, StackProps, TextFieldProps, SelectProps, MenuProps, CheckboxProps, RadioProps, ButtonProps, IconButtonProps, TypographyProps, ListProps, ListItemProps, LinearProgressProps, AlertProps, CardContentProps, TabsProps, TabProps } from '@mui/material';
-import { SurveyResponseSummarySkipReason, SurveyResponseSummaryData, SurveyResponseSummaryLanguageOption, SurveyClientAsyncState, SurveyResponseSummaryDomainLabels, SurveyResponseSummaryQuestion, SurveyResponseSummaryDomainInputProps } from '@form-engine-ts/custom-survey-client';
+import { SurveyResponseSummarySkipReason, SurveyResponseSummaryData, SurveyResponseSummaryLanguageOption, SurveyResponseSummaryTabOption, SurveyResponseSummaryTabSelection, SurveyClientAsyncState, SurveyResponseSummaryDomainLabels, SurveyResponseSummaryQuestion, SurveyResponseSummaryTabsProps, SurveyResponseSummaryDomainInputProps } from '@form-engine-ts/custom-survey-client';
 
 type BuilderSectionName = "basicSettings" | "completionMessage" | "questions" | "addQuestion" | "localization" | "submissionSettings";
 type MuiButtonVariant = "contained" | "outlined" | "text";
@@ -384,6 +384,8 @@ interface MuiSurveyResponseSummarySlots<TSkipReason = unknown> {
     readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
     readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
     readonly skipReasons?: (reasons: readonly TSkipReason[]) => ReactNode;
+    readonly renderTabs?: (props: SurveyResponseSummaryTabsProps) => ReactNode;
+    readonly tabs?: (props: SurveyResponseSummaryTabsProps) => ReactNode;
 }
 interface MuiSurveyResponseSummarySlotProps {
     readonly root?: StackProps;
@@ -405,8 +407,11 @@ interface MuiSurveyResponseSummarySlotProps {
 interface MuiSurveyResponseSummaryDataProps<TCustomData = unknown, TSkipReason = SurveyResponseSummarySkipReason> {
     readonly data: SurveyResponseSummaryData<TCustomData, TSkipReason>;
     readonly languageOptions?: readonly SurveyResponseSummaryLanguageOption[];
+    readonly tabOptions?: readonly SurveyResponseSummaryTabOption[];
     readonly selectedLanguage?: string | null;
     readonly onLanguageChange?: (language: string | null) => void;
+    readonly selectedTab?: SurveyResponseSummaryTabSelection;
+    readonly onTabChange?: (tab: SurveyResponseSummaryTabSelection) => void;
     readonly summaryState?: SurveyClientAsyncState;
     readonly labels?: SurveyResponseSummaryDomainLabels;
     /** Locale used for counts, statistics, and percentages. Defaults to the active summary language. */

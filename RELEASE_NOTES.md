@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v7.15.0 — 2026-09-12
+
+- Added an all-languages aggregate tab to response summaries, with scope-aware tab options, controlled selection, and customizable tab slots while preserving the language-only APIs.
+- Added typed summary-tab contracts and aligned the MUI response-summary adapter with the new aggregate and language scopes.
+- Forced the workspace `esbuild` resolution to `0.28.2` to address the audited development-server file-read vulnerability.
+- Aligned all public packages to version 7.15.0.
+
 ### v7.14.2 — 2026-09-10
 
 - Added localized validation-summary messages for English and Japanese, including singular/plural forms and `{{count}}` interpolation.

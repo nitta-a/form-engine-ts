@@ -132,7 +132,8 @@ the application accepts that state. `isSurveyMappingRevisionConflict` is availab
 ## v7.6 APIs
 
 Response Summary language state, language labels, language tabs, and language-specific unanswered counts can now be owned by
-the package hook. The hook result is directly spreadable into the component:
+the package hook. The hook result is directly spreadable into the component. The default tab is now the all-languages
+aggregate, followed by each language:
 
 ```tsx
 const summaryDomain = useSurveyResponseSummaryDomain({
@@ -140,12 +141,16 @@ const summaryDomain = useSurveyResponseSummaryDomain({
   version,
   domainAdapter,
   languageOptions,
-  defaultLanguage: null,
   languageLabel: (language) => languageNames[language] ?? language
 });
 
 <SurveyResponseSummaryDomain {...summaryDomain} />
 ```
+
+The all-languages tab uses the top-level `summary` and does not call `summaryLoader`. Use `selectedTab`, `defaultTab`, and
+`onTabChange` for explicit scope-aware control. `tabOptions` contains `{ scope: "all" }` and `{ scope: "language" }`
+entries, and `slots.summaryTabs` / `slots.renderSummaryTabs` receive the same options and selection state. The older
+language-only props and tab slot remain available for compatibility.
 
 `toLanguageSummaryInput` keeps application-owned aggregate conversion inside the domain adapter. For schema translation,
 use the async-only adapter and package-owned metadata policy/report callback:

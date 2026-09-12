@@ -4,7 +4,10 @@ import type {
   SurveyResponseSummaryDomainLabels,
   SurveyResponseSummaryLanguageOption,
   SurveyResponseSummaryQuestion,
-  SurveyResponseSummarySkipReason
+  SurveyResponseSummarySkipReason,
+  SurveyResponseSummaryTabOption,
+  SurveyResponseSummaryTabSelection,
+  SurveyResponseSummaryTabsProps
 } from "@form-engine-ts/custom-survey-client";
 import {
   Alert,
@@ -41,6 +44,8 @@ export interface MuiSurveyResponseSummarySlots<TSkipReason = unknown> {
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly skipReasons?: (reasons: readonly TSkipReason[]) => ReactNode;
+  readonly renderTabs?: (props: SurveyResponseSummaryTabsProps) => ReactNode;
+  readonly tabs?: (props: SurveyResponseSummaryTabsProps) => ReactNode;
 }
 
 export interface MuiSurveyResponseSummarySlotProps {
@@ -67,8 +72,11 @@ export interface MuiSurveyResponseSummaryDataProps<
 > {
   readonly data: SurveyResponseSummaryData<TCustomData, TSkipReason>;
   readonly languageOptions?: readonly SurveyResponseSummaryLanguageOption[];
+  readonly tabOptions?: readonly SurveyResponseSummaryTabOption[];
   readonly selectedLanguage?: string | null;
   readonly onLanguageChange?: (language: string | null) => void;
+  readonly selectedTab?: SurveyResponseSummaryTabSelection;
+  readonly onTabChange?: (tab: SurveyResponseSummaryTabSelection) => void;
   readonly summaryState?: SurveyClientAsyncState;
   readonly labels?: SurveyResponseSummaryDomainLabels;
   /** Locale used for counts, statistics, and percentages. Defaults to the active summary language. */
@@ -118,6 +126,7 @@ function statisticValue(statistics: Readonly<Record<string, number | null>>, key
 
 const defaultLabels: Required<SurveyResponseSummaryDomainLabels> = {
   languages: "Languages",
+  allLanguages: "All languages",
   answered: "Answered",
   unanswered: "Unanswered",
   skipReasons: "Skip reasons",
@@ -323,8 +332,11 @@ export function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = Su
   const {
     data,
     languageOptions,
+    tabOptions,
     selectedLanguage,
     onLanguageChange,
+    selectedTab,
+    onTabChange,
     summaryState,
     labels,
     locale,
@@ -332,13 +344,41 @@ export function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = Su
     slotProps = {},
     className
   } = props;
-  const resolvedLabels = { ...defaultLabels, ...labels };
   const displayLocale = locale ?? data.sourceLanguage;
+  const resolvedLabels = {
+    ...defaultLabels,
+    ...labels,
+    allLanguages: labels?.allLanguages ?? (displayLocale.startsWith("ja") ? "全言語" : defaultLabels.allLanguages)
+  };
   const resolvedLanguageOptions: readonly SurveyResponseSummaryLanguageOption[] =
     languageOptions ??
     data.languages?.map(({ language, submissionCount }) => ({ language, count: submissionCount })) ??
     [];
-  const activeLanguage = selectedLanguage ?? data.sourceLanguage;
+  const resolvedTabOptions: readonly SurveyResponseSummaryTabOption[] =
+    tabOptions ??
+    (resolvedLanguageOptions.length === 0
+      ? []
+      : [
+          { scope: "all" as const, count: resolvedLanguageOptions.reduce((total, option) => total + option.count, 0) },
+          ...resolvedLanguageOptions.map((option) => ({ scope: "language" as const, ...option }))
+        ]);
+  const activeTab: SurveyResponseSummaryTabSelection =
+    selectedTab ??
+    (selectedLanguage === undefined
+      ? { scope: "all" }
+      : { scope: "language", language: selectedLanguage ?? data.sourceLanguage });
+  const allTabValue = "__form_engine_all_languages__";
+  const activeTabValue = activeTab.scope === "all" ? allTabValue : activeTab.language;
+  const handleTabChange = (value: string) => {
+    const tab = resolvedTabOptions.find((option) =>
+      option.scope === "all" ? value === allTabValue : option.language === value
+    );
+    if (tab === undefined) return;
+    const nextTab: SurveyResponseSummaryTabSelection =
+      tab.scope === "all" ? { scope: "all" } : { scope: "language", language: tab.language };
+    onTabChange?.(nextTab);
+    if (tab.scope === "language") onLanguageChange?.(tab.language);
+  };
   const header = slots?.header?.(data) ?? slots?.renderHeader?.(data) ?? (
     <Typography component="h2" variant="h5">
       {data.title}
@@ -354,27 +394,40 @@ export function MuiSurveyResponseSummary<TCustomData = unknown, TSkipReason = Su
       className={className ?? slotProps.root?.className}
     >
       {header}
-      {resolvedLanguageOptions.length === 0 ? null : (
-        <Tabs
-          value={activeLanguage}
-          aria-label={resolvedLabels.languages}
-          onChange={(_, language: string) => onLanguageChange?.(language)}
-          {...slotProps.tabs}
-        >
-          {resolvedLanguageOptions.map(({ language, count, label }) => (
-            <Tab
-              value={language}
-              label={
-                <>
-                  {label ?? language} ({formatCount(count, displayLocale)})
-                </>
-              }
-              key={language}
-              {...slotProps.tab}
-            />
+      {resolvedTabOptions.length === 0
+        ? null
+        : ((slots?.tabs ?? slots?.renderTabs)?.({
+            tabs: resolvedTabOptions,
+            activeTab,
+            onChange: (tab) => {
+              onTabChange?.(tab);
+              if (tab.scope === "language") onLanguageChange?.(tab.language);
+            }
+          }) ?? (
+            <Tabs
+              value={activeTabValue}
+              aria-label={resolvedLabels.languages}
+              onChange={(_, value: string) => handleTabChange(value)}
+              {...slotProps.tabs}
+            >
+              {resolvedTabOptions.map((tab) => {
+                const value = tab.scope === "all" ? allTabValue : tab.language;
+                const label = tab.scope === "all" ? resolvedLabels.allLanguages : (tab.label ?? tab.language);
+                return (
+                  <Tab
+                    value={value}
+                    label={
+                      <>
+                        {label} ({formatCount(tab.count, displayLocale)})
+                      </>
+                    }
+                    key={tab.scope === "all" ? "all" : tab.language}
+                    {...slotProps.tab}
+                  />
+                );
+              })}
+            </Tabs>
           ))}
-        </Tabs>
-      )}
       {summaryState?.status === "loading" ? <LinearProgress aria-label="Loading summary" /> : null}
       {summaryState?.status === "error" ? (
         <Alert severity="error">{summaryState.error?.message ?? "Unable to load summary."}</Alert>

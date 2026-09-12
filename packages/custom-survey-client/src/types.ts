@@ -936,6 +936,16 @@ export interface SurveyResponseSummaryLanguageOption {
   readonly label?: ReactNode;
 }
 
+export type SurveyResponseSummaryTabScope = "all" | "language";
+
+export type SurveyResponseSummaryTabOption =
+  | { readonly scope: "all"; readonly count: number; readonly label?: ReactNode }
+  | { readonly scope: "language"; readonly language: string; readonly count: number; readonly label?: ReactNode };
+
+export type SurveyResponseSummaryTabSelection =
+  | { readonly scope: "all" }
+  | { readonly scope: "language"; readonly language: string };
+
 export interface SurveyResponseSummaryProps {
   readonly summary: SurveySummaryInput;
   readonly version: FormVersionRecord | FormSchema;
@@ -959,6 +969,7 @@ export interface SurveyResponseSummaryDomainProps<TDomain> extends Omit<SurveyRe
 
 export interface SurveyResponseSummaryDomainLabels {
   readonly languages?: string;
+  readonly allLanguages?: string;
   readonly answered?: string;
   readonly unanswered?: string;
   readonly skipReasons?: string;
@@ -978,10 +989,14 @@ export interface SurveyResponseSummaryDomainInputProps<TSummary, TVersion> {
   readonly version: TVersion;
   readonly domainAdapter: SurveyResponseSummaryDomainAdapter<TSummary, TVersion>;
   readonly languageOptions?: readonly SurveyResponseSummaryLanguageOption[];
+  readonly tabOptions?: readonly SurveyResponseSummaryTabOption[];
   /** Initial uncontrolled language. `null` uses the adapter's source language. */
   readonly defaultLanguage?: string | null;
   readonly selectedLanguage?: string | null;
   readonly onLanguageChange?: (language: string | null) => void;
+  readonly defaultTab?: SurveyResponseSummaryTabSelection;
+  readonly selectedTab?: SurveyResponseSummaryTabSelection;
+  readonly onTabChange?: (tab: SurveyResponseSummaryTabSelection) => void;
   readonly summaryLoader?: SurveySummaryLoader<TSummary>["load"] | SurveySummaryLoader<TSummary>;
   /** Optional state override used when spreading a domain hook result into this component. */
   readonly summaryState?: SurveyClientAsyncState;
@@ -1012,6 +1027,7 @@ export interface SurveyResponseSummarySlots {
   readonly renderQuestion?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly renderHeader?: (data: SurveyResponseSummaryData) => ReactNode;
   readonly renderLanguageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
+  readonly renderSummaryTabs?: (props: SurveyResponseSummaryTabsProps) => ReactNode;
   readonly header?: (data: SurveyResponseSummaryData) => ReactNode;
   readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
@@ -1023,12 +1039,19 @@ export interface SurveyResponseSummaryDomainSlots extends SurveyResponseSummaryS
   readonly question?: (question: SurveyResponseSummaryQuestion) => ReactNode;
   readonly skipReasons?: (reasons: readonly unknown[]) => ReactNode;
   readonly languageTabs?: (props: SurveyResponseSummaryLanguageTabsProps) => ReactNode;
+  readonly summaryTabs?: (props: SurveyResponseSummaryTabsProps) => ReactNode;
 }
 
 export interface SurveyResponseSummaryLanguageTabsProps {
   readonly languages: readonly SurveyResponseSummaryLanguageAggregate[];
   readonly activeLanguage: string;
   readonly onChange: (language: string) => void;
+}
+
+export interface SurveyResponseSummaryTabsProps {
+  readonly tabs: readonly SurveyResponseSummaryTabOption[];
+  readonly activeTab: SurveyResponseSummaryTabSelection;
+  readonly onChange: (tab: SurveyResponseSummaryTabSelection) => void;
 }
 
 export interface SurveyResponseSummaryComponentProps extends SurveyResponseSummaryProps {
@@ -1058,6 +1081,7 @@ export interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
   readonly summaryError?: Error;
   readonly reloadSummary: () => Promise<TSummary | undefined>;
   readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
+  readonly tabOptions: readonly SurveyResponseSummaryTabOption[];
   readonly variant?: SurveyResponseSummaryVariant;
   readonly locale?: string;
   readonly slots?: SurveyResponseSummaryDomainSlots;
@@ -1067,6 +1091,9 @@ export interface UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
   /** Alias suitable for spreading the hook result into SurveyResponseSummaryDomain. */
   readonly onLanguageChange: (language: string | null) => void;
   readonly setLanguage: (language: string | null) => void;
+  readonly selectedTab: SurveyResponseSummaryTabSelection;
+  readonly onTabChange: (tab: SurveyResponseSummaryTabSelection) => void;
+  readonly setTab: (tab: SurveyResponseSummaryTabSelection) => void;
 }
 
 export type SurveyClientAsyncState = {

@@ -12,6 +12,8 @@ import type {
   SurveyResponseSummaryDomainSlots,
   SurveyResponseSummaryLanguageOption,
   SurveyResponseSummaryQuestion,
+  SurveyResponseSummaryTabOption,
+  SurveyResponseSummaryTabSelection,
   SurveyResponseSummaryVariant,
   SurveySummaryInput,
   SurveySummaryLoader,
@@ -35,6 +37,7 @@ export function toSurveyResponseSummary(
 
 const defaultSummaryLabels: Required<SurveyResponseSummaryDomainLabels> = {
   languages: "Languages",
+  allLanguages: "All languages",
   answered: "Answered",
   unanswered: "Unanswered",
   skipReasons: "Skip reasons",
@@ -73,6 +76,26 @@ function formatPercentage(value: number, language: string): string {
   } catch {
     return new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }).format(percentage / 100);
   }
+}
+
+function tabSelectionForLanguage(language: string): SurveyResponseSummaryTabSelection {
+  return { scope: "language", language };
+}
+
+function isLanguageTabOption(
+  option: SurveyResponseSummaryTabOption
+): option is Extract<SurveyResponseSummaryTabOption, { readonly scope: "language" }> {
+  return option.scope === "language";
+}
+
+function summarySubmissionCount(
+  summary: SurveySummaryInput,
+  languages: readonly { readonly submissionCount: number }[] | undefined,
+  fallback: readonly SurveyResponseSummaryLanguageOption[]
+): number {
+  if ("submissionCount" in summary && typeof summary.submissionCount === "number") return summary.submissionCount;
+  if (languages !== undefined) return languages.reduce((total, language) => total + language.submissionCount, 0);
+  return fallback.reduce((total, language) => total + language.count, 0);
 }
 
 function skipReasonEntry(value: unknown): { readonly reason: string; readonly count: number } | undefined {
@@ -339,26 +362,37 @@ function renderSummaryData(
 
 function domainSummaryData<TSummary, TVersion>(
   options: UseSurveyResponseSummaryDomainOptions<TSummary, TVersion>,
-  selectedLanguage: string | null,
+  selectedTab: SurveyResponseSummaryTabSelection,
   activeSummary: TSummary
 ): {
   readonly data: SurveyResponseSummaryData<TSummary, unknown>;
   readonly languageOptions: readonly SurveyResponseSummaryLanguageOption[];
+  readonly tabOptions: readonly SurveyResponseSummaryTabOption[];
 } {
   const { domainAdapter, version } = options;
+  const sourceLanguage = domainAdapter.sourceLanguage(version);
   const summary = activeSummary;
   const languages = domainAdapter.mapLanguages?.({ domain: version, summary });
-  const sourceLanguage = selectedLanguage ?? domainAdapter.sourceLanguage(version);
-  const selectedAggregate = languages?.find((language) => language.language === sourceLanguage);
-  const summaryInput =
-    selectedAggregate?.summary ??
-    domainAdapter.toLanguageSummaryInput?.({ domain: version, summary, language: sourceLanguage }) ??
-    domainAdapter.toSummaryInput(summary);
-  const baseData = toSurveyResponseSummary(summaryInput, domainAdapter.toFormSchema(version), sourceLanguage);
-  const rawLanguageOptions =
+  const overallLanguages =
+    activeSummary === options.summary
+      ? languages
+      : domainAdapter.mapLanguages?.({ domain: version, summary: options.summary });
+  const rawLanguageOptions: readonly SurveyResponseSummaryLanguageOption[] =
+    options.tabOptions?.filter(isLanguageTabOption).map(({ language, count, label }) => ({ language, count, label })) ??
     options.languageOptions ??
     languages?.map(({ language, submissionCount }) => ({ language, count: submissionCount })) ??
     [];
+  const activeLanguage = selectedTab.scope === "language" ? selectedTab.language : sourceLanguage;
+  const overallSummaryInput = domainAdapter.toSummaryInput(options.summary);
+  const selectedAggregate =
+    selectedTab.scope === "language" ? languages?.find((language) => language.language === activeLanguage) : undefined;
+  const summaryInput =
+    selectedTab.scope === "all"
+      ? overallSummaryInput
+      : (selectedAggregate?.summary ??
+        domainAdapter.toLanguageSummaryInput?.({ domain: version, summary, language: activeLanguage }) ??
+        domainAdapter.toSummaryInput(summary));
+  const baseData = toSurveyResponseSummary(summaryInput, domainAdapter.toFormSchema(version), activeLanguage);
   const resolvedLanguages =
     languages ??
     rawLanguageOptions.map(({ language, count }) => ({
@@ -366,12 +400,21 @@ function domainSummaryData<TSummary, TVersion>(
       submissionCount: count,
       summary:
         domainAdapter.toLanguageSummaryInput?.({ domain: version, summary, language }) ??
-        (language === sourceLanguage ? summaryInput : { questions: [] })
+        (selectedTab.scope === "language" && language === activeLanguage ? summaryInput : { questions: [] })
     }));
   const languageOptions: readonly SurveyResponseSummaryLanguageOption[] = rawLanguageOptions.map((option) => ({
     ...option,
-    ...(options.languageLabel === undefined ? {} : { label: options.languageLabel(option.language) })
+    ...(option.label !== undefined
+      ? {}
+      : options.languageLabel === undefined
+        ? {}
+        : { label: options.languageLabel(option.language) })
   }));
+  const allCount = summarySubmissionCount(overallSummaryInput, overallLanguages, languageOptions);
+  const tabOptions: readonly SurveyResponseSummaryTabOption[] = options.tabOptions ?? [
+    { scope: "all", count: allCount },
+    ...languageOptions.map((option) => ({ scope: "language" as const, ...option }))
+  ];
   const questions = baseData.questions.map((question) => {
     const label = domainAdapter.resolveLabel?.({ domain: version, fieldId: question.fieldId, sourceLanguage });
     const definition = domainAdapter.getQuestionDefinition?.({ domain: version, fieldId: question.fieldId });
@@ -401,19 +444,24 @@ function domainSummaryData<TSummary, TVersion>(
       ...(domainAdapter.mapSkipReasons === undefined
         ? {}
         : (() => {
-            const skipReasons = domainAdapter.mapSkipReasons({ domain: version, summary });
+            const skipReasons = domainAdapter.mapSkipReasons({
+              domain: version,
+              summary: selectedTab.scope === "all" ? options.summary : summary
+            });
             return skipReasons === undefined ? {} : { skipReasons };
           })())
     },
-    languageOptions
+    languageOptions,
+    tabOptions
   };
 }
 
 function renderDomainSummaryData(
   data: SurveyResponseSummaryData<unknown, unknown>,
   languageOptions: readonly SurveyResponseSummaryLanguageOption[],
-  selectedLanguage: string | null,
-  onLanguageChange: (language: string | null) => void,
+  tabOptions: readonly SurveyResponseSummaryTabOption[],
+  selectedTab: SurveyResponseSummaryTabSelection,
+  onTabChange: (tab: SurveyResponseSummaryTabSelection) => void,
   slots: SurveyResponseSummaryDomainSlots,
   className: string | undefined,
   labels: SurveyResponseSummaryDomainLabels | undefined,
@@ -422,8 +470,13 @@ function renderDomainSummaryData(
   variant: SurveyResponseSummaryVariant = "default",
   locale?: string
 ): React.JSX.Element {
-  const resolvedLabels = { ...defaultSummaryLabels, ...labels };
   const displayLocale = locale ?? data.sourceLanguage;
+  const resolvedLabels = {
+    ...defaultSummaryLabels,
+    ...labels,
+    allLanguages:
+      labels?.allLanguages ?? (displayLocale.startsWith("ja") ? "全言語" : defaultSummaryLabels.allLanguages)
+  };
   const languageAggregates =
     data.languages ??
     languageOptions.map(({ language, count }) => ({ language, submissionCount: count, summary: { questions: [] } }));
@@ -435,25 +488,39 @@ function renderDomainSummaryData(
       data-summary-variant={variant}
     >
       {slots.header?.(data) ?? slots.renderHeader?.(data) ?? <h2>{data.title}</h2>}
-      {languageOptions.length === 0
+      {tabOptions.length === 0
         ? null
-        : ((slots.languageTabs ?? slots.renderLanguageTabs)?.({
+        : ((slots.summaryTabs ?? slots.renderSummaryTabs)?.({
+            tabs: tabOptions,
+            activeTab: selectedTab,
+            onChange: onTabChange
+          }) ??
+          (slots.languageTabs ?? slots.renderLanguageTabs)?.({
             languages: languageAggregates,
-            activeLanguage: selectedLanguage ?? data.sourceLanguage,
-            onChange: (language) => onLanguageChange(language)
+            activeLanguage: selectedTab.scope === "language" ? selectedTab.language : data.sourceLanguage,
+            onChange: (language) => onTabChange(tabSelectionForLanguage(language))
           }) ?? (
             <div role="tablist" aria-label={resolvedLabels.languages}>
-              {languageOptions.map(({ language, count, label }) => {
-                const active = (selectedLanguage ?? data.sourceLanguage) === language;
+              {tabOptions.map((tab) => {
+                const active =
+                  tab.scope === "all"
+                    ? selectedTab.scope === "all"
+                    : selectedTab.scope === "language" && selectedTab.language === tab.language;
+                const label =
+                  tab.scope === "all"
+                    ? resolvedLabels.allLanguages
+                    : (languageLabel?.(tab.language) ?? tab.label ?? tab.language);
                 return (
                   <button
-                    key={language}
+                    key={tab.scope === "all" ? "all" : tab.language}
                     type="button"
                     role="tab"
                     aria-selected={active}
-                    onClick={() => onLanguageChange(language)}
+                    onClick={() =>
+                      onTabChange(tab.scope === "all" ? { scope: "all" } : tabSelectionForLanguage(tab.language))
+                    }
                   >
-                    {languageLabel?.(language) ?? label ?? language} ({count})
+                    {label} ({tab.count})
                   </button>
                 );
               })}
@@ -502,10 +569,27 @@ function normalizedError(cause: unknown): Error {
 export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
   options: UseSurveyResponseSummaryDomainOptions<TSummary, TVersion>
 ): UseSurveyResponseSummaryDomainResult<TSummary, TVersion> {
-  const [internalLanguage, setInternalLanguage] = useState<string | null>(() => options.defaultLanguage ?? null);
-  const selectedLanguage = options.selectedLanguage === undefined ? internalLanguage : options.selectedLanguage;
   const sourceLanguage = options.domainAdapter.sourceLanguage(options.version);
-  const activeLanguage = selectedLanguage ?? sourceLanguage;
+  const initialTab =
+    options.defaultTab ??
+    (options.defaultLanguage === undefined
+      ? { scope: "all" as const }
+      : tabSelectionForLanguage(options.defaultLanguage ?? sourceLanguage));
+  const [internalTab, setInternalTab] = useState<SurveyResponseSummaryTabSelection>(initialTab);
+  const selectedTab =
+    options.selectedTab ??
+    (options.selectedLanguage === undefined
+      ? internalTab
+      : tabSelectionForLanguage(options.selectedLanguage ?? sourceLanguage));
+  const selectedLanguage =
+    selectedTab.scope === "language"
+      ? options.selectedLanguage !== undefined
+        ? options.selectedLanguage
+        : options.defaultLanguage === null && selectedTab.language === sourceLanguage
+          ? null
+          : selectedTab.language
+      : null;
+  const activeLanguage = selectedTab.scope === "language" ? selectedTab.language : sourceLanguage;
   const loader = summaryLoaderFunction(options.summaryLoader);
   const cacheRef = useRef<Map<string, TSummary>>(new Map([[activeLanguage, options.summary]]));
   const activeSummaryRef = useRef<{ readonly language: string; readonly summary: TSummary }>({
@@ -565,19 +649,42 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
     },
     [loader]
   );
-  const setLanguage = useCallback(
-    (language: string | null) => {
-      if (options.selectedLanguage === undefined) setInternalLanguage(language);
-      options.onLanguageChange?.(language);
-      const nextLanguage = language ?? sourceLanguage;
-      if (loader !== undefined) void loadSummaryForLanguage(nextLanguage);
+  const setTab = useCallback(
+    (tab: SurveyResponseSummaryTabSelection) => {
+      if (options.selectedTab === undefined && options.selectedLanguage === undefined) setInternalTab(tab);
+      options.onTabChange?.(tab);
+      if (tab.scope === "language") {
+        options.onLanguageChange?.(tab.language);
+        if (loader !== undefined) void loadSummaryForLanguage(tab.language);
+        return;
+      }
+      controllerRef.current?.abort();
+      requestRef.current += 1;
+      activeSummaryRef.current = { language: sourceLanguage, summary: options.summary };
+      setActiveSummaryState(activeSummaryRef.current);
+      if (options.summaryState === undefined) setSummaryState({ status: "success" });
     },
-    [loadSummaryForLanguage, loader, options.onLanguageChange, options.selectedLanguage, sourceLanguage]
+    [
+      loadSummaryForLanguage,
+      loader,
+      options.onLanguageChange,
+      options.onTabChange,
+      options.selectedLanguage,
+      options.selectedTab,
+      options.summaryState,
+      options.summary,
+      sourceLanguage
+    ]
+  );
+  const setLanguage = useCallback(
+    (language: string | null) => setTab(tabSelectionForLanguage(language ?? sourceLanguage)),
+    [setTab, sourceLanguage]
   );
   useEffect(() => {
-    if (loader === undefined || activeSummaryRef.current.language === activeLanguage) return;
+    if (loader === undefined || selectedTab.scope === "all" || activeSummaryRef.current.language === activeLanguage)
+      return;
     void loadSummaryForLanguage(activeLanguage);
-  }, [activeLanguage, loadSummaryForLanguage, loader]);
+  }, [activeLanguage, loadSummaryForLanguage, loader, selectedTab.scope]);
   useEffect(
     () => () => {
       controllerRef.current?.abort();
@@ -585,18 +692,18 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
     []
   );
   const activeSummary =
-    loader === undefined || activeLanguage === sourceLanguage
+    loader === undefined || selectedTab.scope === "all" || activeLanguage === sourceLanguage
       ? options.summary
       : activeSummaryState.language === activeLanguage
         ? activeSummaryState.summary
         : options.summary;
   const mapped = useMemo(
-    () => domainSummaryData(options, selectedLanguage, activeSummary),
-    [activeSummary, options, selectedLanguage]
+    () => domainSummaryData(options, selectedTab, activeSummary),
+    [activeSummary, options, selectedTab]
   );
   const reloadSummary = useCallback(
-    () => loadSummaryForLanguage(activeLanguage, true),
-    [activeLanguage, loadSummaryForLanguage]
+    () => (selectedTab.scope === "all" ? Promise.resolve(undefined) : loadSummaryForLanguage(activeLanguage, true)),
+    [activeLanguage, loadSummaryForLanguage, selectedTab.scope]
   );
   const effectiveSummaryState = options.summaryState ?? summaryState;
   return {
@@ -610,6 +717,7 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
     ...(effectiveSummaryState.error === undefined ? {} : { summaryError: effectiveSummaryState.error }),
     reloadSummary,
     languageOptions: mapped.languageOptions,
+    tabOptions: mapped.tabOptions,
     ...(options.variant === undefined ? {} : { variant: options.variant }),
     ...(options.locale === undefined ? {} : { locale: options.locale }),
     ...(options.slots === undefined ? {} : { slots: options.slots }),
@@ -617,7 +725,10 @@ export function useSurveyResponseSummaryDomain<TSummary, TVersion>(
     ...(options.languageLabel === undefined ? {} : { languageLabel: options.languageLabel }),
     ...(options.className === undefined ? {} : { className: options.className }),
     onLanguageChange: setLanguage,
-    setLanguage
+    setLanguage,
+    selectedTab,
+    onTabChange: setTab,
+    setTab
   };
 }
 
@@ -629,8 +740,9 @@ function SurveyResponseSummaryDomainView<TSummary, TVersion>(
   return renderDomainSummaryData(
     controller.data,
     controller.languageOptions,
-    controller.selectedLanguage,
-    controller.setLanguage,
+    controller.tabOptions,
+    controller.selectedTab,
+    controller.setTab,
     props.slots ?? {},
     props.className,
     props.labels,

@@ -1,5 +1,6 @@
 import type { FormSchema } from "@form-engine-ts/core";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MuiSurveyResponseSummaryDomain } from "../src";
 
 const schema: FormSchema = {
@@ -136,5 +137,64 @@ describe("@form-engine-ts/mui response summary", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(question).toHaveBeenCalledWith(expect.objectContaining({ fieldId: "satisfaction" }));
     expect(skipReasons).toHaveBeenCalledWith([{ reason: "not-applicable", count: 1234 }]);
+  });
+
+  it("renders and switches between the all-languages and language tabs", async () => {
+    const user = userEvent.setup();
+    const languageAdapter = {
+      toSummaryInput: ({ answeredCount }: { readonly answeredCount: number }) => ({
+        questions: [
+          {
+            fieldId: "satisfaction",
+            kind: "radio" as const,
+            answeredCount,
+            unansweredCount: 4 - answeredCount,
+            options: []
+          }
+        ]
+      }),
+      toFormSchema: () => schema,
+      sourceLanguage: () => "en",
+      mapLanguages: ({ summary: current }: { readonly summary: { readonly answeredCount: number } }) => [
+        { language: "en", submissionCount: 1, summary: { questions: [] } },
+        {
+          language: "ja",
+          submissionCount: 3,
+          summary: {
+            questions: [
+              {
+                fieldId: "satisfaction",
+                kind: "radio" as const,
+                answeredCount: current.answeredCount - 1,
+                unansweredCount: 5 - current.answeredCount,
+                options: []
+              }
+            ]
+          }
+        }
+      ]
+    };
+
+    render(
+      <MuiSurveyResponseSummaryDomain
+        summary={{ answeredCount: 4 }}
+        version={{ id: "version" }}
+        domainAdapter={languageAdapter}
+        locale="ja-JP"
+        labels={{ languages: "言語" }}
+      />
+    );
+
+    const allTab = screen.getByRole("tab", { name: "全言語 (4)" });
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "en (1)" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "ja (3)" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByText("Answered").nextElementSibling).toHaveTextContent("4");
+
+    await user.click(screen.getByRole("tab", { name: "ja (3)" }));
+
+    expect(allTab).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "ja (3)" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Answered").nextElementSibling).toHaveTextContent("3");
   });
 });
