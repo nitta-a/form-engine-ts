@@ -3,6 +3,8 @@
   "compilerOptions": {
     "types": ["vitest/globals", "@testing-library/jest-dom"],
     "paths": {
+      "@form-engine-ts/core": ["../core/src/index.ts"],
+      "@form-engine-ts/privacy": ["../privacy/src/index.ts"],
       "@form-engine-ts/react/builder": ["./src/builder.tsx"],
       "@form-engine-ts/react/hooks": ["./src/hooks.ts"],
       "@form-engine-ts/react/i18n": ["./src/i18n.ts"],
