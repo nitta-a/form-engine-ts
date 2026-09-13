@@ -1,5 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["node", "vitest/globals"] },
+  "compilerOptions": {
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@form-engine-ts/core/analytics": ["./src/analytics.ts"],
+      "@form-engine-ts/core/i18n/en": ["./src/i18n/catalogs/en.ts"],
+      "@form-engine-ts/core/i18n/translator": ["./src/i18n/translator.ts"],
+      "@form-engine-ts/core/schema": ["./src/schema.ts"],
+      "@form-engine-ts/core/submission": ["./src/submission.ts"],
+      "@form-engine-ts/core/validation": ["./src/validation.ts"]
+    }
+  },
   "include": ["src", "test"]
 }

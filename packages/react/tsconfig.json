@@ -1,5 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["vitest/globals", "@testing-library/jest-dom"] },
+  "compilerOptions": {
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "paths": {
+      "@form-engine-ts/react/builder": ["./src/builder.tsx"],
+      "@form-engine-ts/react/hooks": ["./src/hooks.ts"],
+      "@form-engine-ts/react/i18n": ["./src/i18n.ts"],
+      "@form-engine-ts/react/renderer": ["./src/renderer.tsx"],
+      "@form-engine-ts/react/submission": ["./src/submission.ts"]
+    }
+  },
   "include": ["src", "test", "vitest.config.ts"]
 }
