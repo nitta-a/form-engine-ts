@@ -39,6 +39,19 @@ export function ContactForm() {
 
 Use any compatible `TranslationAdapter` in place of the mock translator.
 
+## Selective imports
+
+The root import remains supported. For smaller consumer module graphs, import a focused entry instead:
+
+```tsx
+import { FormBuilder } from "@form-engine-ts/react/builder";
+import { FormRenderer } from "@form-engine-ts/react/renderer";
+import { useFormBuilder } from "@form-engine-ts/react/hooks";
+```
+
+The `@form-engine-ts/react/content-renderer`, `/context`, `/i18n`, `/submission`, `/attempt`, and `/receipt` subpaths
+are also available. Import `@form-engine-ts/react/styles.css` explicitly when using the package styles.
+
 ## Choice field layout
 
 Radio, checkbox, and multi-select questions use the flat layout by default. Set `appearance.choiceField` to `"grouped"`

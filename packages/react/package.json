@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/react",
-  "version": "7.15.0",
+  "version": "7.15.1",
   "publishConfig": {
     "access": "public"
   },
@@ -22,6 +22,61 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./attempt": {
+      "types": "./dist/attempt.d.ts",
+      "import": "./dist/attempt.js",
+      "require": "./dist/attempt.cjs"
+    },
+    "./builder": {
+      "types": "./dist/builder.d.ts",
+      "import": "./dist/builder.js",
+      "require": "./dist/builder.cjs"
+    },
+    "./content-renderer": {
+      "types": "./dist/contentRenderer.d.ts",
+      "import": "./dist/contentRenderer.js",
+      "require": "./dist/contentRenderer.cjs"
+    },
+    "./context": {
+      "types": "./dist/context.d.ts",
+      "import": "./dist/context.js",
+      "require": "./dist/context.cjs"
+    },
+    "./hooks": {
+      "types": "./dist/hooks.d.ts",
+      "import": "./dist/hooks.js",
+      "require": "./dist/hooks.cjs"
+    },
+    "./i18n": {
+      "types": "./dist/i18n.d.ts",
+      "import": "./dist/i18n.js",
+      "require": "./dist/i18n.cjs"
+    },
+    "./receipt": {
+      "types": "./dist/receipt.d.ts",
+      "import": "./dist/receipt.js",
+      "require": "./dist/receipt.cjs"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "import": "./dist/renderer.js",
+      "require": "./dist/renderer.cjs"
+    },
+    "./submission": {
+      "types": "./dist/submission.d.ts",
+      "import": "./dist/submission.js",
+      "require": "./dist/submission.cjs"
+    },
+    "./submission-identity": {
+      "types": "./dist/submissionIdentity.d.ts",
+      "import": "./dist/submissionIdentity.js",
+      "require": "./dist/submissionIdentity.cjs"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js",
+      "require": "./dist/types.cjs"
+    },
     "./styles.css": "./dist/styles.css"
   },
   "license": "MIT",
@@ -42,7 +97,7 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/styles.css --format esm,cjs --dts --clean --external react --external react/jsx-runtime --external @form-engine-ts/core --external @form-engine-ts/privacy",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external react --external react/jsx-runtime --external @form-engine-ts/core --external @form-engine-ts/privacy && tsup src/attempt.ts src/builder.tsx src/contentRenderer.tsx src/context.tsx src/hooks.ts src/i18n.ts src/receipt.ts src/renderer.tsx src/submission.ts src/submissionIdentity.ts src/types.ts --format esm,cjs --dts --external react --external react/jsx-runtime --external @form-engine-ts/core --external @form-engine-ts/privacy && tsup src/styles.css --format esm,cjs --external react --external react/jsx-runtime --external @form-engine-ts/core --external @form-engine-ts/privacy",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"

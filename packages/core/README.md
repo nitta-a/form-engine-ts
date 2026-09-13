@@ -24,6 +24,20 @@ const result = validateAnswers(schema, { name: "Ada" });
 if (!result.valid) console.error(result.issues);
 ```
 
+## Selective imports
+
+The root import remains supported. For smaller consumer module graphs, import a focused entry instead:
+
+```ts
+import { validateFormSchema } from "@form-engine-ts/core/schema";
+import { validateSubmission } from "@form-engine-ts/core/validation";
+import { EN_MESSAGES } from "@form-engine-ts/core/i18n/en";
+```
+
+Core also provides subpaths for analytics, aggregation, visibility, pipeline, submission, policy, translation,
+versioning, and the other public top-level modules. Locale catalogs are available from `@form-engine-ts/core/i18n/en`
+and `@form-engine-ts/core/i18n/ja` without importing them from an application feature entry.
+
 ## Multi-step, localization, analytics, and events
 
 Add `pages` to partition every field into an accessible wizard and use `validatePageAnswers(schema, pageIndex, values)`
