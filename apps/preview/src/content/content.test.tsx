@@ -55,6 +55,57 @@ describe("content mode demo", () => {
     });
     expect(screen.getByRole("button", { name: /Lunch vote/ })).toBeVisible();
   });
+
+  it("filters templates by mode and creates a selected survey template", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("button", { name: "Create form" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("button", { name: /Satisfaction survey/ })).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: /Ideas and improvements/ })).toBeInTheDocument();
+    await user.click(dialog.getByRole("button", { name: "Poll" }));
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: /Popular choice poll/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: /Satisfaction survey/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Survey" }));
+    await user.click(screen.getByRole("button", { name: /Satisfaction survey/ }));
+    expect(screen.getByText("Template contents")).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getAllByText("3 questions").length).toBeGreaterThan(0);
+    await user.type(screen.getByLabelText("Title"), "Customer feedback");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("heading", { name: "Overall satisfaction" })).toBeInTheDocument();
+  });
+
+  it("returns to blank creation when the mode changes or the dialog is cancelled", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("button", { name: "Create form" }));
+    await user.click(screen.getByRole("button", { name: /Satisfaction survey/ }));
+    expect(screen.getByText("Template contents")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Poll" }));
+    expect(screen.queryByText("Template contents")).toBeNull();
+    expect(screen.getByText("A blank form will be created.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "Create form" }));
+    expect(screen.queryByText("Template contents")).toBeNull();
+    expect(screen.getByText("A blank form will be created.")).toBeInTheDocument();
+  });
+
+  it("localizes the template picker in Japanese", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "日本語" }));
+    await user.click(screen.getByRole("tab", { name: "フォーム一覧" }));
+    await user.click(screen.getByRole("button", { name: "新規作成" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText("開始方法を選択")).toBeInTheDocument();
+    await user.click(dialog.getByRole("button", { name: /満足度調査/ }));
+    expect(dialog.getByText("テンプレートの内容")).toBeInTheDocument();
+  });
+
   it("edits quiz correctness and explanation then renders the submitted result", async () => {
     const user = userEvent.setup();
     render(<App />);

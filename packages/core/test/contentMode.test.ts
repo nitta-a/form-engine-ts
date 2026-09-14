@@ -12,8 +12,70 @@ import {
   validateContentModeConstraints
 } from "../src/contentMode";
 import { validateFormSchema } from "../src/schema";
+import { createSchemaFromTemplate, getFormTemplates } from "../src/templates";
 
 describe("content modes", () => {
+  it("provides localized templates and creates independent schemas", () => {
+    const english = getFormTemplates({ locale: "en" });
+    const japanese = getFormTemplates({ locale: "ja-JP" });
+    expect(english).toHaveLength(4);
+    expect(japanese.map((template) => template.name)).toEqual([
+      "満足度調査",
+      "意見改善提案",
+      "人気投票",
+      "理解度チェック"
+    ]);
+    expect(getFormTemplates({ mode: "poll", locale: "fr" })).toHaveLength(1);
+    const template = english.find((candidate) => candidate.id === "popular-choice-poll");
+    if (template === undefined) throw new Error("Missing poll template");
+    const first = createSchemaFromTemplate({ template, id: "poll-1", title: "Lunch" });
+    const second = createSchemaFromTemplate({ template, id: "poll-2", title: "Dinner" });
+    expect(first).toMatchObject({ id: "poll-1", title: "Lunch", version: 1, defaultLocale: "en" });
+    expect(first.fields).toHaveLength(1);
+    expect(first.metadata).toEqual({ mode: "poll", poll: { resultVisibility: "after_submit" } });
+    expect(first.fields).not.toBe(second.fields);
+    const firstField = first.fields[0];
+    const secondField = second.fields[0];
+    if (
+      firstField === undefined ||
+      secondField === undefined ||
+      !("options" in firstField) ||
+      !("options" in secondField)
+    )
+      throw new Error("Missing poll options");
+    expect(firstField.options).not.toBe(secondField.options);
+    expect(firstField.options).toEqual(secondField.options);
+    expect(firstField.options).toHaveLength(3);
+  });
+
+  it("creates valid quiz and survey templates without contact fields", () => {
+    for (const locale of ["en", "ja-JP"]) {
+      for (const template of getFormTemplates({ locale })) {
+        const schema = createSchemaFromTemplate({
+          template,
+          id: `form-${locale}-${template.id}`,
+          title: template.name
+        });
+        expect(validateFormSchema(schema).valid).toBe(true);
+        expect(schema.defaultLocale).toBe(locale);
+        expect(schema.fields.some((field) => /email|name|phone|contact/i.test(field.id))).toBe(false);
+        if (template.mode === "poll") {
+          expect(schema.fields).toHaveLength(1);
+          const pollField = schema.fields[0];
+          if (pollField === undefined || !("options" in pollField)) throw new Error("Missing poll field");
+          expect(pollField.type).toBe("radio");
+          expect(pollField.options).toHaveLength(3);
+        }
+      }
+    }
+    for (const locale of ["en", "ja-JP"]) {
+      const quiz = getFormTemplates({ mode: "quiz", locale })[0];
+      if (quiz === undefined) throw new Error("Missing quiz template");
+      expect(quiz.schema.fields).toHaveLength(3);
+      expect(quiz.schema.fields.every((field) => field.metadata?.quiz !== undefined)).toBe(true);
+    }
+  });
+
   it("creates deterministic presets and preserves legacy survey behavior", () => {
     expect(getFormContentMode(undefined)).toBe("survey");
     for (const mode of ["survey", "poll", "quiz"] as const) {

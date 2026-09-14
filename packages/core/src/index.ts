@@ -18,6 +18,7 @@ export * from "./sanitization";
 export * from "./schema";
 export * from "./schemas/submission.zod";
 export * from "./submission";
+export * from "./templates";
 export * from "./translation";
 export * from "./types";
 export * from "./validation";

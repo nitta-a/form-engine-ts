@@ -5,6 +5,12 @@ current release and usage information.
 
 ## Latest release
 
+### v7.17.1 — 2026-09-15
+
+- Added four bilingual purpose templates for survey, poll, and quiz creation through the Core `FormTemplate`, `getFormTemplates`, and `createSchemaFromTemplate` APIs.
+- Added the preview new-form flow for mode selection, blank or template creation, template content review, same-ID retry after save failure, and accessible Japanese/English labels.
+- Aligned all public packages to version 7.17.1.
+
 ### v7.17.0 — 2026-09-14
 
 - Added optional single-page editing to the React and MUI builders, with page selection, question counts, page-aware question creation, split and deletion guidance, and preserved question ordering and assignments.

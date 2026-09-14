@@ -1,8 +1,10 @@
 import {
   createInitialSchemaByMode,
+  createSchemaFromTemplate,
   type FormContentMode,
   type FormSchema,
   type FormStorageAdapter,
+  type FormTemplate,
   getFormContentMode
 } from "@form-engine-ts/core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -57,8 +59,12 @@ export function useContentLibrary(storage: FormStorageAdapter) {
     },
     [storage]
   );
-  const create = async (mode: FormContentMode, title: string, locale: string) => {
-    const schema = createInitialSchemaByMode(mode, { title, locale, id: crypto.randomUUID() });
+  const create = async (mode: FormContentMode, title: string, locale: string, template?: FormTemplate, id?: string) => {
+    const schemaId = id ?? crypto.randomUUID();
+    const schema =
+      template === undefined
+        ? createInitialSchemaByMode(mode, { title, locale, id: schemaId })
+        : createSchemaFromTemplate({ template, id: schemaId, title });
     if (mode === "survey") setSelected(schema);
     else await save(schema);
   };

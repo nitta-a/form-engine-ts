@@ -56,9 +56,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.15.0** (2026-09-12). All public packages are currently aligned to version `7.15.0`.
-This release adds an all-languages aggregate tab to response summaries, scope-aware tab customization, and the audited
-`esbuild` security update.
+The latest release is **v7.17.1** (2026-09-15). All public packages are currently aligned to version `7.17.1`.
+This release adds bilingual purpose templates and a mode-first template or blank creation flow in the preview.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -72,6 +71,13 @@ two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HM
 an optional `{ pageIndex }` for step-scoped validation.
 Quiz authors can enable or disable the passing-score threshold; when it is disabled, respondent results omit total score
 and pass/fail status.
+
+The Core package includes four bilingual purpose templates (satisfaction, improvements, popular choice, and
+understanding check). A host can filter them with `getFormTemplates({ mode, locale })` and create an independent schema
+with `createSchemaFromTemplate({ template, id, title })`; blank forms continue to use `createInitialSchemaByMode`.
+Core owns template definitions and generation, while the host owns the new-form entry point, ID issuance, saving, and
+navigation. The templates avoid contact questions, request that respondents do not enter personal information, and do
+not promise a reply or a storage-dependent anonymity guarantee.
 
 ### Define and render a form
 
@@ -373,8 +379,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.15.0**（2026-09-12）です。公開パッケージはすべてバージョン `7.15.0` に揃えています。
-本リリースでは、回答サマリーに全言語集計タブ、スコープ対応のタブカスタマイズ、監査で検出された `esbuild` のセキュリティ更新を追加しました。
+最新版は **v7.17.1**（2026-09-15）です。公開パッケージはすべてバージョン `7.17.1` に揃えています。
+本リリースでは、日英対応の目的別テンプレートと、種別を先に選ぶテンプレート／白紙作成フローをpreviewに追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -388,6 +394,13 @@ pnpm test
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 クイズでは合格ラインの設定有無を切り替えられ、未設定の場合は回答結果に合計点と合否を表示しません。
+
+Coreパッケージには、満足度、意見改善、人気投票、理解度チェックの4種類の日英対応目的別テンプレートが
+含まれます。利用側は`getFormTemplates({ mode, locale })`で種別と言語を絞り、
+`createSchemaFromTemplate({ template, id, title })`で独立したスキーマを生成できます。白紙は引き続き
+`createInitialSchemaByMode`を使います。テンプレート定義と生成はCore、新規作成入口・ID発行・保存・画面遷移は
+利用側が担当します。連絡先の質問は含めず、回答者には個人情報を入力しないよう案内し、返信や保存環境に
+依存する匿名性を約束しません。
 
 ### フォームの定義とレンダリング
 

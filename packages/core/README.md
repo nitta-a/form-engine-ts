@@ -24,6 +24,26 @@ const result = validateAnswers(schema, { name: "Ada" });
 if (!result.valid) console.error(result.issues);
 ```
 
+## Built-in templates
+
+Core includes four purpose-oriented templates for survey, poll, and quiz creation. Select them by mode and locale,
+then pass the selected template to `createSchemaFromTemplate` with an application-issued ID and title:
+
+```ts
+import { createSchemaFromTemplate, getFormTemplates } from "@form-engine-ts/core";
+
+const [template] = getFormTemplates({ mode: "survey", locale: "ja-JP" });
+if (template) {
+  const schema = createSchemaFromTemplate({ template, id: "feedback-2026", title: "春の満足度" });
+}
+```
+
+Templates provide Japanese text for Japanese locales and English text otherwise. The returned templates and schemas
+are defensive copies, so changing one form does not change another. Core owns definitions and generation; the host
+application owns the new-form entry point, ID issuance, persistence, and navigation. Built-in open-text prompts ask
+respondents not to include personal information and do not promise a reply or a storage-specific anonymity guarantee.
+Use `createInitialSchemaByMode` when a blank form is preferred.
+
 ## Selective imports
 
 The root import remains supported. For smaller consumer module graphs, import a focused entry instead:
