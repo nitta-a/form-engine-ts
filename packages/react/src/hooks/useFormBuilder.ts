@@ -36,7 +36,7 @@ export interface FormBuilderOptions {
   readonly idFactory?: (kind: BuilderIdKind, existingIds: ReadonlySet<string>) => string;
   readonly factories?: BuilderFactories;
   readonly fieldEditorMode?: FieldEditorMode;
-  readonly activeFieldId?: string;
+  readonly activeFieldId?: string | undefined;
   readonly defaultActiveFieldId?: string;
   readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
 }
@@ -291,27 +291,29 @@ function failedId(kind: BuilderIdKind, result: { readonly error?: BuilderActionE
   return { success: false, error: result.error ?? { type: "invalid_id", kind, id: "" } };
 }
 
-export function useFormBuilder({
-  schema,
-  onChange,
-  policy,
-  idFactory = defaultIdFactory,
-  factories = {},
-  fieldEditorMode = "all",
-  activeFieldId: controlledActiveFieldId,
-  defaultActiveFieldId,
-  onActiveFieldChange
-}: FormBuilderOptions): FormBuilderResult {
+export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
+  const {
+    schema,
+    onChange,
+    policy,
+    idFactory = defaultIdFactory,
+    factories = {},
+    fieldEditorMode = "all",
+    activeFieldId: controlledActiveFieldId,
+    defaultActiveFieldId,
+    onActiveFieldChange
+  } = options;
+  const isActiveFieldControlled = Object.hasOwn(options, "activeFieldId");
   const [internalActiveFieldId, setInternalActiveFieldId] = useState<string | undefined>(
     defaultActiveFieldId ?? (fieldEditorMode === "single" ? schema.fields[0]?.id : undefined)
   );
-  const activeFieldId = controlledActiveFieldId ?? internalActiveFieldId;
+  const activeFieldId = isActiveFieldControlled ? controlledActiveFieldId : internalActiveFieldId;
   const setActiveFieldId = useCallback(
     (fieldId: string | undefined): void => {
-      if (controlledActiveFieldId === undefined) setInternalActiveFieldId(fieldId);
+      if (!isActiveFieldControlled) setInternalActiveFieldId(fieldId);
       onActiveFieldChange?.(fieldId);
     },
-    [controlledActiveFieldId, onActiveFieldChange]
+    [isActiveFieldControlled, onActiveFieldChange]
   );
   const createId = useCallback(
     (

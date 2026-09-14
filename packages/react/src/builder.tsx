@@ -18,7 +18,7 @@ import {
   type TranslationReport
 } from "@form-engine-ts/core";
 import type { ReactElement, ReactNode } from "react";
-import { Children, createContext, isValidElement, useContext, useState } from "react";
+import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { BuilderPageConditionEditor } from "./BuilderPageConditionEditor";
 import {
   ConditionValueEditor,
@@ -55,6 +55,7 @@ import type {
   FieldTypeSelectOptionsContext,
   FormBuilderComponents,
   FormBuilderSectionName,
+  FormBuilderSectionVisibility,
   FormBuilderSlots,
   FormBuilderSubmissionSettingsOptions,
   ManualTranslationContext,
@@ -162,6 +163,7 @@ function DefaultTextInput({
   "aria-describedby": ariaDescribedBy,
   "aria-labelledby": ariaLabelledBy,
   name,
+  inputRef,
   label,
   required,
   error,
@@ -184,6 +186,7 @@ function DefaultTextInput({
       <input
         id={id}
         name={name}
+        ref={inputRef}
         className={className}
         disabled={disabled}
         readOnly={readOnly}
@@ -711,11 +714,12 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
 
 interface BuilderSectionGroupProps {
   readonly name: FormBuilderSectionName;
+  readonly visible?: boolean;
   readonly children: ReactNode;
 }
 
-function BuilderSectionGroup({ children }: BuilderSectionGroupProps) {
-  return children;
+function BuilderSectionGroup({ children, visible = true }: BuilderSectionGroupProps) {
+  return visible ? children : null;
 }
 
 function sectionGroupName(node: ReactNode): FormBuilderSectionName | undefined {
@@ -864,46 +868,52 @@ export interface FormBuilderProps {
   readonly components?: FormBuilderComponents;
   readonly slots?: FormBuilderSlots;
   readonly sectionOrder?: readonly FormBuilderSectionName[];
+  readonly sectionVisibility?: FormBuilderSectionVisibility;
   readonly disableDefaultStyles?: boolean;
   readonly unstyled?: boolean;
   readonly fieldEditorMode?: "all" | "single";
-  readonly activeFieldId?: string;
+  readonly activeFieldId?: string | undefined;
+  readonly autoFocusActiveField?: boolean;
   readonly defaultActiveFieldId?: string;
   readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
   readonly submissionSettingsOptions?: FormBuilderSubmissionSettingsOptions;
 }
 
-export function FormBuilder({
-  schema,
-  onChange,
-  locale: explicitLocale,
-  translator,
-  translationAdapter,
-  translationOptions,
-  onTranslationReport,
-  policy,
-  addFieldDisabledReason,
-  idFactory,
-  factories,
-  className = "",
-  defaultFieldType,
-  onActionError,
-  createManualTranslationMetadata,
-  readOnly = false,
-  features,
-  fieldEditorControls,
-  fieldTypeOptions,
-  components: componentOverrides,
-  slots,
-  sectionOrder,
-  disableDefaultStyles = false,
-  unstyled = false,
-  fieldEditorMode = "all",
-  activeFieldId,
-  defaultActiveFieldId,
-  onActiveFieldChange,
-  submissionSettingsOptions
-}: FormBuilderProps) {
+export function FormBuilder(props: FormBuilderProps) {
+  const {
+    schema,
+    onChange,
+    locale: explicitLocale,
+    translator,
+    translationAdapter,
+    translationOptions,
+    onTranslationReport,
+    policy,
+    addFieldDisabledReason,
+    idFactory,
+    factories,
+    className = "",
+    defaultFieldType,
+    onActionError,
+    createManualTranslationMetadata,
+    readOnly = false,
+    features,
+    fieldEditorControls,
+    fieldTypeOptions,
+    components: componentOverrides,
+    slots,
+    sectionOrder,
+    sectionVisibility,
+    disableDefaultStyles = false,
+    unstyled = false,
+    fieldEditorMode = "all",
+    activeFieldId,
+    autoFocusActiveField = false,
+    defaultActiveFieldId,
+    onActiveFieldChange,
+    submissionSettingsOptions
+  } = props;
+  const hasActiveFieldId = Object.hasOwn(props, "activeFieldId");
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const locale = explicitLocale ?? (isProviderValue ? i18n.uiLocale : "en");
@@ -941,10 +951,40 @@ export function FormBuilder({
     ...(idFactory === undefined ? {} : { idFactory }),
     ...(factories === undefined ? {} : { factories }),
     fieldEditorMode,
-    ...(activeFieldId === undefined ? {} : { activeFieldId }),
+    ...(hasActiveFieldId ? { activeFieldId } : {}),
     ...(defaultActiveFieldId === undefined ? {} : { defaultActiveFieldId }),
     ...(onActiveFieldChange === undefined ? {} : { onActiveFieldChange })
   });
+  const resolvedActiveFieldId = headless.activeFieldId;
+  const activeFieldTitleInputRef = useRef<HTMLInputElement | null>(null);
+  const previousActiveFieldIdRef = useRef(resolvedActiveFieldId);
+  const setActiveFieldTitleInputRef = useCallback(
+    (element: HTMLInputElement | null) => {
+      activeFieldTitleInputRef.current = element;
+      if (
+        element !== null &&
+        autoFocusActiveField &&
+        previousActiveFieldIdRef.current !== resolvedActiveFieldId &&
+        resolvedActiveFieldId !== undefined
+      ) {
+        element.focus();
+        previousActiveFieldIdRef.current = resolvedActiveFieldId;
+      }
+    },
+    [autoFocusActiveField, resolvedActiveFieldId]
+  );
+  useEffect(() => {
+    if (previousActiveFieldIdRef.current === resolvedActiveFieldId) return;
+    if (!autoFocusActiveField || resolvedActiveFieldId === undefined) {
+      previousActiveFieldIdRef.current = resolvedActiveFieldId;
+      return;
+    }
+    if (activeFieldTitleInputRef.current !== null) {
+      activeFieldTitleInputRef.current.focus();
+      previousActiveFieldIdRef.current = resolvedActiveFieldId;
+    }
+  }, [autoFocusActiveField, resolvedActiveFieldId]);
+  const isSectionVisible = (name: FormBuilderSectionName): boolean => sectionVisibility?.[name] !== false;
   const [newPageQuestionId, setNewPageQuestionId] = useState("");
   const [newLocale, setNewLocale] = useState("");
   const [editingLocale, setEditingLocale] = useState("");
@@ -1314,7 +1354,7 @@ export function FormBuilder({
       >
         <Fieldset className={builderClass("form-engine-builder__controls")} disabled={readOnly}>
           <OrderedBuilderSections {...(resolvedSectionOrder === undefined ? {} : { order: resolvedSectionOrder })}>
-            <BuilderSectionGroup name="basicSettings">
+            <BuilderSectionGroup name="basicSettings" visible={isSectionVisible("basicSettings")}>
               <Section
                 className={builderClass("form-engine-builder__basic-settings")}
                 headingId="builder-basic-settings-heading"
@@ -1358,7 +1398,7 @@ export function FormBuilder({
                 )}
               </Section>
             </BuilderSectionGroup>
-            <BuilderSectionGroup name="submissionSettings">
+            <BuilderSectionGroup name="submissionSettings" visible={isSectionVisible("submissionSettings")}>
               {submissionSettingsOptions?.enabled ? (
                 <Section
                   className={builderClass("form-engine-builder__submission-settings")}
@@ -1396,7 +1436,7 @@ export function FormBuilder({
               ) : null}
             </BuilderSectionGroup>
             {resolvedSectionOrder === undefined ? null : (
-              <BuilderSectionGroup name="completionMessage">
+              <BuilderSectionGroup name="completionMessage" visible={isSectionVisible("completionMessage")}>
                 <Section headingId="builder-completion-message-heading" title={translate("builder.completionMessage")}>
                   <TextInput
                     id="builder-completion-message"
@@ -1407,7 +1447,7 @@ export function FormBuilder({
                 </Section>
               </BuilderSectionGroup>
             )}
-            <BuilderSectionGroup name="questions">
+            <BuilderSectionGroup name="questions" visible={isSectionVisible("questions")}>
               {pagesEnabled ? (
                 PagesSlot === undefined ? (
                   <Section
@@ -1607,7 +1647,7 @@ export function FormBuilder({
               ) : null}
             </BuilderSectionGroup>
 
-            <BuilderSectionGroup name="localization">
+            <BuilderSectionGroup name="localization" visible={isSectionVisible("localization")}>
               {localizationEnabled ? (
                 LocalizationSlot === undefined ? (
                   <Section
@@ -1615,7 +1655,7 @@ export function FormBuilder({
                     headingId="builder-localization-heading"
                     title={translate("builder.localization")}
                   >
-                    {resolvedSectionOrder === undefined ? (
+                    {resolvedSectionOrder === undefined && isSectionVisible("completionMessage") ? (
                       <div className={builderClass("form-engine-builder__field")}>
                         <TextInput
                           id="builder-completion-message"
@@ -1751,7 +1791,7 @@ export function FormBuilder({
               ) : null}
             </BuilderSectionGroup>
 
-            <BuilderSectionGroup name="questions">
+            <BuilderSectionGroup name="questions" visible={isSectionVisible("questions")}>
               <div className={builderClass("form-engine-builder__list")}>
                 {schema.fields.map((field, index) => {
                   const controls = resolveFieldEditorControls(fieldEditorControls);
@@ -1795,6 +1835,7 @@ export function FormBuilder({
                         {...(features === undefined ? {} : { features })}
                         {...(fieldEditorControls === undefined ? {} : { fieldEditorControls })}
                         {...(fieldTypeOptions === undefined ? {} : { fieldTypeOptions })}
+                        {...(editorState.isActive ? { titleInputRef: setActiveFieldTitleInputRef } : {})}
                         readOnly={readOnly}
                         actions={actions}
                         components={components}
@@ -1855,6 +1896,7 @@ export function FormBuilder({
                             <TextInput
                               id={`builder-field-${field.id}-title`}
                               name={`fields.${field.id}.title`}
+                              {...(editorState.isActive ? { inputRef: setActiveFieldTitleInputRef } : {})}
                               label={translate("builder.questionTitle")}
                               required={true}
                               error={field.title.trim().length === 0}
@@ -2328,7 +2370,7 @@ export function FormBuilder({
                 })}
               </div>
             </BuilderSectionGroup>
-            <BuilderSectionGroup name="addQuestion">
+            <BuilderSectionGroup name="addQuestion" visible={isSectionVisible("addQuestion")}>
               <span title={maxFieldsReached || initialFieldType === null ? addFieldDisabledReason : undefined}>
                 <Button
                   className={builderClass("form-engine-builder__add")}

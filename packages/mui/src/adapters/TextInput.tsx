@@ -14,6 +14,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
     "aria-describedby": ariaDescribedBy,
     "aria-labelledby": ariaLabelledBy,
     name,
+    inputRef,
     label,
     required,
     error,
@@ -35,6 +36,7 @@ export function createMuiTextInputAdapter(options?: MuiAdapterOptions): Componen
       <TextField
         {...textFieldSlotProps}
         id={id}
+        inputRef={inputRef}
         className={className}
         name={name}
         label={label}

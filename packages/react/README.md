@@ -91,6 +91,11 @@ single-slot or batch translation with stale/manual status handling. The MUI pack
 `TranslationWorkspace` surface. For large forms, set `fieldEditorMode="single"` and use `activeFieldId` or the hook's
 `setActiveFieldId` to keep one field editor open at a time. Set `submissionSettingsOptions={{ enabled: true }}` to expose
 schema-driven pre-submit confirmation controls in the builder.
+Use `sectionVisibility` to hide individual builder sections, such as `basicSettings` and `completionMessage`, while
+keeping `questions` visible. Set `autoFocusActiveField` to focus the selected question's title input whenever
+`activeFieldId` changes; it does not focus an input during the initial mount.
+Pass `activeFieldId={undefined}` explicitly when the common settings view is selected; omit the prop to retain the
+single-mode default selection.
 
 `useTranslationWorkspace` validates added locales against `policy.allowedLocales` and `policy.maxLocales` and returns
 a structured `{ success, error }` result from `addLocale`, `translateAll`, and `translateSlot`. Errors use the exported

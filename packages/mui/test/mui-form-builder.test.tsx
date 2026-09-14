@@ -138,6 +138,55 @@ describe("MuiFormBuilder", () => {
     expect(toolbar === null ? "" : getComputedStyle(toolbar).display).toBe("flex");
   });
 
+  it("focuses the active MUI question title when the active field changes", () => {
+    const controlledSchema: FormSchema = {
+      ...schema,
+      fields: [
+        { id: "first", type: "text", title: "First", required: false },
+        { id: "second", type: "text", title: "Second", required: false }
+      ]
+    };
+    const { rerender } = render(
+      <MuiFormBuilder
+        schema={controlledSchema}
+        onChange={() => undefined}
+        fieldEditorMode="single"
+        activeFieldId="first"
+        autoFocusActiveField
+        features={{ pages: false, localization: false, conditions: false }}
+      />
+    );
+
+    expect(document.activeElement).not.toBe(screen.getByDisplayValue("First"));
+
+    rerender(
+      <MuiFormBuilder
+        schema={controlledSchema}
+        onChange={() => undefined}
+        fieldEditorMode="single"
+        activeFieldId="second"
+        autoFocusActiveField
+        features={{ pages: false, localization: false, conditions: false }}
+      />
+    );
+
+    expect(document.activeElement).toBe(screen.getByDisplayValue("Second"));
+
+    rerender(
+      <MuiFormBuilder
+        schema={controlledSchema}
+        onChange={() => undefined}
+        fieldEditorMode="single"
+        activeFieldId={undefined}
+        sectionVisibility={{ basicSettings: true }}
+        features={{ pages: false, localization: false, conditions: false }}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "Form title" })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Second")).not.toBeInTheDocument();
+  });
+
   it("supports type changes, option ordering and deletion, translation editing, translation batches, and adding fields", async () => {
     const user = userEvent.setup();
     const translationAdapter: AsyncTranslationAdapter = {
@@ -187,6 +236,7 @@ describe("MuiFormBuilder", () => {
   it("forwards native input attributes and supplies action-aware icon tooltips", async () => {
     const user = userEvent.setup();
     const TextInput = createMuiTextInputAdapter({ size: "small" });
+    let inputRef: HTMLInputElement | null = null;
     const Checkbox = createMuiCheckboxAdapter({ size: "small" });
     const IconButton = createMuiIconButtonAdapter({
       size: "small",
@@ -206,6 +256,9 @@ describe("MuiFormBuilder", () => {
           helperText="Input error"
           aria-describedby="native-input-error"
           aria-labelledby="explicit-label"
+          inputRef={(element) => {
+            inputRef = element;
+          }}
           onChange={() => undefined}
         />
         <Checkbox
@@ -224,6 +277,7 @@ describe("MuiFormBuilder", () => {
     );
 
     const input = screen.getByRole("textbox", { name: "Explicit label" });
+    expect(inputRef).toBe(input);
     expect(input).toHaveAttribute("id", "native-input");
     expect(input).toHaveAttribute("name", "nativeName");
     expect(input).toBeRequired();

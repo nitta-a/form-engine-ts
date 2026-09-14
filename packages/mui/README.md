@@ -22,6 +22,9 @@ import { MuiChoiceGroupSlot } from "@form-engine-ts/mui";
 show/hide actions. `TranslationWorkspace` provides MUI tabs, progress, status chips, manual translation editing, and
 single-slot or batch translation through the React translation workspace hook. Enable the builder's submission settings
 section with `submissionSettingsOptions={{ enabled: true }}` and use `layoutOptions.sectionOrder` to place it.
+`MuiFormBuilder` also accepts the React builder's `sectionVisibility` and `autoFocusActiveField` props. The latter
+focuses the active question title only after `activeFieldId` changes, not during the initial mount.
+Pass `activeFieldId={undefined}` explicitly for the common settings view; omit it to retain the single-mode default.
 
 `TranslationComparisonWorkspace` provides a responsive source/translation view: two columns at the `md` breakpoint
 and a stacked layout on smaller screens. Its source panel is read-only, while the target panel exposes status badges,
@@ -226,6 +229,8 @@ Labels use `builder.content.*` translation keys, including `builder.content.poin
 
 日本語: `MuiFormBuilder`単体で投票・クイズの設定と問題を編集できます。
 `contentModeOptions={{ showSelector: true }}`で種別切替を表示し、`i18n={{ locale: "ja" }}`で日本語になります。
+React版と同じく、`sectionVisibility`で各セクションを個別に表示・非表示にでき、
+`autoFocusActiveField`は初回マウントではフォーカスせず、`activeFieldId`変更時だけ質問文へフォーカスします。
 種別切替では質問や各種設定を保持します。個別slotの指定が自動UIより優先されます。
 投票・クイズでは質問形式の制約、追加時のradio既定値、保存可否に使える検証結果も自動適用されます。
 `contentModeOptions.controls`で各設定を編集可・読み取り専用・非表示にでき、

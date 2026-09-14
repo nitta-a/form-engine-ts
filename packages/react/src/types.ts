@@ -99,6 +99,7 @@ export interface InputComponentProps extends ComponentBaseProps {
 }
 
 export interface BuilderTextInputProps extends InputComponentProps {
+  readonly inputRef?: (element: HTMLInputElement | null) => void;
   readonly inputMode?: "text" | "numeric";
   readonly type?: "text" | "number";
   readonly min?: number;
@@ -270,6 +271,7 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
   readonly field: FormField;
   readonly index: number;
   readonly currentLocale: string;
+  readonly titleInputRef?: (element: HTMLInputElement | null) => void;
   readonly policy?: FormPolicy;
   readonly features?: {
     readonly pages?: boolean;
@@ -557,6 +559,8 @@ export type FormBuilderSectionName =
   | "addQuestion"
   | "localization"
   | "submissionSettings";
+
+export type FormBuilderSectionVisibility = Partial<Record<FormBuilderSectionName, boolean>>;
 
 export interface FormBuilderSubmissionSettingsOptions {
   readonly enabled: boolean;

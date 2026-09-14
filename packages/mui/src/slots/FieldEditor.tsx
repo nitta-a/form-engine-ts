@@ -63,6 +63,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     field,
     index,
     currentLocale,
+    titleInputRef,
     policy,
     features,
     readOnly,
@@ -159,6 +160,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               <TextInput
                 id={`mui-field-${field.id}-title`}
                 name={`fields.${field.id}.title`}
+                {...(titleInputRef === undefined ? {} : { inputRef: titleInputRef })}
                 label={translate("builder.questionTitle")}
                 value={field.title}
                 required
