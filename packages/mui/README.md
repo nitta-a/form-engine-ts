@@ -355,6 +355,8 @@ export function MultiPageSurveyEditor() {
 
 The existing preview application's **MUI Mode** uses this slot automatically when pages are enabled. Use the page
 manager to choose a question for a new page, or a question's page selector to move it to another existing page.
+Pass `pageEditorMode="single"` through `MuiFormBuilder` to show a page picker and edit one page at a time; `"all"`
+keeps the complete page list visible.
 
 The editor delegates mutations to React's `BuilderSlotActions`; it does not maintain a second schema model.
 Existing headless rules still apply: pages cannot be created empty; splitting requires a source page with at least two

@@ -66,7 +66,8 @@ See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 Optional `pages` turn a schema into a validated wizard with conditional page skipping and accessible progress. The React
 renderer can debounce versioned drafts to `localStorage` with `autoSaveKey`. Authoring-time translations are stored in the
 schema, populated in batches through `populateSchemaTranslations`, and applied synchronously by `resolveLocalizedSchema`.
-The builder exposes page membership and locale override controls. Core also provides `calculateCrossTabulation` for
+The builder exposes page membership and locale override controls. Set `pageEditorMode="single"` to edit one selected page
+at a time; the default `"all"` mode remains available. Core also provides `calculateCrossTabulation` for
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
 Quiz authors can enable or disable the passing-score threshold; when it is disabled, respondent results omit total score
@@ -382,6 +383,8 @@ pnpm test
 ウィザードになります。React Rendererは`autoSaveKey`によりversion付き下書きを500ms debounceで`localStorage`へ
 保存・復元できます。編集時翻訳はスキーマへ保持され、`populateSchemaTranslations`で一括生成し、
 `resolveLocalizedSchema`でAPI通信なしに同期解決します。Builderはページ所属と各言語の手動訳文を編集できます。
+大きな複数ページフォームでは`pageEditorMode="single"`を指定するとページを選択して1ページずつ編集でき、
+新しい質問は選択中のページへ追加されます。既定の`"all"`表示も利用でき、各ページに最低1問を残す制約は維持されます。
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
 クイズでは合格ラインの設定有無を切り替えられ、未設定の場合は回答結果に合計点と合否を表示しません。

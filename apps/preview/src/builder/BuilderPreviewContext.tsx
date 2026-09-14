@@ -4,6 +4,7 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 
 export type TranslationOverwrite = "missing-only" | "all";
+export type PageEditorMode = "all" | "single";
 
 export interface BuilderPreviewContextValue {
   readonly translationOverwrite: TranslationOverwrite;
@@ -14,12 +15,14 @@ export interface BuilderPreviewContextValue {
   readonly localizationEnabled: boolean;
   readonly conditionsEnabled: boolean;
   readonly useCustomBuilderUi: boolean;
+  readonly pageEditorMode: PageEditorMode;
   readonly setTranslationOverwrite: (value: TranslationOverwrite) => void;
   readonly setBuilderReadOnly: (value: boolean) => void;
   readonly setPagesEnabled: (value: boolean) => void;
   readonly setLocalizationEnabled: (value: boolean) => void;
   readonly setConditionsEnabled: (value: boolean) => void;
   readonly setUseCustomBuilderUi: (value: boolean) => void;
+  readonly setPageEditorMode: (value: PageEditorMode) => void;
   readonly setTranslationReport: (message: string) => void;
   readonly setBuilderActionStatus: (message: string) => void;
   readonly runTranslationPolicy: () => Promise<void>;
@@ -37,6 +40,7 @@ export function BuilderPreviewProvider({ children }: { readonly children: ReactN
   const [localizationEnabled, setLocalizationEnabled] = useState(true);
   const [conditionsEnabled, setConditionsEnabled] = useState(true);
   const [useCustomBuilderUi, setUseCustomBuilderUi] = useState(false);
+  const [pageEditorMode, setPageEditorMode] = useState<PageEditorMode>("all");
 
   const runTranslationPolicy = useCallback(async () => {
     if (!workspaceReady) return;
@@ -64,12 +68,14 @@ export function BuilderPreviewProvider({ children }: { readonly children: ReactN
       localizationEnabled,
       conditionsEnabled,
       useCustomBuilderUi,
+      pageEditorMode,
       setTranslationOverwrite,
       setBuilderReadOnly,
       setPagesEnabled,
       setLocalizationEnabled,
       setConditionsEnabled,
       setUseCustomBuilderUi,
+      setPageEditorMode,
       setTranslationReport,
       setBuilderActionStatus,
       runTranslationPolicy
@@ -83,7 +89,8 @@ export function BuilderPreviewProvider({ children }: { readonly children: ReactN
       runTranslationPolicy,
       translationOverwrite,
       translationReport,
-      useCustomBuilderUi
+      useCustomBuilderUi,
+      pageEditorMode
     ]
   );
 

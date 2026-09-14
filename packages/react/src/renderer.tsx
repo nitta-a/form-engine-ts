@@ -974,6 +974,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const prefix = useId().replace(/:/g, "");
   const formRef = useRef<HTMLFormElement>(null);
+  const pageHeaderRef = useRef<HTMLElement>(null);
+  const pageNavigationPending = useRef(false);
+  const pageVisibilityInitialized = useRef(false);
   const loadedDraftKey = useRef<string | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -1088,10 +1091,16 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
 
   useEffect(() => {
     if (pages === undefined || visiblePageIndexes.length === 0) {
+      pageNavigationPending.current = false;
       setCurrentPageIndex(0);
+      pageVisibilityInitialized.current = true;
       return;
     }
-    if (!visiblePageIndexes.includes(currentPageIndex)) setCurrentPageIndex(visiblePageIndexes[0] ?? 0);
+    if (!visiblePageIndexes.includes(currentPageIndex)) {
+      if (pageVisibilityInitialized.current) pageNavigationPending.current = true;
+      setCurrentPageIndex(visiblePageIndexes[0] ?? 0);
+    }
+    pageVisibilityInitialized.current = true;
   }, [currentPageIndex, pages, visiblePageIndexes]);
 
   useEffect(() => {
@@ -1106,6 +1115,17 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       setFocusFieldId(null);
     }
   }, [focusFieldId]);
+
+  useEffect(() => {
+    if (!pageNavigationPending.current) return;
+    if (activePage === undefined) {
+      pageNavigationPending.current = false;
+      return;
+    }
+    pageNavigationPending.current = false;
+    pageHeaderRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    pageHeaderRef.current?.focus();
+  }, [activePage]);
 
   useEffect(() => {
     if (!isReplaceMode || form.submitStatus !== "success") return;
@@ -1178,6 +1198,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     if (fieldId !== undefined) setFocusFieldId(fieldId);
   };
 
+  const goToPage = (pageIndex: number) => {
+    pageNavigationPending.current = true;
+    setCurrentPageIndex(pageIndex);
+  };
+
   const handleNext = () => {
     if (interactionLocked) return;
     const result = form.validatePage(currentPageIndex);
@@ -1186,7 +1211,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       return;
     }
     const nextPageIndex = visiblePageIndexes[activeVisibleIndex + 1];
-    if (nextPageIndex !== undefined) setCurrentPageIndex(nextPageIndex);
+    if (nextPageIndex !== undefined) goToPage(nextPageIndex);
   };
 
   const runSubmissionGuards = async (
@@ -1657,24 +1682,30 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
           </header>
         )}
-        {activePage === undefined
-          ? null
-          : (slots.renderPageHeader?.({
+        {activePage === undefined ? null : (
+          <section
+            ref={pageHeaderRef}
+            className={joinClassNames("fe-page-header", classNames?.pageHeader)}
+            tabIndex={-1}
+            aria-label={
+              activePage.title ??
+              form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })
+            }
+          >
+            {slots.renderPageHeader?.({
               page: activePage,
               pageIndex: activeVisibleIndex,
               totalPages: visiblePageIndexes.length
             }) ?? (
-              <div className={joinClassNames("fe-page-header", classNames?.pageHeader)}>
-                {activePage.title === undefined ? null : (
-                  <h2 className={joinClassNames("fe-page-title", classNames?.pageTitle)}>{activePage.title}</h2>
-                )}
+              <>
+                {activePage.title === undefined ? null : <h2 className={classNames?.pageTitle}>{activePage.title}</h2>}
                 {activePage.description === undefined ? null : (
-                  <p className={joinClassNames("fe-page-description", classNames?.pageDescription)}>
-                    {activePage.description}
-                  </p>
+                  <p className={classNames?.pageDescription}>{activePage.description}</p>
                 )}
-              </div>
-            ))}
+              </>
+            )}
+          </section>
+        )}
         {(() => {
           const fieldChildren = form.schema.fields
             .filter((field) => form.visibility[field.id] === true && (fieldIds === undefined || fieldIds.has(field.id)))
@@ -1765,7 +1796,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               canPrev,
               canNext,
               onPrev: () => {
-                if (!interactionLocked) setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
+                if (!interactionLocked) goToPage(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
               },
               onNext: handleNext
             }) ?? (
@@ -1775,7 +1806,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                     className={joinClassNames("btn-prev", classNames?.previousButton)}
                     type="button"
                     disabled={interactionLocked}
-                    onClick={() => setCurrentPageIndex(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
+                    onClick={() => goToPage(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
                   >
                     {form.translate("form.back")}
                   </button>

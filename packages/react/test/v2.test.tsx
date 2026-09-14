@@ -478,7 +478,7 @@ describe("FormRenderer v2 lifecycle and slots", () => {
     );
     expect(screen.getByTestId("page-header-slot")).toHaveTextContent("main:1/1");
     expect(screen.queryByText("Default page")).not.toBeInTheDocument();
-    expect(document.querySelector(".fe-page-header")).toBeNull();
+    expect(document.querySelector(".fe-page-header")).toHaveAttribute("tabindex", "-1");
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByTestId("submit-error-slot")).toHaveTextContent("network unavailable");
     expect(screen.queryByText("fallback.error")).not.toBeInTheDocument();

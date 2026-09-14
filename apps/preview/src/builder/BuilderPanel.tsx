@@ -300,12 +300,14 @@ export function BuilderPanel() {
     localizationEnabled,
     conditionsEnabled,
     useCustomBuilderUi,
+    pageEditorMode,
     setTranslationOverwrite,
     setBuilderReadOnly,
     setPagesEnabled,
     setLocalizationEnabled,
     setConditionsEnabled,
     setUseCustomBuilderUi,
+    setPageEditorMode,
     setTranslationReport,
     setBuilderActionStatus,
     runTranslationPolicy
@@ -369,6 +371,16 @@ export function BuilderPanel() {
             Conditions feature
           </label>
           <label>
+            Page editor
+            <select
+              value={pageEditorMode}
+              onChange={(event) => setPageEditorMode(event.currentTarget.value as "all" | "single")}
+            >
+              <option value="single">One page at a time</option>
+              <option value="all">All pages</option>
+            </select>
+          </label>
+          <label>
             <input
               type="checkbox"
               checked={useCustomBuilderUi}
@@ -392,6 +404,7 @@ export function BuilderPanel() {
           defaultFieldType="textarea"
           readOnly={builderReadOnly}
           features={{ pages: pagesEnabled, localization: localizationEnabled, conditions: conditionsEnabled }}
+          pageEditorMode={pageEditorMode}
           {...(useCustomBuilderUi
             ? { components: previewBuilderComponents, slots: { translationActions: PreviewAiTranslationActions } }
             : {})}

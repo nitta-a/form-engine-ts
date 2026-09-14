@@ -319,6 +319,9 @@ export interface BuilderOptionEditorSlotProps extends BuilderSlotBaseProps {
 
 export interface BuilderPagesSlotProps extends BuilderSlotBaseProps {
   readonly currentLocale: string;
+  readonly pageEditorMode?: "all" | "single";
+  readonly selectedPageId?: string;
+  readonly onSelectedPageChange?: (pageId: string) => void;
   readonly features?: {
     readonly pages?: boolean;
     readonly localization?: boolean;

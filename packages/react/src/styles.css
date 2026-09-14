@@ -48,6 +48,10 @@
 .fe-page-description {
   margin: 0;
 }
+.fe-page-header:focus {
+  outline: 3px solid #98aaf8;
+  outline-offset: 0.25rem;
+}
 .form-draft-badge {
   background: #ecfdf3;
   border-radius: 999px;
@@ -290,6 +294,25 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+.form-engine-builder__page-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.form-engine-builder__page-picker button[aria-selected="true"] {
+  background: #eef4ff;
+  border-color: #3056d3;
+  color: #173ea5;
+}
+@media (max-width: 600px) {
+  .form-engine-builder__page-picker {
+    flex-direction: column;
+  }
+  .form-engine-builder__page-picker button {
+    text-align: left;
+    width: 100%;
+  }
 }
 .form-engine-builder__question {
   border: 1px solid #d8dee9;

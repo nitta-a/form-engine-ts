@@ -9,7 +9,7 @@ const muiPreviewTheme = createTheme();
 
 export function MuiPanel() {
   const { schema, locale, changeSchema } = usePreviewWorkspace();
-  const { builderReadOnly, pagesEnabled, localizationEnabled, conditionsEnabled } = useBuilderPreview();
+  const { builderReadOnly, pagesEnabled, localizationEnabled, conditionsEnabled, pageEditorMode } = useBuilderPreview();
   return (
     <section className="workspace-card">
       <h2>MUI Mode</h2>
@@ -24,6 +24,7 @@ export function MuiPanel() {
           defaultFieldType="textarea"
           readOnly={builderReadOnly}
           features={{ pages: pagesEnabled, localization: localizationEnabled, conditions: conditionsEnabled }}
+          pageEditorMode={pageEditorMode}
           muiOptions={{
             size: "small",
             dense: true,

@@ -65,7 +65,7 @@ describe("MUI pages editor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Enable multi-step pages" }));
     expect(state().pages?.[0]?.questionIds).toEqual(["name", "age", "comment"]);
     await choose(screen.getByRole("combobox", { name: "Question to move to the new page" }), "Age");
-    await userEvent.click(screen.getByRole("button", { name: "Add page" }));
+    await userEvent.click(screen.getByRole("button", { name: "Split a question into a new page" }));
     expect(state().pages?.map((page) => page.questionIds)).toEqual([["name", "comment"], ["age"]]);
     const titles = screen.getAllByRole("textbox", { name: "Page title" });
     fireEvent.change(elementAt(titles, 0), { target: { value: "First" } });
@@ -75,6 +75,30 @@ describe("MUI pages editor", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete First" }));
     expect(state().pages).toBeUndefined();
     expect(state().fields).toEqual(schema.fields);
+  });
+  it("shows one selected page in single page editor mode", async () => {
+    render(<Harness pageEditorMode="single" />);
+    expect(screen.getByText(/1\. Basic \(2\)/)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Page title" })).toHaveValue("Basic");
+    await userEvent.click(screen.getByRole("button", { name: /2\. Feedback \(1\)/ }));
+    expect(screen.getByRole("textbox", { name: "Page title" })).toHaveValue("Feedback");
+  });
+  it("explains why page splitting is unavailable when every page has one question", () => {
+    render(
+      <Harness
+        initial={{
+          ...schema,
+          pages: [
+            { id: "basic", title: "Basic", questionIds: ["name"] },
+            { id: "age", title: "Age", questionIds: ["age"] },
+            { id: "feedback", title: "Feedback", questionIds: ["comment"] }
+          ]
+        }}
+      />
+    );
+    expect(
+      screen.getByText("Each page must keep at least one question. Add another question first.")
+    ).toBeInTheDocument();
   });
   it("edits source text without remounting and reorders and assigns through headless actions", async () => {
     render(<Harness muiOptions={{ dense: true, size: "small" }} />);
@@ -151,7 +175,7 @@ describe("MUI pages editor", () => {
         initial={{ ...schema, fields: schema.fields.slice(0, 1), pages: [{ id: "only", questionIds: ["name"] }] }}
       />
     );
-    expect(screen.getByRole("button", { name: "Add page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Split a question into a new page" })).toBeDisabled();
     expect(screen.queryByRole("combobox", { name: "Page display condition" })).toBeNull();
     rerender(<Harness features={{ pages: false }} />);
     expect(screen.queryByRole("heading", { name: "Page manager" })).toBeNull();

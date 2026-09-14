@@ -23,4 +23,20 @@ describe("FormEngineI18nProvider", () => {
     expect(schema.defaultLocale).toBe("en");
     expect(schema.supportedLocales).toEqual(["zh-Hans", "ko"]);
   });
+
+  it("localizes page editor guidance in Japanese", () => {
+    const pagedSchema: FormSchema = {
+      ...schema,
+      pages: [{ id: "only", title: "Only", questionIds: ["name"] }]
+    };
+    render(
+      <FormEngineI18nProvider locale="ja">
+        <FormBuilder schema={pagedSchema} onChange={() => undefined} />
+      </FormEngineI18nProvider>
+    );
+
+    expect(screen.getByLabelText("新しいページへ移動する質問")).toBeInTheDocument();
+    expect(screen.getByText("各ページには最低1問が必要です。先に質問を追加してください。")).toBeInTheDocument();
+    expect(screen.getByText("最後のページを削除するとページ分割を解除し、質問は残ります。")).toBeInTheDocument();
+  });
 });

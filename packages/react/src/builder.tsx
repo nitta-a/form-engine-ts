@@ -636,10 +636,15 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.pages": "Page manager",
   "builder.enablePages": "Enable multi-step pages",
   "builder.addPage": "Add page",
+  "builder.splitPage": "Split a question into a new page",
   "builder.newPage": "New page",
   "builder.pageTitle": "Page title",
   "builder.pageDescription": "Page description",
   "builder.pageQuestion": "Question to move to the new page",
+  "builder.pageQuestionToMove": "Question to move to the new page",
+  "builder.noPageQuestions": "Each page must keep at least one question. Add another question first.",
+  "builder.pageDeleteMoves": "Deleting this page moves its questions to the adjacent page.",
+  "builder.pageDeleteLast": "Deleting the last page removes page splitting and keeps all questions.",
   "builder.questionPage": "Page",
   "builder.pageCondition": "Page display condition",
   "builder.unassigned": "Unassigned",
@@ -872,6 +877,7 @@ export interface FormBuilderProps {
   readonly disableDefaultStyles?: boolean;
   readonly unstyled?: boolean;
   readonly fieldEditorMode?: "all" | "single";
+  readonly pageEditorMode?: "all" | "single";
   readonly activeFieldId?: string | undefined;
   readonly autoFocusActiveField?: boolean;
   readonly defaultActiveFieldId?: string;
@@ -907,6 +913,7 @@ export function FormBuilder(props: FormBuilderProps) {
     disableDefaultStyles = false,
     unstyled = false,
     fieldEditorMode = "all",
+    pageEditorMode = "all",
     activeFieldId,
     autoFocusActiveField = false,
     defaultActiveFieldId,
@@ -986,23 +993,40 @@ export function FormBuilder(props: FormBuilderProps) {
   }, [autoFocusActiveField, resolvedActiveFieldId]);
   const isSectionVisible = (name: FormBuilderSectionName): boolean => sectionVisibility?.[name] !== false;
   const [newPageQuestionId, setNewPageQuestionId] = useState("");
+  const [selectedPageId, setSelectedPageId] = useState<string | undefined>(schema.pages?.[0]?.id);
+  const [selectLastPageAfterAdd, setSelectLastPageAfterAdd] = useState(false);
   const [newLocale, setNewLocale] = useState("");
   const [editingLocale, setEditingLocale] = useState("");
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
   const [translationReport, setTranslationReport] = useState<TranslationReport>();
+  const builderMessages = locale.startsWith("ja")
+    ? { ...EN_MESSAGES, ...BUILDER_DEFAULTS, ...JA_MESSAGES }
+    : { ...EN_MESSAGES, ...BUILDER_DEFAULTS };
   const translate = (key: string, params: Record<string, unknown> = {}) =>
     resolveTranslation(
       key,
       BUILDER_TRANSLATION_ALIASES[key] === undefined ? [] : [BUILDER_TRANSLATION_ALIASES[key]],
       resolvedTranslator,
-      key.startsWith("builder.content.") ? (locale.startsWith("ja") ? JA_MESSAGES : EN_MESSAGES) : BUILDER_DEFAULTS,
+      key.startsWith("builder.content.") ? (locale.startsWith("ja") ? JA_MESSAGES : EN_MESSAGES) : builderMessages,
       params,
       locale
     );
   const pagesEnabled = features?.pages ?? true;
   const localizationEnabled = features?.localization ?? true;
   const conditionsEnabled = features?.conditions ?? true;
+  const pagesForEditor =
+    features?.pages !== false && pageEditorMode === "single" && selectedPageId !== undefined
+      ? (schema.pages?.filter((page) => page.id === selectedPageId) ?? [])
+      : (schema.pages ?? []);
+  const fieldsForEditor =
+    features?.pages !== false && pageEditorMode === "single" && selectedPageId !== undefined
+      ? schema.fields.filter(
+          (field) =>
+            schema.pages?.find((page) => page.id === selectedPageId)?.questionIds.includes(field.id) ||
+            !schema.pages?.some((page) => page.questionIds.includes(field.id))
+        )
+      : schema.fields;
   const executeAction = (run: () => BuilderActionResult, context: BuilderActionContext): BuilderActionResult => {
     if (readOnly) return { success: true };
     const result = run();
@@ -1038,9 +1062,26 @@ export function FormBuilder(props: FormBuilderProps) {
     }
   };
 
+  useEffect(() => {
+    if (schema.pages === undefined || schema.pages.length === 0) {
+      setSelectedPageId(undefined);
+      return;
+    }
+    if (selectLastPageAfterAdd) {
+      setSelectedPageId(schema.pages.at(-1)?.id);
+      setSelectLastPageAfterAdd(false);
+      return;
+    }
+    if (selectedPageId === undefined || !schema.pages.some((page) => page.id === selectedPageId)) {
+      setSelectedPageId(schema.pages[0]?.id);
+    }
+  }, [schema.pages, selectLastPageAfterAdd, selectedPageId]);
+
   const addField = () => {
     if (initialFieldType === null) return;
-    executeAction(() => headless.addField(initialFieldType), { action: "addField" });
+    executeAction(() => headless.addField(initialFieldType, pageEditorMode === "single" ? selectedPageId : undefined), {
+      action: "addField"
+    });
   };
 
   const enablePages = () => {
@@ -1058,18 +1099,33 @@ export function FormBuilder(props: FormBuilderProps) {
     }
     const questionId = movablePageQuestions.includes(newPageQuestionId) ? newPageQuestionId : movablePageQuestions[0];
     if (questionId === undefined) return;
-    executeAction(() => headless.addPage(questionId), {
+    const result = executeAction(() => headless.addPage(questionId), {
       action: "addPage",
       targetId: questionId,
       params: { questionId }
     });
+    if (result.success && !readOnly && pageEditorMode === "single") setSelectLastPageAfterAdd(true);
     setNewPageQuestionId("");
+  };
+
+  const removePageById = (pageId: string): BuilderActionResult => {
+    const pageIndex = schema.pages?.findIndex((page) => page.id === pageId) ?? -1;
+    if (pageIndex < 0) {
+      return { success: false, error: { type: "node_not_found", kind: "page", id: pageId } };
+    }
+    const destinationPageId =
+      schema.pages === undefined || schema.pages.length === 1
+        ? undefined
+        : schema.pages[pageIndex === 0 ? 1 : pageIndex - 1]?.id;
+    const result = executeAction(() => headless.removePage(pageId), { action: "removePage", targetId: pageId });
+    if (result.success && !readOnly && pageEditorMode === "single") setSelectedPageId(destinationPageId);
+    return result;
   };
 
   const removePage = (pageIndex: number) => {
     const page = schema.pages?.[pageIndex];
-    if (page !== undefined)
-      executeAction(() => headless.removePage(page.id), { action: "removePage", targetId: page.id });
+    if (page === undefined) return;
+    removePageById(page.id);
   };
 
   const movePage = (pageIndex: number, offset: -1 | 1) => {
@@ -1271,15 +1327,17 @@ export function FormBuilder(props: FormBuilderProps) {
         targetId: optionId,
         params: { fieldId, targetIndex }
       }),
-    addPage: (questionId) =>
-      executeAction(() => headless.addPage(questionId), {
+    addPage: (questionId) => {
+      const result = executeAction(() => headless.addPage(questionId), {
         action: "addPage",
         ...(questionId === undefined ? {} : { targetId: questionId, params: { questionId } })
-      }),
+      });
+      if (result.success && !readOnly && pageEditorMode === "single") setSelectLastPageAfterAdd(true);
+      return result;
+    },
     updatePage: (pageId, updater) =>
       executeAction(() => headless.updatePage(pageId, updater), { action: "updatePage", targetId: pageId }),
-    removePage: (pageId) =>
-      executeAction(() => headless.removePage(pageId), { action: "removePage", targetId: pageId }),
+    removePage: (pageId) => removePageById(pageId),
     movePage: (pageId, targetIndex) =>
       executeAction(() => headless.movePage(pageId, targetIndex), {
         action: "movePage",
@@ -1459,7 +1517,28 @@ export function FormBuilder(props: FormBuilderProps) {
                       <Button onClick={enablePages}>{translate("builder.enablePages")}</Button>
                     ) : (
                       <>
-                        {schema.pages.map((page, pageIndex) => {
+                        {pageEditorMode === "single" ? (
+                          <div
+                            className={builderClass("form-engine-builder__page-picker")}
+                            role="tablist"
+                            aria-label={translate("builder.pages")}
+                          >
+                            {schema.pages.map((page, pageIndex) => (
+                              <button
+                                key={page.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={page.id === selectedPageId}
+                                onClick={() => setSelectedPageId(page.id)}
+                              >
+                                {pageIndex + 1}. {page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`} (
+                                {page.questionIds.length})
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {pagesForEditor.map((page) => {
+                          const pageIndex = schema.pages?.findIndex((candidate) => candidate.id === page.id) ?? 0;
                           return (
                             <Fieldset
                               className={builderClass("form-engine-builder__page")}
@@ -1505,6 +1584,11 @@ export function FormBuilder(props: FormBuilderProps) {
                                   />
                                 )}
                               </div>
+                              <p className={builderClass("form-engine-builder__page-help")}>
+                                {schema.pages?.length === 1
+                                  ? translate("builder.pageDeleteLast")
+                                  : translate("builder.pageDeleteMoves")}
+                              </p>
                               <div className={builderClass("form-engine-builder__grid")}>
                                 <div className={builderClass("form-engine-builder__field")}>
                                   <TextInput
@@ -1614,7 +1698,7 @@ export function FormBuilder(props: FormBuilderProps) {
                           <div className={builderClass("form-engine-builder__field")}>
                             <Select
                               id="builder-page-question"
-                              label={translate("builder.pageQuestion")}
+                              label={translate("builder.pageQuestionToMove")}
                               value={newPageQuestionId}
                               disabled={movablePageQuestions.length === 0}
                               onChange={setNewPageQuestionId}
@@ -1626,8 +1710,11 @@ export function FormBuilder(props: FormBuilderProps) {
                               ]}
                             />
                           </div>
+                          {movablePageQuestions.length === 0 ? (
+                            <p role="status">{translate("builder.noPageQuestions")}</p>
+                          ) : null}
                           <Button disabled={movablePageQuestions.length === 0} onClick={addPage}>
-                            {translate("builder.addPage")}
+                            {translate("builder.splitPage")}
                           </Button>
                         </div>
                       </>
@@ -1638,6 +1725,9 @@ export function FormBuilder(props: FormBuilderProps) {
                     schema={schema}
                     translate={translate}
                     currentLocale={editingLocale}
+                    pageEditorMode={pageEditorMode}
+                    {...(selectedPageId === undefined ? {} : { selectedPageId })}
+                    onSelectedPageChange={setSelectedPageId}
                     {...(features === undefined ? {} : { features })}
                     readOnly={readOnly}
                     actions={actions}
@@ -1793,7 +1883,8 @@ export function FormBuilder(props: FormBuilderProps) {
 
             <BuilderSectionGroup name="questions" visible={isSectionVisible("questions")}>
               <div className={builderClass("form-engine-builder__list")}>
-                {schema.fields.map((field, index) => {
+                {fieldsForEditor.map((field) => {
+                  const index = schema.fields.findIndex((candidate) => candidate.id === field.id);
                   const controls = resolveFieldEditorControls(fieldEditorControls);
                   const editorState = headless.getFieldEditorProps?.(field.id) ?? {
                     isActive: true,

@@ -86,6 +86,10 @@ on the next mount:
 membership controls and localization editors; pass an `AsyncTranslationAdapter` as `translationAdapter` to enable its
 batch-translation action.
 
+For large multi-page forms, set `pageEditorMode="single"` to show a page picker and edit one page's questions at a time;
+the default `"all"` mode keeps the existing full page list. New questions are assigned to the selected page in single
+mode, while the existing rule that every page keeps at least one question remains enforced.
+
 `useTranslationWorkspace` exposes locale management, translation slots, completion summaries, manual editing, and
 single-slot or batch translation with stale/manual status handling. The MUI package exports a ready-made
 `TranslationWorkspace` surface. For large forms, set `fieldEditorMode="single"` and use `activeFieldId` or the hook's

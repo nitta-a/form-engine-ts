@@ -560,6 +560,9 @@ interface BuilderOptionEditorSlotProps extends BuilderSlotBaseProps {
 }
 interface BuilderPagesSlotProps extends BuilderSlotBaseProps {
     readonly currentLocale: string;
+    readonly pageEditorMode?: "all" | "single";
+    readonly selectedPageId?: string;
+    readonly onSelectedPageChange?: (pageId: string) => void;
     readonly features?: {
         readonly pages?: boolean;
         readonly localization?: boolean;
@@ -1219,6 +1222,7 @@ interface FormBuilderProps {
     readonly disableDefaultStyles?: boolean;
     readonly unstyled?: boolean;
     readonly fieldEditorMode?: "all" | "single";
+    readonly pageEditorMode?: "all" | "single";
     readonly activeFieldId?: string | undefined;
     readonly autoFocusActiveField?: boolean;
     readonly defaultActiveFieldId?: string;

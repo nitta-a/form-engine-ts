@@ -226,9 +226,11 @@ describe("React form engine", () => {
     await user.type(screen.getByLabelText(/^First/), "kept");
     await user.click(screen.getByRole("button", { name: "en:form.next" }));
     expect(screen.getByLabelText(/^Second/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Two" })).toHaveFocus();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
     await user.click(screen.getByRole("button", { name: "en:form.back" }));
     expect(screen.getByLabelText(/^First/)).toHaveValue("kept");
+    expect(screen.getByRole("region", { name: "One" })).toHaveFocus();
   });
 
   it("resolves static localized schema text through the provider", () => {
@@ -353,7 +355,7 @@ describe("React form engine", () => {
     render(<BuilderHarness />);
     await user.click(screen.getByRole("button", { name: "Enable multi-step pages" }));
     await user.selectOptions(screen.getByLabelText("Question to move to the new page"), "second");
-    await user.click(screen.getByRole("button", { name: "Add page" }));
+    await user.click(screen.getByRole("button", { name: "Split a question into a new page" }));
     expect(screen.getByTestId("page-builder-schema")).toHaveTextContent('"questionIds":["second"]');
     await user.selectOptions(screen.getByLabelText("Edit locale"), "ja");
     const localizedTitles = screen.getAllByLabelText("質問文 / Question Title");
@@ -364,6 +366,67 @@ describe("React form engine", () => {
     await user.click(screen.getByRole("button", { name: "Translate all text" }));
     await waitFor(() => expect(translationAdapter.translateBatch).toHaveBeenCalled());
     expect(screen.getByTestId("page-builder-schema")).toHaveTextContent("翻訳タイトル");
+  });
+
+  it("edits one selected page at a time and adds new questions to it", async () => {
+    const user = userEvent.setup();
+    function PageBuilderHarness() {
+      const [current, setCurrent] = useState<FormSchema>({
+        id: "page-editor",
+        version: 1,
+        title: "Page editor",
+        fields: [
+          { id: "first", type: "text", title: "First", required: false },
+          { id: "second", type: "text", title: "Second", required: false }
+        ],
+        pages: [
+          { id: "one", title: "One", questionIds: ["first"] },
+          { id: "two", title: "Two", questionIds: ["second"] }
+        ]
+      });
+      return (
+        <>
+          <FormBuilder schema={current} onChange={setCurrent} pageEditorMode="single" />
+          <output data-testid="single-page-schema">{JSON.stringify(current)}</output>
+        </>
+      );
+    }
+    render(<PageBuilderHarness />);
+    expect(screen.getByLabelText(/Question Title/)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Second")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: /2\. Two/ }));
+    expect(screen.getByDisplayValue("Second")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("First")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add question" }));
+    expect(screen.getByTestId("single-page-schema")).toHaveTextContent('"questionIds":["second","q_');
+    await user.click(screen.getByRole("button", { name: "Delete Two" }));
+    expect(screen.getByRole("textbox", { name: "Page title" })).toHaveValue("One");
+    expect(screen.getByRole("tab", { name: /1\. One/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("shows the complete question list when page editing is disabled", () => {
+    render(
+      <FormBuilder
+        schema={{
+          id: "pages-disabled",
+          version: 1,
+          title: "Pages disabled",
+          fields: [
+            { id: "first", type: "text", title: "First", required: false },
+            { id: "second", type: "text", title: "Second", required: false }
+          ],
+          pages: [
+            { id: "one", title: "One", questionIds: ["first"] },
+            { id: "two", title: "Two", questionIds: ["second"] }
+          ]
+        }}
+        onChange={() => undefined}
+        features={{ pages: false }}
+        pageEditorMode="single"
+      />
+    );
+    expect(screen.getByDisplayValue("First")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Second")).toBeInTheDocument();
   });
 
   it("hides generated IDs and keeps them stable while natural-language labels change", () => {

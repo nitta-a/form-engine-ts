@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v7.17.0 — 2026-09-14
+
+- Added optional single-page editing to the React and MUI builders, with page selection, question counts, page-aware question creation, split and deletion guidance, and preserved question ordering and assignments.
+- Added accessible respondent page navigation that focuses and scrolls to the new page heading after navigation while preserving initial focus and validation-error focus behavior.
+- Added English and Japanese copy for the new page authoring and navigation experiences, plus preview controls for switching between all-pages and single-page editing.
+- Aligned all public packages to version 7.17.0.
+
 ### v7.15.0 — 2026-09-12
 
 - Added an all-languages aggregate tab to response summaries, with scope-aware tab options, controlled selection, and customizable tab slots while preserving the language-only APIs.

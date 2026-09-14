@@ -15,7 +15,10 @@ export function createMuiPagesEditorSlot(options?: MuiAdapterOptions): Component
     translate,
     readOnly,
     features,
-    currentLocale
+    currentLocale,
+    pageEditorMode = "all",
+    selectedPageId,
+    onSelectedPageChange
   }: MuiPagesEditorProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const id = useId();
@@ -29,12 +32,17 @@ export function createMuiPagesEditorSlot(options?: MuiAdapterOptions): Component
     const questionId = movable.some((field) => field.id === selectedQuestionId)
       ? selectedQuestionId
       : (movable[0]?.id ?? "");
+    const pagesToRender =
+      pageEditorMode === "single" && selectedPageId !== undefined
+        ? (pages?.filter((page) => page.id === selectedPageId) ?? [])
+        : (pages ?? []);
     const pageOptions = (pages ?? []).map((page, index) => ({
       value: page.id,
       label: page.title ?? `${translate("builder.newPage")} ${index + 1}`
     }));
     const renderPage = (page: FormPage, index: number) => {
-      const title = page.title ?? `${translate("builder.newPage")} ${index + 1}`;
+      const pageIndex = pages?.findIndex((candidate) => candidate.id === page.id) ?? index;
+      const title = page.title ?? `${translate("builder.newPage")} ${pageIndex + 1}`;
       return (
         <Card
           key={page.id}
@@ -47,14 +55,14 @@ export function createMuiPagesEditorSlot(options?: MuiAdapterOptions): Component
               <IconButton
                 actionType="moveUp"
                 title={translate("builder.moveUp", { title })}
-                disabled={readOnly || index === 0}
-                onClick={() => actions.movePage(page.id, index - 1)}
+                disabled={readOnly || pageIndex === 0}
+                onClick={() => actions.movePage(page.id, pageIndex - 1)}
               />
               <IconButton
                 actionType="moveDown"
                 title={translate("builder.moveDown", { title })}
-                disabled={readOnly || index === pageOptions.length - 1}
-                onClick={() => actions.movePage(page.id, index + 1)}
+                disabled={readOnly || pageIndex === pageOptions.length - 1}
+                onClick={() => actions.movePage(page.id, pageIndex + 1)}
               />
               <IconButton
                 actionType="delete"
@@ -63,6 +71,9 @@ export function createMuiPagesEditorSlot(options?: MuiAdapterOptions): Component
                 onClick={() => actions.removePage(page.id)}
               />
             </Stack>
+            <small>
+              {pages?.length === 1 ? translate("builder.pageDeleteLast") : translate("builder.pageDeleteMoves")}
+            </small>
             <TextInput
               id={`${id}-${page.id}-title`}
               label={translate("builder.pageTitle")}
@@ -145,10 +156,24 @@ export function createMuiPagesEditorSlot(options?: MuiAdapterOptions): Component
             </Button>
           ) : (
             <>
-              {pages.map(renderPage)}
+              {pageEditorMode === "single" ? (
+                <Stack direction="column" spacing={0.5} role="tablist" aria-label={translate("builder.pages")}>
+                  {pages.map((page, index) => (
+                    <Button
+                      key={page.id}
+                      variant={page.id === selectedPageId ? "primary" : "secondary"}
+                      onClick={() => onSelectedPageChange?.(page.id)}
+                    >
+                      {index + 1}. {page.title ?? `${translate("builder.newPage")} ${index + 1}`} (
+                      {page.questionIds.length})
+                    </Button>
+                  ))}
+                </Stack>
+              ) : null}
+              {pagesToRender.map(renderPage)}
               <Select
                 id={`${id}-new-page-question`}
-                label={translate("builder.pageQuestion")}
+                label={translate("builder.pageQuestionToMove")}
                 value={questionId}
                 disabled={readOnly || movable.length === 0}
                 onChange={setSelectedQuestionId}
@@ -158,8 +183,9 @@ export function createMuiPagesEditorSlot(options?: MuiAdapterOptions): Component
                     : movable.map((field) => ({ value: field.id, label: field.title }))
                 }
               />
+              {movable.length === 0 ? <small role="status">{translate("builder.noPageQuestions")}</small> : null}
               <Button disabled={readOnly || movable.length === 0} onClick={() => actions.addPage(questionId)}>
-                {translate("builder.addPage")}
+                {translate("builder.splitPage")}
               </Button>
             </>
           )}
