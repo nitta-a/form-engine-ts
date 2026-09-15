@@ -82,6 +82,10 @@ on the next mount:
 <FormRenderer autoSaveKey={`contact-draft:${schema.version}`} />
 ```
 
+For anonymous respondent resume, combine `autoSaveKey` with `draftResume={{}}`. The renderer asks whether to continue
+or start over, stores the current page with the answers, and expires resumable drafts after seven days by default. The
+respondent can disable device saving; storage failures never block submission.
+
 `FormProvider` resolves authoring-time translations synchronously whenever `locale` changes. `FormBuilder` includes page
 membership controls and localization editors; pass an `AsyncTranslationAdapter` as `translationAdapter` to enable its
 batch-translation action.

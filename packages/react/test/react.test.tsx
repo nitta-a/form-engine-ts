@@ -285,6 +285,89 @@ describe("React form engine", () => {
     await waitFor(() => expect(globalThis.localStorage.getItem("draft-test")).toBeNull());
   });
 
+  it("asks before resuming a recent anonymous draft and honors the device opt-out", async () => {
+    const user = userEvent.setup();
+    const key = "resume-test";
+    globalThis.localStorage.setItem(
+      key,
+      JSON.stringify({
+        formId: schema.id,
+        formVersion: schema.version,
+        values: { name: "Ada" },
+        savedAt: new Date().toISOString()
+      })
+    );
+    render(
+      <FormProvider schema={schema} locale="en" translator={translator} onSubmit={() => undefined}>
+        <FormRenderer autoSaveKey={key} draftResume={{}} />
+      </FormProvider>
+    );
+    expect(screen.getByRole("heading", { name: "Continue your response" })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Name/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Continue where you left off" }));
+    expect(screen.getByLabelText(/Name/)).toHaveValue("Ada");
+    const saving = screen.getByLabelText("Save my response on this device for 7 days");
+    expect(saving).toBeChecked();
+    await user.click(saving);
+    expect(globalThis.localStorage.getItem(key)).toBeNull();
+    await user.type(screen.getByLabelText(/Name/), " Lovelace");
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 550));
+    expect(globalThis.localStorage.getItem(key)).toBeNull();
+  });
+
+  it("discards expired resume drafts without extending their lifetime", () => {
+    const key = "expired-resume-test";
+    globalThis.localStorage.setItem(
+      key,
+      JSON.stringify({
+        formId: schema.id,
+        formVersion: schema.version,
+        values: { name: "Ada" },
+        savedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString()
+      })
+    );
+    render(
+      <FormProvider schema={schema} locale="en" translator={translator} onSubmit={() => undefined}>
+        <FormRenderer autoSaveKey={key} draftResume={{}} />
+      </FormProvider>
+    );
+    expect(screen.getByLabelText(/Name/)).toHaveValue("");
+    expect(globalThis.localStorage.getItem(key)).toBeNull();
+  });
+
+  it("restores the saved page after the answer is resumed", async () => {
+    const user = userEvent.setup();
+    const key = "paged-resume-test";
+    const pagedSchema = {
+      ...schema,
+      id: "paged-resume",
+      fields: [schema.fields[0], schema.fields[1]],
+      pages: [
+        { id: "first", title: "First page", questionIds: ["name"] },
+        { id: "second", title: "Second page", questionIds: ["age"] }
+      ]
+    } as const satisfies FormSchema;
+    globalThis.localStorage.setItem(
+      key,
+      JSON.stringify({
+        formId: pagedSchema.id,
+        formVersion: pagedSchema.version,
+        values: { name: "Ada" },
+        pageId: "second",
+        savedAt: new Date().toISOString()
+      })
+    );
+    render(
+      <FormProvider schema={pagedSchema} locale="en" translator={translator} onSubmit={() => undefined}>
+        <FormRenderer autoSaveKey={key} draftResume={{}} />
+      </FormProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Continue where you left off" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Second page" })).toBeInTheDocument());
+    expect(screen.getByLabelText("Age")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Name/)).not.toBeInTheDocument();
+  });
+
   it("edits schema through the accessible builder controls", async () => {
     const user = userEvent.setup();
     function BuilderHarness() {

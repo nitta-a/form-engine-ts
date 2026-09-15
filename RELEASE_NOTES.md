@@ -5,6 +5,12 @@ current release and usage information.
 
 ## Latest release
 
+### v7.17.2 — 2026-09-16
+
+- Added same-browser anonymous respondent draft resume for surveys with seven-day expiry, answer and page restoration, start-over controls, and device-saving opt-out.
+- Added shared React and MUI resume UI, localized English/Japanese messages, storage failure handling, and preview wiring with form/version-scoped keys.
+- Aligned all public packages to version 7.17.2.
+
 ### v7.17.1 — 2026-09-15
 
 - Added four bilingual purpose templates for survey, poll, and quiz creation through the Core `FormTemplate`, `getFormTemplates`, and `createSchemaFromTemplate` APIs.

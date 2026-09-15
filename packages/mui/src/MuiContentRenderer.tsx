@@ -12,6 +12,7 @@ import {
   type ContentRendererClassNames,
   type ContentRendererProps,
   type ContentRendererSlots,
+  type FormDraftResumeSlotProps,
   FormEngineI18nProvider,
   type FormRendererProps,
   type FormSubmissionMetadata,
@@ -20,7 +21,7 @@ import {
   type PollResultsLoadingProps,
   type TypedFormRendererProps
 } from "@form-engine-ts/react";
-import { Alert, Button, LinearProgress, Stack, Typography } from "@mui/material";
+import { Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import { muiContentTranslation } from "./contentTranslation";
 import { MuiFormBuilderContext } from "./context";
@@ -201,6 +202,89 @@ function MuiInvalidQuiz({
   return <Alert severity="error">{t("content.results.invalidQuiz")}</Alert>;
 }
 
+function MuiDraftResume({
+  props,
+  locale,
+  i18n
+}: {
+  props: FormDraftResumeSlotProps;
+  locale: string;
+  i18n?: MuiFormEngineI18nOptions;
+}) {
+  const ja = locale.toLowerCase().startsWith("ja");
+  const label = (key: string, fallback: string) => {
+    const translated = i18n?.translator?.(key);
+    return translated === undefined || translated === key ? fallback : translated;
+  };
+  if (props.mode === "prompt") {
+    return (
+      <Alert severity="info">
+        <Typography component="h2" variant="h6">
+          {label("renderer.draftResumeTitle", ja ? "回答を続ける" : "Continue your response")}
+        </Typography>
+        <Typography>
+          {label(
+            "renderer.draftResumeMessage",
+            ja
+              ? "このブラウザーに保存された未送信の回答があります。"
+              : "A saved response from this browser is available. It has not been submitted."
+          )}
+        </Typography>
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+          <Button type="button" variant="contained" onClick={props.onResume}>
+            {label("renderer.draftResumeContinue", ja ? "続きから回答する" : "Continue where you left off")}
+          </Button>
+          <Button type="button" onClick={props.onStartOver}>
+            {label("renderer.draftResumeStartOver", ja ? "最初から回答する" : "Start over")}
+          </Button>
+        </Stack>
+      </Alert>
+    );
+  }
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={props.savingEnabled}
+            disabled={!props.storageAvailable}
+            onChange={(_, checked) => props.onToggleSaving(checked)}
+          />
+        }
+        label={label(
+          props.savingEnabled ? "renderer.draftResumeEnabled" : "renderer.draftResumeDisabled",
+          props.savingEnabled
+            ? ja
+              ? "この端末に回答を7日間保存する"
+              : "Save my response on this device for 7 days"
+            : ja
+              ? "この端末に回答を保存しない"
+              : "Do not save my response on this device"
+        )}
+      />
+      {props.saveStatus === "saved" ? (
+        <Typography role="status">
+          {label("renderer.draftSaved", ja ? "この端末に一時保存しました" : "Saved on this device")}
+        </Typography>
+      ) : null}
+      {props.error === undefined ? null : (
+        <Typography role="alert">
+          {label(
+            props.errorKind === "delete" ? "renderer.draftDeleteFailed" : "renderer.draftSaveFailed",
+            props.errorKind === "delete"
+              ? ja
+                ? "保存された回答を削除できませんでした。"
+                : "The saved response could not be removed."
+              : ja
+                ? "この端末に回答を保存できませんでした。"
+                : "This response could not be saved on this device."
+          )}
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
 function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>(
   props: MuiContentRendererProps | TypedMuiContentRendererProps<TMeta>
 ) {
@@ -214,6 +298,9 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
   const contentSlots = slots;
   const resolvedSlots: ContentRendererSlots = {
     ...slots,
+    renderDraftResume:
+      contentSlots?.renderDraftResume ??
+      ((draft) => <MuiDraftResume props={draft} locale={locale} {...(i18n === undefined ? {} : { i18n })} />),
     renderChoiceGroup: slots?.renderChoiceGroup ?? MuiChoiceGroupSlot,
     renderQuizFeedback:
       contentSlots?.renderQuizFeedback ??

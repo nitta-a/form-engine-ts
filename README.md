@@ -56,8 +56,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.17.1** (2026-09-15). All public packages are currently aligned to version `7.17.1`.
-This release adds bilingual purpose templates and a mode-first template or blank creation flow in the preview.
+The latest release is **v7.17.2** (2026-09-16). All public packages are currently aligned to version `7.17.2`.
+This release adds same-browser anonymous respondent draft resume with seven-day expiry, page restoration, and storage controls.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -65,6 +65,8 @@ See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 Optional `pages` turn a schema into a validated wizard with conditional page skipping and accessible progress. The React
 renderer can debounce versioned drafts to `localStorage` with `autoSaveKey`. Authoring-time translations are stored in the
 schema, populated in batches through `populateSchemaTranslations`, and applied synchronously by `resolveLocalizedSchema`.
+For anonymous respondents, combine `autoSaveKey` with `draftResume={{}}` to offer same-browser resume. The renderer asks
+whether to continue or start over, restores the current page, and expires resumable drafts after seven days by default.
 The builder exposes page membership and locale override controls. Set `pageEditorMode="single"` to edit one selected page
 at a time; the default `"all"` mode remains available. Core also provides `calculateCrossTabulation` for
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
@@ -379,8 +381,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.17.1**（2026-09-15）です。公開パッケージはすべてバージョン `7.17.1` に揃えています。
-本リリースでは、日英対応の目的別テンプレートと、種別を先に選ぶテンプレート／白紙作成フローをpreviewに追加しました。
+最新版は **v7.17.2**（2026-09-16）です。公開パッケージはすべてバージョン `7.17.2` に揃えています。
+本リリースでは、匿名回答の同じブラウザーでの再開、7日間の期限、回答中ページの復元、端末保存の停止を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -389,6 +391,9 @@ pnpm test
 ウィザードになります。React Rendererは`autoSaveKey`によりversion付き下書きを500ms debounceで`localStorage`へ
 保存・復元できます。編集時翻訳はスキーマへ保持され、`populateSchemaTranslations`で一括生成し、
 `resolveLocalizedSchema`でAPI通信なしに同期解決します。Builderはページ所属と各言語の手動訳文を編集できます。
+回答者向けには`autoSaveKey`と`draftResume={{}}`を組み合わせると、同じブラウザーで回答途中から再開できます。
+再開前に「続きから／最初から」を選べ、回答中ページも復元されます。既定の保存期間は7日間で、回答者は
+端末保存を停止できます。localStorageが利用できない場合も回答送信は継続できます。
 大きな複数ページフォームでは`pageEditorMode="single"`を指定するとページを選択して1ページずつ編集でき、
 新しい質問は選択中のページへ追加されます。既定の`"all"`表示も利用でき、各ページに最低1問を残す制約は維持されます。
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の

@@ -36,6 +36,7 @@ export interface ContentAnswerProps {
   readonly schema: FormSchema;
   readonly locale: string;
   readonly storage: FormStorageAdapter;
+  readonly storageKind?: string;
 }
 function AnswerBody(
   props: ContentAnswerProps & {
@@ -45,6 +46,7 @@ function AnswerBody(
     readonly alreadyVoted?: boolean;
     readonly revision: number;
     readonly rendererKind: "mui" | "tailwind";
+    readonly storageKind: string;
   }
 ) {
   const contentModeOptions = {
@@ -60,6 +62,12 @@ function AnswerBody(
     return (
       <MuiContentRenderer
         i18n={{ locale: props.locale }}
+        {...(getFormContentMode(props.schema.metadata) === "survey"
+          ? {
+              autoSaveKey: `form-engine-preview-draft:${props.storageKind}:${props.schema.id}:${props.schema.version}`,
+              draftResume: {}
+            }
+          : {})}
         contentModeOptions={contentModeOptions}
         slots={{
           renderSubmitError: ({ error, onRetry }) => (
@@ -107,6 +115,12 @@ function AnswerBody(
   };
   return (
     <ContentRenderer
+      {...(getFormContentMode(props.schema.metadata) === "survey"
+        ? {
+            autoSaveKey: `form-engine-preview-draft:${props.storageKind}:${props.schema.id}:${props.schema.version}`,
+            draftResume: {}
+          }
+        : {})}
       contentModeOptions={contentModeOptions}
       classNames={classNames}
       slots={{
@@ -122,7 +136,7 @@ function AnswerBody(
     />
   );
 }
-export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
+export function ContentAnswer({ schema, locale, storage, storageKind = "default" }: ContentAnswerProps) {
   const [closed, setClosed] = useState(false);
   const [canViewResults, setCanViewResults] = useState(true);
   const [failResults, setFailResults] = useState(false);
@@ -255,6 +269,7 @@ export function ContentAnswer({ schema, locale, storage }: ContentAnswerProps) {
           {...(alreadyVoted === undefined ? {} : { alreadyVoted })}
           revision={revision}
           rendererKind={rendererKind}
+          storageKind={storageKind}
         />
       </FormProvider>
     </Stack>

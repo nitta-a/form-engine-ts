@@ -41,6 +41,7 @@ import type {
   ChoiceFieldTypeLayoutMap,
   ChoiceGroupSlotProps,
   FieldError,
+  FormDraftResumeSlotProps,
   FormRendererAppearance,
   FormRendererClassNames,
   FormRendererFieldConfig,
@@ -705,6 +706,7 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly messages?: Partial<FormRendererMessages>;
   readonly messageResolver?: (key: keyof FormRendererMessages, defaultText: string) => string;
   readonly autoSaveKey?: string;
+  readonly draftResume?: { readonly maxAgeMs?: number };
   readonly beforeSubmit?: BeforeSubmit;
   readonly onDraftSave?: (draft: FormValues) => void;
   readonly fieldConfig?: Readonly<Record<string, FormRendererFieldConfig>>;
@@ -787,6 +789,7 @@ interface StoredDraft {
   readonly formVersion: number;
   readonly values: Readonly<Record<string, FormValue>>;
   readonly savedAt: string;
+  readonly pageId?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -861,6 +864,7 @@ function parseDraft(serialized: string): StoredDraft | null {
       formId: value.formId,
       formVersion: value.formVersion,
       savedAt: value.savedAt,
+      ...(typeof value.pageId === "string" ? { pageId: value.pageId } : {}),
       values: Object.fromEntries(
         Object.entries(value.values).filter((entry): entry is [string, FormValue] => isFormValue(entry[1]))
       )
@@ -884,7 +888,16 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
     confirmSensitiveDataTitle: "Sensitive data may be included",
     confirmSensitiveDataMessage: "The following answers may contain personal information. Continue submitting?",
     confirmButton: "Proceed",
-    cancelButton: "Cancel"
+    cancelButton: "Cancel",
+    draftResumeTitle: "Continue your response",
+    draftResumeMessage: "A saved response from this browser is available. It has not been submitted.",
+    draftResumeContinue: "Continue where you left off",
+    draftResumeStartOver: "Start over",
+    draftResumeEnabled: "Save my response on this device for 7 days",
+    draftResumeDisabled: "Do not save my response on this device",
+    draftSaved: "Saved on this device",
+    draftSaveFailed: "This response could not be saved on this device.",
+    draftDeleteFailed: "The saved response could not be removed."
   },
   ja: {
     submitButton: "送信する",
@@ -899,7 +912,16 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
     confirmSensitiveDataTitle: "個人情報が含まれている可能性があります",
     confirmSensitiveDataMessage: "以下の項目に個人情報とみられる記述があります。このまま送信してもよろしいですか？",
     confirmButton: "このまま送信",
-    cancelButton: "修正する"
+    cancelButton: "修正する",
+    draftResumeTitle: "回答を続ける",
+    draftResumeMessage: "このブラウザーに保存された未送信の回答があります。",
+    draftResumeContinue: "続きから回答する",
+    draftResumeStartOver: "最初から回答する",
+    draftResumeEnabled: "この端末に回答を7日間保存する",
+    draftResumeDisabled: "この端末に回答を保存しない",
+    draftSaved: "この端末に一時保存しました",
+    draftSaveFailed: "この端末に回答を保存できませんでした。",
+    draftDeleteFailed: "保存された回答を削除できませんでした。"
   }
 };
 
@@ -934,6 +956,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   messages = {},
   messageResolver,
   autoSaveKey,
+  draftResume,
   beforeSubmit,
   onDraftSave,
   fieldConfig,
@@ -978,7 +1001,16 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   const pageNavigationPending = useRef(false);
   const pageVisibilityInitialized = useRef(false);
   const loadedDraftKey = useRef<string | null>(null);
+  const draftBaselineRef = useRef<string | null>(null);
+  const draftClearedAfterSubmitRef = useRef(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [draftCandidate, setDraftCandidate] = useState<StoredDraft | null>(null);
+  const [draftResumeState, setDraftResumeState] = useState<"checking" | "ready" | "choice">("ready");
+  const [draftSavingEnabled, setDraftSavingEnabled] = useState(true);
+  const [draftSaveStatus, setDraftSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [draftStorageError, setDraftStorageError] = useState<string>();
+  const [draftStorageErrorKind, setDraftStorageErrorKind] = useState<"save" | "delete">("save");
+  const [resumePageId, setResumePageId] = useState<string | null>(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [focusFieldId, setFocusFieldId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{
@@ -1062,6 +1094,98 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     const button = formRef.current?.querySelector<HTMLElement>(".fe-submit, button[type='submit'], button");
     button?.focus();
   }, []);
+
+  const draftResumeEnabled = draftResume !== undefined && autoSaveKey !== undefined;
+  const removeDraft = useCallback(() => {
+    if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
+    try {
+      globalThis.localStorage.removeItem(autoSaveKey);
+      setDraftStorageError(undefined);
+    } catch (cause) {
+      setDraftStorageErrorKind("delete");
+      setDraftStorageError(cause instanceof Error ? cause.message : String(cause));
+    }
+  }, [autoSaveKey]);
+  const resumeDraft = useCallback(() => {
+    if (draftCandidate === null) return;
+    form.restoreValues(draftCandidate.values);
+    draftBaselineRef.current = JSON.stringify({
+      values: draftCandidate.values,
+      ...(draftCandidate.pageId === undefined ? {} : { pageId: draftCandidate.pageId })
+    });
+    setResumePageId(draftCandidate.pageId ?? null);
+    setDraftCandidate(null);
+    setDraftRestored(true);
+    setDraftResumeState("ready");
+    globalThis.setTimeout(() => pageHeaderRef.current?.focus(), 0);
+  }, [draftCandidate, form.restoreValues]);
+  const startDraftOver = useCallback(() => {
+    removeDraft();
+    form.reset();
+    setCurrentPageIndex(0);
+    setDraftCandidate(null);
+    setDraftRestored(false);
+    setDraftResumeState("ready");
+    draftBaselineRef.current = JSON.stringify({ values: {}, pageId: undefined });
+  }, [form.reset, removeDraft]);
+  const toggleDraftSaving = useCallback(
+    (enabled: boolean) => {
+      setDraftSavingEnabled(enabled);
+      if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
+      try {
+        globalThis.localStorage.setItem(`${autoSaveKey}:settings`, enabled ? "true" : "false");
+        if (!enabled) removeDraft();
+      } catch (cause) {
+        setDraftStorageError(cause instanceof Error ? cause.message : String(cause));
+      }
+    },
+    [autoSaveKey, removeDraft]
+  );
+  const draftSlotProps: FormDraftResumeSlotProps = {
+    mode: draftCandidate === null ? "settings" : "prompt",
+    ...(draftCandidate === null ? {} : { savedAt: draftCandidate.savedAt }),
+    savingEnabled: draftSavingEnabled,
+    storageAvailable: typeof globalThis.localStorage !== "undefined",
+    saveStatus: draftSaveStatus,
+    ...(draftStorageError === undefined ? {} : { error: draftStorageError }),
+    ...(draftStorageError === undefined ? {} : { errorKind: draftStorageErrorKind }),
+    onResume: resumeDraft,
+    onStartOver: startDraftOver,
+    onToggleSaving: toggleDraftSaving
+  };
+  const draftResumeContent =
+    slots.renderDraftResume?.(draftSlotProps) ??
+    (draftSlotProps.mode === "prompt" ? (
+      <section className="fe-draft-resume" aria-labelledby={`${prefix}-draft-title`}>
+        <h2 id={`${prefix}-draft-title`}>{resolveMessage("draftResumeTitle")}</h2>
+        <p>{resolveMessage("draftResumeMessage")}</p>
+        <button type="button" onClick={resumeDraft}>
+          {resolveMessage("draftResumeContinue")}
+        </button>{" "}
+        <button type="button" onClick={startDraftOver}>
+          {resolveMessage("draftResumeStartOver")}
+        </button>
+      </section>
+    ) : (
+      <section className="fe-draft-settings" aria-label={resolveMessage("draftResumeTitle")}>
+        <label>
+          <input
+            type="checkbox"
+            checked={draftSavingEnabled}
+            disabled={!draftSlotProps.storageAvailable}
+            onChange={(event) => toggleDraftSaving(event.currentTarget.checked)}
+          />{" "}
+          {draftSavingEnabled ? resolveMessage("draftResumeEnabled") : resolveMessage("draftResumeDisabled")}
+        </label>
+        {draftSaveStatus === "saved" ? <span role="status"> {resolveMessage("draftSaved")}</span> : null}
+        {draftStorageError === undefined ? null : (
+          <span role="alert">
+            {" "}
+            {resolveMessage(draftStorageErrorKind === "delete" ? "draftDeleteFailed" : "draftSaveFailed")}
+          </span>
+        )}
+      </section>
+    ));
 
   useEffect(() => {
     let active = true;
@@ -1166,33 +1290,168 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   }, [confirmation, confirmationRenderMode, focusSubmitButton]);
 
   useEffect(() => {
-    if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
-    const loadIdentity = `${autoSaveKey}:${form.schema.id}:${form.schema.version}`;
+    if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") {
+      if (draftResume !== undefined && autoSaveKey !== undefined) setDraftResumeState("ready");
+      return;
+    }
+    const loadIdentity = `${autoSaveKey}:${form.schema.id}:${form.schema.version}:${draftResume?.maxAgeMs ?? "default"}`;
     if (loadedDraftKey.current === loadIdentity) return;
     loadedDraftKey.current = loadIdentity;
-    const serialized = globalThis.localStorage.getItem(autoSaveKey);
-    if (serialized === null) return;
-    const draft = parseDraft(serialized);
-    if (draft === null || draft.formId !== form.schema.id || draft.formVersion !== form.schema.version) return;
-    form.restoreValues(draft.values);
-    setDraftRestored(true);
-  }, [autoSaveKey, form.restoreValues, form.schema.id, form.schema.version]);
+    if (draftResume === undefined) {
+      try {
+        const serialized = globalThis.localStorage.getItem(autoSaveKey);
+        if (serialized === null) return;
+        const draft = parseDraft(serialized);
+        if (draft === null || draft.formId !== form.schema.id || draft.formVersion !== form.schema.version) return;
+        form.restoreValues(draft.values);
+        setDraftRestored(true);
+      } catch {
+        // Existing auto-save behavior must remain best effort.
+      }
+      return;
+    }
+    setDraftResumeState("checking");
+    const settingsKey = `${autoSaveKey}:settings`;
+    try {
+      const savingEnabled = globalThis.localStorage.getItem(settingsKey) !== "false";
+      setDraftSavingEnabled(savingEnabled);
+      const serialized = globalThis.localStorage.getItem(autoSaveKey);
+      if (serialized === null || !savingEnabled) {
+        draftBaselineRef.current = JSON.stringify({ values: form.values });
+        setDraftResumeState("ready");
+        return;
+      }
+      const draft = parseDraft(serialized);
+      const configuredMaxAgeMs = draftResume.maxAgeMs;
+      const maxAgeMs =
+        configuredMaxAgeMs !== undefined && Number.isFinite(configuredMaxAgeMs) && configuredMaxAgeMs > 0
+          ? configuredMaxAgeMs
+          : 7 * 24 * 60 * 60 * 1000;
+      const savedAt = draft === null ? NaN : Date.parse(draft.savedAt);
+      const valid =
+        draft !== null &&
+        draft.formId === form.schema.id &&
+        draft.formVersion === form.schema.version &&
+        Number.isFinite(savedAt) &&
+        savedAt <= Date.now() &&
+        Date.now() - savedAt <= maxAgeMs;
+      if (!valid) {
+        globalThis.localStorage.removeItem(autoSaveKey);
+        draftBaselineRef.current = JSON.stringify({ values: form.values });
+        setDraftResumeState("ready");
+        return;
+      }
+      draftBaselineRef.current = JSON.stringify({
+        values: draft.values,
+        ...(draft.pageId === undefined ? {} : { pageId: draft.pageId })
+      });
+      setDraftCandidate(draft);
+      setDraftResumeState("choice");
+    } catch (cause) {
+      setDraftStorageError(cause instanceof Error ? cause.message : String(cause));
+      setDraftResumeState("ready");
+    }
+  }, [autoSaveKey, draftResume, form.restoreValues, form.schema.id, form.schema.version, form.values]);
 
   useEffect(() => {
-    if (form.submitStatus === "success") return;
+    if (form.submitStatus === "success" || draftResumeState !== "ready" || !draftSavingEnabled) return;
+    if (draftClearedAfterSubmitRef.current && Object.keys(form.values).length === 0) return;
+    draftClearedAfterSubmitRef.current = false;
+    const baseline = JSON.stringify({
+      values: form.values,
+      ...(activePage?.id === undefined ? {} : { pageId: activePage.id })
+    });
+    if (draftResume !== undefined && baseline === draftBaselineRef.current) return;
     const timeout = globalThis.setTimeout(() => {
       onDraftSave?.(form.values);
       if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
+      setDraftSaveStatus("saving");
       const draft: StoredDraft = {
         formId: form.schema.id,
         formVersion: form.schema.version,
         values: form.values,
+        ...(activePage?.id === undefined ? {} : { pageId: activePage.id }),
         savedAt: new Date().toISOString()
       };
-      globalThis.localStorage.setItem(autoSaveKey, JSON.stringify(draft));
+      try {
+        globalThis.localStorage.setItem(autoSaveKey, JSON.stringify(draft));
+        draftBaselineRef.current = JSON.stringify({
+          values: form.values,
+          ...(activePage?.id === undefined ? {} : { pageId: activePage.id })
+        });
+        setDraftSaveStatus("saved");
+        setDraftStorageError(undefined);
+      } catch (cause) {
+        setDraftStorageErrorKind("save");
+        setDraftSaveStatus("error");
+        setDraftStorageError(cause instanceof Error ? cause.message : String(cause));
+      }
     }, 500);
     return () => globalThis.clearTimeout(timeout);
-  }, [autoSaveKey, form.schema.id, form.schema.version, form.submitStatus, form.values, onDraftSave]);
+  }, [
+    activePage?.id,
+    autoSaveKey,
+    draftResumeState,
+    draftSavingEnabled,
+    form.schema.id,
+    form.schema.version,
+    form.submitStatus,
+    form.values,
+    onDraftSave,
+    draftResume
+  ]);
+
+  useEffect(() => {
+    if (
+      !draftResumeEnabled ||
+      !draftSavingEnabled ||
+      autoSaveKey === undefined ||
+      form.submitStatus === "success" ||
+      (draftClearedAfterSubmitRef.current && Object.keys(form.values).length === 0) ||
+      typeof globalThis.localStorage === "undefined"
+    )
+      return;
+    const persistBeforeLeave = () => {
+      const baseline = JSON.stringify({
+        values: form.values,
+        ...(activePage?.id === undefined ? {} : { pageId: activePage.id })
+      });
+      if (baseline === draftBaselineRef.current) return;
+      const draft: StoredDraft = {
+        formId: form.schema.id,
+        formVersion: form.schema.version,
+        values: form.values,
+        ...(activePage?.id === undefined ? {} : { pageId: activePage.id }),
+        savedAt: new Date().toISOString()
+      };
+      try {
+        globalThis.localStorage.setItem(autoSaveKey, JSON.stringify(draft));
+        draftBaselineRef.current = baseline;
+      } catch {
+        // Leaving the page must not block the response.
+      }
+    };
+    globalThis.addEventListener("pagehide", persistBeforeLeave);
+    return () => globalThis.removeEventListener("pagehide", persistBeforeLeave);
+  }, [
+    activePage?.id,
+    autoSaveKey,
+    draftResumeEnabled,
+    draftSavingEnabled,
+    form.schema.id,
+    form.schema.version,
+    form.submitStatus,
+    form.values
+  ]);
+
+  useEffect(() => {
+    if (resumePageId === null || pages === undefined) return;
+    const resumedIndex = pages.findIndex(
+      (page, index) => page.id === resumePageId && visiblePageIndexes.includes(index)
+    );
+    setCurrentPageIndex(resumedIndex >= 0 ? resumedIndex : (visiblePageIndexes[0] ?? 0));
+    setResumePageId(null);
+  }, [pages, resumePageId, visiblePageIndexes]);
 
   const focusFirstIssue = (fieldId: string | undefined) => {
     if (fieldId !== undefined) setFocusFieldId(fieldId);
@@ -1408,6 +1667,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       if (attemptStore === undefined) fallbackAttemptId.current = null;
       if (autoSaveKey !== undefined && typeof globalThis.localStorage !== "undefined") {
         globalThis.localStorage.removeItem(autoSaveKey);
+        draftClearedAfterSubmitRef.current = true;
         setDraftRestored(false);
       }
       setCurrentPageIndex(visiblePageIndexes[0] ?? 0);
@@ -1590,6 +1850,14 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   );
 
   if (!receiptLoaded) return null;
+  if (draftResumeEnabled && draftResumeState === "checking") return null;
+  if (draftResumeEnabled && draftResumeState === "choice") {
+    return (
+      <div className={`fe-form ${className}`.trim()} data-mode={getFormContentMode(form.schema.metadata)}>
+        {draftResumeContent}
+      </div>
+    );
+  }
   if (receipt !== null) {
     return (
       <div
@@ -1651,6 +1919,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         onSubmit={handleSubmit}
         aria-hidden={confirmation !== null && confirmationRenderMode === "dialog" ? true : undefined}
       >
+        {draftResumeEnabled ? draftResumeContent : null}
         {slots.renderHeader?.({
           title: form.schema.title,
           ...(form.schema.description === undefined ? {} : { description: form.schema.description })

@@ -80,7 +80,13 @@ function ContentLibraryBody({
           {answer ? (
             <>
               <Button onClick={() => setAnswer(undefined)}>{ja ? "編集に戻る" : "Back to editor"}</Button>
-              <ContentAnswer key={`${answer.id}:${answer.version}`} schema={answer} locale={locale} storage={storage} />
+              <ContentAnswer
+                key={`${answer.id}:${answer.version}`}
+                schema={answer}
+                locale={locale}
+                storage={storage}
+                storageKind={storageKind}
+              />
             </>
           ) : (
             <ContentEditor

@@ -668,6 +668,15 @@ export interface FormRendererMessages {
   readonly confirmSensitiveDataMessage?: string;
   readonly confirmButton?: string;
   readonly cancelButton?: string;
+  readonly draftResumeTitle?: string;
+  readonly draftResumeMessage?: string;
+  readonly draftResumeContinue?: string;
+  readonly draftResumeStartOver?: string;
+  readonly draftResumeEnabled?: string;
+  readonly draftResumeDisabled?: string;
+  readonly draftSaved?: string;
+  readonly draftSaveFailed?: string;
+  readonly draftDeleteFailed?: string;
 }
 
 export interface FieldA11yOptions {
@@ -960,7 +969,21 @@ export interface FormRendererSlotProps {
   };
 }
 
+export interface FormDraftResumeSlotProps {
+  readonly mode: "prompt" | "settings";
+  readonly savedAt?: string;
+  readonly savingEnabled: boolean;
+  readonly storageAvailable: boolean;
+  readonly saveStatus: "idle" | "saving" | "saved" | "error";
+  readonly error?: string;
+  readonly errorKind?: "save" | "delete";
+  readonly onResume: () => void;
+  readonly onStartOver: () => void;
+  readonly onToggleSaving: (enabled: boolean) => void;
+}
+
 export interface FormRendererSlots {
+  readonly renderDraftResume?: (props: FormDraftResumeSlotProps) => ReactNode;
   readonly renderHeader?: (props: { readonly title: string; readonly description?: string }) => ReactNode;
   readonly renderPageHeader?: (props: {
     readonly page: FormPage;

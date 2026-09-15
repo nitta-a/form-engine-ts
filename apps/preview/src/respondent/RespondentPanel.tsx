@@ -1,3 +1,4 @@
+import { getFormContentMode } from "@form-engine-ts/core";
 import { MuiChoiceGroupSlot } from "@form-engine-ts/mui";
 import { FormRenderer, type FormRendererSlots, useForm } from "@form-engine-ts/react";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
@@ -121,7 +122,8 @@ export function RespondentPanel() {
       errorMessageKey="preview.error"
       appearance={choiceFieldAppearance}
       successRenderMode={successRenderMode}
-      autoSaveKey={`form-engine-preview-draft:${schema.id}:${schema.version}`}
+      autoSaveKey={`form-engine-preview-draft:${storageKind}:${schema.id}:${schema.version}`}
+      {...(getFormContentMode(schema.metadata) === "survey" ? { draftResume: {} } : {})}
       beforeSubmit={() => {
         if (!cancelNextSubmit) return "continue";
         setCancelNextSubmit(false);
