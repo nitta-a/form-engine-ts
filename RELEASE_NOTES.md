@@ -5,6 +5,12 @@ current release and usage information.
 
 ## Latest release
 
+### v7.18.1 — 2026-09-17
+
+- Preserved standard MUI section layout when `muiSlotProps.paper.sx` is customized.
+- Made MongoDB non-atomic form deletion explicit with `allowNonAtomic: true` when transactions are unsupported, including partial-failure reporting.
+- Aligned all public packages to version 7.18.1.
+
 ### v7.18.0 — 2026-09-17
 
 - Added configurable Content Mode policies for question counts, option counts, allowed field types, and custom quiz evaluation.

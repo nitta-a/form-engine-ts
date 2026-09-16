@@ -63,7 +63,7 @@ function matches(document: TestDocument, filter: Record<string, unknown>): boole
   });
 }
 
-function createDbStub(options: { readonly transactionSupported?: boolean } = {}) {
+function createDbStub(options: { readonly transactionSupported?: boolean; readonly deleteErrorId?: string } = {}) {
   const collections = new Map<string, Map<string, TestDocument>>();
   const indexes = new Map<
     string,
@@ -153,6 +153,8 @@ function createDbStub(options: { readonly transactionSupported?: boolean } = {})
         return result;
       },
       async deleteOne(filter: Record<string, unknown>) {
+        if (options.deleteErrorId !== undefined && filter._id === options.deleteErrorId)
+          throw new Error("delete failed");
         const found = [...documents.values()].find((document) => matches(document, filter));
         if (found !== undefined) documents.delete(found._id);
         return { deletedCount: found === undefined ? 0 : 1 };
@@ -500,6 +502,45 @@ describe("createMongoDbStorage", () => {
     expect(result).toEqual({ success: false, error: { type: "transaction_unsupported" } });
     expect(collections.get("form_version_states")?.size).toBe(0);
     expect(collections.get("form_versions")?.size).toBe(0);
+  });
+
+  it("explicitly deletes non-atomically when transactions are unsupported", async () => {
+    const { db, collections } = createDbStub({ transactionSupported: false });
+    const adapter = createMongoDbStorage({ db });
+    if (adapter.deleteForm === undefined) throw new Error("MongoDB lifecycle contract is unavailable");
+    const deleteForm = adapter.deleteForm;
+    await adapter.saveSchema(schema("non-atomic"));
+    await adapter.saveSubmission(submission("non-atomic-response", "non-atomic"));
+
+    const unsupported = await deleteForm({ formId: "non-atomic" });
+    expect(unsupported).toMatchObject({ status: "failed", atomic: false, error: { code: "transaction_unsupported" } });
+    expect(collections.get("form_schemas")?.size).toBe(1);
+
+    const deleted = await deleteForm({ formId: "non-atomic", allowNonAtomic: true });
+    expect(deleted).toMatchObject({
+      status: "deleted",
+      atomic: false,
+      counts: { schema: 1, submission: 1 }
+    });
+    expect(collections.get("form_schemas")?.size).toBe(0);
+    expect(collections.get("form_responses")?.size).toBe(0);
+  });
+
+  it("reports non-atomic deletion failures as partial storage errors", async () => {
+    const { db } = createDbStub({ deleteErrorId: "failed-response" });
+    const adapter = createMongoDbStorage({ db });
+    if (adapter.deleteForm === undefined) throw new Error("MongoDB lifecycle contract is unavailable");
+    const deleteForm = adapter.deleteForm;
+    await adapter.saveSchema(schema("failed-form"));
+    await adapter.saveSubmission(submission("failed-response", "failed-form"));
+
+    const result = await deleteForm({ formId: "failed-form", allowNonAtomic: true });
+    expect(result).toMatchObject({
+      status: "partial",
+      atomic: false,
+      counts: { schema: 1, submission: 0 },
+      error: { code: "storage_error" }
+    });
   });
 
   it("allows only one concurrent version transition for the same expected revision", async () => {

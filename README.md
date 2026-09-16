@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.18.0** (2026-09-17). All public packages are currently aligned to version `7.18.0`.
-This release adds configurable Content Mode policies, schema mapping and cross-form analytics, lifecycle-aware storage contracts, and shared storage contract tests.
+The latest release is **v7.18.1** (2026-09-17). All public packages are currently aligned to version `7.18.1`.
+This patch preserves standard MUI section layout when Paper styles are customized and makes MongoDB non-atomic form deletion explicit.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -393,8 +393,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.18.0**（2026-09-17）です。公開パッケージはすべてバージョン `7.18.0` に揃えています。
-本リリースでは、Content Modeポリシー、スキーマ変換・横断集計、ライフサイクル対応Storage契約、共通Storage契約テストを追加しました。
+最新版は **v7.18.1**（2026-09-17）です。公開パッケージはすべてバージョン `7.18.1` に揃えています。
+本パッチでは、PaperのスタイルをカスタマイズしてもMUI標準のセクションレイアウトを維持し、MongoDBの非atomicなフォーム削除を明示指定できるようにしました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

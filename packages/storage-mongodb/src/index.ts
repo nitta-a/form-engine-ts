@@ -1,6 +1,7 @@
 import type {
   BaseSubmissionMetadata,
   FormAnalytics,
+  FormDeletionRequest,
   FormSchema,
   FormSubmission,
   FormSubmissionValidationSource,
@@ -364,6 +365,7 @@ function isRevisionConflict(error: unknown): boolean {
 
 function isTransactionUnsupported(error: unknown): boolean {
   if (!isRecord(error)) return false;
+  if (error.code === "transaction_unsupported") return true;
   if (error.code === 20 || error.code === 263 || error.code === 303) return true;
   return /transaction numbers are only allowed|transactions? (?:are|is) not supported|replica set member|mongos/iu.test(
     mongoErrorMessage(error)
@@ -620,7 +622,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
     state: versionStatesCollectionName,
     auditEvent: versionEventsCollectionName
   };
-  function lifecycleBackend(session?: ClientSession): FormLifecycleBackend {
+  function lifecycleBackend(session?: ClientSession, includeTransaction = session === undefined): FormLifecycleBackend {
     const sessionOptions = session === undefined ? {} : { session };
     return {
       resources: ["schema", "submission", "version", "state", "auditEvent"],
@@ -643,12 +645,16 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
         if (result.deletedCount === 0) throw new Error("Deletion revision conflict or record disappeared.");
         return result.deletedCount;
       },
-      ...(options.db.client?.startSession === undefined
+      ...(!includeTransaction || options.db.client?.startSession === undefined
         ? {}
         : {
             transaction: async <T>(operation: (backend: FormLifecycleBackend) => Promise<T>): Promise<T> => {
               const transactionSession = options.db.client.startSession();
               try {
+                if (typeof transactionSession.withTransaction !== "function")
+                  throw Object.assign(new Error("MongoDB transactions are unsupported."), {
+                    code: "transaction_unsupported"
+                  });
                 return await transactionSession.withTransaction(() => operation(lifecycleBackend(transactionSession)));
               } finally {
                 await transactionSession.endSession();
@@ -657,28 +663,24 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
           })
     };
   }
-  const lifecycle = createFormLifecycleAdapter(
-    lifecycleBackend(),
-    options.lifecycle === undefined
-      ? {}
+  const lifecycleOptions: FormLifecycleOptions =
+    options.lifecycle?.scope === undefined
+      ? (options.lifecycle ?? {})
       : {
           ...options.lifecycle,
-          ...(options.lifecycle.scope === undefined
-            ? {}
-            : {
-                scope: (resource: FormResource) => {
-                  if (!isRecord(resource.value)) throw new TypeError("Invalid deletion resource.");
-                  const value =
-                    resource.value.schema ??
-                    resource.value.submission ??
-                    resource.value.record ??
-                    resource.value.event ??
-                    resource.value;
-                  return options.lifecycle?.scope?.({ ...resource, value }) ?? {};
-                }
-              })
-        }
-  );
+          scope: (resource: FormResource) => {
+            if (!isRecord(resource.value)) throw new TypeError("Invalid deletion resource.");
+            const value =
+              resource.value.schema ??
+              resource.value.submission ??
+              resource.value.record ??
+              resource.value.event ??
+              resource.value;
+            return options.lifecycle?.scope?.({ ...resource, value }) ?? {};
+          }
+        };
+  const lifecycle = createFormLifecycleAdapter(lifecycleBackend(), lifecycleOptions);
+  const nonAtomicLifecycle = createFormLifecycleAdapter(lifecycleBackend(undefined, false), lifecycleOptions);
 
   const adapter: Omit<PagedSubmissionStorageAdapter, "saveSubmission"> &
     Omit<VersionedFormStorageAdapter, "saveSubmission"> & {
@@ -1094,6 +1096,13 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
   return {
     ...adapter,
     ...lifecycle,
+    async deleteForm(request: FormDeletionRequest) {
+      if (request.allowNonAtomic === true) return nonAtomicLifecycle.deleteForm(request);
+      const result = await lifecycle.deleteForm(request);
+      return result.error?.code === "storage_error" && isTransactionUnsupported(result.error.cause)
+        ? { ...result, atomic: false, error: { code: "transaction_unsupported" as const } }
+        : result;
+    },
     async fetchSubmissionPage(formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) {
       return (await adapter.listSubmissionPage(
         formId,

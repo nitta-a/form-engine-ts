@@ -51,6 +51,11 @@ of individual text/textarea answers without loading every answer body at once.
 The adapter also exposes the common required storage operations `aggregateResponses`, `exportResponsesToCsv`, and
 `validateSubmission`, using the same core aggregation, CSV, and validation contracts as the Azure Table adapter.
 
+`deleteForm({ formId })` uses a MongoDB transaction when the connected client supports one. For standalone MongoDB,
+Cosmos DB for MongoDB, or another transaction-incompatible deployment, pass `allowNonAtomic: true` to explicitly use
+ordered non-atomic deletion. The result reports `deleted`, `partial`, or `failed`; transaction capability failures use
+`error.code: "transaction_unsupported"`, while other deletion failures use `"storage_error"`.
+
 Version records are stored in `form_versions`, with a unique `(formId, version)` index. Partial unique indexes allow at
 most one Draft and one Published record per form, while any number of Archived records remain available. Transition state
 lives in `form_version_states`. `commitVersionTransition(plan)` compares `expectedRevision` atomically and returns

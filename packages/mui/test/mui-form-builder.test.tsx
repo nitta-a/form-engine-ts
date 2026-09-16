@@ -162,6 +162,26 @@ describe("MuiFormBuilder", () => {
     expect(toolbar === null ? "" : getComputedStyle(toolbar).display).toBe("flex");
   });
 
+  it("keeps the standard section layout when paper sx is customized", () => {
+    const { container } = render(
+      <MuiFormBuilder
+        schema={schema}
+        onChange={() => undefined}
+        muiSlotProps={{ paper: { sx: { backgroundColor: "rgb(1, 2, 3)" } } }}
+      />
+    );
+
+    const heading = document.getElementById("builder-basic-settings-heading");
+    const paper = heading === null ? null : heading.closest<HTMLElement>(".MuiPaper-root");
+    expect(paper).not.toBeNull();
+    if (paper === null) return;
+    const grid = paper.children[1];
+    if (grid === undefined) throw new Error("Expected the basic settings grid.");
+    expect(getComputedStyle(grid).gap).toBe("16px");
+    expect(getComputedStyle(paper).backgroundColor).toBe("rgb(1, 2, 3)");
+    expect(container.querySelectorAll(".MuiPaper-root").length).toBeGreaterThan(0);
+  });
+
   it("focuses the active MUI question title when the active field changes", () => {
     const controlledSchema: FormSchema = {
       ...schema,

@@ -162,6 +162,8 @@ locale is added. `defaultExpanded` also accepts `"always"`; `autoFocusNewTab` fo
 default.
 `layoutOptions`, `localizationOptions`, and `muiSlotProps` are also accepted in `muiOptions` for low-level factories such
 as `createMuiBuilderSlots`; the dedicated `MuiFormBuilder` props take precedence.
+`muiSlotProps.paper.sx` is merged after the standard section styles, so custom Paper styling preserves the default
+basic-settings grid gap between the form title and description.
 
 Select options in the MUI adapter support icons, descriptions, groups (`group`/`groupLabel` or `kind`), custom metadata,
 and custom `renderOption`/`renderValue` callbacks, label-only or rich option display, description text, and per-control
@@ -244,6 +246,7 @@ Labels use `builder.content.*` translation keys, including `builder.content.poin
 React版と同じく、`sectionVisibility`で各セクションを個別に表示・非表示にでき、
 `autoFocusActiveField`は初回マウントではフォーカスせず、`activeFieldId`変更時だけ質問文へフォーカスします。
 種別切替では質問や各種設定を保持します。個別slotの指定が自動UIより優先されます。
+`muiSlotProps.paper.sx`を指定しても標準のセクションスタイルとbasicSettings内のタイトル・説明間のgapは維持されます。
 投票・クイズでは質問形式の制約、追加時のradio既定値、保存可否に使える検証結果も自動適用されます。
 `contentModeOptions.controls`で各設定を編集可・読み取り専用・非表示にでき、
 `onValidationChange`で統合済みの検証状態を受け取れます。
