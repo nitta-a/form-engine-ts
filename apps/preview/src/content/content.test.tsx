@@ -12,7 +12,7 @@ describe("content mode demo", () => {
     localStorage.clear();
     window.history.replaceState(null, "", "/");
   });
-  it("creates a poll, blocks adding another question, saves and shows current results", async () => {
+  it("creates a poll, allows another question, saves and shows current results", async () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole("tab", { name: "Forms" }));
@@ -22,7 +22,7 @@ describe("content mode demo", () => {
     await user.type(dialog.getByLabelText("Title"), "Lunch vote");
     await user.click(dialog.getByRole("button", { name: "Create" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add question" })).toBeEnabled();
     expect(screen.getByRole("combobox", { name: "Result visibility" })).toBeVisible();
     await user.click(screen.getByRole("checkbox", { name: "One vote per user" }));
     await user.click(screen.getByRole("button", { name: "Save" }));

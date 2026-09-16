@@ -245,6 +245,7 @@ export interface BuilderSlotActions extends FormBuilderActions {
 
 interface BuilderSlotBaseProps {
   readonly schema: FormSchema;
+  readonly policy?: FormPolicy;
   readonly readOnly: boolean;
   readonly actions: BuilderSlotActions;
   readonly components: Required<FormBuilderComponents>;
@@ -720,6 +721,7 @@ export interface FormCompletionSlotProps {
 }
 
 export interface FormAfterFormSlotProps {
+  readonly policy?: import("@form-engine-ts/core").FormPolicy;
   readonly schema: FormSchema;
   readonly answers: Readonly<Record<string, unknown>>;
   readonly submitStatus: FormSubmitStatus;

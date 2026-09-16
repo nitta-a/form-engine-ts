@@ -1,4 +1,4 @@
-import { assertValidFormSchema } from "./schema";
+import { assertValidFormSchema, type ValidateFormSchemaOptions } from "./schema";
 import type { FormSubmissionWireSchemaType } from "./schemas/submission.zod";
 import type {
   BaseSubmissionMetadata,
@@ -18,6 +18,7 @@ import { selectVisibleAnswers } from "./visibility";
 export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
   extends ExtensibleNode {
   readonly id?: string;
+  readonly schemaValidation?: ValidateFormSchemaOptions;
   readonly idFormat?: SubmissionIdFormat;
   readonly locale: string;
   readonly submittedAt: string;
@@ -182,9 +183,10 @@ export const createSubmissionPayloadHash = hashFormSubmissionPayload;
 /** Re-validates a submission against the exact schema version used to create it. */
 function assertValidFormSubmissionInternal<TMeta extends BaseSubmissionMetadata | undefined = undefined>(
   schema: FormSchema,
-  submission: FormSubmission<TMeta>
+  submission: FormSubmission<TMeta>,
+  validation: ValidateFormSchemaOptions = {}
 ): void {
-  assertValidFormSchema(schema);
+  assertValidFormSchema(schema, validation);
   if (submission.formId !== schema.id || submission.formVersion !== schema.version) {
     throw new TypeError("Submission form identity does not match the schema.");
   }
@@ -201,8 +203,12 @@ function assertValidFormSubmissionInternal<TMeta extends BaseSubmissionMetadata 
 }
 
 /** Re-validates a submission against the exact schema version used to create it. */
-export function assertValidFormSubmission(schema: FormSchema, submission: FormSubmission): void {
-  assertValidFormSubmissionInternal(schema, submission);
+export function assertValidFormSubmission(
+  schema: FormSchema,
+  submission: FormSubmission,
+  validation: ValidateFormSchemaOptions = {}
+): void {
+  assertValidFormSubmissionInternal(schema, submission, validation);
 }
 
 function isFormSchema<TMeta extends BaseSubmissionMetadata | undefined>(
@@ -303,7 +309,7 @@ export function createSubmission<TMeta extends BaseSubmissionMetadata = BaseSubm
 
   const schema = schemaOrInput;
   if (values === undefined || options === undefined) throw new TypeError("values and options are required.");
-  assertValidFormSchema(schema);
+  assertValidFormSchema(schema, options.schemaValidation);
   const id = options.id ?? createSubmissionId(options.idFormat ?? "uuid");
   if (options.locale.trim().length === 0) throw new TypeError("Submission locale must not be empty.");
   const result = validateAnswers(schema, values);

@@ -1,5 +1,12 @@
 import type { FormSchema, FormStorageAdapter, FormSubmission } from "@form-engine-ts/core";
-import { assertValidFormSchema } from "@form-engine-ts/core";
+import {
+  assertValidFormSchema,
+  createFormLifecycleAdapter,
+  type FormLifecycleBackend,
+  type FormLifecycleOptions,
+  type FormResource,
+  type ValidateFormSchemaOptions
+} from "@form-engine-ts/core";
 
 export interface StorageLike {
   readonly length: number;
@@ -25,10 +32,10 @@ function parseJson(value: string, key: string): unknown {
   }
 }
 
-function parseSchema(value: string, key: string): FormSchema {
+function parseSchema(value: string, key: string, validation: ValidateFormSchemaOptions = {}): FormSchema {
   const parsed = parseJson(value, key);
   try {
-    assertValidFormSchema(parsed);
+    assertValidFormSchema(parsed, validation);
   } catch (cause) {
     throw new Error(`Stored schema at "${key}" is invalid.`, { cause });
   }
@@ -55,7 +62,17 @@ function encoded(value: string): string {
   return encodeURIComponent(value);
 }
 
-export function createLocalStorageAdapter(storagePrefix = "pf_", injectedStorage?: StorageLike): FormStorageAdapter {
+export function createLocalStorageAdapter(
+  storagePrefix = "pf_",
+  injectedStorage?: StorageLike,
+  options: {
+    /** @deprecated Use schemaValidation. */
+    readonly validation?: ValidateFormSchemaOptions;
+    readonly schemaValidation?: ValidateFormSchemaOptions;
+    readonly lifecycle?: FormLifecycleOptions;
+  } = {}
+): FormStorageAdapter {
+  const schemaValidation = options.schemaValidation ?? options.validation;
   const storage =
     injectedStorage ??
     (typeof globalThis.localStorage === "undefined" ? undefined : (globalThis.localStorage as StorageLike));
@@ -76,22 +93,46 @@ export function createLocalStorageAdapter(storagePrefix = "pf_", injectedStorage
     return keys;
   };
 
+  const backend: FormLifecycleBackend = {
+    resources: ["schema", "submission"],
+    async list(formId) {
+      const result: FormResource[] = [];
+      for (const kind of ["schema", "submission"] as const) {
+        for (const key of prefixedKeys(kind === "schema" ? schemaPrefix : submissionPrefix)) {
+          const raw = storage.getItem(key);
+          if (raw === null) continue;
+          const value = kind === "schema" ? parseSchema(raw, key, schemaValidation) : parseSubmission(raw, key);
+          if (("formId" in value ? value.formId : value.id) === formId) result.push({ kind, id: key, value });
+        }
+      }
+      return result;
+    },
+    async remove(resource) {
+      const raw = storage.getItem(resource.id);
+      if (raw === null) return 0;
+      if (JSON.stringify(parseJson(raw, resource.id)) !== JSON.stringify(resource.value))
+        throw new Error("Deletion revision conflict.");
+      storage.removeItem(resource.id);
+      return 1;
+    }
+  };
   return {
+    ...createFormLifecycleAdapter(backend, options.lifecycle),
     async saveSchema(schema) {
-      assertValidFormSchema(schema);
+      assertValidFormSchema(schema, schemaValidation);
       storage.setItem(schemaKey(schema.id, schema.version), JSON.stringify(schema));
     },
     async getSchema(formId, formVersion) {
       const key = schemaKey(formId, formVersion);
       const value = storage.getItem(key);
-      return value === null ? null : cloneJson(parseSchema(value, key));
+      return value === null ? null : cloneJson(parseSchema(value, key, schemaValidation));
     },
     async listSchemas() {
       return prefixedKeys(schemaPrefix)
         .map((key) => {
           const value = storage.getItem(key);
           if (value === null) throw new Error(`Stored schema at "${key}" disappeared during reading.`);
-          return parseSchema(value, key);
+          return parseSchema(value, key, schemaValidation);
         })
         .sort((left, right) => left.id.localeCompare(right.id) || left.version - right.version)
         .map(cloneJson);

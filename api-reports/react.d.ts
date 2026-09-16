@@ -491,6 +491,7 @@ interface BuilderSlotActions extends FormBuilderActions {
 }
 interface BuilderSlotBaseProps {
     readonly schema: FormSchema;
+    readonly policy?: FormPolicy;
     readonly readOnly: boolean;
     readonly actions: BuilderSlotActions;
     readonly components: Required<FormBuilderComponents>;
@@ -905,6 +906,7 @@ interface FormCompletionSlotProps {
     readonly onReset?: () => void;
 }
 interface FormAfterFormSlotProps {
+    readonly policy?: _form_engine_ts_core.FormPolicy;
     readonly schema: FormSchema;
     readonly answers: Readonly<Record<string, unknown>>;
     readonly submitStatus: FormSubmitStatus;
@@ -1394,6 +1396,7 @@ interface FormRendererPresentationProps extends SubmissionProtectionProps {
 }
 interface StandaloneFormRendererProps extends FormRendererPresentationProps {
     readonly schema: FormSchema;
+    readonly policy?: FormPolicy;
     readonly locale?: string;
     readonly translator?: TranslationAdapter;
     readonly initialValues?: FormValues;
@@ -1406,6 +1409,7 @@ interface TypedFormRendererPresentationProps<TMeta extends BaseSubmissionMetadat
 }
 interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata> extends TypedFormRendererPresentationProps<TMeta> {
     readonly schema: FormSchema;
+    readonly policy?: FormPolicy;
     readonly locale?: string;
     readonly translator?: TranslationAdapter;
     readonly initialValues?: FormValues;
@@ -1545,6 +1549,7 @@ declare function ContentRenderer<TMeta extends BaseSubmissionMetadata>(props: Ty
 
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
 interface FormContextValue {
+    readonly policy?: FormPolicy;
     readonly schema: FormSchema;
     readonly locale: string;
     readonly translator: TranslationAdapter;
@@ -1567,6 +1572,7 @@ interface TypedFormContextValue<TMeta extends BaseSubmissionMetadata = BaseSubmi
     readonly submit: (beforeSubmit?: BeforeSubmit, submitContext?: TypedSubmitContext<TMeta>) => Promise<SubmitResult>;
 }
 interface FormProviderProps {
+    readonly policy?: FormPolicy;
     readonly schema: FormSchema;
     readonly locale: string;
     readonly translator: TranslationAdapter;

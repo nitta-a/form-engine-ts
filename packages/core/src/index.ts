@@ -1,7 +1,7 @@
 export * from "./aggregation";
 export * from "./analytics";
 export * from "./contentMode";
-/** @deprecated Install `@form-engine-ts/legacy` for migration-only answers contracts. */
+export * from "./crossFormAnalytics";
 export * from "./errors";
 export * from "./events";
 export * from "./field";
@@ -10,6 +10,8 @@ export * from "./i18n/catalogs/en";
 export * from "./i18n/catalogs/ja";
 export * from "./i18n/keys";
 export * from "./i18n/translator";
+export * from "./lifecycle";
+export * from "./mapping";
 export * from "./pagination";
 export * from "./pipeline";
 export * from "./policy";

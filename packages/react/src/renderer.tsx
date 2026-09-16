@@ -4,6 +4,7 @@ import {
   deserializeSubmissionErrorFromTrpc,
   type FieldType,
   type FormField,
+  type FormPolicy,
   type FormSchema,
   FormSubmissionError,
   type FormValue,
@@ -721,6 +722,7 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
 
 export interface StandaloneFormRendererProps extends FormRendererPresentationProps {
   readonly schema: FormSchema;
+  readonly policy?: FormPolicy;
   readonly locale?: string;
   readonly translator?: TranslationAdapter;
   readonly initialValues?: FormValues;
@@ -737,6 +739,7 @@ export interface TypedFormRendererPresentationProps<TMeta extends BaseSubmission
 export interface TypedStandaloneFormRendererProps<TMeta extends BaseSubmissionMetadata = FormSubmissionMetadata>
   extends TypedFormRendererPresentationProps<TMeta> {
   readonly schema: FormSchema;
+  readonly policy?: FormPolicy;
   readonly locale?: string;
   readonly translator?: TranslationAdapter;
   readonly initialValues?: FormValues;
@@ -1766,6 +1769,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     </div>
   );
   const afterFormRegion = slots.renderAfterForm?.({
+    ...(form.policy === undefined ? {} : { policy: form.policy }),
     schema: form.schema,
     answers: activeCompletionData.answers,
     submitStatus: form.submitStatus,
@@ -2189,6 +2193,7 @@ export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   }
   const {
     schema,
+    policy,
     locale = schema.defaultLocale ?? "en",
     translator: explicitTranslator,
     initialValues,
@@ -2210,6 +2215,7 @@ export function FormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   return (
     <FormProvider<TMeta>
       schema={schema}
+      {...(policy === undefined ? {} : { policy })}
       locale={locale}
       translator={translator}
       onSubmit={

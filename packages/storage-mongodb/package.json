@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/storage-mongodb",
-  "version": "7.17.3",
+  "version": "7.18.0",
   "publishConfig": {
     "access": "public"
   },
@@ -51,6 +51,7 @@
     "mongodb": "^6.0.0"
   },
   "devDependencies": {
-    "mongodb": "^6.0.0"
+    "mongodb": "^6.0.0",
+    "@form-engine-ts/storage": "workspace:*"
   }
 }

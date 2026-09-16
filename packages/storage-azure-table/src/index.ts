@@ -26,10 +26,15 @@ import {
   assertValidFormSchema,
   assertValidFormSubmission,
   assertValidFormSubmissionWith,
+  createFormLifecycleAdapter,
   exportResponsesToCsv,
+  type FormLifecycleBackend,
+  type FormLifecycleOptions,
+  type FormResource,
   hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
-  normalizeSubmissionPageSize
+  normalizeSubmissionPageSize,
+  type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
 export interface AzureTableListOptions {
@@ -54,7 +59,7 @@ export interface AzureTableClientLike {
   upsertEntity(entity: Record<string, unknown>, mode?: "Merge" | "Replace"): Promise<unknown>;
   getEntity(partitionKey: string, rowKey: string): Promise<Record<string, unknown>>;
   listEntities(options?: AzureTableListOptions): AzureTableEntityIterator;
-  deleteEntity(partitionKey: string, rowKey: string): Promise<unknown>;
+  deleteEntity(partitionKey: string, rowKey: string, options?: { readonly etag?: string }): Promise<unknown>;
 }
 
 export type AzureTableSubmissionEntity = Record<string, unknown> & { readonly answers?: never };
@@ -85,6 +90,8 @@ export interface AzureTableValueCodec {
 }
 
 export interface AzureTableStorageOptions<T = FormSubmission> {
+  readonly schemaValidation?: ValidateFormSchemaOptions;
+  readonly lifecycle?: FormLifecycleOptions;
   /** @deprecated Use schemasTableClient, submissionsTableClient, or clientResolver. */
   readonly client?: AzureTableClientLike;
   readonly schemasTableClient?: AzureTableClientLike;
@@ -560,7 +567,7 @@ async function collectSubmissionPages(
   return submissions;
 }
 
-function parseSchemaEntity(value: Record<string, unknown>): FormSchema {
+function parseSchemaEntity(value: Record<string, unknown>, validation: ValidateFormSchemaOptions = {}): FormSchema {
   if (
     typeof value.partitionKey !== "string" ||
     typeof value.rowKey !== "string" ||
@@ -571,7 +578,7 @@ function parseSchemaEntity(value: Record<string, unknown>): FormSchema {
     throw new Error("Azure Table schema entity is invalid.");
   }
   const schema = parseJson(value.payload, `schema ${value.partitionKey}/${value.rowKey}`);
-  assertValidFormSchema(schema);
+  assertValidFormSchema(schema, validation);
   if (schema.id !== value.partitionKey || schema.version !== value.formVersion) {
     throw new Error("Azure Table schema entity has inconsistent metadata.");
   }
@@ -800,6 +807,60 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
     );
   };
 
+  const lifecycleBackend: FormLifecycleBackend = {
+    resources: ["schema", "submission"],
+    async list(formId) {
+      const records: FormResource[] = [];
+      for (const kind of ["schema", "submission"] as const) {
+        const client = kind === "schema" ? await schemaClient(formId) : await submissionClient(formId);
+        const filter =
+          kind === "schema" ? `PartitionKey eq '${escapeOData(formId)}' and kind eq 'schema'` : queryFilter(formId, {});
+        for await (const raw of client.listEntities({ queryOptions: { filter } })) {
+          if (kind === "schema" && raw.kind !== "schema") continue;
+          const value =
+            kind === "schema" ? parseSchemaEntity(raw, options.schemaValidation) : deserializeIfMatching(raw);
+          if (value === undefined || ("formId" in value ? value.formId : value.id) !== formId) continue;
+          if (typeof raw.partitionKey !== "string" || typeof raw.rowKey !== "string")
+            throw new TypeError("Missing entity keys.");
+          records.push({ kind, id: JSON.stringify([raw.partitionKey, raw.rowKey]), value: { raw, value, formId } });
+        }
+      }
+      return records;
+    },
+    async remove(resource) {
+      ensureWritable();
+      if (!isRecord(resource.value) || !isRecord(resource.value.raw) || typeof resource.value.formId !== "string")
+        throw new TypeError("Invalid deletion resource.");
+      const { raw, formId } = resource.value;
+      if (typeof raw.partitionKey !== "string" || typeof raw.rowKey !== "string" || typeof raw.etag !== "string")
+        throw new TypeError("Conditional deletion requires entity keys and an ETag.");
+      const client = resource.kind === "schema" ? await schemaClient(formId) : await submissionClient(formId);
+      try {
+        await client.deleteEntity(raw.partitionKey, raw.rowKey, { etag: raw.etag });
+        return 1;
+      } catch (error) {
+        if (isNotFound(error)) return 0;
+        throw error;
+      }
+    }
+  };
+  const lifecycle = createFormLifecycleAdapter(
+    lifecycleBackend,
+    options.lifecycle === undefined
+      ? {}
+      : {
+          ...options.lifecycle,
+          ...(options.lifecycle.scope === undefined
+            ? {}
+            : {
+                scope: (resource: FormResource) => {
+                  if (!isRecord(resource.value)) throw new TypeError("Invalid deletion resource.");
+                  return options.lifecycle?.scope?.({ ...resource, value: resource.value.value }) ?? {};
+                }
+              })
+        }
+  );
+
   const adapter: Omit<PagedSubmissionStorageAdapter, "saveSubmission"> & {
     saveSubmission(
       submission: FormSubmission,
@@ -811,7 +872,7 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
   } = {
     async saveSchema(schema) {
       ensureWritable();
-      assertValidFormSchema(schema);
+      assertValidFormSchema(schema, options.schemaValidation);
       const entity: StoredSchemaEntity = {
         partitionKey: schema.id,
         rowKey: schemaRowKey(schema.version),
@@ -823,7 +884,10 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
     },
     async getSchema(formId, formVersion) {
       try {
-        return parseSchemaEntity(await (await schemaClient(formId)).getEntity(formId, schemaRowKey(formVersion)));
+        return parseSchemaEntity(
+          await (await schemaClient(formId)).getEntity(formId, schemaRowKey(formVersion)),
+          options.schemaValidation
+        );
       } catch (error) {
         if (isNotFound(error)) return null;
         throw error;
@@ -832,7 +896,7 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
     async listSchemas() {
       const found: FormSchema[] = [];
       for await (const raw of (await schemaClient("")).listEntities({ queryOptions: { filter: "kind eq 'schema'" } })) {
-        if (raw.kind === "schema") found.push(parseSchemaEntity(raw));
+        if (raw.kind === "schema") found.push(parseSchemaEntity(raw, options.schemaValidation));
       }
       return found.sort((left, right) => left.id.localeCompare(right.id) || left.version - right.version);
     },
@@ -861,7 +925,7 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
         const schema = parseSchemaEntity(
           await (await schemaClient(stored.formId)).getEntity(stored.formId, schemaRowKey(stored.formVersion))
         );
-        assertValidFormSubmission(schema, stored);
+        assertValidFormSubmission(schema, stored, options.schemaValidation);
       }
       const payloadHash = await hashFormSubmissionPayload(stored);
       const createdEntity = codec.createEntity(stored);
@@ -1099,7 +1163,7 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
       }
       const schema = await adapter.getSchema(submission.formId, submission.formVersion);
       if (schema === null) throw new Error("Azure Table submission schema was not found.");
-      assertValidFormSubmission(schema, submission);
+      assertValidFormSubmission(schema, submission, options.schemaValidation);
     },
     async deleteSubmission(submissionId) {
       ensureWritable();
@@ -1145,6 +1209,7 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
   };
   return {
     ...adapter,
+    ...lifecycle,
     async fetchSubmissionPage(formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) {
       return (await adapter.listSubmissionPage(
         formId,

@@ -1,6 +1,12 @@
 import type { TableClient } from "@azure/data-tables";
 import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
 import {
+  runIdempotencyContract,
+  runLifecycleContract,
+  runStorageContract,
+  storageContractScope
+} from "@form-engine-ts/storage/testing";
+import {
   type AzureTableClientLike,
   type AzureTableEntityPage,
   type AzureTableSubmissionCodec,
@@ -39,7 +45,7 @@ function createClientStub() {
       );
       return {
         async *[Symbol.asyncIterator]() {
-          for (const entity of sorted) yield clone(entity);
+          for (const entity of sorted) yield { ...clone(entity), etag: JSON.stringify(entity) };
         },
         byPage(settings = {}) {
           return (async function* () {
@@ -57,7 +63,9 @@ function createClientStub() {
         }
       };
     },
-    async deleteEntity(partitionKey, rowKey) {
+    async deleteEntity(partitionKey, rowKey, options) {
+      const current = entities.get(key(partitionKey, rowKey));
+      if (options?.etag !== undefined && options.etag !== JSON.stringify(current)) throw { statusCode: 412 };
       entities.delete(key(partitionKey, rowKey));
     }
   };
@@ -440,5 +448,20 @@ describe("createAzureTableStorage", () => {
     expect(page.items).toEqual([submission("mapped")]);
     expect(filters.at(-1)).toContain("surveyVersion eq 2");
     expect(filters.at(-1)).toContain("answeredAt ge '2026-08-24T00:00:00.000Z'");
+  });
+});
+
+describe("shared storage contracts", () => {
+  it("passes JSON and pagination vectors", async () => {
+    await runStorageContract(createAzureTableStorage({ client: createClientStub().client }));
+  });
+  it("passes scoped deletion vectors", async () => {
+    await runLifecycleContract(
+      createAzureTableStorage({ client: createClientStub().client, lifecycle: { scope: storageContractScope } })
+    );
+  });
+  it("passes idempotency vectors", async () => {
+    const adapter = createAzureTableStorage<undefined>({ client: createClientStub().client, idempotency: true });
+    await runIdempotencyContract(adapter.saveSubmission);
   });
 });

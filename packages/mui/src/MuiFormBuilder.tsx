@@ -109,9 +109,10 @@ export function MuiFormBuilder({
       code: issue.code,
       message: issue.message
     }));
-    const contentIssues: readonly MuiFormBuilderValidationIssue[] = getContentModeDiagnostics(props.schema).map(
-      (issue) => ({ source: "contentMode", path: issue.path, code: issue.code, message: issue.message })
-    );
+    const contentIssues: readonly MuiFormBuilderValidationIssue[] = getContentModeDiagnostics(
+      props.schema,
+      resolvedPolicy
+    ).map((issue) => ({ source: "contentMode", path: issue.path, code: issue.code, message: issue.message }));
     const hasContentFieldCountIssue = contentIssues.some(
       (issue) => issue.code === "poll_field_count" || issue.code === "quiz_field_count"
     );

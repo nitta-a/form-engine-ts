@@ -1,3 +1,4 @@
+import { getFormContentMode, resolveContentModeSettings } from "@form-engine-ts/core";
 import type { BuilderOptionEditorSlotProps, FormBuilderSlots } from "@form-engine-ts/react";
 import { Stack } from "@mui/material";
 import type { ComponentType } from "react";
@@ -10,13 +11,19 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
     option,
     index,
     currentLocale,
+    schema,
     readOnly,
     actions,
+    policy,
     components,
     translate
   }: BuilderOptionEditorSlotProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
     const { IconButton, TextInput } = components;
+    const minimumOptions = Math.max(
+      1,
+      resolveContentModeSettings(getFormContentMode(schema.metadata), policy).minOptionsPerField ?? 1
+    );
     const describedBy = option.label.trim().length === 0 ? `mui-option-${option.id}-error` : undefined;
     return (
       <Stack {...resolved.muiSlotProps?.stack} data-mui-slot="option-editor" spacing={resolved.dense ? 0.75 : 1}>
@@ -48,7 +55,7 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
             <IconButton
               actionType="delete"
               title={translate("builder.delete", { title: option.label })}
-              disabled={readOnly || field.options.length <= 1}
+              disabled={readOnly || field.options.length <= minimumOptions}
               onClick={() => actions.removeOption(field.id, option.id)}
             />
           </Stack>

@@ -298,6 +298,20 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
   const contentSlots = slots;
   const resolvedSlots: ContentRendererSlots = {
     ...slots,
+    renderHeader:
+      contentSlots?.renderHeader ??
+      (({ title, description }) => (
+        <Stack component="header" className={props.classNames?.header} spacing={1}>
+          <Typography component="h1" className={props.classNames?.headerTitle} variant="h4">
+            {title}
+          </Typography>
+          {description === undefined ? null : (
+            <Typography component="p" className={props.classNames?.headerDescription} color="text.secondary">
+              {description}
+            </Typography>
+          )}
+        </Stack>
+      )),
     renderDraftResume:
       contentSlots?.renderDraftResume ??
       ((draft) => <MuiDraftResume props={draft} locale={locale} {...(i18n === undefined ? {} : { i18n })} />),

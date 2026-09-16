@@ -38,6 +38,7 @@ export type FieldConstraintRule =
   | BaseFieldConstraintRule;
 
 export interface FormPolicy {
+  readonly contentMode?: import("./contentMode").ContentModeSettings;
   readonly allowedFieldTypes?: readonly FieldType[];
   readonly maxFields?: number;
   readonly maxOptionsPerField?: number;
@@ -218,6 +219,19 @@ export interface FormSchema extends ExtensibleNode {
   readonly submissionSettings?: FormSubmissionSettings;
 }
 
+/** Metadata-typed schema view that keeps the legacy FormSchema contract unchanged. */
+export type TypedExtensibleNode<
+  TMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>,
+  TTranslationMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>
+> = Omit<ExtensibleNode, "metadata" | "translationMetadata"> & {
+  readonly metadata?: TMetadata;
+  readonly translationMetadata?: Readonly<Record<string, Readonly<Record<string, TTranslationMetadata>>>>;
+};
+export type TypedFormSchema<
+  TMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>,
+  TTranslationMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>
+> = Omit<FormSchema, "metadata" | "translationMetadata"> & TypedExtensibleNode<TMetadata, TTranslationMetadata>;
+
 export interface FormSubmissionSettings extends ExtensibleNode {
   readonly showConfirmationBeforeSubmit?: boolean;
   readonly confirmationRenderMode?: "dialog" | "inline" | "replace";
@@ -376,6 +390,9 @@ export interface FormStorageAdapter extends StorageAdapter {
   listSchemas(): Promise<readonly FormSchema[]>;
   deleteSchema(formId: string, formVersion: number): Promise<void>;
   deleteSubmission(submissionId: string): Promise<void>;
+  readonly inspectFormDeletion?: import("./lifecycle").FormLifecycleAdapter["inspectFormDeletion"];
+  readonly deleteForm?: import("./lifecycle").FormLifecycleAdapter["deleteForm"];
+  readonly lifecycleCapabilities?: import("./lifecycle").FormLifecycleAdapter["lifecycleCapabilities"];
 }
 
 export interface SubmissionPageQueryOptions {

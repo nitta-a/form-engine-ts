@@ -1,4 +1,4 @@
-import { FormStorageAdapter } from '@form-engine-ts/core';
+import { ValidateFormSchemaOptions, FormLifecycleOptions, FormStorageAdapter } from '@form-engine-ts/core';
 
 interface D1ResultLike<T = Record<string, unknown>> {
     readonly success: boolean;
@@ -15,6 +15,8 @@ interface D1DatabaseLike {
     batch(statements: readonly D1PreparedStatementLike[]): Promise<readonly D1ResultLike[]>;
 }
 interface D1StorageOptions {
+    readonly schemaValidation?: ValidateFormSchemaOptions;
+    readonly lifecycle?: FormLifecycleOptions;
     readonly db: D1DatabaseLike;
     readonly schemasTable?: string;
     readonly responsesTable?: string;

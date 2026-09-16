@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/core",
-  "version": "7.17.3",
+  "version": "7.18.0",
   "publishConfig": {
     "access": "public"
   },
@@ -34,6 +34,11 @@
       "types": "./dist/contentMode.d.ts",
       "import": "./dist/contentMode.js",
       "require": "./dist/contentMode.cjs"
+    },
+    "./cross-form-analytics": {
+      "types": "./dist/crossFormAnalytics.d.ts",
+      "import": "./dist/crossFormAnalytics.js",
+      "require": "./dist/crossFormAnalytics.cjs"
     },
     "./errors": {
       "types": "./dist/errors.d.ts",
@@ -84,6 +89,16 @@
       "types": "./dist/locale.d.ts",
       "import": "./dist/locale.js",
       "require": "./dist/locale.cjs"
+    },
+    "./lifecycle": {
+      "types": "./dist/lifecycle.d.ts",
+      "import": "./dist/lifecycle.js",
+      "require": "./dist/lifecycle.cjs"
+    },
+    "./mapping": {
+      "types": "./dist/mapping.d.ts",
+      "import": "./dist/mapping.js",
+      "require": "./dist/mapping.cjs"
     },
     "./pagination": {
       "types": "./dist/pagination.d.ts",
@@ -167,7 +182,7 @@
     "zod": "^4.0.0"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean && tsup src/aggregation.ts src/analytics.ts src/contentMode.ts src/errors.ts src/events.ts src/field.ts src/fieldTypes.ts src/i18n/index.ts src/i18n/catalogs/en.ts src/i18n/catalogs/ja.ts src/i18n/keys.ts src/i18n/translator.ts src/locale.ts src/pagination.ts src/pipeline.ts src/policy.ts src/responseSummary.ts src/sanitization.ts src/schema.ts src/submission.ts src/translation.ts src/types.ts src/validation.ts src/versioning.ts src/visibility.ts --format esm,cjs --dts",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && tsup src/aggregation.ts src/analytics.ts src/contentMode.ts src/crossFormAnalytics.ts src/errors.ts src/events.ts src/field.ts src/fieldTypes.ts src/i18n/index.ts src/i18n/catalogs/en.ts src/i18n/catalogs/ja.ts src/i18n/keys.ts src/i18n/translator.ts src/lifecycle.ts src/locale.ts src/mapping.ts src/pagination.ts src/pipeline.ts src/policy.ts src/responseSummary.ts src/sanitization.ts src/schema.ts src/submission.ts src/translation.ts src/types.ts src/validation.ts src/versioning.ts src/visibility.ts --format esm,cjs --dts",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"

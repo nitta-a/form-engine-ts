@@ -803,7 +803,7 @@ export async function populateSchemaTranslations(
   adapter: TranslationProvider,
   options: PopulateTranslationOptions = {}
 ): Promise<{ readonly schema: FormSchema; readonly report: TranslationReport }> {
-  assertValidFormSchema(schema);
+  assertValidFormSchema(schema, options.policy === undefined ? {} : { policy: options.policy });
   const defaultLocale =
     schema.defaultLocale === undefined ? undefined : (normalizeLocale(schema.defaultLocale) ?? schema.defaultLocale);
   const locales = [
@@ -963,7 +963,7 @@ export async function populateSchemaTranslations(
     ])
   ];
   if (supportedLocales.length > 0) result = { ...result, supportedLocales };
-  assertValidFormSchema(result);
+  assertValidFormSchema(result, options.policy === undefined ? {} : { policy: options.policy });
   return {
     schema: result,
     report: {

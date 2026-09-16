@@ -7,10 +7,15 @@ import type {
 } from "@form-engine-ts/core";
 import {
   assertValidFormSchema,
+  createFormLifecycleAdapter,
   decodeSubmissionCursor,
   encodeSubmissionCursor,
+  type FormLifecycleBackend,
+  type FormLifecycleOptions,
+  type FormResource,
   matchesSubmissionPageFilters,
-  normalizeSubmissionPageSize
+  normalizeSubmissionPageSize,
+  type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
 function cloneValue(value: FormValue): FormValue {
@@ -44,13 +49,69 @@ function schemaKey(formId: string, formVersion: number): string {
   return `${formId}@${formVersion}`;
 }
 
-export function createMemoryStorageAdapter(): PagedSubmissionStorageAdapter {
+export function createMemoryStorageAdapter(
+  options: {
+    /** @deprecated Use schemaValidation. */
+    readonly validation?: ValidateFormSchemaOptions;
+    readonly schemaValidation?: ValidateFormSchemaOptions;
+    readonly lifecycle?: FormLifecycleOptions;
+  } = {}
+): PagedSubmissionStorageAdapter {
   const submissions = new Map<string, FormSubmission>();
   const schemas = new Map<string, FormSchema>();
+  const schemaValidation = options.schemaValidation ?? options.validation;
 
+  const backend: FormLifecycleBackend = {
+    resources: ["schema", "submission"],
+    async list(formId) {
+      return [
+        ...[...schemas]
+          .filter(([, value]) => value.id === formId)
+          .map(([id, value]): FormResource => ({ kind: "schema", id, value: cloneJson(value) })),
+        ...[...submissions]
+          .filter(([, value]) => value.formId === formId)
+          .map(([id, value]): FormResource => ({ kind: "submission", id, value: cloneJson(value) }))
+      ];
+    },
+    async remove(resource) {
+      const map = resource.kind === "schema" ? schemas : submissions;
+      if (JSON.stringify(map.get(resource.id)) !== JSON.stringify(resource.value))
+        throw new Error("Deletion revision conflict.");
+      return map.delete(resource.id) ? 1 : 0;
+    },
+    async transaction(operation) {
+      const originalSchemas = new Map(schemas);
+      const originalSubmissions = new Map(submissions);
+      const pending: FormResource[] = [];
+      const result = await operation({
+        ...backend,
+        remove: async (resource) => {
+          pending.push(resource);
+          return 1;
+        }
+      });
+      // ponytail: any concurrent write conflicts; per-form revisions if contention matters.
+      if (
+        schemas.size !== originalSchemas.size ||
+        submissions.size !== originalSubmissions.size ||
+        [...originalSchemas].some(([key, value]) => schemas.get(key) !== value) ||
+        [...originalSubmissions].some(([key, value]) => submissions.get(key) !== value)
+      )
+        throw new Error("Deletion revision conflict.");
+      // Validate and commit without yielding, so ordinary writes cannot interleave.
+      for (const resource of pending) {
+        const map = resource.kind === "schema" ? schemas : submissions;
+        if (JSON.stringify(map.get(resource.id)) !== JSON.stringify(resource.value))
+          throw new Error("Deletion revision conflict.");
+      }
+      for (const resource of pending) (resource.kind === "schema" ? schemas : submissions).delete(resource.id);
+      return result;
+    }
+  };
   return {
+    ...createFormLifecycleAdapter(backend, options.lifecycle),
     async saveSchema(schema) {
-      assertValidFormSchema(schema);
+      assertValidFormSchema(schema, schemaValidation);
       schemas.set(schemaKey(schema.id, schema.version), cloneSchema(schema));
     },
     async getSchema(formId, formVersion) {

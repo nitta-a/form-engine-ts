@@ -23,6 +23,7 @@ export interface CustomFormMetadata {
 }
 
 export type ContentModeConstraintCode =
+  | "CONTENT_MODE_CONSTRAINT"
   | "POLL_SINGLE_FIELD_REQUIRED"
   | "POLL_INVALID_FIELD_TYPE"
   | "POLL_MIN_OPTIONS_REQUIRED"
@@ -79,68 +80,83 @@ function isChoiceField(
   return field.type === "select" || field.type === "radio" || field.type === "multi-select";
 }
 
-function addConstraintIssue(
-  issues: ContentModeConstraintIssue[],
-  path: string,
-  code: ContentModeConstraintCode,
-  message: string
-): void {
-  issues.push({ path, code, message });
+export interface ContentModeSettings {
+  readonly minFields?: number;
+  readonly maxFields?: number;
+  readonly allowedFieldTypes?: FormPolicy["allowedFieldTypes"];
+  readonly minOptionsPerField?: number;
+  readonly maxOptionsPerField?: number;
+  readonly evaluateQuiz?: (schema: FormSchema, answers: FormValues) => QuizEvaluationResult;
 }
 
-export function validateContentModeConstraints(schema: FormSchema): ContentModeValidationResult {
-  const mode = getFormContentMode(schema.metadata);
-  const issues: ContentModeConstraintIssue[] = [];
-  if (mode === "survey") return { valid: true, issues };
-
-  if (mode === "poll") {
-    if (schema.fields.length !== 1)
-      addConstraintIssue(issues, "fields", "POLL_SINGLE_FIELD_REQUIRED", "Polls require exactly one question.");
-    schema.fields.forEach((field, index) => {
-      if (field.type !== "radio" && field.type !== "multi-select") {
-        addConstraintIssue(
-          issues,
-          `fields[${index}].type`,
-          "POLL_INVALID_FIELD_TYPE",
-          "Poll questions must use radio or multi-select fields."
-        );
-        return;
-      }
-      const options = Array.isArray(field.options) ? field.options : [];
-      if (options.length < 2)
-        addConstraintIssue(
-          issues,
-          `fields[${index}].options`,
-          "POLL_MIN_OPTIONS_REQUIRED",
-          "Poll questions require at least two options."
-        );
-    });
+export function resolveContentModeSettings(mode: FormContentMode, policy: FormPolicy = {}): ContentModeSettings {
+  const settings = policy.contentMode ?? {};
+  for (const value of [
+    settings.minFields,
+    settings.maxFields,
+    settings.minOptionsPerField,
+    settings.maxOptionsPerField,
+    policy.maxFields,
+    policy.maxOptionsPerField
+  ]) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0))
+      throw new TypeError("Content mode limits must be non-negative safe integers.");
   }
+  const defaults = mode === "poll" ? (["radio", "multi-select"] as const) : (["radio"] as const);
+  const allowed = settings.allowedFieldTypes ?? (mode === "survey" ? undefined : defaults);
+  const minimum = (a: number | undefined, b: number | undefined) =>
+    a === undefined ? b : b === undefined ? a : Math.min(a, b);
+  const maxFields = minimum(settings.maxFields, policy.maxFields);
+  const maxOptionsPerField = minimum(settings.maxOptionsPerField, policy.maxOptionsPerField);
+  const minFields = settings.minFields ?? (mode === "survey" ? 0 : 1);
+  const minOptionsPerField = settings.minOptionsPerField ?? (mode === "survey" ? 0 : 2);
+  return {
+    ...settings,
+    minFields,
+    minOptionsPerField,
+    ...(maxFields === undefined ? {} : { maxFields }),
+    ...(maxOptionsPerField === undefined ? {} : { maxOptionsPerField }),
+    ...(allowed === undefined
+      ? policy.allowedFieldTypes === undefined
+        ? {}
+        : { allowedFieldTypes: policy.allowedFieldTypes }
+      : {
+          allowedFieldTypes: allowed.filter(
+            (type) => policy.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
+          )
+        })
+  };
+}
 
-  if (mode === "quiz") {
-    schema.fields.forEach((field, index) => {
-      if (!isChoiceField(field)) return;
-      const metadata = readQuizFieldMetadata(field.metadata);
-      if (metadata.correctOptionId.length === 0) {
-        addConstraintIssue(
-          issues,
-          `fields[${index}].metadata.quiz.correctOptionId`,
-          "QUIZ_CORRECT_OPTION_MISSING",
-          "Quiz questions require a correct option."
-        );
-        return;
-      }
-      const options = Array.isArray(field.options) ? field.options : [];
-      if (!options.some((option) => option.id === metadata.correctOptionId))
-        addConstraintIssue(
-          issues,
-          `fields[${index}].metadata.quiz.correctOptionId`,
-          "QUIZ_INVALID_CORRECT_OPTION",
-          "Quiz correctOptionId must reference an existing option."
-        );
-    });
-  }
-
+export function validateContentModeConstraints(
+  schema: FormSchema,
+  policy: FormPolicy = {}
+): ContentModeValidationResult {
+  const diagnostics = getContentModeDiagnostics(schema, policy);
+  const codes: Partial<Record<ContentModeIssueCode, ContentModeConstraintCode>> = {
+    poll_field_count: "POLL_SINGLE_FIELD_REQUIRED",
+    unsupported_field_type:
+      getFormContentMode(schema.metadata) === "poll" ? "POLL_INVALID_FIELD_TYPE" : "CONTENT_MODE_CONSTRAINT",
+    options_minimum: "POLL_MIN_OPTIONS_REQUIRED",
+    correct_option_missing: "QUIZ_CORRECT_OPTION_MISSING"
+  };
+  const issues = diagnostics.map(({ path, code, message }) => {
+    const index = schema.fields.findIndex((field) => field.id === path);
+    const field = schema.fields[index];
+    const mappedCode =
+      code === "correct_option_missing" &&
+      field !== undefined &&
+      readQuizFieldMetadata(field.metadata).correctOptionId.length > 0
+        ? "QUIZ_INVALID_CORRECT_OPTION"
+        : (codes[code] ?? "CONTENT_MODE_CONSTRAINT");
+    const suffix =
+      code === "unsupported_field_type"
+        ? ".type"
+        : code === "correct_option_missing"
+          ? ".metadata.quiz.correctOptionId"
+          : ".options";
+    return { path: index < 0 ? path : `fields[${index}]${suffix}`, code: mappedCode, message };
+  });
   return { valid: issues.length === 0, issues };
 }
 /** Explicit JSON boundary: rejects non-JSON values instead of silently dropping them. */
@@ -198,15 +214,12 @@ export function createInitialSchemaByMode(
   };
 }
 export function getContentModePolicy(mode: FormContentMode, policy: FormPolicy = {}): FormPolicy {
-  if (mode === "survey") return policy;
-  const allowedFieldTypes: NonNullable<FormPolicy["allowedFieldTypes"]> =
-    mode === "poll" ? ["radio", "multi-select"] : ["radio"];
+  const settings = resolveContentModeSettings(mode, policy);
   return {
     ...policy,
-    allowedFieldTypes: allowedFieldTypes.filter(
-      (type) => policy.allowedFieldTypes === undefined || policy.allowedFieldTypes.includes(type)
-    ),
-    ...(mode === "poll" ? { maxFields: Math.min(1, policy.maxFields ?? 1) } : {})
+    ...(settings.allowedFieldTypes === undefined ? {} : { allowedFieldTypes: settings.allowedFieldTypes }),
+    ...(settings.maxFields === undefined ? {} : { maxFields: settings.maxFields }),
+    ...(settings.maxOptionsPerField === undefined ? {} : { maxOptionsPerField: settings.maxOptionsPerField })
   };
 }
 export interface ContentModeIssue {
@@ -214,6 +227,9 @@ export interface ContentModeIssue {
   readonly message: string;
 }
 export type ContentModeIssueCode =
+  | "field_count"
+  | "options_maximum"
+  | "quiz_evaluator_missing"
   | "poll_field_count"
   | "quiz_field_count"
   | "unsupported_field_type"
@@ -230,23 +246,42 @@ export interface ContentModeDiagnostic extends ContentModeIssue {
   readonly code: ContentModeIssueCode;
 }
 /** Opt-in validation, separate from the backwards-compatible base schema validator. */
-export function getContentModeDiagnostics(schema: FormSchema): readonly ContentModeDiagnostic[] {
+export function getContentModeDiagnostics(
+  schema: FormSchema,
+  policy: FormPolicy = {}
+): readonly ContentModeDiagnostic[] {
   const mode = getFormContentMode(schema.metadata);
   const issues: ContentModeDiagnostic[] = [];
   const add = (path: string, code: ContentModeIssueCode, message: string) => issues.push({ path, code, message });
-  if (mode === "survey") return issues;
-  if (mode === "poll" && schema.fields.length !== 1)
-    add("fields", "poll_field_count", "Polls require exactly one question.");
-  if (mode === "quiz" && schema.fields.length === 0)
-    add("fields", "quiz_field_count", "Quizzes require at least one question.");
+  const settings = resolveContentModeSettings(mode, policy);
+  if (
+    schema.fields.length < (settings.minFields ?? 0) ||
+    (settings.maxFields !== undefined && schema.fields.length > settings.maxFields)
+  )
+    add(
+      "fields",
+      mode === "poll" ? "poll_field_count" : mode === "quiz" ? "quiz_field_count" : "field_count",
+      "Question count is outside the configured limits."
+    );
   let total = 0;
   for (const field of schema.fields) {
-    if (field.type !== "radio" && !(mode === "poll" && field.type === "multi-select"))
+    if (settings.allowedFieldTypes !== undefined && !settings.allowedFieldTypes.includes(field.type))
       add(field.id, "unsupported_field_type", "Unsupported question type.");
     const options = "options" in field && Array.isArray(field.options) ? field.options : undefined;
-    if (options === undefined || options.length < 2)
-      add(field.id, "options_minimum", "At least two options are required.");
+    if (isChoiceField(field) && (options?.length ?? 0) < (settings.minOptionsPerField ?? 0))
+      add(field.id, "options_minimum", "Too few options for the configured minimum.");
+    if (
+      options !== undefined &&
+      settings.maxOptionsPerField !== undefined &&
+      options.length > settings.maxOptionsPerField
+    )
+      add(field.id, "options_maximum", "Too many options for the configured maximum.");
     if (mode !== "quiz") continue;
+    if (settings.evaluateQuiz !== undefined) continue;
+    if (field.type !== "radio") {
+      add(field.id, "quiz_evaluator_missing", "A custom evaluator is required for this question type.");
+      continue;
+    }
     const quiz = readQuizFieldMetadata(field.metadata);
     if (options === undefined || !options.some((option) => option.id === quiz.correctOptionId))
       add(field.id, "correct_option_missing", "Select a correct option.");
@@ -277,14 +312,20 @@ export function getContentModeDiagnostics(schema: FormSchema): readonly ContentM
     )
       add("metadata.quiz", "quiz_explanation_timing", "Invalid explanation timing.");
     const score = raw.passingScore;
-    if (score !== undefined && (typeof score !== "number" || !Number.isFinite(score) || score < 0 || score > total))
+    if (
+      score !== undefined &&
+      (typeof score !== "number" ||
+        !Number.isFinite(score) ||
+        score < 0 ||
+        (settings.evaluateQuiz === undefined && score > total))
+    )
       add("metadata.quiz.passingScore", "quiz_passing_score", "Passing score must be between zero and total points.");
   }
   return issues;
 }
 /** Opt-in validation, separate from the backwards-compatible base schema validator. */
-export function validateContentMode(schema: FormSchema): readonly ContentModeIssue[] {
-  return getContentModeDiagnostics(schema).map(({ path, message }) => ({ path, message }));
+export function validateContentMode(schema: FormSchema, policy: FormPolicy = {}): readonly ContentModeIssue[] {
+  return getContentModeDiagnostics(schema, policy).map(({ path, message }) => ({ path, message }));
 }
 export interface QuizQuestionResult {
   readonly fieldId: string;
@@ -324,9 +365,32 @@ export interface QuizEvaluationResult {
   };
 }
 
-export function evaluateQuizLocally(schema: FormSchema, answers: FormValues): QuizEvaluationResult {
-  if (getFormContentMode(schema.metadata) !== "quiz" || !validateContentModeConstraints(schema).valid)
+export function evaluateQuizLocally(
+  schema: FormSchema,
+  answers: FormValues,
+  policy: FormPolicy = {}
+): QuizEvaluationResult {
+  if (getFormContentMode(schema.metadata) !== "quiz" || !validateContentModeConstraints(schema, policy).valid)
     throw new TypeError("Invalid quiz schema.");
+  const evaluator = policy.contentMode?.evaluateQuiz;
+  if (evaluator !== undefined) {
+    const result = evaluator(schema, answers);
+    if (
+      !Number.isFinite(result.totalScore) ||
+      !Number.isFinite(result.maxPossibleScore) ||
+      result.totalScore < 0 ||
+      result.maxPossibleScore < result.totalScore ||
+      result.questions.some(
+        (question) =>
+          !Number.isFinite(question.scoreEarned) ||
+          !Number.isFinite(question.maxScore) ||
+          question.scoreEarned < 0 ||
+          question.maxScore < question.scoreEarned
+      )
+    )
+      throw new TypeError("Invalid quiz evaluation.");
+    return result;
+  }
   const visibility = calculateFieldVisibility(schema, answers);
   const questions: QuizQuestionEvaluation[] = [];
   for (const field of schema.fields) {
@@ -356,8 +420,8 @@ export function evaluateQuizLocally(schema: FormSchema, answers: FormValues): Qu
   };
 }
 
-export function evaluateQuiz(schema: FormSchema, answers: FormValues): QuizResult {
-  const evaluation = evaluateQuizLocally(schema, answers);
+export function evaluateQuiz(schema: FormSchema, answers: FormValues, policy: FormPolicy = {}): QuizResult {
+  const evaluation = evaluateQuizLocally(schema, answers, policy);
   return {
     questions: evaluation.questions.map((question) => {
       const field = schema.fields.find((candidate) => candidate.id === question.questionId);

@@ -229,12 +229,12 @@ describe("MuiFormBuilder content integration", () => {
     await userEvent.keyboard(" ");
     expect(answer).toBeChecked();
   });
-  it("applies poll policy and a radio default while allowing an explicit policy opt-out", async () => {
+  it("applies poll defaults while allowing an explicit policy opt-out", async () => {
     const poll = { ...createInitialSchemaByMode("poll", { title: "Poll", locale: "en" }), fields: [] };
     const { unmount } = render(<Editor initial={poll} />);
     await userEvent.click(screen.getByRole("button", { name: "Add question" }));
     expect(current().fields[0]?.type).toBe("radio");
-    expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add question" })).toBeEnabled();
     unmount();
 
     render(<Editor initial={poll} contentModeOptions={{ applyPolicy: false }} />);
@@ -314,7 +314,7 @@ describe("MuiFormBuilder content integration", () => {
     );
     await waitFor(() => expect(onValidationChange).toHaveBeenCalled());
     const state = onValidationChange.mock.lastCall?.[0];
-    expect(state.issues.filter((issue: { code: string }) => issue.code === "poll_field_count")).toHaveLength(1);
+    expect(state.issues.filter((issue: { code: string }) => issue.code === "poll_field_count")).toHaveLength(0);
     expect(state.issues.filter((issue: { code: string }) => issue.code === "max_fields_exceeded")).toHaveLength(0);
   });
   it("reports validation state for survey mode without adding a summary", async () => {

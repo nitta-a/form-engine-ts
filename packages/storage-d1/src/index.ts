@@ -1,5 +1,12 @@
 import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine-ts/core";
-import { assertValidFormSchema } from "@form-engine-ts/core";
+import {
+  assertValidFormSchema,
+  createFormLifecycleAdapter,
+  type FormLifecycleBackend,
+  type FormLifecycleOptions,
+  type FormResource,
+  type ValidateFormSchemaOptions
+} from "@form-engine-ts/core";
 
 export interface D1ResultLike<T = Record<string, unknown>> {
   readonly success: boolean;
@@ -19,6 +26,8 @@ export interface D1DatabaseLike {
 }
 
 export interface D1StorageOptions {
+  readonly schemaValidation?: ValidateFormSchemaOptions;
+  readonly lifecycle?: FormLifecycleOptions;
   readonly db: D1DatabaseLike;
   readonly schemasTable?: string;
   readonly responsesTable?: string;
@@ -84,12 +93,12 @@ function parseSubmission(value: unknown, location: string): FormSubmission {
   return cloneJson(parsed) as unknown as FormSubmission;
 }
 
-function parseSchemaRow(value: unknown, index: number): FormSchema {
+function parseSchemaRow(value: unknown, index: number, validation: ValidateFormSchemaOptions = {}): FormSchema {
   if (!isRecord(value)) throw new Error(`D1 schema row ${index} is invalid.`);
   const row = value as unknown as SchemaRow;
   const schema = parseJson(row.schema_json, `schema row ${index}`);
   try {
-    assertValidFormSchema(schema);
+    assertValidFormSchema(schema, validation);
   } catch (cause) {
     throw new Error(`D1 schema row ${index} is invalid.`, { cause });
   }
@@ -190,10 +199,75 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
     await migration;
   };
 
+  function lifecycleBackend(client: D1DatabaseLike): FormLifecycleBackend {
+    const query = async (sql: string, params: unknown[]): Promise<readonly unknown[]> => {
+      const result = await boundStatement(client, sql, params).all<unknown>();
+      assertSuccessful(result, "lifecycle");
+      if (result.results === undefined) throw new Error("D1 lifecycle result missing rows.");
+      return result.results;
+    };
+    const marker = (_index: number) => "?";
+    return {
+      resources: ["schema", "submission"],
+      async list(formId) {
+        await ensureReady();
+        const records: FormResource[] = [];
+        for (const kind of ["schema", "submission"] as const) {
+          const table = kind === "schema" ? schemasTable : responsesTable;
+          const rows = await query(`SELECT * FROM ${table} WHERE form_id = ${marker(1)}`, [formId]);
+          for (const row of rows) {
+            if (!isRecord(row)) throw new TypeError("Invalid lifecycle row.");
+            const payload = row[kind === "schema" ? "schema_json" : "submission_json"];
+            const value = parseJson(payload, "lifecycle");
+            const id = kind === "schema" ? JSON.stringify([row.form_id, row.form_version]) : String(row.response_id);
+            records.push({ kind, id, value: { row, value } });
+          }
+        }
+        return records;
+      },
+      async remove(resource) {
+        if (!isRecord(resource.value) || !isRecord(resource.value.row))
+          throw new TypeError("Invalid lifecycle resource.");
+        const row = resource.value.row;
+        const schema = resource.kind === "schema";
+        const table = schema ? schemasTable : responsesTable;
+        const payloadColumn = schema ? "schema_json" : "submission_json";
+        const payload = row[payloadColumn];
+        const params: unknown[] = schema ? [row.form_id, row.form_version] : [row.response_id, row.form_id];
+        const identity = schema
+          ? `form_id = ${marker(1)} AND form_version = ${marker(2)}`
+          : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
+        params.push(typeof payload === "string" ? payload : JSON.stringify(payload));
+        const deleted = await query(
+          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(3)} RETURNING ${schema ? "form_id" : "response_id"}`,
+          params
+        );
+        if (deleted.length === 0) throw new Error("Deletion revision conflict or record disappeared.");
+        return deleted.length;
+      }
+    };
+  }
+  const lifecycle = createFormLifecycleAdapter(
+    lifecycleBackend(options.db),
+    options.lifecycle === undefined
+      ? {}
+      : {
+          ...options.lifecycle,
+          ...(options.lifecycle.scope === undefined
+            ? {}
+            : {
+                scope: (resource: FormResource) => {
+                  if (!isRecord(resource.value)) throw new TypeError("Invalid lifecycle resource.");
+                  return options.lifecycle?.scope?.({ ...resource, value: resource.value.value }) ?? {};
+                }
+              })
+        }
+  );
   return {
+    ...lifecycle,
     async saveSchema(schema) {
       await ensureReady();
-      assertValidFormSchema(schema);
+      assertValidFormSchema(schema, options.schemaValidation);
       await run(
         `INSERT INTO ${schemasTable} (form_id, form_version, schema_json, updated_at)
          VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -209,14 +283,14 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
         `SELECT form_id, form_version, schema_json FROM ${schemasTable} WHERE form_id = ? AND form_version = ? LIMIT 1`,
         [formId, formVersion]
       ).first<SchemaRow>();
-      return row === null ? null : parseSchemaRow(row, 0);
+      return row === null ? null : parseSchemaRow(row, 0, options.schemaValidation);
     },
     async listSchemas() {
       await ensureReady();
       const rows = await all<SchemaRow>(
         `SELECT form_id, form_version, schema_json FROM ${schemasTable} ORDER BY form_id, form_version`
       );
-      return rows.map(parseSchemaRow);
+      return rows.map((row, index) => parseSchemaRow(row, index, options.schemaValidation));
     },
     async deleteSchema(formId, formVersion) {
       await ensureReady();

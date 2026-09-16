@@ -63,8 +63,8 @@ describe("MUI content slots", () => {
     await user.clear(screen.getByLabelText("Passing score"));
     expect(screen.getByTestId("schema")).not.toHaveTextContent("passingScore");
     expect(screen.getByTestId("issues")).toBeEmptyDOMElement();
-    await user.click(screen.getByRole("button", { name: "Delete Option 1" }));
-    await waitFor(() => expect(screen.getByTestId("issues")).toHaveTextContent("Select a correct option."));
+    expect(screen.getByRole("button", { name: "Delete Option 1" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByTestId("issues")).toBeEmptyDOMElement());
     expect(screen.getByRole("radio", { name: "Correct answer: Option 2" })).not.toBeChecked();
   });
   it("reads absent quiz settings as an unset correct answer", () => {

@@ -40,8 +40,9 @@ to fill the requested logical page after client-side filtering. `buildSubmission
 The caller owns table creation, credentials, retries, and client lifecycle.
 
 The default codec persists the canonical `FormSubmission.values` payload and never creates an `answers` property. The
-standard adapter rejects entities containing the legacy `answers` column; it does not decode or migrate them. Legacy
-codecs are available only from `@form-engine-ts/legacy`. `idempotentSubmissions: true` enables typed `created`, `duplicate`, and `conflict` results from
+standard adapter rejects entities containing the legacy `answers` column; it does not decode or migrate them.
+Applications must migrate legacy data to the canonical `values` contract before using this adapter.
+`idempotentSubmissions: true` enables typed `created`, `duplicate`, and `conflict` results from
 `saveSubmission(submission)`. Pass `validateAgainstSchema: true` to re-validate against the stored schema. Pass
 `submissionSchema`, `submissionValidator`, or `validation` to validate every submission before it is written; the same
 source can be supplied per call as `saveSubmission(submission, { validation })`. A source can be a FormSchema, a

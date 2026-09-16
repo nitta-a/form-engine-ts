@@ -54,6 +54,20 @@ function pollAnalytics(schema: FormSchema): FormAnalytics {
 }
 
 describe("MuiContentRenderer", () => {
+  it("separates the form title and description in the MUI header", () => {
+    render(
+      <MuiContentRenderer
+        schema={{ ...quizSchema(), title: "Form title", description: "Form description" }}
+        locale="en"
+        onSubmit={async () => undefined}
+      />
+    );
+
+    const header = screen.getByRole("heading", { name: "Form title" }).parentElement;
+    expect(header).toHaveClass("MuiStack-root");
+    expect(header).toContainElement(screen.getByText("Form description"));
+  });
+
   it("shows immediate quiz feedback and a final score", async () => {
     render(<MuiContentRenderer schema={quizSchema()} locale="en" onSubmit={async () => undefined} />);
     await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));

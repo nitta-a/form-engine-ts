@@ -6,8 +6,11 @@ import {
   type FormPage,
   type FormPolicy,
   type FormSchema,
+  getContentModePolicy,
+  getFormContentMode,
   type JsonValue,
   type QuestionType,
+  resolveContentModeSettings,
   type SchemaIssue,
   transformFieldType,
   validateFormSchema
@@ -295,7 +298,7 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
   const {
     schema,
     onChange,
-    policy,
+    policy: hostPolicy,
     idFactory = defaultIdFactory,
     factories = {},
     fieldEditorMode = "all",
@@ -303,6 +306,10 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
     defaultActiveFieldId,
     onActiveFieldChange
   } = options;
+  const policy = useMemo(
+    () => getContentModePolicy(getFormContentMode(schema.metadata), hostPolicy),
+    [schema.metadata, hostPolicy]
+  );
   const isActiveFieldControlled = Object.hasOwn(options, "activeFieldId");
   const [internalActiveFieldId, setInternalActiveFieldId] = useState<string | undefined>(
     defaultActiveFieldId ?? (fieldEditorMode === "single" ? schema.fields[0]?.id : undefined)
@@ -422,16 +429,23 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       let field = (factories.createField ?? defaultCreateField)(type, fieldId.id);
       if (field.id !== fieldId.id || field.type !== type || fieldIds.has(field.id))
         return { success: false, error: { type: "invalid_id", kind: "field", id: field.id } };
-      if (CHOICE_TYPES.includes(type) && "options" in field && field.options.length === 0) {
-        const optionIds = new Set(
-          schema.fields.flatMap((item) => ("options" in item ? item.options.map((option) => option.id) : []))
-        );
+      const minimumOptions = Math.max(
+        1,
+        resolveContentModeSettings(getFormContentMode(schema.metadata), policy).minOptionsPerField ?? 1
+      );
+      if ("options" in field && policy.maxOptionsPerField !== undefined && minimumOptions > policy.maxOptionsPerField)
+        return { success: false, error: { type: "invalid_operation", message: "Option limits conflict." } };
+      while (CHOICE_TYPES.includes(type) && "options" in field && field.options.length < minimumOptions) {
+        const optionIds = new Set([
+          ...schema.fields.flatMap((item) => ("options" in item ? item.options.map((option) => option.id) : [])),
+          ...field.options.map((option) => option.id)
+        ]);
         const optionId = createId("option", optionIds);
         if (optionId.id === undefined) return failedId("option", optionId);
         const option = (factories.createOption ?? defaultCreateOption)(field, optionId.id);
         if (option.id !== optionId.id || optionIds.has(option.id))
           return { success: false, error: { type: "invalid_id", kind: "option", id: option.id } };
-        field = { ...field, options: [option] } as FormField;
+        field = { ...field, options: [...field.options, option] } as FormField;
       }
       field = applyFieldConstraintDefaults(field, policy);
       const pages = schema.pages?.map((page, index) => ({
@@ -452,7 +466,10 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
     (fieldId: string): BuilderActionResult => {
       if (!schema.fields.some((field) => field.id === fieldId))
         return { success: false, error: { type: "node_not_found", kind: "field", id: fieldId } };
-      if (schema.fields.length <= 1)
+      if (
+        schema.fields.length <=
+        Math.max(1, resolveContentModeSettings(getFormContentMode(schema.metadata), policy).minFields ?? 1)
+      )
         return { success: false, error: { type: "invalid_operation", message: "A form must contain one field." } };
       const removedIndex = schema.fields.findIndex((field) => field.id === fieldId);
       const fields = schema.fields
@@ -472,7 +489,7 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       if (activeFieldId === fieldId) setActiveFieldId(fields[removedIndex]?.id ?? fields.at(-1)?.id);
       return { success: true };
     },
-    [activeFieldId, onChange, schema, setActiveFieldId]
+    [activeFieldId, onChange, policy, schema, setActiveFieldId]
   );
 
   const moveField = useCallback(
@@ -546,7 +563,10 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       if (field === undefined) return { success: false, error: { type: "node_not_found", kind: "field", id: fieldId } };
       if (!("options" in field) || !field.options.some((option) => option.id === optionId))
         return { success: false, error: { type: "node_not_found", kind: "option", id: optionId } };
-      if (field.options.length <= 1)
+      if (
+        field.options.length <=
+        Math.max(1, resolveContentModeSettings(getFormContentMode(schema.metadata), policy).minOptionsPerField ?? 1)
+      )
         return { success: false, error: { type: "invalid_operation", message: "A choice field needs one option." } };
       const constraint = policy?.fieldConstraints?.[field.type];
       if (

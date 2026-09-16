@@ -1,4 +1,4 @@
-import { FormStorageAdapter } from '@form-engine-ts/core';
+import { ValidateFormSchemaOptions, FormLifecycleOptions, FormStorageAdapter } from '@form-engine-ts/core';
 
 interface StorageLike {
     readonly length: number;
@@ -7,6 +7,11 @@ interface StorageLike {
     removeItem(key: string): void;
     key(index: number): string | null;
 }
-declare function createLocalStorageAdapter(storagePrefix?: string, injectedStorage?: StorageLike): FormStorageAdapter;
+declare function createLocalStorageAdapter(storagePrefix?: string, injectedStorage?: StorageLike, options?: {
+    /** @deprecated Use schemaValidation. */
+    readonly validation?: ValidateFormSchemaOptions;
+    readonly schemaValidation?: ValidateFormSchemaOptions;
+    readonly lifecycle?: FormLifecycleOptions;
+}): FormStorageAdapter;
 
 export { type StorageLike, createLocalStorageAdapter };

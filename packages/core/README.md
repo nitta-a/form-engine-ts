@@ -97,7 +97,7 @@ through creation and wire conversion. Applications that own storage contracts ca
 and `TypedPagedSubmissionStorageAdapter<TMeta>` to retain that type through persistence and pagination. `toFormSubmissionWire` and
 `fromFormSubmissionWire` preserve the optional submission `locale` across validated wire payloads. Use
 `createFormSubmissionSchema({ metadata })` to generate a wire schema with application-owned metadata validation. Legacy
-payloads with `answers` are provided by the separate `@form-engine-ts/legacy` package.
+payloads with `answers` must be migrated to the canonical `values` contract by the application.
 `serializeSubmissionError` and `deserializeSubmissionError` provide the JSON boundary for `FormSubmissionError`, while
 `trpcSubmissionErrorAdapter` handles tRPC `data` and `shape.data` boundaries.
 `TrpcSubmissionErrorFormatter` is structurally compatible with tRPC's standard formatter input;
@@ -254,7 +254,7 @@ See the [project documentation](https://github.com/nitta-a/form-engine-ts#readme
 `FormContentMode`, `CustomFormMetadata`, `PollMetadata`, `QuizMetadata` and
 `QuizFieldMetadata` are optional metadata contracts. `getFormContentMode(metadata)`
 returns `survey` for absent or unrecognized modes. `validateFormSchema` now also
-enforces mode-specific structure: polls have exactly one radio/multi-select question
+enforces mode-specific structure: polls have at least one radio/multi-select question
 with at least two options, and every quiz choice question must reference an existing
 correct option. `getContentModeDiagnostics(schema)` returns stable issue codes for
 localized UIs; `validateContentMode(schema)` retains its path/message result for
@@ -274,10 +274,24 @@ before persistence), no survey questions, or one required radio question with tw
 options for poll/quiz. An empty survey is an editing draft and still fails the base
 validator until a question is added. Quiz presets include `option-1` as a valid
 correct answer so they can be validated and rendered immediately. Poll allows
-`radio` / `multi-select` and exactly one question;
+`radio` / `multi-select`; the default poll has no maximum question count.
 quiz allows `radio`. Mode policy intersects allowed types and never raises a host
 limit. React's low-level builder applies it through `policy`; `MuiFormBuilder`
 applies it automatically for poll/quiz unless `contentModeOptions.applyPolicy` is false.
+
+Use `FormPolicy.contentMode` to configure the same limits for validation, diagnostics,
+Builder and respondent evaluation. For example, `getContentModePolicy("poll", {
+contentMode: { maxFields: 10, minOptionsPerField: 2 } })` produces the effective policy.
+Quiz formats that are not radio can provide `contentMode.evaluateQuiz`; the evaluator
+result is checked at the boundary before it is used.
+
+`mapField`, `mapOption`, `mapPage`, `mapSchema` and `createSchemaDomainCodec` preserve
+unknown JSON properties, page/condition references and typed metadata while validating both
+conversion boundaries. `aggregateForms` adds locale, content-mode, metadata and optional
+quiz score groups without changing `aggregateResponses`.
+
+Use `TypedFormSchema<TMetadata, TTranslationMetadata>` when an application owns metadata
+types; the legacy `FormSchema` shape remains available without type arguments.
 
 `contentMetadataToJson` copies JSON metadata and rejects undefined, non-finite,
 cyclic and non-JSON data. `readPollMetadata`, `readQuizMetadata` and

@@ -29,14 +29,19 @@ import {
   assertValidFormSchema,
   assertValidFormSubmission,
   assertValidFormSubmissionWith,
+  createFormLifecycleAdapter,
   decodeSubmissionCursor,
   decodeTextAnswerCursor,
   encodeSubmissionCursor,
   encodeTextAnswerCursor,
   exportResponsesToCsv,
+  type FormLifecycleBackend,
+  type FormLifecycleOptions,
+  type FormResource,
   hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
-  normalizeSubmissionPageSize
+  normalizeSubmissionPageSize,
+  type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 import type {
   ClientSession,
@@ -54,6 +59,8 @@ export interface MongoCustomIndexDefinition {
 }
 
 export interface MongoDbStorageOptions {
+  readonly schemaValidation?: ValidateFormSchemaOptions;
+  readonly lifecycle?: FormLifecycleOptions;
   readonly db: Db;
   readonly schemasCollectionName?: string;
   readonly responsesCollectionName?: string;
@@ -363,9 +370,9 @@ function isTransactionUnsupported(error: unknown): boolean {
   );
 }
 
-function parseSchemaDocument(document: StoredSchemaDocument): FormSchema {
+function parseSchemaDocument(document: StoredSchemaDocument, validation: ValidateFormSchemaOptions = {}): FormSchema {
   try {
-    assertValidFormSchema(document.schema);
+    assertValidFormSchema(document.schema, validation);
   } catch (cause) {
     throw new Error(`MongoDB schema document "${String(document._id)}" is invalid.`, { cause });
   }
@@ -606,6 +613,73 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
     return { success: true, value: { success: true } };
   };
 
+  const lifecycleCollections = {
+    schema: schemasCollectionName,
+    submission: responsesCollectionName,
+    version: versionsCollectionName,
+    state: versionStatesCollectionName,
+    auditEvent: versionEventsCollectionName
+  };
+  function lifecycleBackend(session?: ClientSession): FormLifecycleBackend {
+    const sessionOptions = session === undefined ? {} : { session };
+    return {
+      resources: ["schema", "submission", "version", "state", "auditEvent"],
+      async list(formId) {
+        const result: FormResource[] = [];
+        for (const kind of ["schema", "submission", "version", "state", "auditEvent"] as const) {
+          const collection = options.db.collection<Document & { _id: string }>(lifecycleCollections[kind]);
+          const documents = await collection
+            .find(kind === "state" ? { _id: formId } : { formId }, sessionOptions)
+            .toArray();
+          for (const value of documents) result.push({ kind, id: value._id, value });
+        }
+        return result;
+      },
+      async remove(resource) {
+        if (resource.kind === "internal" || !isRecord(resource.value))
+          throw new TypeError("Invalid deletion resource.");
+        const collection = options.db.collection<Document & { _id: string }>(lifecycleCollections[resource.kind]);
+        const result = await collection.deleteOne({ ...resource.value, _id: resource.id }, sessionOptions);
+        if (result.deletedCount === 0) throw new Error("Deletion revision conflict or record disappeared.");
+        return result.deletedCount;
+      },
+      ...(options.db.client?.startSession === undefined
+        ? {}
+        : {
+            transaction: async <T>(operation: (backend: FormLifecycleBackend) => Promise<T>): Promise<T> => {
+              const transactionSession = options.db.client.startSession();
+              try {
+                return await transactionSession.withTransaction(() => operation(lifecycleBackend(transactionSession)));
+              } finally {
+                await transactionSession.endSession();
+              }
+            }
+          })
+    };
+  }
+  const lifecycle = createFormLifecycleAdapter(
+    lifecycleBackend(),
+    options.lifecycle === undefined
+      ? {}
+      : {
+          ...options.lifecycle,
+          ...(options.lifecycle.scope === undefined
+            ? {}
+            : {
+                scope: (resource: FormResource) => {
+                  if (!isRecord(resource.value)) throw new TypeError("Invalid deletion resource.");
+                  const value =
+                    resource.value.schema ??
+                    resource.value.submission ??
+                    resource.value.record ??
+                    resource.value.event ??
+                    resource.value;
+                  return options.lifecycle?.scope?.({ ...resource, value }) ?? {};
+                }
+              })
+        }
+  );
+
   const adapter: Omit<PagedSubmissionStorageAdapter, "saveSubmission"> &
     Omit<VersionedFormStorageAdapter, "saveSubmission"> & {
       saveSubmission(
@@ -618,7 +692,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       createIndexes(): Promise<void>;
     } = {
     async saveSchema(schema) {
-      assertValidFormSchema(schema);
+      assertValidFormSchema(schema, options.schemaValidation);
       const stored = cloneJson(schema);
       await schemas.updateOne(
         { _id: schemaDocumentId(schema.id, schema.version) },
@@ -628,12 +702,12 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
     },
     async getSchema(formId, formVersion) {
       const document = await schemas.findOne({ _id: schemaDocumentId(formId, formVersion) });
-      return document === null ? null : parseSchemaDocument(document);
+      return document === null ? null : parseSchemaDocument(document, options.schemaValidation);
     },
     async listSchemas() {
       const documents = await schemas.find({}).toArray();
       return documents
-        .map(parseSchemaDocument)
+        .map((document) => parseSchemaDocument(document, options.schemaValidation))
         .sort((left, right) => left.id.localeCompare(right.id) || left.version - right.version);
     },
     async deleteSchema(formId, formVersion) {
@@ -658,7 +732,11 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
         const schema = await schemas.findOne({ _id: schemaDocumentId(stored.formId, stored.formVersion) });
         if (schema === null) throw new Error("MongoDB submission schema was not found.");
-        assertValidFormSubmission(parseSchemaDocument(schema), stored);
+        assertValidFormSubmission(
+          parseSchemaDocument(schema, options.schemaValidation),
+          stored,
+          options.schemaValidation
+        );
       }
       const payloadHash = await hashFormSubmissionPayload(stored);
       try {
@@ -891,7 +969,11 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       }
       const document = await schemas.findOne({ _id: schemaDocumentId(submission.formId, submission.formVersion) });
       if (document === null) throw new Error("MongoDB submission schema was not found.");
-      assertValidFormSubmission(parseSchemaDocument(document), submission);
+      assertValidFormSubmission(
+        parseSchemaDocument(document, options.schemaValidation),
+        submission,
+        options.schemaValidation
+      );
     },
     async deleteSubmission(submissionId) {
       await submissions.deleteOne({ _id: submissionId });
@@ -1011,6 +1093,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
   };
   return {
     ...adapter,
+    ...lifecycle,
     async fetchSubmissionPage(formId: string, options?: TypedSubmissionPageQueryOptions<TMeta>) {
       return (await adapter.listSubmissionPage(
         formId,

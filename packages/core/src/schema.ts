@@ -944,7 +944,7 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
         ...(input as unknown as FormSchema),
         fields: input.fields.filter((field): field is FormField => isRecord(field) && isNonEmptyString(field.id))
       } as FormSchema;
-      issues.push(...validateContentModeConstraints(contentSchema).issues);
+      issues.push(...validateContentModeConstraints(contentSchema, options.policy).issues);
     }
     const policyIssues: SchemaIssue[] = [];
     try {
@@ -959,8 +959,11 @@ export function validateFormSchema(input: unknown, options: ValidateFormSchemaOp
     : { valid: false, issues };
 }
 
-export function assertValidFormSchema(input: unknown): asserts input is FormSchema {
-  const result = validateFormSchema(input);
+export function assertValidFormSchema(
+  input: unknown,
+  options: ValidateFormSchemaOptions = {}
+): asserts input is FormSchema {
+  const result = validateFormSchema(input, options);
   if (!result.valid) {
     throw new TypeError(
       `Invalid form schema: ${result.issues.map((item) => `${item.path}: ${item.message}`).join("; ")}`

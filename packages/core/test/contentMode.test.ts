@@ -135,15 +135,15 @@ describe("content modes", () => {
       fields: [{ ...field, metadata: contentMetadataToJson({ quiz: { correctOptionId: "deleted" } }) }]
     };
     expect(() => evaluateQuiz(invalid, {})).toThrow("Invalid quiz");
-    expect(validateContentModeConstraints(invalid).issues).toEqual([
-      expect.objectContaining({ code: "QUIZ_INVALID_CORRECT_OPTION" })
-    ]);
+    expect(validateContentModeConstraints(invalid).issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "QUIZ_INVALID_CORRECT_OPTION" })])
+    );
   });
   it("validates mode-specific constraints in the base validator", () => {
     const poll = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
     expect(validateContentMode({ ...poll, fields: [] })).toHaveLength(1);
     expect(getContentModeDiagnostics({ ...poll, fields: [] })).toEqual([
-      { path: "fields", code: "poll_field_count", message: "Polls require exactly one question." }
+      { path: "fields", code: "poll_field_count", message: "Question count is outside the configured limits." }
     ]);
     expect(validateFormSchema({ ...poll, fields: [] }).issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "POLL_SINGLE_FIELD_REQUIRED" })])

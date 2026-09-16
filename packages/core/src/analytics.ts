@@ -1,10 +1,11 @@
-import { assertValidFormSchema } from "./schema";
+import { assertValidFormSchema, type ValidateFormSchemaOptions } from "./schema";
 import type {
   BaseSubmissionMetadata,
   ChoiceQuestionAggregate,
   CrossTabulationResult,
   FormAnalytics,
   FormField,
+  FormPolicy,
   FormResponse,
   FormSchema,
   FormSubmission,
@@ -173,8 +174,12 @@ function aggregateField(
   return aggregate;
 }
 
-export function aggregateResponses(schema: FormSchema, submissions: readonly FormSubmission[]): FormAnalytics {
-  assertValidFormSchema(schema);
+export function aggregateResponses(
+  schema: FormSchema,
+  submissions: readonly FormSubmission[],
+  options: ValidateFormSchemaOptions = {}
+): FormAnalytics {
+  assertValidFormSchema(schema, options);
   for (const submission of submissions) {
     if (submission.formId !== schema.id || submission.formVersion !== schema.version) {
       throw new TypeError(`Submission ${submission.id} does not match ${schema.id}@${schema.version}.`);
@@ -212,6 +217,7 @@ export interface ResponseAccumulator {
 
 export interface ResponseAccumulatorOptions {
   readonly mode?: "strict" | "lenient";
+  readonly policy?: FormPolicy;
 }
 
 interface FieldAccumulator {
@@ -285,7 +291,7 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
   #submissionCount = 0;
 
   constructor(schema: FormSchema, options: ResponseAccumulatorOptions) {
-    assertValidFormSchema(schema);
+    assertValidFormSchema(schema, options);
     this.#schema = JSON.parse(JSON.stringify(schema)) as FormSchema;
     this.#mode = options.mode ?? "strict";
     this.#fields = new Map(
@@ -481,6 +487,7 @@ export interface CsvColumnDefinition<TMeta extends BaseSubmissionMetadata = Base
 }
 
 export interface CsvExportOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
+  readonly policy?: FormPolicy;
   readonly withBom?: boolean;
   readonly neutralizeFormulas?: boolean;
   /** Alias for withBom used by the public export contract. */
@@ -567,7 +574,7 @@ async function* generateCsvChunks(
   submissions: Iterable<AccumulatorResponse> | AsyncIterable<AccumulatorResponse>,
   options: InternalStreamCsvOptions = {}
 ): AsyncIterable<string> {
-  assertValidFormSchema(schema);
+  assertValidFormSchema(schema, options);
   const includeDefaultColumns = options.includeDefaultColumns ?? true;
   const customColumns = options.columns ?? [];
   const contractColumns = options.customColumns ?? [];
@@ -761,7 +768,7 @@ export function exportResponsesToCsv<TMeta extends BaseSubmissionMetadata = Base
   responses: readonly FormSubmission<TMeta>[],
   options: MetadataCsvExportOptions<TMeta> = {}
 ): string {
-  assertValidFormSchema(schema);
+  assertValidFormSchema(schema, options);
   for (const response of responses) {
     if (response.formId !== schema.id || response.formVersion !== schema.version) {
       throw new TypeError(`Submission ${response.id} does not match ${schema.id}@${schema.version}.`);

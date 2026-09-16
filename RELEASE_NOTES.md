@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v7.18.0 — 2026-09-17
+
+- Added configurable Content Mode policies for question counts, option counts, allowed field types, and custom quiz evaluation.
+- Added schema mapping, cross-form analytics, lifecycle-aware storage contracts, and framework-independent storage contract fixtures.
+- Extended React, MUI, and storage adapters while removing the deprecated `@form-engine-ts/legacy` package.
+- Aligned all public packages to version 7.18.0.
+
 ### v7.17.3 — 2026-09-16
 
 - Added the React `fieldEditorPreview` slot for customizing non-selected questions in `fieldEditorMode="single"`.

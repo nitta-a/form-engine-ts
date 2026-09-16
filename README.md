@@ -9,7 +9,6 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Area | Package | Purpose |
 | --- | --- | --- |
 | Core | `@form-engine-ts/core` | Schema, visibility, validation, submissions, analytics, CSV, and shared adapter types |
-| Migration package | `@form-engine-ts/legacy` | Isolated compatibility helpers for migrating the deprecated `answers` contract |
 | React renderer / builder | `@form-engine-ts/react` | SSR-safe provider, conditional renderer, accessible visual builder, hooks, overrides, and base styles |
 | Survey client | `@form-engine-ts/custom-survey-client` | Adapter-driven survey editor, free-text translation, version actions, and localized response summaries |
 | Storage adapter | `@form-engine-ts/storage-memory` | Process-local form/submission storage with defensive copying and duplicate protection |
@@ -56,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.17.3** (2026-09-16). All public packages are currently aligned to version `7.17.3`.
-This release adds customizable single-mode question previews, including the React preview slot and the standard MUI preview.
+The latest release is **v7.18.0** (2026-09-17). All public packages are currently aligned to version `7.18.0`.
+This release adds configurable Content Mode policies, schema mapping and cross-form analytics, lifecycle-aware storage contracts, and shared storage contract tests.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -305,6 +304,20 @@ const result = answerSchema.safeParse(candidateAnswers);
 
 Zod failures use the field ID as their path and expose the Core validation code, translation message key, and interpolation values in custom issue parameters. Hidden answers are ignored during validation but are not transformed out of successful parse results.
 
+### 7.18.x extended APIs and migration
+
+Use `FormPolicy.contentMode` from `@form-engine-ts/core` to configure question counts, option counts, and allowed field types. Poll now defaults to at least one question with no upper bound; preserve the old single-question rule with `{ contentMode: { maxFields: 1 } }` and pass the same policy to storage, Builder, and answer validation. The `mapSchema` helpers preserve unknown metadata, translation metadata, pages, and conditions.
+
+Storage adapters expose `inspectFormDeletion` and `deleteForm` through the lifecycle contract, and `@form-engine-ts/storage/testing` provides framework-independent fixtures and scenarios. Transactions are required by default; pass `allowNonAtomic: true` explicitly for adapters without transaction support. `aggregateForms` combines locale, Content Mode, metadata, and Quiz scores across forms and versions.
+
+| Package group | Supported version |
+| --- | --- |
+| Core / React / MUI | 7.18.x |
+| Storage (Memory, MongoDB, Azure Table, Postgres, SQLite, D1, LocalStorage) | 7.18.x |
+| Translator / Zod / Privacy | 7.18.x (existing contracts) |
+
+Existing `StorageAdapter`, `aggregateResponses`, and `validateContentMode` APIs remain available. Adopt the new lifecycle, cross-form aggregation, and mapping contracts incrementally.
+
 ### Analytics semantics
 
 - Percentages use all valid submissions as the denominator.
@@ -334,7 +347,6 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | 分類 | パッケージ | 用途 |
 | --- | --- | --- |
 | Core | `@form-engine-ts/core` | JSON互換型とスキーマ・表示条件・検証・回答・集計・CSVの純粋関数 |
-| Migration package | `@form-engine-ts/legacy` | 非推奨の`answers`契約から移行するための互換ヘルパー |
 | React Renderer / Builder | `@form-engine-ts/react` | SSR対応Provider、条件付きRenderer、アクセシブルなBuilder、フック、標準CSS |
 | Survey client | `@form-engine-ts/custom-survey-client` | adapter駆動のSurvey Editor、自由記述翻訳、version action、ローカライズ済み回答サマリー |
 | Storage Adapter | `@form-engine-ts/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージ |
@@ -381,8 +393,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.17.3**（2026-09-16）です。公開パッケージはすべてバージョン `7.17.3` に揃えています。
-本リリースでは、singleモードの質問プレビューslotと、番号・枠線・hover・focusに対応したMUI標準プレビューを追加しました。
+最新版は **v7.18.0**（2026-09-17）です。公開パッケージはすべてバージョン `7.18.0` に揃えています。
+本リリースでは、Content Modeポリシー、スキーマ変換・横断集計、ライフサイクル対応Storage契約、共通Storage契約テストを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -605,6 +617,25 @@ const result = answerSchema.safeParse(candidateAnswers);
 Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補間値をcustom paramsに保持します。非表示回答は検証対象外ですが、成功したparse結果からは削除されません。
 
 ### 分析の仕様
+
+#### 7.18.x の拡張APIと移行
+
+`@form-engine-ts/core` の `FormPolicy.contentMode` で Content Mode の設問数・選択肢数・許可形式を設定できます。
+Pollは既定で1問以上・上限なしになりました。従来の1問制約が必要な場合は
+`{ contentMode: { maxFields: 1 } }` を保存・Builder・回答検証へ同じく渡してください。
+`mapSchema` 系の変換ヘルパーは未知のmetadata、翻訳metadata、ページ、条件分岐を保持します。
+
+Storage Adapterには `inspectFormDeletion` / `deleteForm` と `@form-engine-ts/storage/testing` が追加されました。
+削除はTransaction対応を既定とし、非対応Adapterでは `allowNonAtomic: true` を明示します。
+`aggregateForms` は複数Form・Versionのlocale、Content Mode、metadata、Quiz得点を横断集計します。
+
+| パッケージ群 | 対応バージョン |
+| --- | --- |
+| Core / React / MUI | 7.18.x |
+| Storage（Memory、MongoDB、Azure Table、Postgres、SQLite、D1、LocalStorage） | 7.18.x |
+| Translator / Zod / Privacy | 7.18.x（既存契約） |
+
+既存の `StorageAdapter`、`aggregateResponses`、`validateContentMode` は維持されます。新しい削除・横断集計・変換APIへ移行する場合も、まず既存APIを残したまま追加契約を導入できます。
 
 - パーセンテージの分母には、すべての有効な回答を使用します。
 - 複数選択のパーセンテージは、各選択肢を選んだ回答の割合を示すため、合計が100%を超える場合があります。

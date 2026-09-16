@@ -37,7 +37,8 @@
       "@form-engine-ts/translator-google": ["./packages/translator-google/src/index.ts"],
       "@form-engine-ts/translator-i18next": ["./packages/translator-i18next/src/index.ts"],
       "@form-engine-ts/translator-mock": ["./packages/translator-mock/src/index.ts"],
-      "@form-engine-ts/zod": ["./packages/zod/src/index.ts"]
+      "@form-engine-ts/zod": ["./packages/zod/src/index.ts"],
+      "@form-engine-ts/storage/testing": ["./packages/storage/src/testing.ts"]
     },
     "resolveJsonModule": true,
     "skipLibCheck": true,

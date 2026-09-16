@@ -17,12 +17,12 @@ describe("content mode controllers", () => {
     submissionCount,
     questions: []
   });
-  it("blocks a second poll question and unsupported quiz types through actions", () => {
+  it("allows a second poll question and blocks unsupported quiz types through actions", () => {
     const schema = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
     const onChange = vi.fn();
     const { result } = renderHook(() => useFormBuilder({ schema, onChange, policy: getContentModePolicy("poll") }));
-    expect(result.current.addField("radio")).toMatchObject({ success: false });
-    expect(onChange).not.toHaveBeenCalled();
+    expect(result.current.addField("radio")).toMatchObject({ success: true });
+    expect(onChange).toHaveBeenCalledOnce();
     const quiz = renderHook(() => useFormBuilder({ schema, onChange, policy: getContentModePolicy("quiz") }));
     expect(quiz.result.current.addField("text")).toMatchObject({ success: false });
     expect(quiz.result.current.changeFieldType("question-1", "multi-select")).toMatchObject({ success: false });

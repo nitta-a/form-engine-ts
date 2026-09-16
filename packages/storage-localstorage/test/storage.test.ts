@@ -1,4 +1,5 @@
 import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
+import { runLifecycleContract, runStorageContract, storageContractScope } from "@form-engine-ts/storage/testing";
 import { createLocalStorageAdapter, type StorageLike } from "../src";
 
 function createStorage(): StorageLike {
@@ -128,4 +129,29 @@ describe("createLocalStorageAdapter", () => {
     storage.removeItem("pf_submission:corrupt");
     expect(await adapter.listSubmissions("form")).toHaveLength(1);
   });
+});
+
+function contractLocalStorage() {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+    key: (index: number) => [...values.keys()][index] ?? null
+  };
+}
+it("passes the shared JSON vectors", async () => {
+  await runStorageContract(createLocalStorageAdapter("contract_", contractLocalStorage()));
+});
+it("passes the shared scoped deletion vectors", async () => {
+  await runLifecycleContract(
+    createLocalStorageAdapter("contract_", contractLocalStorage(), { lifecycle: { scope: storageContractScope } })
+  );
 });

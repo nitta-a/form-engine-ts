@@ -1,4 +1,4 @@
-import { BaseSubmissionMetadata, PagedSubmissionStorageAdapter, TextAnswerPageQueryOptions, TextAnswerPage, TypedSubmissionPageQueryOptions, TypedSubmissionPage, FormSubmission, FormSchema, SubmissionPageQueryOptions, FormAnalytics, StorageSubmissionExportOptions, FormSubmissionValidationSource, FormSubmissionValidator, SaveSubmissionOptions, SubmissionSaveResult, SubmissionFilter, JsonValue, TypedTextAnswerPage } from '@form-engine-ts/core';
+import { BaseSubmissionMetadata, PagedSubmissionStorageAdapter, TextAnswerPageQueryOptions, TextAnswerPage, TypedSubmissionPageQueryOptions, TypedSubmissionPage, FormSubmission, FormSchema, SubmissionPageQueryOptions, FormAnalytics, StorageSubmissionExportOptions, FormSubmissionValidationSource, ValidateFormSchemaOptions, FormLifecycleOptions, FormSubmissionValidator, SaveSubmissionOptions, SubmissionSaveResult, SubmissionFilter, JsonValue, TypedTextAnswerPage } from '@form-engine-ts/core';
 
 interface AzureTableListOptions {
     readonly queryOptions?: {
@@ -20,7 +20,9 @@ interface AzureTableClientLike {
     upsertEntity(entity: Record<string, unknown>, mode?: "Merge" | "Replace"): Promise<unknown>;
     getEntity(partitionKey: string, rowKey: string): Promise<Record<string, unknown>>;
     listEntities(options?: AzureTableListOptions): AzureTableEntityIterator;
-    deleteEntity(partitionKey: string, rowKey: string): Promise<unknown>;
+    deleteEntity(partitionKey: string, rowKey: string, options?: {
+        readonly etag?: string;
+    }): Promise<unknown>;
 }
 type AzureTableSubmissionEntity = Record<string, unknown> & {
     readonly answers?: never;
@@ -48,6 +50,8 @@ interface AzureTableValueCodec {
     readonly decodeValues?: (raw: string) => Record<string, unknown>;
 }
 interface AzureTableStorageOptions<T = FormSubmission> {
+    readonly schemaValidation?: ValidateFormSchemaOptions;
+    readonly lifecycle?: FormLifecycleOptions;
     /** @deprecated Use schemasTableClient, submissionsTableClient, or clientResolver. */
     readonly client?: AzureTableClientLike;
     readonly schemasTableClient?: AzureTableClientLike;

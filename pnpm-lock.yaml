@@ -145,12 +145,6 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
 
-  packages/legacy:
-    dependencies:
-      '@form-engine-ts/core':
-        specifier: workspace:*
-        version: link:../core
-
   packages/mui:
     devDependencies:
       '@emotion/react':
@@ -227,6 +221,9 @@ importers:
       '@azure/data-tables':
         specifier: ^13.3.2
         version: 13.3.2
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
 
   packages/storage-d1:
     dependencies:
@@ -237,18 +234,29 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20240000.0
         version: 4.20260702.1
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
 
   packages/storage-localstorage:
     dependencies:
       '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
 
   packages/storage-memory:
     dependencies:
       '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
 
   packages/storage-mongodb:
     dependencies:
@@ -256,6 +264,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
       mongodb:
         specifier: ^6.0.0
         version: 6.21.0
@@ -266,6 +277,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
       '@types/pg':
         specifier: ^8.11.0
         version: 8.23.1
@@ -278,6 +292,10 @@ importers:
       '@form-engine-ts/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@form-engine-ts/storage':
+        specifier: workspace:*
+        version: link:../storage
 
   packages/translator-azure:
     dependencies:

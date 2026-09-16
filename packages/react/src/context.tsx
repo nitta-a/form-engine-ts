@@ -1,3 +1,4 @@
+import type { FormPolicy } from "@form-engine-ts/core";
 import {
   type AnswerValidationResult,
   assertValidFormSchema,
@@ -34,6 +35,7 @@ import type {
 export type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
 export interface FormContextValue {
+  readonly policy?: FormPolicy;
   readonly schema: FormSchema;
   readonly locale: string;
   readonly translator: TranslationAdapter;
@@ -87,6 +89,7 @@ function isServerErrorPayload(value: unknown): value is FormServerErrorPayload {
 }
 
 export interface FormProviderProps {
+  readonly policy?: FormPolicy;
   readonly schema: FormSchema;
   readonly locale: string;
   readonly translator: TranslationAdapter;
@@ -109,17 +112,18 @@ export function FormProvider<TMeta extends BaseSubmissionMetadata>({
   schema,
   locale,
   translator,
+  policy,
   initialValues = {},
   resetOnSuccess = false,
   onSubmit,
   children
 }: FormProviderProps | TypedFormProviderProps<TMeta>) {
   const validSchema = useMemo(() => {
-    assertValidFormSchema(schema);
+    assertValidFormSchema(schema, policy === undefined ? {} : { policy });
     const localized = resolveLocalizedSchema(schema, locale);
-    assertValidFormSchema(localized);
+    assertValidFormSchema(localized, policy === undefined ? {} : { policy });
     return localized;
-  }, [locale, schema]);
+  }, [locale, schema, policy]);
   const [values, setValues] = useState<FormValues>(() => ({ ...initialValues }));
   const [errors, setErrors] = useState<Record<string, ValidationIssue | undefined>>({});
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
@@ -267,6 +271,7 @@ export function FormProvider<TMeta extends BaseSubmissionMetadata>({
   const contextValue = useMemo<TypedFormContextValue<TMeta>>(
     () => ({
       schema: validSchema,
+      ...(policy === undefined ? {} : { policy }),
       locale,
       translator,
       values,
@@ -286,6 +291,7 @@ export function FormProvider<TMeta extends BaseSubmissionMetadata>({
     }),
     [
       errors,
+      policy,
       locale,
       pageVisibility,
       reset,

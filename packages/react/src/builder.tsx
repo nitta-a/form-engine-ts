@@ -9,16 +9,29 @@ import {
   type FormField,
   type FormPolicy,
   type FormSchema,
+  getContentModePolicy,
+  getFormContentMode,
   JA_MESSAGES,
   type JsonValue,
   type PopulateTranslationOptions,
   populateSchemaTranslations,
   type QuestionType,
+  resolveContentModeSettings,
   type TranslationAdapter,
   type TranslationReport
 } from "@form-engine-ts/core";
 import type { ReactElement, ReactNode } from "react";
-import { Children, createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  Children,
+  createContext,
+  isValidElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { BuilderPageConditionEditor } from "./BuilderPageConditionEditor";
 import {
   ConditionValueEditor,
@@ -894,7 +907,7 @@ export function FormBuilder(props: FormBuilderProps) {
     translationAdapter,
     translationOptions,
     onTranslationReport,
-    policy,
+    policy: hostPolicy,
     addFieldDisabledReason,
     idFactory,
     factories,
@@ -920,6 +933,10 @@ export function FormBuilder(props: FormBuilderProps) {
     onActiveFieldChange,
     submissionSettingsOptions
   } = props;
+  const policy = useMemo(
+    () => getContentModePolicy(getFormContentMode(schema.metadata), hostPolicy),
+    [schema.metadata, hostPolicy]
+  );
   const hasActiveFieldId = Object.hasOwn(props, "activeFieldId");
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
@@ -2335,7 +2352,15 @@ export function FormBuilder(props: FormBuilderProps) {
                                     />
                                     <IconButton
                                       actionType="delete"
-                                      disabled={controls.options === "readOnly" || field.options.length === 1}
+                                      disabled={
+                                        controls.options === "readOnly" ||
+                                        field.options.length <=
+                                          Math.max(
+                                            1,
+                                            resolveContentModeSettings(getFormContentMode(schema.metadata), policy)
+                                              .minOptionsPerField ?? 1
+                                          )
+                                      }
                                       onClick={() => removeOption(field.id, option.id)}
                                       title={translate("builder.remove")}
                                     />
@@ -2343,6 +2368,7 @@ export function FormBuilder(props: FormBuilderProps) {
                                 ) : (
                                   <ToolbarSlot
                                     schema={schema}
+                                    policy={policy}
                                     translate={translate}
                                     kind="option"
                                     targetId={option.id}
@@ -2360,6 +2386,7 @@ export function FormBuilder(props: FormBuilderProps) {
                                 {OptionEditorAfter === undefined ? null : (
                                   <OptionEditorAfter
                                     schema={schema}
+                                    policy={policy}
                                     field={field}
                                     option={option}
                                     index={optionIndex}
@@ -2376,6 +2403,7 @@ export function FormBuilder(props: FormBuilderProps) {
                               <OptionEditorSlot
                                 key={option.id}
                                 schema={schema}
+                                policy={policy}
                                 field={field}
                                 option={option}
                                 index={optionIndex}

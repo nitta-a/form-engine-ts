@@ -6,6 +6,13 @@ import {
   type FormVersionRecord,
   type VersionTransitionPlan
 } from "@form-engine-ts/core";
+import {
+  runIdempotencyContract,
+  runLifecycleContract,
+  runRevisionConflictContract,
+  runStorageContract,
+  storageContractScope
+} from "@form-engine-ts/storage/testing";
 import type { Db } from "mongodb";
 import { createMongoDbStorage } from "../src";
 
@@ -148,6 +155,7 @@ function createDbStub(options: { readonly transactionSupported?: boolean } = {})
       async deleteOne(filter: Record<string, unknown>) {
         const found = [...documents.values()].find((document) => matches(document, filter));
         if (found !== undefined) documents.delete(found._id);
+        return { deletedCount: found === undefined ? 0 : 1 };
       },
       async deleteMany(filter: Record<string, unknown>) {
         for (const [id, document] of documents) {
@@ -185,7 +193,7 @@ function createDbStub(options: { readonly transactionSupported?: boolean } = {})
               code: 20
             });
           }
-          await callback();
+          return callback();
         },
         async endSession() {}
       };
@@ -676,5 +684,34 @@ describe("createMongoDbStorage", () => {
     if (document === undefined) throw new Error("Expected stored response");
     (document.submission as { values: Record<string, unknown> }).values.answer = { invalid: true };
     await expect(adapter.listSubmissions("form")).rejects.toThrow(/invalid/);
+  });
+});
+
+describe("shared storage contracts", () => {
+  it("passes JSON and pagination vectors", async () => {
+    await runStorageContract(createMongoDbStorage({ db: createDbStub().db }));
+  });
+  it("passes scoped deletion vectors", async () => {
+    await runLifecycleContract(
+      createMongoDbStorage({ db: createDbStub().db, lifecycle: { scope: storageContractScope } })
+    );
+  });
+  it("passes idempotency vectors", async () => {
+    const adapter = createMongoDbStorage<undefined>({ db: createDbStub().db, idempotency: true });
+    await runIdempotencyContract(adapter.saveSubmission);
+  });
+  it("passes revision vectors and deletes version state and events", async () => {
+    const adapter = createMongoDbStorage({ db: createDbStub().db });
+    await runRevisionConflictContract(adapter);
+    if (adapter.inspectFormDeletion === undefined || adapter.deleteForm === undefined) {
+      throw new Error("MongoDB lifecycle contract is unavailable");
+    }
+    const inspectFormDeletion = adapter.inspectFormDeletion;
+    const deleteForm = adapter.deleteForm;
+    const inspected = await inspectFormDeletion({ formId: "contract-form" });
+    expect(inspected.counts).toMatchObject({ version: 1, state: 1, auditEvent: 1 });
+    const result = await deleteForm({ formId: "contract-form" });
+    expect(result).toMatchObject({ status: "deleted", atomic: true, counts: { version: 1, state: 1, auditEvent: 1 } });
+    expect(await adapter.listVersionRecords("contract-form")).toEqual([]);
   });
 });

@@ -575,10 +575,39 @@ function ContentChoiceGroup({
   const metadata = readQuizMetadata(form.schema.metadata);
   const answer =
     props.submitStatus === "success" && props.submittedValue !== undefined ? props.submittedValue : props.value;
-  const feedback =
-    mode === "quiz" && getContentModeDiagnostics(form.schema).length === 0
-      ? questionResult(props.field, answer)
+  const evaluation =
+    mode === "quiz" &&
+    form.policy?.contentMode?.evaluateQuiz !== undefined &&
+    getContentModeDiagnostics(form.schema, form.policy).length === 0
+      ? evaluateQuizLocally(
+          form.schema,
+          {
+            ...form.values,
+            [props.field.id]:
+              typeof answer === "string" ||
+              (Array.isArray(answer) && answer.every((value) => typeof value === "string"))
+                ? answer
+                : undefined
+          },
+          form.policy
+        ).questions.find((question) => question.questionId === props.field.id)
       : undefined;
+  const feedback =
+    mode !== "quiz" || getContentModeDiagnostics(form.schema, form.policy).length > 0
+      ? undefined
+      : form.policy?.contentMode?.evaluateQuiz === undefined
+        ? questionResult(props.field, answer)
+        : evaluation === undefined
+          ? undefined
+          : {
+              fieldId: evaluation.questionId,
+              title: props.field.title,
+              correct: evaluation.isCorrect,
+              correctOption: evaluation.correctOptionId ?? "",
+              points: evaluation.maxScore,
+              earned: evaluation.scoreEarned,
+              ...(evaluation.explanation === undefined ? {} : { explanation: evaluation.explanation })
+            };
   const visible =
     feedback !== undefined &&
     answer !== undefined &&
@@ -688,11 +717,12 @@ function ContentRendererImplementation(props: ContentRendererProps | TypedConten
       return slots.renderPollResults?.(pollProps) ?? null;
     }
     if (mode !== "quiz") return null;
-    const issues = getContentModeDiagnostics(state.schema);
+    const issues = getContentModeDiagnostics(state.schema, state.policy);
     if (issues.length > 0)
       return <InvalidContent issues={issues} renderInvalid={slots.renderInvalidQuiz} locale={locale} />;
     if (state.submitStatus !== "success") return null;
-    const evaluation = state.response?.quizEvaluation ?? evaluateQuizLocally(state.schema, state.answers as FormValues);
+    const evaluation =
+      state.response?.quizEvaluation ?? evaluateQuizLocally(state.schema, state.answers as FormValues, state.policy);
     const summaryProps: QuizResultSummaryProps = {
       evaluation,
       schema: state.schema,
