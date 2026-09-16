@@ -56,8 +56,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.17.2** (2026-09-16). All public packages are currently aligned to version `7.17.2`.
-This release adds same-browser anonymous respondent draft resume with seven-day expiry, page restoration, and storage controls.
+The latest release is **v7.17.3** (2026-09-16). All public packages are currently aligned to version `7.17.3`.
+This release adds customizable single-mode question previews, including the React preview slot and the standard MUI preview.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -381,8 +381,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.17.2**（2026-09-16）です。公開パッケージはすべてバージョン `7.17.2` に揃えています。
-本リリースでは、匿名回答の同じブラウザーでの再開、7日間の期限、回答中ページの復元、端末保存の停止を追加しました。
+最新版は **v7.17.3**（2026-09-16）です。公開パッケージはすべてバージョン `7.17.3` に揃えています。
+本リリースでは、singleモードの質問プレビューslotと、番号・枠線・hover・focusに対応したMUI標準プレビューを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

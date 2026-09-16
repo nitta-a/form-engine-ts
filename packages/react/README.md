@@ -208,6 +208,25 @@ to `currentType`, `allowedTypes`, and `onChangeType`.
 />
 ```
 
+In `fieldEditorMode="single"`, `slots.fieldEditorPreview` customizes the non-selected question preview. The slot
+receives the field, its zero-based absolute `index`, `totalFields`, and `onSelect`; when it is omitted, the existing
+title-only preview remains unchanged.
+
+```tsx
+<FormBuilder
+  schema={schema}
+  onChange={setSchema}
+  fieldEditorMode="single"
+  slots={{
+    fieldEditorPreview: ({ field, index, onSelect }) => (
+      <button type="button" onClick={onSelect}>
+        {index + 1}. {field.title}
+      </button>
+    )
+  }}
+/>
+```
+
 ```tsx
 <FormBuilder
   schema={schema}

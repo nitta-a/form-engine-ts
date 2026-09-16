@@ -98,6 +98,30 @@ function LocalizationOptionsHarness() {
   );
 }
 
+function SinglePreviewHarness() {
+  const [activeFieldId, setActiveFieldId] = useState("first");
+  const singleSchema: FormSchema = {
+    ...schema,
+    fields: [
+      { id: "first", type: "text", title: "First", required: false },
+      { id: "second", type: "text", title: "Second", required: false }
+    ]
+  };
+  return (
+    <MuiFormBuilder
+      schema={singleSchema}
+      onChange={() => undefined}
+      fieldEditorMode="single"
+      activeFieldId={activeFieldId}
+      onActiveFieldChange={(fieldId) => {
+        if (fieldId !== undefined) setActiveFieldId(fieldId);
+      }}
+      features={{ pages: false, localization: false, conditions: false }}
+      muiSlotProps={{ questionPreview: { "data-testid": "question-preview" } }}
+    />
+  );
+}
+
 describe("MuiFormBuilder", () => {
   it("forces unstyled mode and applies shared size and theme options", () => {
     const theme = createTheme({ palette: { primary: { main: "#123456" } }, shape: { borderRadius: 18 } });
@@ -185,6 +209,48 @@ describe("MuiFormBuilder", () => {
 
     expect(screen.getByRole("textbox", { name: "Form title" })).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Second")).not.toBeInTheDocument();
+  });
+
+  it("renders and selects the standard MUI question preview", async () => {
+    render(<SinglePreviewHarness />);
+
+    const preview = screen.getByTestId("question-preview");
+    expect(preview).toHaveAttribute("data-mui-slot", "question-preview");
+    expect(preview).toHaveAttribute("data-field-id", "second");
+    expect(preview).toHaveTextContent("2.");
+    expect(preview).toHaveTextContent("Second");
+
+    await userEvent.click(preview);
+    expect(screen.getByDisplayValue("Second")).toBeInTheDocument();
+    expect(screen.getByTestId("question-preview")).toHaveAttribute("data-field-id", "first");
+  });
+
+  it("lets applications replace the standard MUI question preview", () => {
+    render(
+      <MuiFormBuilder
+        schema={{
+          ...schema,
+          fields: [
+            { id: "first", type: "text", title: "First", required: false },
+            { id: "second", type: "text", title: "Second", required: false }
+          ]
+        }}
+        onChange={() => undefined}
+        fieldEditorMode="single"
+        activeFieldId="first"
+        features={{ pages: false, localization: false, conditions: false }}
+        slots={{
+          fieldEditorPreview: ({ field, onSelect }) => (
+            <button type="button" onClick={onSelect}>
+              Custom: {field.title}
+            </button>
+          )
+        }}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Custom: Second" })).toBeInTheDocument();
+    expect(screen.queryByTestId("question-preview")).toBeNull();
   });
 
   it("supports type changes, option ordering and deletion, translation editing, translation batches, and adding fields", async () => {

@@ -169,7 +169,19 @@ size, variant, and width settings. Without a custom renderer, icons appear besid
 value. The standard
 MUI field editor supplies icons for every field type and accepts `slots.fieldTypeSelect` and `slots.fieldEditorHeader`
 for focused customization. `muiSlotProps` also supports `textField`, `select`, `selectMenu`, `checkbox`, `radio`,
-`button`, and `iconButton` MUI props in addition to the layout props.
+`button`, `iconButton`, and `questionPreview` MUI props in addition to the layout props. In
+`fieldEditorMode="single"`, the default `fieldEditorPreview` renders a numbered, clickable MUI preview with border,
+spacing, hover, and focus-visible styling. Override its appearance with `muiSlotProps.questionPreview` or replace it
+with `slots.fieldEditorPreview`.
+
+```tsx
+<MuiFormBuilder
+  schema={schema}
+  onChange={setSchema}
+  fieldEditorMode="single"
+  muiSlotProps={{ questionPreview: { sx: { borderRadius: 3 }, "data-testid": "question-preview" } }}
+/>
+```
 `fieldEditorOptions.fieldTypeOptions` can explicitly order, sort, or transform the generated type choices without
 mutating the defaults.
 

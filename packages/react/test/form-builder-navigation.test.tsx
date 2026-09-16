@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { FormBuilder } from "../src";
 
 const schema = {
@@ -13,6 +13,31 @@ const schema = {
 };
 
 describe("FormBuilder navigation", () => {
+  it("supports a custom preview slot for non-selected questions", () => {
+    const onActiveFieldChange = vi.fn();
+    render(
+      <FormBuilder
+        schema={schema}
+        onChange={() => undefined}
+        fieldEditorMode="single"
+        activeFieldId="first"
+        onActiveFieldChange={onActiveFieldChange}
+        features={{ pages: false, localization: false, conditions: false }}
+        slots={{
+          fieldEditorPreview: ({ field, index, totalFields, onSelect }) => (
+            <button type="button" data-testid={`preview-${field.id}`} onClick={onSelect}>
+              {index + 1}/{totalFields}: {field.title}
+            </button>
+          )
+        }}
+      />
+    );
+
+    expect(screen.getByTestId("preview-second")).toHaveTextContent("2/2: Second");
+    fireEvent.click(screen.getByTestId("preview-second"));
+    expect(onActiveFieldChange).toHaveBeenCalledWith("second");
+  });
+
   it("hides configured sections without changing the field editor mode", () => {
     render(
       <FormBuilder

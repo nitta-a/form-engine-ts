@@ -943,6 +943,7 @@ export function FormBuilder(props: FormBuilderProps) {
   const { Button, Checkbox, ErrorMessage, Fieldset, IconButton, Section, Select, TextArea, TextInput } = components;
   const ToolbarSlot = slots?.toolbar;
   const BasicSettingsAfter = slots?.basicSettingsAfter;
+  const FieldEditorPreviewSlot = slots?.fieldEditorPreview;
   const FieldEditorSlot = slots?.fieldEditor;
   const OptionEditorSlot = slots?.optionEditor;
   const OptionEditorAfter = slots?.optionEditorAfter;
@@ -1904,9 +1905,24 @@ export function FormBuilder(props: FormBuilderProps) {
                         className={builderClass("form-engine-builder__question-preview")}
                         data-field-id={field.id}
                       >
-                        <button type="button" onClick={editorState.onSelect}>
-                          {field.title}
-                        </button>
+                        {FieldEditorPreviewSlot === undefined ? (
+                          <button type="button" onClick={editorState.onSelect}>
+                            {field.title}
+                          </button>
+                        ) : (
+                          <FieldEditorPreviewSlot
+                            schema={schema}
+                            field={field}
+                            index={index}
+                            totalFields={schema.fields.length}
+                            onSelect={editorState.onSelect}
+                            translate={translate}
+                            readOnly={readOnly}
+                            actions={actions}
+                            components={components}
+                            onChange={onChange}
+                          />
+                        )}
                       </div>
                     );
                   }

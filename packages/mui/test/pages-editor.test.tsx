@@ -54,7 +54,9 @@ describe("MUI pages editor", () => {
     expect(muiBuilderSlots.pages).toBe(MuiPagesEditor);
     expect(MuiPagesEditorSlot).toBe(MuiPagesEditor);
     const Custom = () => <div>Custom pages</div>;
+    const CustomPreview = () => <div>Custom preview</div>;
     expect(createMuiBuilderSlots({}, { pages: Custom }).pages).toBe(Custom);
+    expect(createMuiBuilderSlots({}, { fieldEditorPreview: CustomPreview }).fieldEditorPreview).toBe(CustomPreview);
     render(<Harness slots={{ pages: Custom }} />);
     expect(screen.getByText("Custom pages")).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Page title" })).toBeNull();

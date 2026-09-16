@@ -17,6 +17,7 @@ import type {
 import type {
   AccordionProps,
   ButtonProps,
+  CardActionAreaProps,
   CardProps,
   CheckboxProps,
   IconButtonProps,
@@ -123,6 +124,7 @@ export interface MuiFieldEditorOptions {
 }
 
 export interface MuiSlotProps {
+  readonly questionPreview?: MuiComponentSlotProps<CardActionAreaProps>;
   readonly card?: Partial<CardProps>;
   readonly paper?: Partial<PaperProps>;
   readonly accordion?: Partial<AccordionProps>;
@@ -137,6 +139,7 @@ export interface MuiSlotProps {
 }
 
 export interface MuiBuilderSlotProps {
+  readonly questionPreview?: MuiComponentSlotProps<CardActionAreaProps>;
   readonly card?: Partial<CardProps>;
   readonly paper?: Partial<PaperProps>;
   readonly accordion?: Partial<AccordionProps>;

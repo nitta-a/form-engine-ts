@@ -5,6 +5,12 @@ current release and usage information.
 
 ## Latest release
 
+### v7.17.3 — 2026-09-16
+
+- Added the React `fieldEditorPreview` slot for customizing non-selected questions in `fieldEditorMode="single"`.
+- Added the standard MUI numbered question preview with clickable focus, hover styling, and `muiSlotProps.questionPreview`.
+- Aligned all public packages to version 7.17.3.
+
 ### v7.17.2 — 2026-09-16
 
 - Added same-browser anonymous respondent draft resume for surveys with seven-day expiry, answer and page restoration, start-over controls, and device-saving opt-out.
