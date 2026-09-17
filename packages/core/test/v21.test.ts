@@ -50,6 +50,30 @@ describe("v2.1 Core authoring APIs", () => {
     expect(number.displayCondition).toEqual(original.displayCondition);
   });
 
+  it("creates new string-based field types without adding choice options", () => {
+    const original = {
+      id: "contact",
+      type: "text",
+      title: "Contact",
+      required: false,
+      placeholderKey: "contact.placeholder"
+    } as const;
+    for (const type of ["date", "time", "email", "tel", "url"] as const) {
+      const field = transformFieldType(original, type);
+      expect(field).toMatchObject({ id: "contact", type, placeholderKey: "contact.placeholder" });
+      expect("options" in field).toBe(false);
+    }
+    const date = transformFieldType(
+      { ...original, type: "date", minDate: "2026-01-01", maxDate: "2026-12-31" },
+      "date"
+    );
+    expect(date).toMatchObject({ minDate: "2026-01-01", maxDate: "2026-12-31" });
+    expect(transformFieldType({ ...original, type: "email" }, "text")).toMatchObject({
+      type: "text",
+      placeholderKey: "contact.placeholder"
+    });
+  });
+
   it("exposes existing translation metadata independently to overwrite decisions", async () => {
     const schema: FormSchema = {
       id: "translation-metadata",

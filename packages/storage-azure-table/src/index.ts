@@ -968,6 +968,18 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
         ...(formVersion === undefined ? {} : { version: formVersion })
       });
     },
+    async countSubmissions(formId, formVersion, options = {}) {
+      let count = 0;
+      const query = { ...options, ...(formVersion === undefined ? {} : { version: formVersion }) };
+      const client = await submissionClient(formId, query);
+      for await (const raw of client.listEntities({
+        queryOptions: { filter: queryFilter(formId, query) }
+      })) {
+        const submission = deserializeIfMatching(raw);
+        if (submission !== undefined && matchesBuiltInFilters(submission, formId, query)) count += 1;
+      }
+      return count;
+    },
     async listSubmissionPage(formId, query = {}) {
       const pageSize = normalizeSubmissionPageSize(query.pageSize);
       const client = await submissionClient(formId, query);

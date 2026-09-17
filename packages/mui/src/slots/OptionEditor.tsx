@@ -19,7 +19,7 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
     translate
   }: BuilderOptionEditorSlotProps) {
     const resolved = useResolvedMuiAdapterOptions(options);
-    const { IconButton, TextInput } = components;
+    const { Checkbox, IconButton, TextInput } = components;
     const minimumOptions = Math.max(
       1,
       resolveContentModeSettings(getFormContentMode(schema.metadata), policy).minOptionsPerField ?? 1
@@ -60,6 +60,20 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
             />
           </Stack>
         </Stack>
+        {Checkbox === undefined ? null : (
+          <Checkbox
+            checked={option.pinned === true}
+            disabled={readOnly}
+            label={translate("builder.pinOption")}
+            onChange={(checked) =>
+              actions.updateOption(field.id, option.id, (current) => {
+                if (checked) return { ...current, pinned: true };
+                const { pinned: _removed, ...remaining } = current;
+                return remaining;
+              })
+            }
+          />
+        )}
         {currentLocale.length === 0 ? null : (
           <TextInput
             id={`mui-option-${option.id}-${currentLocale}`}

@@ -41,6 +41,17 @@ describe("submission error serialization", () => {
     expect(getTrpcSubmissionErrorData({ shape: { data } })).toMatchObject(error.payload);
   });
 
+  it("restores form-closed errors through tRPC-shaped data", () => {
+    const error = new FormSubmissionError({
+      code: "FORM_CLOSED",
+      messageKey: "form.responseLimitReached",
+      formErrors: ["The response limit has been reached."]
+    });
+    const data = serializeSubmissionErrorForTrpc(error);
+
+    expect(deserializeSubmissionErrorFromTrpc({ shape: { data } })?.payload).toMatchObject(error.payload);
+  });
+
   it("provides a formatter and client restoration pair", () => {
     const error = new FormSubmissionError({
       code: "VALIDATION_FAILED",

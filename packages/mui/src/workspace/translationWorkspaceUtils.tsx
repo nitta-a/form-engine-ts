@@ -32,7 +32,9 @@ export const translationPropertyKey: Record<TranslationComparisonItem["targetPro
   title: "workspace.comparison.property.title",
   description: "workspace.comparison.property.description",
   label: "workspace.comparison.property.label",
-  completionMessage: "workspace.comparison.property.completionMessage"
+  completionMessage: "workspace.comparison.property.completionMessage",
+  closedMessage: "workspace.comparison.property.closedMessage",
+  notYetOpenMessage: "workspace.comparison.property.notYetOpenMessage"
 };
 
 export const translationNodeKindKey: Record<TranslationComparisonItem["targetKind"], string> = {

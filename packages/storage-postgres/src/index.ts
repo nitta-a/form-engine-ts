@@ -303,6 +303,29 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
       );
       return result.rows.map(parseSubmissionRow);
     },
+    async countSubmissions(formId, formVersion, queryOptions) {
+      await ensureReady();
+      const conditions = ["form_id = $1"];
+      const params: unknown[] = [formId];
+      if (formVersion !== undefined) {
+        params.push(formVersion);
+        conditions.push(`form_version = $${params.length}`);
+      }
+      if (queryOptions?.since !== undefined) {
+        params.push(queryOptions.since);
+        conditions.push(`submitted_at >= $${params.length}::timestamptz`);
+      }
+      if (queryOptions?.until !== undefined) {
+        params.push(queryOptions.until);
+        conditions.push(`submitted_at <= $${params.length}::timestamptz`);
+      }
+      const result = await options.client.query(
+        `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE ${conditions.join(" AND ")}`,
+        params
+      );
+      const row = result.rows[0];
+      return typeof row === "object" && row !== null && "count" in row ? Number(row.count) : 0;
+    },
     async listSubmissionPage(formId, queryOptions = {}) {
       await ensureReady();
       const pageSize = normalizeSubmissionPageSize(queryOptions.pageSize);

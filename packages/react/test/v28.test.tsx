@@ -178,7 +178,7 @@ describe("v2.8 React authoring and receipts", () => {
         schema={schema}
         translator={protectionTranslator}
         onSubmit={() => undefined}
-        submissionGuards={[() => ({ status: "block", findings: [] })]}
+        submissionGuards={[() => ({ status: "block", findings: [] }) as const]}
       />
     );
     await user.click(screen.getByRole("button", { name: "Submit" }));
@@ -192,7 +192,7 @@ describe("v2.8 React authoring and receipts", () => {
         translator={protectionTranslator}
         onSubmit={() => ({ submissionId: "localized-28" })}
         receiptStore={store}
-        submissionGuards={[() => ({ status: "confirm", findings: [] })]}
+        submissionGuards={[() => ({ status: "confirm", findings: [] }) as const]}
       />
     );
     await user.click(await screen.findByRole("button", { name: "Submit" }));

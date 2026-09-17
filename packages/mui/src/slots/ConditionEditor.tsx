@@ -69,6 +69,8 @@ function operatorsFor(field: FormField | undefined): readonly ConditionOperator[
     );
   if (field.type === "number" || field.type === "rating")
     return ["equals", "not_equals", "greater_than", "less_than", "is_empty", "is_not_empty"];
+  if (field.type === "date" || field.type === "time")
+    return ["equals", "not_equals", "greater_than", "less_than", "is_empty", "is_not_empty"];
   return ["equals", "not_equals", "is_empty", "is_not_empty"];
 }
 

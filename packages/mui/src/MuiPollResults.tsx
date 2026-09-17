@@ -1,5 +1,5 @@
 import type { ChoiceQuestionAggregate, FormAnalytics, FormSchema, PollRuntimeAdapter } from "@form-engine-ts/core";
-import { usePollResults } from "@form-engine-ts/react";
+import { usePollResults, useVisibilityPolling } from "@form-engine-ts/react";
 import {
   Alert,
   type AlertProps,
@@ -18,7 +18,7 @@ import {
   Typography,
   type TypographyProps
 } from "@mui/material";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { muiContentTranslation } from "./contentTranslation";
 import type { MuiComponentSlotProps, MuiFormEngineI18nOptions } from "./types";
 
@@ -141,6 +141,26 @@ export interface MuiPollResultsProps {
   readonly slots?: MuiPollResultsSlots;
   readonly slotProps?: MuiPollResultsSlotProps;
   readonly i18n?: MuiFormEngineI18nOptions;
+}
+
+export interface MuiPollResultsEmbedProps
+  extends Omit<MuiPollResultsProps, "submitted" | "alreadyVoted" | "closed" | "canViewResults" | "submissionRevision"> {
+  readonly refreshIntervalMs?: number;
+  readonly closed?: boolean;
+}
+
+export function MuiPollResultsEmbed({ refreshIntervalMs, closed = false, ...props }: MuiPollResultsEmbedProps) {
+  const [submissionRevision, setSubmissionRevision] = useState(0);
+  useVisibilityPolling(() => setSubmissionRevision((value) => value + 1), refreshIntervalMs);
+  return (
+    <MuiPollResults
+      {...props}
+      submitted={false}
+      closed={closed}
+      canViewResults
+      submissionRevision={submissionRevision}
+    />
+  );
 }
 
 export function MuiPollResults({

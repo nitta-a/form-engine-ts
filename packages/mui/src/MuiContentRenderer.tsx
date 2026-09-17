@@ -1,10 +1,8 @@
 import type {
   BaseSubmissionMetadata,
   FormAnalytics,
-  FormSchema,
   getContentModeDiagnostics,
   PollRuntimeAdapter,
-  QuizEvaluationResult,
   QuizQuestionResult
 } from "@form-engine-ts/core";
 import {
@@ -14,12 +12,16 @@ import {
   type ContentRendererSlots,
   type FormDraftResumeSlotProps,
   FormEngineI18nProvider,
+  type FormQuizShareSlotProps,
   type FormRendererProps,
   type FormSubmissionMetadata,
   type PollResultOptionProps,
   type PollResultsErrorProps,
   type PollResultsLoadingProps,
-  type TypedFormRendererProps
+  type QuizResultSummaryProps,
+  type QuizShareOptions,
+  type TypedFormRendererProps,
+  useShare
 } from "@form-engine-ts/react";
 import { Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
@@ -32,13 +34,15 @@ import type { MuiAdapterOptions, MuiFormEngineI18nOptions } from "./types";
 
 export interface MuiQuizRendererOptions {
   readonly showImmediateFeedback?: boolean;
+  readonly share?: QuizShareOptions;
+  readonly renderShare?: (props: FormQuizShareSlotProps) => ReactNode;
   readonly resultViewProps?: Omit<QuizResultViewProps, "evaluation" | "schema" | "locale" | "i18n">;
   readonly renderInvalid?: (issues: ReturnType<typeof getContentModeDiagnostics>) => ReactNode;
 }
 
 export interface MuiPollRendererOptions {
   readonly adapter: PollRuntimeAdapter<FormAnalytics>;
-  readonly closed: boolean;
+  readonly closed?: boolean;
   readonly canViewResults: boolean;
   readonly alreadyVoted?: boolean;
   readonly submissionRevision?: number;
@@ -104,22 +108,65 @@ function MuiQuizSummary({
   schema,
   locale,
   i18n,
+  labels,
+  share,
+  renderShare,
+  className,
   options
-}: {
-  readonly evaluation: QuizEvaluationResult;
-  readonly schema: FormSchema;
+}: QuizResultSummaryProps & {
   readonly locale: string;
   readonly i18n?: MuiFormEngineI18nOptions;
   readonly options?: MuiQuizRendererOptions;
 }) {
+  const {
+    share: shareResult,
+    status: shareStatus,
+    supported
+  } = useShare(share?.onShare === undefined ? {} : { onShare: share.onShare });
+  const { translate: t } = muiContentTranslation(locale, i18n);
+  const shareProps: FormQuizShareSlotProps = {
+    evaluation,
+    schema,
+    status: shareStatus,
+    supported,
+    onShare: () =>
+      void shareResult({
+        title: schema.title,
+        text:
+          share?.buildText?.(evaluation, schema) ??
+          `${labels?.totalScore ?? t("content.results.totalScore")}: ${evaluation.totalScore} / ${evaluation.maxPossibleScore}`,
+        ...(share?.url === undefined ? {} : { url: share.url })
+      })
+  };
+  const shareLabel = locale.toLowerCase().startsWith("ja") ? "結果を共有" : "Share result";
+  const sharedLabel = locale.toLowerCase().startsWith("ja") ? "共有しました" : "Shared";
+  const copiedLabel = locale.toLowerCase().startsWith("ja") ? "コピーしました" : "Copied";
+  const failedLabel = locale.toLowerCase().startsWith("ja") ? "共有できませんでした" : "Share failed";
+  const shareContent =
+    share === undefined
+      ? null
+      : (renderShare?.(shareProps) ??
+        options?.renderShare?.(shareProps) ?? (
+          <Button
+            type="button"
+            disabled={!supported || shareStatus === "shared" || shareStatus === "copied"}
+            onClick={shareProps.onShare}
+          >
+            {shareStatus === "shared" ? sharedLabel : shareStatus === "copied" ? copiedLabel : shareLabel}
+          </Button>
+        ));
   return (
-    <QuizResultView
-      {...options?.resultViewProps}
-      evaluation={evaluation}
-      schema={schema}
-      locale={locale}
-      {...(i18n === undefined ? {} : { i18n })}
-    />
+    <Stack className={className} spacing={2}>
+      <QuizResultView
+        {...options?.resultViewProps}
+        evaluation={evaluation}
+        schema={schema}
+        locale={locale}
+        {...(i18n === undefined ? {} : { i18n })}
+      />
+      {shareContent}
+      {shareStatus === "error" ? <Alert severity="error">{failedLabel}</Alert> : null}
+    </Stack>
   );
 }
 
@@ -325,6 +372,7 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
       contentSlots?.renderQuizSummary ??
       ((summary) => (
         <MuiQuizSummary
+          {...summary}
           evaluation={summary.evaluation}
           schema={summary.schema}
           locale={locale}
@@ -371,7 +419,8 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
           quiz: {
             ...(quizOptions.showImmediateFeedback === undefined
               ? {}
-              : { showImmediateFeedback: quizOptions.showImmediateFeedback })
+              : { showImmediateFeedback: quizOptions.showImmediateFeedback }),
+            ...(quizOptions.share === undefined ? {} : { share: quizOptions.share })
           }
         }),
     ...(pollOptions === undefined
@@ -379,8 +428,8 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
       : {
           poll: {
             adapter: pollOptions.adapter,
-            closed: pollOptions.closed,
             canViewResults: pollOptions.canViewResults,
+            ...(pollOptions.closed === undefined ? {} : { closed: pollOptions.closed }),
             ...(pollOptions.alreadyVoted === undefined ? {} : { alreadyVoted: pollOptions.alreadyVoted }),
             ...(pollOptions.submissionRevision === undefined
               ? {}

@@ -156,6 +156,16 @@ function defaultFieldTypeIcon(type: QuestionType): ReactNode {
       return "#";
     case "rating":
       return "★";
+    case "date":
+      return "D";
+    case "time":
+      return "T";
+    case "email":
+      return "@";
+    case "tel":
+      return "#";
+    case "url":
+      return "↗";
     case "select":
       return "▾";
     case "multi-select":
@@ -267,6 +277,14 @@ function DefaultTextArea({
       {helperText === undefined || helperText.length === 0 ? null : <small id={ariaDescribedBy}>{helperText}</small>}
     </>
   );
+}
+
+function toDateTimeLocalValue(value: string | undefined): string {
+  if (value === undefined) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const part = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}T${part(date.getHours())}:${part(date.getMinutes())}`;
 }
 
 function DefaultSelect({
@@ -563,16 +581,7 @@ const GUARDED_COMPONENTS: Omit<Required<FormBuilderComponents>, "renderIcon" | "
   ErrorMessage: BuilderErrorMessage
 };
 
-const FIELD_TYPES: readonly FieldType[] = [
-  "text",
-  "textarea",
-  "number",
-  "rating",
-  "select",
-  "multi-select",
-  "checkbox",
-  "radio"
-];
+const FIELD_TYPES: readonly FieldType[] = DEFAULT_FIELD_TYPE_DEFINITIONS.map((definition) => definition.type);
 
 const DEFAULT_FIELD_EDITOR_CONTROL_MODE: FieldPropertyControlMode = "editable";
 
@@ -634,6 +643,14 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.pattern": "Pattern",
   "builder.step": "Step",
   "builder.options": "Options",
+  "builder.shuffleOptions": "Shuffle options for respondents",
+  "builder.pinOption": "Keep this option in place",
+  "builder.openAt": "Open at (ISO timestamp)",
+  "builder.closeAt": "Close at (ISO timestamp)",
+  "builder.maxResponses": "Maximum responses",
+  "builder.closedMessage": "Closed message",
+  "builder.notYetOpenMessage": "Not-yet-open message",
+  "builder.honeypotFieldId": "Anti-spam hidden field ID",
   "builder.optionLabel": "選択肢 / Option Label {{index}}",
   "builder.optionLabelPlaceholder": "Example: Very satisfied",
   "builder.newOptionLabel": "Option {{index}}",
@@ -696,6 +713,11 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.fields.typeTextarea": "Textarea",
   "builder.fields.typeNumber": "Number",
   "builder.fields.typeRating": "Rating",
+  "builder.fields.typeDate": "Date",
+  "builder.fields.typeTime": "Time",
+  "builder.fields.typeEmail": "Email",
+  "builder.fields.typeTel": "Phone",
+  "builder.fields.typeUrl": "URL",
   "builder.fields.typeSelect": "Select",
   "builder.fields.typeMultiSelect": "Multi-select",
   "builder.fields.typeCheckbox": "Checkbox",
@@ -1277,6 +1299,16 @@ export function FormBuilder(props: FormBuilderProps) {
       targetId: optionId,
       params: { fieldId }
     });
+  const updateOptionPinned = (fieldId: string, optionId: string, pinned: boolean) =>
+    executeAction(
+      () =>
+        headless.updateOption(fieldId, optionId, (option) => {
+          if (pinned) return { ...option, pinned: true };
+          const { pinned: _removed, ...remaining } = option;
+          return remaining;
+        }),
+      { action: "updateOption", targetId: optionId, params: { fieldId } }
+    );
   const addOption = (fieldId: string) =>
     executeAction(() => headless.addOption(fieldId), { action: "addOption", targetId: fieldId });
   const removeOption = (fieldId: string, optionId: string) =>
@@ -1506,6 +1538,79 @@ export function FormBuilder(props: FormBuilderProps) {
                         ...schema,
                         submissionSettings: { ...schema.submissionSettings, confirmationRenderMode: value }
                       });
+                    }}
+                  />
+                  <TextInput
+                    id="builder-open-at"
+                    type="datetime-local"
+                    label={translate("builder.openAt")}
+                    value={toDateTimeLocalValue(schema.submissionSettings?.openAt)}
+                    onChange={(value) => {
+                      const settings = { ...schema.submissionSettings };
+                      if (value.trim().length === 0) delete settings.openAt;
+                      else settings.openAt = new Date(value).toISOString();
+                      onChange({ ...schema, submissionSettings: settings });
+                    }}
+                  />
+                  <TextInput
+                    id="builder-close-at"
+                    type="datetime-local"
+                    label={translate("builder.closeAt")}
+                    value={toDateTimeLocalValue(schema.submissionSettings?.closeAt)}
+                    onChange={(value) => {
+                      const settings = { ...schema.submissionSettings };
+                      if (value.trim().length === 0) delete settings.closeAt;
+                      else settings.closeAt = new Date(value).toISOString();
+                      onChange({ ...schema, submissionSettings: settings });
+                    }}
+                  />
+                  <TextInput
+                    id="builder-max-responses"
+                    type="number"
+                    min={1}
+                    step={1}
+                    label={translate("builder.maxResponses")}
+                    value={schema.submissionSettings?.maxResponses?.toString() ?? ""}
+                    onChange={(value) => {
+                      const settings = { ...schema.submissionSettings };
+                      const parsed = Number(value);
+                      if (value.trim().length === 0) delete settings.maxResponses;
+                      else if (Number.isInteger(parsed) && parsed > 0) settings.maxResponses = parsed;
+                      else return;
+                      onChange({ ...schema, submissionSettings: settings });
+                    }}
+                  />
+                  <TextInput
+                    id="builder-closed-message"
+                    label={translate("builder.closedMessage")}
+                    value={schema.submissionSettings?.closedMessage ?? ""}
+                    onChange={(value) => {
+                      const settings = { ...schema.submissionSettings };
+                      if (value.trim().length === 0) delete settings.closedMessage;
+                      else settings.closedMessage = value;
+                      onChange({ ...schema, submissionSettings: settings });
+                    }}
+                  />
+                  <TextInput
+                    id="builder-not-yet-open-message"
+                    label={translate("builder.notYetOpenMessage")}
+                    value={schema.submissionSettings?.notYetOpenMessage ?? ""}
+                    onChange={(value) => {
+                      const settings = { ...schema.submissionSettings };
+                      if (value.trim().length === 0) delete settings.notYetOpenMessage;
+                      else settings.notYetOpenMessage = value;
+                      onChange({ ...schema, submissionSettings: settings });
+                    }}
+                  />
+                  <TextInput
+                    id="builder-honeypot-field-id"
+                    label={translate("builder.honeypotFieldId")}
+                    value={schema.submissionSettings?.honeypotFieldId ?? ""}
+                    onChange={(value) => {
+                      const settings = { ...schema.submissionSettings };
+                      if (value.trim().length === 0) delete settings.honeypotFieldId;
+                      else settings.honeypotFieldId = value.trim();
+                      onChange({ ...schema, submissionSettings: settings });
                     }}
                   />
                 </Section>
@@ -2321,6 +2426,22 @@ export function FormBuilder(props: FormBuilderProps) {
                       {"options" in field && controls.options !== "hidden" ? (
                         <div className={builderClass("form-engine-builder__options")}>
                           <strong>{translate("builder.options")}</strong>
+                          {(field.type === "select" || field.type === "radio" || field.type === "multi-select") && (
+                            <Checkbox
+                              className={builderClass("form-engine-builder__check")}
+                              checked={field.shuffleOptions === true}
+                              disabled={controls.options === "readOnly"}
+                              onChange={(checked) =>
+                                updateField(field.id, (current) => {
+                                  if (!("options" in current)) return current;
+                                  if (checked) return { ...current, shuffleOptions: true };
+                                  const { shuffleOptions: _removed, ...remaining } = current;
+                                  return remaining;
+                                })
+                              }
+                              label={translate("builder.shuffleOptions")}
+                            />
+                          )}
                           {field.options.map((option, optionIndex) =>
                             OptionEditorSlot === undefined ? (
                               <div className={builderClass("form-engine-builder__option")} key={option.id}>
@@ -2333,6 +2454,13 @@ export function FormBuilder(props: FormBuilderProps) {
                                   onChange={(value) =>
                                     value.trim().length === 0 ? undefined : updateOption(field.id, option.id, value)
                                   }
+                                />
+                                <Checkbox
+                                  className={builderClass("form-engine-builder__check")}
+                                  checked={option.pinned === true}
+                                  disabled={controls.options === "readOnly"}
+                                  onChange={(checked) => updateOptionPinned(field.id, option.id, checked)}
+                                  label={translate("builder.pinOption")}
                                 />
                                 {ToolbarSlot === undefined ? (
                                   <>

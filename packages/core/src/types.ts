@@ -3,7 +3,20 @@ import type { BuilderTranslationKey } from "./i18n/keys";
 import type { FormSubmissionValidationSource } from "./validation";
 import type { FormVersionRecord, FormVersionState, Result, VersionTransitionEvent } from "./versioning";
 
-export type FieldType = "text" | "textarea" | "number" | "rating" | "select" | "multi-select" | "checkbox" | "radio";
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "rating"
+  | "date"
+  | "time"
+  | "email"
+  | "tel"
+  | "url"
+  | "select"
+  | "multi-select"
+  | "checkbox"
+  | "radio";
 
 export type QuestionType = FieldType;
 
@@ -118,6 +131,8 @@ export interface LocalizedText {
   readonly title?: string;
   readonly description?: string;
   readonly completionMessage?: string;
+  readonly closedMessage?: string;
+  readonly notYetOpenMessage?: string;
 }
 
 export type SchemaTranslations = Readonly<Record<string, LocalizedText>>;
@@ -134,11 +149,13 @@ export type ValidationCode =
   | "invalid_option"
   | "min_selections"
   | "max_selections"
+  | "invalid_format"
   | "unknown_field";
 
 export interface FieldOption extends ExtensibleNode {
   readonly id: string;
   readonly label: string;
+  readonly pinned?: boolean;
   readonly translations?: Readonly<Record<string, string>>;
 }
 
@@ -163,6 +180,35 @@ export interface TextField extends BaseField {
   readonly pattern?: string;
 }
 
+export interface DateField extends BaseField {
+  readonly type: "date";
+  readonly placeholderKey?: string;
+  readonly minDate?: string;
+  readonly maxDate?: string;
+}
+
+export interface TimeField extends BaseField {
+  readonly type: "time";
+  readonly placeholderKey?: string;
+  readonly minTime?: string;
+  readonly maxTime?: string;
+}
+
+export interface EmailField extends BaseField {
+  readonly type: "email";
+  readonly placeholderKey?: string;
+}
+
+export interface TelField extends BaseField {
+  readonly type: "tel";
+  readonly placeholderKey?: string;
+}
+
+export interface UrlField extends BaseField {
+  readonly type: "url";
+  readonly placeholderKey?: string;
+}
+
 export interface NumberField extends BaseField {
   readonly type: "number";
   readonly placeholderKey?: string;
@@ -180,11 +226,13 @@ export interface RatingField extends BaseField {
 export interface SelectField extends BaseField {
   readonly type: "select" | "radio";
   readonly options: readonly FieldOption[];
+  readonly shuffleOptions?: boolean;
 }
 
 export interface MultiSelectField extends BaseField {
   readonly type: "multi-select";
   readonly options: readonly FieldOption[];
+  readonly shuffleOptions?: boolean;
   readonly minSelections?: number;
   readonly maxSelections?: number;
 }
@@ -193,7 +241,18 @@ export interface CheckboxField extends BaseField {
   readonly type: "checkbox";
 }
 
-export type FormField = TextField | NumberField | RatingField | SelectField | MultiSelectField | CheckboxField;
+export type FormField =
+  | TextField
+  | DateField
+  | TimeField
+  | EmailField
+  | TelField
+  | UrlField
+  | NumberField
+  | RatingField
+  | SelectField
+  | MultiSelectField
+  | CheckboxField;
 
 export interface FormPage extends ExtensibleNode {
   readonly id: string;
@@ -237,6 +296,12 @@ export interface FormSubmissionSettings extends ExtensibleNode {
   readonly confirmationRenderMode?: "dialog" | "inline" | "replace";
   readonly confirmButtonLabel?: string;
   readonly cancelButtonLabel?: string;
+  readonly openAt?: string;
+  readonly closeAt?: string;
+  readonly maxResponses?: number;
+  readonly closedMessage?: string;
+  readonly notYetOpenMessage?: string;
+  readonly honeypotFieldId?: string;
 }
 
 export type FormValue = string | number | boolean | readonly string[] | undefined;
@@ -375,6 +440,7 @@ export interface SubmissionQueryOptions {
 
 export interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
+  countSubmissions(formId: string, formVersion?: number, options?: SubmissionQueryOptions): Promise<number>;
   listSubmissions(
     formId: string,
     formVersion?: number,
@@ -437,6 +503,7 @@ export interface PagedSubmissionStorageAdapter extends FormStorageAdapter {
 /** Metadata-typed submission contract for application-owned storage adapters. */
 export interface TypedStorageAdapter<TMeta extends BaseSubmissionMetadata> {
   saveSubmission(submission: FormSubmission<TMeta>): Promise<void>;
+  countSubmissions(formId: string, formVersion?: number, options?: SubmissionQueryOptions): Promise<number>;
   listSubmissions(
     formId: string,
     formVersion?: number,
@@ -497,6 +564,12 @@ export interface UnifiedSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
     submission: FormSubmission<TMeta>,
     options?: SaveSubmissionOptions
   ): Promise<undefined | SubmissionSaveResult<TMeta>>;
+  /** Atomically saves a submission only while the form version remains below its response limit. */
+  saveSubmissionWithinLimit(
+    submission: FormSubmission<TMeta>,
+    maxResponses: number,
+    options?: SaveSubmissionOptions
+  ): Promise<undefined | SubmissionSaveResult<TMeta> | { readonly status: "limit_reached" }>;
   listSubmissionPage(
     formId: string,
     options?: TypedSubmissionPageQueryOptions<TMeta>
@@ -506,6 +579,7 @@ export interface UnifiedSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
     fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
     options?: TextAnswerPageQueryOptions
   ): Promise<TypedTextAnswerPage<TMeta>>;
+  countSubmissions(formId: string, formVersion?: number, options?: SubmissionQueryOptions): Promise<number>;
   aggregateResponses(schema: FormSchema, options?: TypedSubmissionPageQueryOptions<TMeta>): Promise<FormAnalytics>;
   exportResponsesToCsv(schema: FormSchema, options?: StorageSubmissionExportOptions<TMeta>): Promise<string>;
   validateSubmission(submission: FormSubmission<TMeta>, source?: FormSubmissionValidationSource<TMeta>): Promise<void>;
@@ -588,7 +662,7 @@ interface BaseQuestionAggregate {
 }
 
 export interface TextQuestionAggregate extends BaseQuestionAggregate {
-  readonly kind: "text" | "textarea";
+  readonly kind: "text" | "textarea" | "date" | "time" | "email" | "tel" | "url";
 }
 
 export interface NumberQuestionAggregate extends BaseQuestionAggregate {

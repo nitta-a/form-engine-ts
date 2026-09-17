@@ -37,6 +37,7 @@ describe("generic submission metadata", () => {
       saveSubmission: async (submission) => {
         expectTypeOf(submission.metadata.deckId).toEqualTypeOf<string>();
       },
+      countSubmissions: async () => 0,
       listSubmissions: async () => [],
       deleteSubmission: async () => undefined,
       clear: async () => undefined,

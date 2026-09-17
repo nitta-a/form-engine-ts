@@ -9,8 +9,9 @@ import {
   type PollRuntimeAdapter,
   readPollMetadata
 } from "@form-engine-ts/core";
+import { MuiPollResultsEmbed } from "@form-engine-ts/mui";
 import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
-import { ContentRenderer, type ContentRendererClassNames, FormProvider } from "@form-engine-ts/react";
+import { ContentRenderer, type ContentRendererClassNames, FormProvider, PollResultsEmbed } from "@form-engine-ts/react";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 import { Alert, Button, Checkbox, FormControlLabel, Stack } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -50,6 +51,15 @@ function AnswerBody(
   }
 ) {
   const contentModeOptions = {
+    quiz: {
+      share: {
+        url: globalThis.location?.href,
+        buildText: (evaluation: ReturnType<typeof evaluateQuizLocally>) =>
+          props.locale.startsWith("ja")
+            ? `${props.schema.title}で${evaluation.totalScore}/${evaluation.maxPossibleScore}点を獲得しました。`
+            : `I scored ${evaluation.totalScore}/${evaluation.maxPossibleScore} on ${props.schema.title}.`
+      }
+    },
     poll: {
       adapter: props.adapter,
       closed: props.closed,
@@ -144,6 +154,7 @@ export function ContentAnswer({ schema, locale, storage, storageKind = "default"
   const [alreadyVoted, setAlreadyVoted] = useState<boolean | undefined>(undefined);
   const [revision, setRevision] = useState(0);
   const [rendererKind, setRendererKind] = useState<"mui" | "tailwind">("mui");
+  const [showEmbed, setShowEmbed] = useState(false);
   const submitting = useRef(false);
   const ja = locale.startsWith("ja");
   const mode = getFormContentMode(schema.metadata);
@@ -222,6 +233,10 @@ export function ContentAnswer({ schema, locale, storage, storageKind = "default"
             label={ja ? "集計エラーを再現" : "Simulate results error"}
             control={<Checkbox checked={failResults} onChange={(_, checked) => setFailResults(checked)} />}
           />
+          <FormControlLabel
+            label={ja ? "結果 Embed を表示" : "Show results embed"}
+            control={<Checkbox checked={showEmbed} onChange={(_, checked) => setShowEmbed(checked)} />}
+          />
           <p>
             {ja
               ? "一人一票のデモはこのブラウザー内で再現します。"
@@ -272,6 +287,17 @@ export function ContentAnswer({ schema, locale, storage, storageKind = "default"
           storageKind={storageKind}
         />
       </FormProvider>
+      {mode !== "poll" || !showEmbed ? null : rendererKind === "mui" ? (
+        <MuiPollResultsEmbed
+          schema={schema}
+          adapter={adapter}
+          locale={locale}
+          closed={closed}
+          refreshIntervalMs={5_000}
+        />
+      ) : (
+        <PollResultsEmbed schema={schema} adapter={adapter} locale={locale} closed={closed} refreshIntervalMs={5_000} />
+      )}
     </Stack>
   );
 }

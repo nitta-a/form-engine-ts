@@ -55,7 +55,7 @@ pnpm test
 
 ### Current release
 
-The latest release is **v7.18.1** (2026-09-17). All public packages are currently aligned to version `7.18.1`.
+The latest release is **v8.0.0** (2026-09-18). All public packages are currently aligned to version `8.0.0`.
 This patch preserves standard MUI section layout when Paper styles are customized and makes MongoDB non-atomic form deletion explicit.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
@@ -70,6 +70,8 @@ The builder exposes page membership and locale override controls. Set `pageEdito
 at a time; the default `"all"` mode remains available. Core also provides `calculateCrossTabulation` for
 two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
 an optional `{ pageIndex }` for step-scoped validation.
+Core also supports typed `date`, `time`, `email`, `tel`, and `url` fields, deterministic choice shuffling, response
+windows and limits, vendor-neutral submission guards, and optimized response counting across storage adapters.
 Quiz authors can enable or disable the passing-score threshold; when it is disabled, respondent results omit total score
 and pass/fail status.
 
@@ -410,6 +412,8 @@ pnpm test
 新しい質問は選択中のページへ追加されます。既定の`"all"`表示も利用でき、各ページに最低1問を残す制約は維持されます。
 Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
 `dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
+`date`・`time`・`email`・`tel`・`url`の型付き質問、選択肢シャッフル、受付期間・回答上限、
+ベンダー非依存のsubmission guard、storage adapterの回答数取得にも対応します。
 クイズでは合格ラインの設定有無を切り替えられ、未設定の場合は回答結果に合計点と合否を表示しません。
 
 Coreパッケージには、満足度、意見改善、人気投票、理解度チェックの4種類の日英対応目的別テンプレートが

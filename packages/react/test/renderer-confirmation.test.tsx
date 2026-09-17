@@ -112,10 +112,11 @@ describe("FormRenderer generic submission confirmation", () => {
         schema={schema}
         onSubmit={async () => undefined}
         submissionGuards={[
-          () => ({
-            status: "confirm",
-            findings: [{ fieldId: "name", type: "email", matchedText: "ada@example.com" }]
-          })
+          () =>
+            ({
+              status: "confirm",
+              findings: [{ fieldId: "name", type: "email", matchedText: "ada@example.com" }]
+            }) as const
         ]}
         submissionConfirmation={{
           title: "個人情報の確認",

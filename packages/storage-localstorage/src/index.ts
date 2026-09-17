@@ -162,6 +162,22 @@ export function createLocalStorageAdapter(
         .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id))
         .map(cloneJson);
     },
+    async countSubmissions(formId, formVersion, options) {
+      return prefixedKeys(submissionPrefix).reduce((count, key) => {
+        const value = storage.getItem(key);
+        if (value === null) throw new Error(`Stored submission at "${key}" disappeared during reading.`);
+        const submission = parseSubmission(value, key);
+        return (
+          count +
+          (submission.formId === formId &&
+          (formVersion === undefined || submission.formVersion === formVersion) &&
+          (options?.since === undefined || submission.submittedAt >= options.since) &&
+          (options?.until === undefined || submission.submittedAt <= options.until)
+            ? 1
+            : 0)
+        );
+      }, 0);
+    },
     async deleteSubmission(submissionId) {
       storage.removeItem(submissionKey(submissionId));
     },

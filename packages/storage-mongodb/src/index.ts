@@ -787,6 +787,20 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
         .toArray();
       return documents.map(parseSubmissionDocument);
     },
+    async countSubmissions(formId, formVersion, options) {
+      const submittedAt =
+        options?.since === undefined && options?.until === undefined
+          ? undefined
+          : {
+              ...(options.since === undefined ? {} : { $gte: options.since }),
+              ...(options.until === undefined ? {} : { $lte: options.until })
+            };
+      return submissions.countDocuments({
+        formId,
+        ...(formVersion === undefined ? {} : { formVersion }),
+        ...(submittedAt === undefined ? {} : { submittedAt })
+      });
+    },
     async listSubmissionPage(formId, options = {}) {
       const pageSize = normalizeSubmissionPageSize(options.pageSize);
       const cursor = options.cursor === undefined ? undefined : decodeSubmissionCursor(options.cursor);

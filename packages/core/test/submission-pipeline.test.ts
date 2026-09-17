@@ -11,6 +11,8 @@ const schema: FormSchema = {
 function storage(saveSubmission: UnifiedSubmissionStorageAdapter["saveSubmission"]): UnifiedSubmissionStorageAdapter {
   return {
     saveSubmission,
+    saveSubmissionWithinLimit: async (submission, _maxResponses, options) => saveSubmission(submission, options),
+    countSubmissions: async () => 0,
     listSubmissionPage: async () => ({ items: [], hasMore: false }),
     listTextAnswerPage: async () => ({ items: [], hasMore: false }),
     aggregateResponses: async () => ({ formId: "pipeline", formVersion: 1, submissionCount: 0, questions: [] }),

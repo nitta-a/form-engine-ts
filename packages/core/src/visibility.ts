@@ -176,3 +176,46 @@ export function selectVisibleAnswers(schema: FormSchema, currentAnswers: FormVal
       .map((field) => [field.id, currentAnswers[field.id]])
   );
 }
+
+export interface FormProgress {
+  readonly visiblePages: number;
+  readonly currentPage: number;
+  readonly answeredVisibleQuestions: number;
+  readonly totalVisibleQuestions: number;
+  readonly remainingQuestions: number;
+  readonly percent: number;
+}
+
+function hasProgressAnswer(value: unknown): boolean {
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.length > 0;
+  return value === true;
+}
+
+export function calculateProgress(
+  schema: FormSchema,
+  currentAnswers: Readonly<Record<string, unknown>>,
+  currentPageIndex = 0
+): FormProgress {
+  const visibility = calculateFieldVisibility(schema, currentAnswers);
+  const visibleFields = schema.fields.filter((field) => visibility[field.id] === true);
+  const totalVisibleQuestions = visibleFields.length;
+  const answeredVisibleQuestions = visibleFields.filter((field) => hasProgressAnswer(currentAnswers[field.id])).length;
+  const pages = schema.pages;
+  const pageVisibility = pages === undefined ? {} : calculatePageVisibility(schema, currentAnswers);
+  const visiblePageIndexes =
+    pages === undefined ? [] : pages.flatMap((page, index) => (pageVisibility[page.id] === true ? [index] : []));
+  const visiblePages = pages === undefined ? (totalVisibleQuestions === 0 ? 0 : 1) : visiblePageIndexes.length;
+  const currentPage = pages === undefined ? 0 : Math.max(0, visiblePageIndexes.indexOf(currentPageIndex));
+  const percent =
+    totalVisibleQuestions === 0 ? 0 : Math.round((answeredVisibleQuestions / totalVisibleQuestions) * 100);
+  return {
+    visiblePages,
+    currentPage,
+    answeredVisibleQuestions,
+    totalVisibleQuestions,
+    remainingQuestions: totalVisibleQuestions - answeredVisibleQuestions,
+    percent
+  };
+}

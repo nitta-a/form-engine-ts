@@ -6,11 +6,16 @@ import {
   ArrowUpward,
   CheckBox,
   Close,
+  DateRange,
   Delete,
   DragHandle,
   Edit,
+  Email,
+  Link,
   Numbers,
+  Phone,
   RadioButtonChecked,
+  Schedule,
   Settings,
   Star,
   Subject,
@@ -52,6 +57,16 @@ export function muiDefaultFieldTypeIcon(type: QuestionType): ReactNode {
       return <Numbers fontSize="small" />;
     case "rating":
       return <Star fontSize="small" />;
+    case "date":
+      return <DateRange fontSize="small" />;
+    case "time":
+      return <Schedule fontSize="small" />;
+    case "email":
+      return <Email fontSize="small" />;
+    case "tel":
+      return <Phone fontSize="small" />;
+    case "url":
+      return <Link fontSize="small" />;
     case "select":
       return <ArrowDropDown fontSize="small" />;
     case "multi-select":

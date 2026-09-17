@@ -1,5 +1,6 @@
 import {
   type BaseSubmissionMetadata,
+  calculateProgress,
   createSubmissionId,
   deserializeSubmissionErrorFromTrpc,
   type FieldType,
@@ -9,9 +10,12 @@ import {
   FormSubmissionError,
   type FormValue,
   type FormValues,
+  getFormAcceptanceStatus,
   getFormContentMode,
   isFormSubmissionSerializedError,
+  type SubmissionGuardContext,
   selectVisibleAnswers,
+  shuffleOptions,
   type TranslationAdapter,
   type ValidationIssue,
   validateAnswers
@@ -42,6 +46,7 @@ import type {
   ChoiceFieldTypeLayoutMap,
   ChoiceGroupSlotProps,
   FieldError,
+  FormAcceptanceProps,
   FormDraftResumeSlotProps,
   FormRendererAppearance,
   FormRendererClassNames,
@@ -49,6 +54,7 @@ import type {
   FormRendererMessages,
   FormRendererSlotProps,
   FormRendererSlots,
+  FormSubmissionGuard,
   FormSubmissionMetadata,
   FormSubmitHandler,
   FormSubmitStatus,
@@ -96,6 +102,7 @@ export interface FieldComponentProps {
   readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
   readonly a11y?: FormRendererFieldConfig["a11y"];
   readonly classNames?: FormRendererClassNames;
+  readonly optionOrderSeed?: string;
 }
 
 export type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
@@ -255,8 +262,15 @@ function DefaultField({
   readonly submitStatus?: FormSubmitStatus | undefined;
   readonly submittedValue?: unknown;
   readonly renderChoiceOptionAfter?: FormRendererSlots["renderChoiceOptionAfter"];
+  readonly optionOrderSeed?: string;
 }) {
   const { field, value, setValue, inputId, error, translate } = props;
+  const orderedOptions =
+    "options" in field && field.shuffleOptions === true && props.optionOrderSeed !== undefined
+      ? shuffleOptions(field.options, props.optionOrderSeed)
+      : "options" in field
+        ? field.options
+        : [];
   const isGroupedChoiceField =
     isChoiceFieldType(field.type) &&
     resolveChoiceFieldLayout(field.type, appearance, groupedChoiceFields) === "grouped";
@@ -355,7 +369,7 @@ function DefaultField({
           submittedValue={submittedValue}
         >
           <div className={joinClassNames("fe-choice-options", props.classNames?.choiceOptions)}>
-            {field.options.map((option, index) => {
+            {orderedOptions.map((option, index) => {
               const optionId = `${inputId}-${index}`;
               const checked = isRadio ? value === option.id : selected.includes(option.id);
               return (
@@ -390,8 +404,8 @@ function DefaultField({
                               return;
                             event.preventDefault();
                             const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
-                            const nextIndex = (index + offset + field.options.length) % field.options.length;
-                            const nextOption = field.options[nextIndex];
+                            const nextIndex = (index + offset + orderedOptions.length) % orderedOptions.length;
+                            const nextOption = orderedOptions[nextIndex];
                             if (nextOption === undefined) return;
                             setValue(nextOption.id);
                             document.getElementById(`${inputId}-${nextIndex}`)?.focus();
@@ -430,7 +444,7 @@ function DefaultField({
             {field.title}
             {requiredIndicator(field.required, props.a11y)}
           </legend>
-          {field.options.map((option, index) => {
+          {orderedOptions.map((option, index) => {
             const optionId = `${inputId}-${index}`;
             return (
               <label
@@ -470,7 +484,7 @@ function DefaultField({
           {field.title}
           {requiredIndicator(field.required, props.a11y)}
         </legend>
-        {field.options.map((option, index) => {
+        {orderedOptions.map((option, index) => {
           const optionId = `${inputId}-${index}`;
           const checked = field.type === "radio" ? value === option.id : selected.includes(option.id);
           return (
@@ -602,6 +616,31 @@ function DefaultField({
         onChange={(event) => setValue(event.currentTarget.value === "" ? undefined : event.currentTarget.valueAsNumber)}
       />
     );
+  } else if (
+    field.type === "date" ||
+    field.type === "time" ||
+    field.type === "email" ||
+    field.type === "tel" ||
+    field.type === "url"
+  ) {
+    const autoComplete =
+      field.type === "email" ? "email" : field.type === "tel" ? "tel" : field.type === "url" ? "url" : undefined;
+    control = (
+      <input
+        {...ariaProps}
+        id={inputId}
+        className={props.classNames?.fieldInput}
+        name={field.id}
+        type={field.type}
+        autoComplete={autoComplete}
+        required={field.required}
+        min={field.type === "date" ? field.minDate : field.type === "time" ? field.minTime : undefined}
+        max={field.type === "date" ? field.maxDate : field.type === "time" ? field.maxTime : undefined}
+        placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
+        value={typeof value === "string" ? value : ""}
+        onChange={(event) => setValue(event.currentTarget.value)}
+      />
+    );
   } else if (field.type === "select") {
     control = (
       <select
@@ -616,7 +655,7 @@ function DefaultField({
         onChange={(event) => setValue(event.currentTarget.value || undefined)}
       >
         <option value="">—</option>
-        {field.options.map((option) => (
+        {orderedOptions.map((option) => (
           <option value={option.id} key={option.id}>
             {option.label}
           </option>
@@ -702,6 +741,12 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly successMessageKey?: string;
   readonly errorMessageKey?: string;
   readonly attemptIdFactory?: () => string;
+  readonly acceptance?: FormAcceptanceProps;
+  readonly challengeToken?: string | (() => string | Promise<string>);
+  readonly clientKey?: string;
+  /** Seed used to keep shuffled choice options stable for a respondent. */
+  readonly optionOrderSeed?: string;
+  readonly estimateSecondsPerQuestion?: number;
   /** Metadata copied into the submission context for typed application integrations. */
   readonly submissionMetadata?: BaseSubmissionMetadata;
   readonly messages?: Partial<FormRendererMessages>;
@@ -887,6 +932,14 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
     validationSummaryPlural: "There are {{count}} validation errors.",
     alreadySubmittedTitle: "Already Submitted",
     alreadySubmittedMessage: "Already submitted.",
+    formClosedTitle: "Form closed",
+    formClosedMessage: "This form is closed.",
+    formNotYetOpenTitle: "Not open yet",
+    formNotYetOpenMessage: "This form is not open yet.",
+    responseLimitReachedTitle: "Response limit reached",
+    responseLimitReachedMessage: "This form has reached its response limit.",
+    progressLabel: "Progress",
+    remainingQuestions: "{{count}} remaining",
     serverErrorSummary: "Submission failed. Please check your answers and try again.",
     confirmSensitiveDataTitle: "Sensitive data may be included",
     confirmSensitiveDataMessage: "The following answers may contain personal information. Continue submitting?",
@@ -911,6 +964,14 @@ const DEFAULT_RENDERER_MESSAGES: Readonly<Record<"en" | "ja", FormRendererMessag
     validationSummaryPlural: "{{count}}件の入力エラーがあります。",
     alreadySubmittedTitle: "回答済みです",
     alreadySubmittedMessage: "このアンケートにはすでに回答しています。",
+    formClosedTitle: "受付終了",
+    formClosedMessage: "このフォームの受付は終了しています。",
+    formNotYetOpenTitle: "受付開始前",
+    formNotYetOpenMessage: "このフォームはまだ受付を開始していません。",
+    responseLimitReachedTitle: "回答上限に達しました",
+    responseLimitReachedMessage: "このフォームは回答上限に達しています。",
+    progressLabel: "進捗",
+    remainingQuestions: "残り{{count}}問",
     serverErrorSummary: "送信に失敗しました。内容をご確認の上、再度お試しください。",
     confirmSensitiveDataTitle: "個人情報が含まれている可能性があります",
     confirmSensitiveDataMessage: "以下の項目に個人情報とみられる記述があります。このまま送信してもよろしいですか？",
@@ -954,6 +1015,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   successMessageKey,
   errorMessageKey,
   attemptIdFactory,
+  acceptance,
+  challengeToken,
+  clientKey,
+  optionOrderSeed: providedOptionOrderSeed,
+  estimateSecondsPerQuestion,
   idFormat: providedIdFormat = "uuid",
   submissionMetadata,
   messages = {},
@@ -996,6 +1062,12 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           ...(submissionIdentity.scope.tenantId === undefined ? {} : { tenantId: submissionIdentity.scope.tenantId })
         };
   const attemptStore = submissionIdentity?.attemptStore ?? providedAttemptStore;
+  const identityOptionOrderSeed =
+    providedOptionOrderSeed ??
+    submissionIdentity?.scope.sessionId ??
+    submissionIdentity?.scope.userId ??
+    submissionIdentity?.scope.tenantId ??
+    submissionIdentity?.scope.deckId;
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const prefix = useId().replace(/:/g, "");
@@ -1022,6 +1094,13 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     readonly generic: boolean;
   } | null>(null);
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
+  const [honeypotValue, setHoneypotValue] = useState("");
+  const [resolvedSubmissionCount, setResolvedSubmissionCount] = useState<number | undefined>(
+    typeof acceptance?.submissionCount === "number" ? acceptance.submissionCount : undefined
+  );
+  const [acceptanceLoadError, setAcceptanceLoadError] = useState<Error | null>(null);
+  const [acceptanceReloadRevision, setAcceptanceReloadRevision] = useState(0);
+  const [, refreshAcceptanceStatus] = useState(0);
   const [guardsPending, setGuardsPending] = useState(false);
   const [receipt, setReceipt] = useState<SubmissionReceipt | null>(null);
   const [completionData, setCompletionData] = useState<{
@@ -1031,6 +1110,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   } | null>(null);
   const [receiptLoaded, setReceiptLoaded] = useState(receiptStore === undefined);
   const rendererSubmissionInFlight = useRef(false);
+  const acceptanceReloadRevisionRef = useRef(0);
   const fallbackAttemptId = useRef<string | null>(null);
   const confirmedSubmissionSignature = useRef<string | null>(null);
   const piiWarningAcknowledged = useRef(false);
@@ -1040,6 +1120,48 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     () => attemptStore ?? createLocalStorageSubmissionAttemptStore({ idFormat }),
     [attemptStore, idFormat]
   );
+  const [attemptOptionOrderSeed, setAttemptOptionOrderSeed] = useState<string>();
+  const optionOrderSeed = identityOptionOrderSeed ?? attemptOptionOrderSeed;
+  useEffect(() => {
+    if (identityOptionOrderSeed !== undefined) {
+      setAttemptOptionOrderSeed(undefined);
+      return undefined;
+    }
+    let active = true;
+    const scope = { formId: form.schema.id, formVersion: form.schema.version, ...(submissionScope ?? {}) };
+    void (
+      submissionIdentity !== undefined
+        ? submissionIdentity.getOrCreateAttempt()
+        : effectiveAttemptStore.getOrCreateForScope === undefined
+          ? effectiveAttemptStore.getOrCreate(form.schema.id, form.schema.version, attemptIdFactory)
+          : effectiveAttemptStore.getOrCreateForScope(scope, idFormat, attemptIdFactory)
+    )
+      .then((attempt) => {
+        if (active) setAttemptOptionOrderSeed(attempt.attemptId);
+      })
+      .catch(() => {
+        if (!active) return;
+        try {
+          const fallback = fallbackAttemptId.current ?? createSubmissionId(idFormat, attemptIdFactory);
+          fallbackAttemptId.current = fallback;
+          setAttemptOptionOrderSeed(fallback);
+        } catch {
+          setAttemptOptionOrderSeed(undefined);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    attemptIdFactory,
+    effectiveAttemptStore,
+    form.schema.id,
+    form.schema.version,
+    idFormat,
+    identityOptionOrderSeed,
+    submissionIdentity,
+    submissionScope
+  ]);
   const pages = form.schema.pages;
   const visiblePageIndexes = useMemo(
     () =>
@@ -1048,6 +1170,47 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   );
   const activePage = pages?.[currentPageIndex];
   const activeVisibleIndex = visiblePageIndexes.indexOf(currentPageIndex);
+  const progress = useMemo(() => {
+    const base = calculateProgress(form.schema, form.values, currentPageIndex);
+    if (estimateSecondsPerQuestion === undefined || estimateSecondsPerQuestion < 0) return base;
+    return {
+      ...base,
+      estimatedSecondsRemaining: Math.ceil(base.remainingQuestions * estimateSecondsPerQuestion)
+    };
+  }, [currentPageIndex, estimateSecondsPerQuestion, form.schema, form.values]);
+  const honeypotFieldId = form.schema.submissionSettings?.honeypotFieldId;
+  const reloadAcceptanceCount = useCallback(() => {
+    setAcceptanceLoadError(null);
+    acceptanceReloadRevisionRef.current += 1;
+    setAcceptanceReloadRevision(acceptanceReloadRevisionRef.current);
+  }, []);
+  useEffect(() => {
+    const requestRevision = acceptanceReloadRevision;
+    if (typeof acceptance?.submissionCount !== "function") {
+      setResolvedSubmissionCount(acceptance?.submissionCount);
+      setAcceptanceLoadError(null);
+      return undefined;
+    }
+    let active = true;
+    void Promise.resolve(acceptance.submissionCount()).then(
+      (count) => {
+        if (!active || requestRevision !== acceptanceReloadRevisionRef.current) return;
+        setResolvedSubmissionCount(count);
+        setAcceptanceLoadError(null);
+      },
+      (cause: unknown) => {
+        if (!active || requestRevision !== acceptanceReloadRevisionRef.current) return;
+        setAcceptanceLoadError(cause instanceof Error ? cause : new Error(String(cause)));
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [acceptance?.submissionCount, acceptanceReloadRevision]);
+  const acceptanceStatus = getFormAcceptanceStatus(form.schema, {
+    now: acceptance?.now?.() ?? new Date(),
+    ...(resolvedSubmissionCount === undefined ? {} : { submissionCount: resolvedSubmissionCount })
+  });
   const fieldIds = activePage === undefined ? undefined : new Set(activePage.questionIds);
   const visibleValues = useMemo(() => selectVisibleAnswers(form.schema, form.values), [form.schema, form.values]);
   const visibleItems = useMemo(
@@ -1477,7 +1640,10 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   };
 
   const runSubmissionGuards = async (
-    guards: readonly SubmissionGuard[]
+    guards: readonly (SubmissionGuard | FormSubmissionGuard<TMeta>)[],
+    guardValues: FormValues,
+    submittedAt: string,
+    resolvedChallengeToken?: string
   ): Promise<
     | { readonly status: "allow" }
     | {
@@ -1490,9 +1656,25 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     let confirmationMessage: string | undefined;
     let requiresConfirmation = false;
     for (const guard of guards) {
-      const result = await guard(form.schema, visibleValues);
+      const result =
+        guard.length <= 1
+          ? await (guard as FormSubmissionGuard<TMeta>)({
+              schema: form.schema,
+              values: guardValues,
+              context: {
+                formId: form.schema.id,
+                formVersion: form.schema.version,
+                locale: form.locale,
+                submittedAt,
+                ...(resolvedChallengeToken === undefined ? {} : { challengeToken: resolvedChallengeToken }),
+                ...(clientKey === undefined ? {} : { clientKey }),
+                ...(honeypotFieldId === undefined ? {} : { honeypotValue }),
+                ...(submissionMetadata === undefined ? {} : { metadata: submissionMetadata })
+              } satisfies SubmissionGuardContext<TMeta>
+            })
+          : await (guard as SubmissionGuard)(form.schema, guardValues);
       if (result.status === "allow") continue;
-      findings.push(...result.findings);
+      if ("findings" in result && Array.isArray(result.findings)) findings.push(...result.findings);
       if (result.status === "block") {
         return {
           status: "block",
@@ -1529,14 +1711,45 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     ) {
       return { status: "cancelled" };
     }
+    let latestSubmissionCount = resolvedSubmissionCount;
+    if (typeof acceptance?.submissionCount === "function") {
+      try {
+        latestSubmissionCount = await acceptance.submissionCount();
+        setResolvedSubmissionCount(latestSubmissionCount);
+        setAcceptanceLoadError(null);
+      } catch (cause) {
+        const error = cause instanceof Error ? cause : new Error(String(cause));
+        setAcceptanceLoadError(error);
+        return { status: "error", error };
+      }
+    }
+    const latestAcceptanceStatus = getFormAcceptanceStatus(form.schema, {
+      now: acceptance?.now?.() ?? new Date(),
+      ...(latestSubmissionCount === undefined ? {} : { submissionCount: latestSubmissionCount })
+    });
+    if (!latestAcceptanceStatus.accepted) {
+      refreshAcceptanceStatus((revision) => revision + 1);
+      return { status: "cancelled" };
+    }
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
+    const submittedAt = new Date().toISOString();
+    const resolvedChallengeToken = typeof challengeToken === "function" ? await challengeToken() : challengeToken;
+    const guardValues = {
+      ...visibleValues,
+      ...(honeypotFieldId === undefined ? {} : { [honeypotFieldId]: honeypotValue })
+    };
     if (validation.valid && !guardsConfirmed) {
       rendererSubmissionInFlight.current = true;
       setGuardsPending(submissionGuards.length > 0);
       try {
         if (submissionGuards.length > 0) {
-          const guardResult = await runSubmissionGuards(submissionGuards);
+          const guardResult = await runSubmissionGuards(
+            submissionGuards,
+            guardValues,
+            submittedAt,
+            resolvedChallengeToken
+          );
           if (guardResult.status === "block") {
             setGuardMessage(guardResult.message ?? form.translate("form.submissionBlocked"));
             return { status: "cancelled" };
@@ -1580,7 +1793,6 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         fallbackAttemptId.current = attemptId;
       }
       if (attemptId === null) throw new Error("Unable to create a submission attempt id.");
-      const submittedAt = new Date().toISOString();
       const submitContext = {
         attemptId,
         submissionId: attemptId,
@@ -1588,6 +1800,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         formVersion: form.schema.version,
         locale: form.locale,
         submittedAt,
+        ...(resolvedChallengeToken === undefined ? {} : { challengeToken: resolvedChallengeToken }),
+        ...(clientKey === undefined ? {} : { clientKey }),
+        ...(honeypotFieldId === undefined ? {} : { honeypotValue }),
         ...(piiWarningAcknowledged.current ? { piiWarningAcknowledged: true } : {}),
         ...(submissionMetadata === undefined ? {} : { metadata: submissionMetadata })
       };
@@ -1773,6 +1988,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     schema: form.schema,
     answers: activeCompletionData.answers,
     submitStatus: form.submitStatus,
+    acceptanceStatus,
     ...(activeCompletionData.response === undefined ? {} : { response: activeCompletionData.response })
   });
 
@@ -1900,6 +2116,41 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     );
   }
 
+  if (!acceptanceStatus.accepted) {
+    const titleKey =
+      acceptanceStatus.status === "not_yet_open"
+        ? "formNotYetOpenTitle"
+        : acceptanceStatus.status === "limit_reached"
+          ? "responseLimitReachedTitle"
+          : "formClosedTitle";
+    const messageKey =
+      acceptanceStatus.status === "not_yet_open"
+        ? "formNotYetOpenMessage"
+        : acceptanceStatus.status === "limit_reached"
+          ? "responseLimitReachedMessage"
+          : "formClosedMessage";
+    const configuredMessage =
+      acceptanceStatus.status === "not_yet_open"
+        ? form.schema.submissionSettings?.notYetOpenMessage
+        : form.schema.submissionSettings?.closedMessage;
+    const message = configuredMessage ?? resolveMessage(messageKey);
+    return (
+      <div
+        className={`fe-form fe-form-closed ${className}`.trim()}
+        data-mode={getFormContentMode(form.schema.metadata)}
+        data-acceptance-status={acceptanceStatus.status}
+      >
+        {slots.renderClosed?.({ status: acceptanceStatus.status, message }) ?? (
+          <div role="status">
+            <h2>{resolveMessage(titleKey)}</h2>
+            <p>{message}</p>
+          </div>
+        )}
+        {afterFormRegion}
+      </div>
+    );
+  }
+
   if (confirmation !== null && confirmationRenderMode === "replace") {
     return (
       <div
@@ -1923,6 +2174,18 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         onSubmit={handleSubmit}
         aria-hidden={confirmation !== null && confirmationRenderMode === "dialog" ? true : undefined}
       >
+        {honeypotFieldId === undefined ? null : (
+          <input
+            className="fe-honeypot"
+            name={honeypotFieldId}
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            value={honeypotValue}
+            onChange={(event) => setHoneypotValue(event.currentTarget.value)}
+          />
+        )}
         {draftResumeEnabled ? draftResumeContent : null}
         {slots.renderHeader?.({
           title: form.schema.title,
@@ -1933,25 +2196,28 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {form.schema.description === undefined ? null : (
               <p className={classNames?.headerDescription}>{form.schema.description}</p>
             )}
-            {pages === undefined ? null : (
-              <div className="fe-progress">
-                <div
-                  className="form-progress-bar"
-                  role="progressbar"
-                  aria-valuemin={1}
-                  aria-valuemax={visiblePageIndexes.length}
-                  aria-valuenow={activeVisibleIndex + 1}
-                >
+            {slots.renderProgress?.(progress) ??
+              (pages === undefined ? null : (
+                <div className={joinClassNames("fe-progress", classNames?.progress)}>
                   <div
-                    className="form-progress-fill"
-                    style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
-                  />
+                    className="form-progress-bar"
+                    role="progressbar"
+                    aria-valuemin={1}
+                    aria-valuemax={visiblePageIndexes.length}
+                    aria-valuenow={activeVisibleIndex + 1}
+                    aria-label={resolveMessage("progressLabel")}
+                    aria-valuetext={`${form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })} (${resolveMessage("remainingQuestions", undefined, { count: progress.remainingQuestions })})`}
+                  >
+                    <div
+                      className="form-progress-fill"
+                      style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
+                    />
+                  </div>
+                  <span>
+                    {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
+                  </span>
                 </div>
-                <span>
-                  {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
-                </span>
-              </div>
-            )}
+              ))}
             {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
           </header>
         )}
@@ -1968,7 +2234,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {slots.renderPageHeader?.({
               page: activePage,
               pageIndex: activeVisibleIndex,
-              totalPages: visiblePageIndexes.length
+              totalPages: visiblePageIndexes.length,
+              progress
             }) ?? (
               <>
                 {activePage.title === undefined ? null : <h2 className={classNames?.pageTitle}>{activePage.title}</h2>}
@@ -1997,7 +2264,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   ? {}
                   : { renderCharacterCount: slots.renderCharacterCount }),
                 ...(fieldConfig?.[field.id]?.a11y === undefined ? {} : { a11y: fieldConfig[field.id]?.a11y }),
-                ...(classNames === undefined ? {} : { classNames })
+                ...(classNames === undefined ? {} : { classNames }),
+                ...(optionOrderSeed === undefined ? {} : { optionOrderSeed })
               };
               if (slots.renderField !== undefined) {
                 return (
@@ -2056,6 +2324,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               totalPages: 1,
               canPrev: false,
               canNext: false,
+              progress,
               onPrev: () => undefined,
               onNext: () => undefined
             })}
@@ -2068,6 +2337,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               totalPages: visiblePageIndexes.length,
               canPrev,
               canNext,
+              progress,
               onPrev: () => {
                 if (!interactionLocked) goToPage(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
               },
@@ -2100,6 +2370,16 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           </div>
         )}
         <div className={joinClassNames("fe-status", classNames?.status)} aria-live="polite">
+          {acceptanceLoadError === null
+            ? null
+            : (slots.renderSubmitError?.({ error: acceptanceLoadError, onRetry: reloadAcceptanceCount }) ?? (
+                <div role="alert">
+                  {resolveMessage("serverErrorSummary")}
+                  <button type="button" onClick={reloadAcceptanceCount}>
+                    {resolveMessage("retryButton")}
+                  </button>
+                </div>
+              ))}
           {form.submitStatus === "success" ? completionRegion : null}
           {form.submitStatus === "error" && form.submitError !== null
             ? (slots.renderSubmitError?.({ error: form.submitError, onRetry: () => void submitValues() }) ??

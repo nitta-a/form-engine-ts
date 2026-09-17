@@ -22,14 +22,40 @@ export function transformFieldType(field: FormField, nextType: QuestionType): Fo
 
   if (nextType === "text" || nextType === "textarea") {
     const textProperties =
+      "placeholderKey" in field && field.placeholderKey !== undefined ? { placeholderKey: field.placeholderKey } : {};
+    const validationProperties =
       field.type === "text" || field.type === "textarea"
         ? {
-            ...(field.placeholderKey === undefined ? {} : { placeholderKey: field.placeholderKey }),
             ...(field.minLength === undefined ? {} : { minLength: field.minLength }),
             ...(field.maxLength === undefined ? {} : { maxLength: field.maxLength }),
             ...(field.pattern === undefined ? {} : { pattern: field.pattern })
           }
         : {};
+    return { ...common, ...textProperties, ...validationProperties, type: nextType };
+  }
+  if (nextType === "date" || nextType === "time" || nextType === "email" || nextType === "tel" || nextType === "url") {
+    const textProperties =
+      "placeholderKey" in field && field.placeholderKey !== undefined ? { placeholderKey: field.placeholderKey } : {};
+    if (nextType === "date") {
+      const dateProperties =
+        field.type === "date"
+          ? {
+              ...(field.minDate === undefined ? {} : { minDate: field.minDate }),
+              ...(field.maxDate === undefined ? {} : { maxDate: field.maxDate })
+            }
+          : {};
+      return { ...common, ...textProperties, ...dateProperties, type: nextType };
+    }
+    if (nextType === "time") {
+      const timeProperties =
+        field.type === "time"
+          ? {
+              ...(field.minTime === undefined ? {} : { minTime: field.minTime }),
+              ...(field.maxTime === undefined ? {} : { maxTime: field.maxTime })
+            }
+          : {};
+      return { ...common, ...textProperties, ...timeProperties, type: nextType };
+    }
     return { ...common, ...textProperties, type: nextType };
   }
   if (nextType === "number") {
@@ -57,6 +83,7 @@ export function transformFieldType(field: FormField, nextType: QuestionType): Fo
   if (nextType === "checkbox") return { ...common, type: nextType };
 
   const options = "options" in field && field.options.length > 0 ? field.options : [DEFAULT_OPTION];
+  const shuffleOptions = "shuffleOptions" in field && field.shuffleOptions === true ? { shuffleOptions: true } : {};
   if (nextType === "multi-select") {
     const selectionProperties =
       field.type === "multi-select"
@@ -65,7 +92,7 @@ export function transformFieldType(field: FormField, nextType: QuestionType): Fo
             ...(field.maxSelections === undefined ? {} : { maxSelections: field.maxSelections })
           }
         : {};
-    return { ...common, ...selectionProperties, type: nextType, options };
+    return { ...common, ...selectionProperties, ...shuffleOptions, type: nextType, options };
   }
-  return { ...common, type: nextType, options };
+  return { ...common, ...shuffleOptions, type: nextType, options };
 }

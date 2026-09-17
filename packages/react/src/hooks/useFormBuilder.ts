@@ -127,7 +127,19 @@ function defaultIdFactory(kind: BuilderIdKind, existingIds: ReadonlySet<string>)
 
 function defaultCreateField(type: QuestionType, id: string): FormField {
   const base = { id, title: "New question", required: false } as const;
-  if (type === "text" || type === "textarea" || type === "number" || type === "checkbox") return { ...base, type };
+  if (
+    type === "text" ||
+    type === "textarea" ||
+    type === "number" ||
+    type === "date" ||
+    type === "time" ||
+    type === "email" ||
+    type === "tel" ||
+    type === "url" ||
+    type === "checkbox"
+  ) {
+    return { ...base, type };
+  }
   if (type === "rating") return { ...base, type, min: 1, max: 5 };
   return { ...base, type, options: [] };
 }

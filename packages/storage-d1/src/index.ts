@@ -329,6 +329,28 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
       );
       return rows.map(parseSubmissionRow);
     },
+    async countSubmissions(formId, formVersion, queryOptions) {
+      await ensureReady();
+      const conditions = ["form_id = ?"];
+      const params: unknown[] = [formId];
+      if (formVersion !== undefined) {
+        conditions.push("form_version = ?");
+        params.push(formVersion);
+      }
+      if (queryOptions?.since !== undefined) {
+        conditions.push("submitted_at >= ?");
+        params.push(queryOptions.since);
+      }
+      if (queryOptions?.until !== undefined) {
+        conditions.push("submitted_at <= ?");
+        params.push(queryOptions.until);
+      }
+      const row = await options.db
+        .prepare(`SELECT COUNT(*) AS count FROM ${responsesTable} WHERE ${conditions.join(" AND ")}`)
+        .bind(...params)
+        .first<{ readonly count: number }>();
+      return Number(row?.count ?? 0);
+    },
     async deleteSubmission(submissionId) {
       await ensureReady();
       await run(`DELETE FROM ${responsesTable} WHERE response_id = ?`, [submissionId]);

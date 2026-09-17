@@ -18,10 +18,13 @@ import {
 import { createContext, type ReactNode, useContext, useEffect, useRef } from "react";
 import { useForm } from "./context";
 import { usePollResults } from "./hooks/usePollResults";
+import { type SharePayload, useShare } from "./hooks/useShare";
+import { useVisibilityPolling } from "./hooks/useVisibilityPolling";
 import { FormRenderer, type FormRendererProps, type TypedFormRendererProps } from "./renderer";
 import type {
   ChoiceGroupSlotProps,
   ChoiceOptionAfterSlotProps,
+  FormQuizShareSlotProps,
   FormRendererClassNames,
   FormRendererSlots
 } from "./types";
@@ -53,6 +56,16 @@ export interface QuizSummaryLabels {
   readonly passed: string;
   readonly notPassed: string;
   readonly reward?: string;
+  readonly share?: string;
+  readonly shared?: string;
+  readonly copied?: string;
+  readonly shareFailed?: string;
+}
+
+export interface QuizShareOptions {
+  readonly url?: string;
+  readonly onShare?: (payload: SharePayload) => void | Promise<void>;
+  readonly buildText?: (evaluation: QuizEvaluationResult, schema: FormSchema) => string;
 }
 
 export interface PollResultLabels {
@@ -88,6 +101,12 @@ export interface PollResultsErrorProps {
   readonly onRetry: () => void;
   readonly locale: string;
   readonly labels: Pick<PollResultLabels, "retry" | "loadError">;
+}
+
+export interface PollResultsSlots {
+  readonly loading?: (props: PollResultsLoadingProps) => ReactNode;
+  readonly error?: (props: PollResultsErrorProps) => ReactNode;
+  readonly result?: (props: PollResultViewProps) => ReactNode;
 }
 
 export interface QuizQuestionFeedbackProps {
@@ -146,17 +165,51 @@ export interface QuizResultSummaryProps {
   readonly locale?: string;
   readonly labels?: Partial<QuizSummaryLabels>;
   readonly className?: string;
+  readonly share?: QuizShareOptions;
+  readonly renderShare?: (props: FormQuizShareSlotProps) => ReactNode;
 }
 
-export function QuizResultSummary({ evaluation, schema, locale = "en", labels, className }: QuizResultSummaryProps) {
+export function QuizResultSummary({
+  evaluation,
+  schema,
+  locale = "en",
+  labels,
+  className,
+  share,
+  renderShare
+}: QuizResultSummaryProps) {
   const catalog = locale.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
   const resolved: QuizSummaryLabels = {
     totalScore: labels?.totalScore ?? catalog["content.results.totalScore"],
     passed: labels?.passed ?? catalog["content.results.passed"],
-    notPassed: labels?.notPassed ?? catalog["content.results.notPassed"]
+    notPassed: labels?.notPassed ?? catalog["content.results.notPassed"],
+    share: labels?.share ?? (locale.toLowerCase().startsWith("ja") ? "結果を共有" : "Share result"),
+    shared: labels?.shared ?? (locale.toLowerCase().startsWith("ja") ? "共有しました" : "Shared"),
+    copied: labels?.copied ?? (locale.toLowerCase().startsWith("ja") ? "コピーしました" : "Copied"),
+    shareFailed:
+      labels?.shareFailed ?? (locale.toLowerCase().startsWith("ja") ? "共有できませんでした" : "Share failed")
   };
+  const {
+    share: shareResult,
+    status: shareStatus,
+    supported: shareSupported
+  } = useShare(share?.onShare === undefined ? {} : { onShare: share.onShare });
   const questionLabel = (questionId: string) =>
     schema?.fields.find((field) => field.id === questionId)?.title ?? questionId;
+  const shareProps: FormQuizShareSlotProps = {
+    evaluation,
+    schema,
+    status: shareStatus,
+    supported: shareSupported,
+    onShare: () =>
+      void shareResult({
+        title: schema.title,
+        text:
+          share?.buildText?.(evaluation, schema) ??
+          `${resolved.totalScore}: ${evaluation.totalScore} / ${evaluation.maxPossibleScore}`,
+        ...(share?.url === undefined ? {} : { url: share.url })
+      })
+  };
   return (
     <section className={["fe-quiz-summary", className].filter(Boolean).join(" ")} data-quiz-summary>
       <p>
@@ -173,6 +226,18 @@ export function QuizResultSummary({ evaluation, schema, locale = "en", labels, c
           {resolved.reward ?? "Reward"}: {evaluation.reward.message ?? evaluation.reward.code ?? evaluation.reward.type}
         </p>
       )}
+      {share === undefined
+        ? null
+        : (renderShare?.(shareProps) ?? (
+            <button
+              type="button"
+              disabled={!shareSupported || shareStatus === "shared" || shareStatus === "copied"}
+              onClick={shareProps.onShare}
+            >
+              {shareStatus === "shared" ? resolved.shared : shareStatus === "copied" ? resolved.copied : resolved.share}
+            </button>
+          ))}
+      {shareStatus === "error" ? <p role="alert">{resolved.shareFailed}</p> : null}
     </section>
   );
 }
@@ -277,6 +342,7 @@ export interface PollResultsProps extends Omit<PollResultViewProps, "analytics">
   readonly closed: boolean;
   readonly canViewResults: boolean;
   readonly submissionRevision?: number;
+  readonly slots?: PollResultsSlots;
 }
 
 export function PollResults({
@@ -289,7 +355,8 @@ export function PollResults({
   submissionRevision,
   locale = "en",
   labels,
-  classNames = {}
+  classNames = {},
+  slots = {}
 }: PollResultsProps) {
   const result = usePollResults({
     schema,
@@ -302,25 +369,87 @@ export function PollResults({
   });
   const catalog = locale.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
   if (!result.enabled) return null;
-  if (result.loading) return <p role="status">{labels?.loading ?? catalog["content.results.loading"]}</p>;
+  if (result.loading) {
+    const loadingProps = { locale, label: labels?.loading ?? catalog["content.results.loading"] };
+    return slots.loading?.(loadingProps) ?? <p role="status">{loadingProps.label}</p>;
+  }
   if (result.error !== undefined)
     return (
+      slots.error?.({
+        error: result.error,
+        onRetry: result.reload,
+        locale,
+        labels: {
+          retry: labels?.retry ?? catalog["content.results.retry"],
+          loadError: labels?.loadError ?? catalog["content.results.loadError"]
+        }
+      }) ?? (
+        <div role="alert">
+          <p>{labels?.loadError ?? catalog["content.results.loadError"]}</p>
+          <button type="button" onClick={result.reload}>
+            {labels?.retry ?? catalog["content.results.retry"]}
+          </button>
+        </div>
+      )
+    );
+  if (result.data === undefined) return null;
+  const viewProps: PollResultViewProps = {
+    schema,
+    analytics: result.data,
+    locale,
+    ...(labels === undefined ? {} : { labels }),
+    classNames
+  };
+  return slots.result?.(viewProps) ?? <PollResultView {...viewProps} />;
+}
+
+export interface PollResultsEmbedProps
+  extends Omit<PollResultsProps, "submitted" | "alreadyVoted" | "closed" | "canViewResults" | "submissionRevision"> {
+  readonly refreshIntervalMs?: number;
+  readonly closed?: boolean;
+}
+
+export function PollResultsEmbed({ refreshIntervalMs, closed = false, ...props }: PollResultsEmbedProps) {
+  const result = usePollResults({
+    schema: props.schema,
+    adapter: props.adapter,
+    submitted: false,
+    closed,
+    canViewResults: true
+  });
+  useVisibilityPolling(result.reload, refreshIntervalMs, result.enabled);
+  const catalog = props.locale?.toLowerCase().startsWith("ja") ? JA_MESSAGES : EN_MESSAGES;
+  if (!result.enabled) return null;
+  if (result.loading) {
+    const loadingProps = {
+      locale: props.locale ?? "en",
+      label: props.labels?.loading ?? catalog["content.results.loading"]
+    };
+    return props.slots?.loading?.(loadingProps) ?? <p role="status">{loadingProps.label}</p>;
+  }
+  if (result.error !== undefined) {
+    const errorProps: PollResultsErrorProps = {
+      error: result.error,
+      onRetry: result.reload,
+      locale: props.locale ?? "en",
+      labels: {
+        retry: props.labels?.retry ?? catalog["content.results.retry"],
+        loadError: props.labels?.loadError ?? catalog["content.results.loadError"]
+      }
+    };
+    if (props.slots?.error !== undefined) return <>{props.slots.error(errorProps)}</>;
+    return (
       <div role="alert">
-        <p>{labels?.loadError ?? catalog["content.results.loadError"]}</p>
+        <p>{props.labels?.loadError ?? catalog["content.results.loadError"]}</p>
         <button type="button" onClick={result.reload}>
-          {labels?.retry ?? catalog["content.results.retry"]}
+          {props.labels?.retry ?? catalog["content.results.retry"]}
         </button>
       </div>
     );
-  return result.data === undefined ? null : (
-    <PollResultView
-      schema={schema}
-      analytics={result.data}
-      locale={locale}
-      {...(labels === undefined ? {} : { labels })}
-      classNames={classNames}
-    />
-  );
+  }
+  if (result.data === undefined) return null;
+  const viewProps: PollResultViewProps = { ...props, analytics: result.data };
+  return props.slots?.result?.(viewProps) ?? <PollResultView {...viewProps} />;
 }
 
 export interface ContentRendererOptions {
@@ -328,10 +457,11 @@ export interface ContentRendererOptions {
     readonly showImmediateFeedback?: boolean;
     readonly feedbackLabels?: Partial<QuizFeedbackLabels>;
     readonly summaryLabels?: Partial<QuizSummaryLabels>;
+    readonly share?: QuizShareOptions;
   };
   readonly poll?: {
     readonly adapter: PollRuntimeAdapter<FormAnalytics>;
-    readonly closed: boolean;
+    readonly closed?: boolean;
     readonly canViewResults: boolean;
     readonly alreadyVoted?: boolean;
     readonly submissionRevision?: number;
@@ -446,7 +576,7 @@ function PollChoiceGroup({
     adapter: options.adapter,
     submitted: props.submitStatus === "submitting" || props.submitStatus === "success",
     ...(options.alreadyVoted === undefined ? {} : { alreadyVoted: options.alreadyVoted }),
-    closed: options.closed,
+    closed: options.closed ?? false,
     canViewResults: options.canViewResults,
     ...(options.submissionRevision === undefined ? {} : { submissionRevision: options.submissionRevision })
   });
@@ -707,14 +837,27 @@ function ContentRendererImplementation(props: ContentRendererProps | TypedConten
     const mode = getFormContentMode(state.schema.metadata);
     const locale = state.schema.defaultLocale ?? "en";
     if (mode === "poll" && contentModeOptions?.poll !== undefined) {
+      const closed =
+        contentModeOptions.poll.closed ??
+        (state.acceptanceStatus.status === "closed" || state.acceptanceStatus.status === "limit_reached");
       const pollProps: PollResultsProps = {
         schema: state.schema,
-        ...contentModeOptions.poll,
+        adapter: contentModeOptions.poll.adapter,
+        closed,
+        canViewResults: contentModeOptions.poll.canViewResults,
+        ...(contentModeOptions.poll.alreadyVoted === undefined
+          ? {}
+          : { alreadyVoted: contentModeOptions.poll.alreadyVoted }),
+        ...(contentModeOptions.poll.submissionRevision === undefined
+          ? {}
+          : { submissionRevision: contentModeOptions.poll.submissionRevision }),
+        ...(contentModeOptions.poll.labels === undefined ? {} : { labels: contentModeOptions.poll.labels }),
         submitted: state.submitStatus === "success",
         locale,
         classNames
       };
-      return slots.renderPollResults?.(pollProps) ?? null;
+      if (slots.renderPollResults !== undefined) return slots.renderPollResults(pollProps);
+      return inlinePollResults && state.acceptanceStatus.accepted ? null : <PollResults {...pollProps} />;
     }
     if (mode !== "quiz") return null;
     const issues = getContentModeDiagnostics(state.schema, state.policy);
@@ -730,6 +873,8 @@ function ContentRendererImplementation(props: ContentRendererProps | TypedConten
       ...(contentModeOptions?.quiz?.summaryLabels === undefined
         ? {}
         : { labels: contentModeOptions.quiz.summaryLabels }),
+      ...(contentModeOptions?.quiz?.share === undefined ? {} : { share: contentModeOptions.quiz.share }),
+      ...(slots.renderQuizShare === undefined ? {} : { renderShare: slots.renderQuizShare }),
       ...(classNames.quizSummary === undefined ? {} : { className: classNames.quizSummary })
     };
     return slots.renderQuizSummary?.(summaryProps) ?? <QuizResultSummary {...summaryProps} />;

@@ -71,6 +71,24 @@ describe("survey definition conversion", () => {
     expect(schema.fields).toHaveLength(8);
   });
 
+  it("round-trips typed string questions", () => {
+    const typedDefinition: SurveyDefinition = {
+      ...definition,
+      fields: [
+        { id: "date", type: "date", title: "Date", minDate: "2026-01-01", maxDate: "2026-12-31" },
+        { id: "time", type: "time", title: "Time", minTime: "09:00", maxTime: "18:00" },
+        { id: "email", type: "email", title: "Email" },
+        { id: "tel", type: "tel", title: "Phone" },
+        { id: "url", type: "url", title: "URL" }
+      ]
+    };
+    const schema = surveyDefinitionToFormSchema(typedDefinition);
+    expect(schema.fields.map((field) => field.type)).toEqual(["date", "time", "email", "tel", "url"]);
+    expect(formSchemaToSurveyDefinition(schema).fields).toEqual(
+      typedDefinition.fields.map((field) => ({ ...field, required: false }))
+    );
+  });
+
   it("accepts direct radio and preserves the supported values in reverse conversion", () => {
     const schema = surveyDefinitionToFormSchema({
       ...definition,

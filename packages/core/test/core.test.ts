@@ -126,6 +126,20 @@ describe("schema validation", () => {
     [
       {
         ...schema,
+        fields: [{ id: "bad", type: "date", title: "bad", required: false, minDate: "2025-02-30" }]
+      },
+      "invalid_bound"
+    ],
+    [
+      {
+        ...schema,
+        fields: [{ id: "bad", type: "time", title: "bad", required: false, minTime: "18:00", maxTime: "09:00" }]
+      },
+      "contradictory_bounds"
+    ],
+    [
+      {
+        ...schema,
         fields: [
           {
             id: "bad",
@@ -171,6 +185,48 @@ describe("schema validation", () => {
 describe("answer validation", () => {
   it("accepts valid boundary-aware answers", () => {
     expect(validateAnswers(schema, validValues)).toEqual({ valid: true, issues: [] });
+  });
+
+  it("validates date, time, email, telephone, and URL fields", () => {
+    const typedSchema: FormSchema = {
+      id: "typed-fields",
+      version: 1,
+      title: "Typed fields",
+      fields: [
+        { id: "date", type: "date", title: "Date", required: true, minDate: "2025-01-01", maxDate: "2025-12-31" },
+        { id: "time", type: "time", title: "Time", required: true, minTime: "09:00", maxTime: "18:00" },
+        { id: "email", type: "email", title: "Email", required: true },
+        { id: "tel", type: "tel", title: "Phone", required: true },
+        { id: "url", type: "url", title: "URL", required: true }
+      ]
+    };
+    expect(
+      validateAnswers(typedSchema, {
+        date: "2025-06-15",
+        time: "12:30",
+        email: "user@example.com",
+        tel: "+81 3-1234-5678",
+        url: "https://example.com/path"
+      })
+    ).toEqual({ valid: true, issues: [] });
+
+    const result = validateAnswers(typedSchema, {
+      date: "2025-02-30",
+      time: "18:01",
+      email: "invalid",
+      tel: "phone",
+      url: "example.com"
+    });
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "date", code: "invalid_format" }),
+        expect.objectContaining({ fieldId: "time", code: "max" }),
+        expect.objectContaining({ fieldId: "email", code: "invalid_format" }),
+        expect.objectContaining({ fieldId: "tel", code: "invalid_format" }),
+        expect.objectContaining({ fieldId: "url", code: "invalid_format" })
+      ])
+    );
   });
 
   it.each([
@@ -249,6 +305,31 @@ describe("submissions and analytics", () => {
       ]
     });
     expect(JSON.stringify(result)).not.toContain("Fine");
+  });
+
+  it("aggregates typed string fields without treating them as choices", () => {
+    const typedSchema: FormSchema = {
+      id: "typed-analytics",
+      version: 1,
+      title: "Typed analytics",
+      fields: [
+        { id: "date", type: "date", title: "Date", required: false },
+        { id: "email", type: "email", title: "Email", required: false },
+        { id: "url", type: "url", title: "URL", required: false }
+      ]
+    };
+    const submissions = [
+      createSubmission(
+        typedSchema,
+        { date: "2026-09-17", email: "a@example.com", url: "https://example.com" },
+        { id: "typed-1", locale: "en", submittedAt: "2026-01-01" }
+      )
+    ];
+    expect(aggregateResponses(typedSchema, submissions).questions).toEqual([
+      { fieldId: "date", kind: "date", answeredCount: 1, unansweredCount: 0 },
+      { fieldId: "email", kind: "email", answeredCount: 1, unansweredCount: 0 },
+      { fieldId: "url", kind: "url", answeredCount: 1, unansweredCount: 0 }
+    ]);
   });
 
   it("rejects mismatched and invalid persisted submissions", () => {

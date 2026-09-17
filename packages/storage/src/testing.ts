@@ -80,6 +80,23 @@ export async function runStorageContract(adapter: FormStorageAdapter): Promise<S
   check(JSON.stringify(loaded) === JSON.stringify(submissions), "submission ordering/metadata round trip");
   const passed = ["schema", "submission", "translation_metadata"];
   const unsupported: string[] = [];
+  check((await adapter.countSubmissions(schema.id)) === submissions.length, "count must include all form versions");
+  check(
+    (await adapter.countSubmissions(schema.id, schema.version)) === submissions.length,
+    "count must filter by form version"
+  );
+  check(
+    (await adapter.countSubmissions(schema.id, schema.version, {
+      since: "2026-01-01T00:00:00.000Z",
+      until: "2026-01-01T00:00:00.000Z"
+    })) === submissions.length,
+    "count must include since/until boundaries"
+  );
+  check(
+    (await adapter.countSubmissions(schema.id, schema.version, { since: "2026-01-01T00:00:00.001Z" })) === 0,
+    "count must filter by submission time"
+  );
+  passed.push("count");
   if ("listSubmissionPage" in adapter && typeof adapter.listSubmissionPage === "function") {
     const paged = adapter as PagedSubmissionStorageAdapter;
     const ids: string[] = [];

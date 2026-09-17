@@ -30,6 +30,41 @@ export const DEFAULT_FIELD_TYPE_DEFINITIONS: readonly FieldTypeDefinition[] = [
     hasOptions: false
   },
   {
+    type: "date",
+    labelKey: "builder.fields.typeDate",
+    defaultLabel: "日付",
+    category: "text",
+    hasOptions: false
+  },
+  {
+    type: "time",
+    labelKey: "builder.fields.typeTime",
+    defaultLabel: "時刻",
+    category: "text",
+    hasOptions: false
+  },
+  {
+    type: "email",
+    labelKey: "builder.fields.typeEmail",
+    defaultLabel: "メールアドレス",
+    category: "text",
+    hasOptions: false
+  },
+  {
+    type: "tel",
+    labelKey: "builder.fields.typeTel",
+    defaultLabel: "電話番号",
+    category: "text",
+    hasOptions: false
+  },
+  {
+    type: "url",
+    labelKey: "builder.fields.typeUrl",
+    defaultLabel: "URL",
+    category: "text",
+    hasOptions: false
+  },
+  {
     type: "radio",
     labelKey: "builder.fields.typeRadio",
     defaultLabel: "単一選択 (ラジオボタン)",

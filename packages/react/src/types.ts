@@ -2,7 +2,9 @@ import type {
   AsyncTranslationAdapter,
   BaseSubmissionMetadata,
   CanonicalTranslationMetadata,
+  SubmissionGuard as CoreSubmissionGuard,
   FieldOption,
+  FormAcceptanceResult,
   FormField,
   FormPage,
   FormPolicy,
@@ -101,7 +103,7 @@ export interface InputComponentProps extends ComponentBaseProps {
 export interface BuilderTextInputProps extends InputComponentProps {
   readonly inputRef?: (element: HTMLInputElement | null) => void;
   readonly inputMode?: "text" | "numeric";
-  readonly type?: "text" | "number";
+  readonly type?: "text" | "number" | "datetime-local";
   readonly min?: number;
   readonly max?: number;
   readonly step?: number;
@@ -378,7 +380,13 @@ export interface TranslationComparisonItem {
   readonly path: string;
   readonly nodeId?: string;
   readonly targetKind: "form" | "page" | "field" | "option";
-  readonly targetProperty: "title" | "description" | "label" | "completionMessage";
+  readonly targetProperty:
+    | "title"
+    | "description"
+    | "label"
+    | "completionMessage"
+    | "closedMessage"
+    | "notYetOpenMessage";
   readonly nodeTitle?: string;
   readonly sourceText: string;
   readonly translatedText: string;
@@ -656,6 +664,9 @@ export interface SubmitContext {
   readonly submittedAt: string;
   readonly metadata?: BaseSubmissionMetadata;
   readonly piiWarningAcknowledged?: boolean;
+  readonly challengeToken?: string;
+  readonly clientKey?: string;
+  readonly honeypotValue?: string;
 }
 
 export interface TypedSubmitContext<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
@@ -672,6 +683,14 @@ export interface FormRendererMessages {
   readonly validationSummaryPlural?: string;
   readonly alreadySubmittedTitle?: string;
   readonly alreadySubmittedMessage?: string;
+  readonly formClosedTitle?: string;
+  readonly formClosedMessage?: string;
+  readonly formNotYetOpenTitle?: string;
+  readonly formNotYetOpenMessage?: string;
+  readonly responseLimitReachedTitle?: string;
+  readonly responseLimitReachedMessage?: string;
+  readonly progressLabel?: string;
+  readonly remainingQuestions?: string;
   readonly serverErrorSummary?: string;
   readonly confirmSensitiveDataTitle?: string;
   readonly confirmSensitiveDataMessage?: string;
@@ -725,6 +744,7 @@ export interface FormAfterFormSlotProps {
   readonly schema: FormSchema;
   readonly answers: Readonly<Record<string, unknown>>;
   readonly submitStatus: FormSubmitStatus;
+  readonly acceptanceStatus: FormAcceptanceResult;
   readonly response?: SubmitResponse;
 }
 
@@ -748,10 +768,14 @@ export type SubmissionGuardResult =
   | { readonly status: "confirm"; readonly findings: readonly SensitiveDataFinding[]; readonly message?: string }
   | { readonly status: "block"; readonly findings: readonly SensitiveDataFinding[]; readonly message?: string };
 
+/** @deprecated Use SubmissionGuard from @form-engine-ts/core for server-side guards with submission context. */
 export type SubmissionGuard = (
   schema: FormSchema,
   values: Record<string, unknown>
 ) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
+
+export type FormSubmissionGuard<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> =
+  CoreSubmissionGuard<TMeta>;
 
 export type FormSuccessRenderMode = "append" | "replace";
 
@@ -948,6 +972,25 @@ export interface FormRendererClassNames {
   readonly submitButton?: string;
   readonly status?: string;
   readonly completion?: string;
+  readonly progress?: string;
+}
+
+export interface FormProgressSlotProps {
+  readonly visiblePages: number;
+  readonly currentPage: number;
+  readonly answeredVisibleQuestions: number;
+  readonly totalVisibleQuestions: number;
+  readonly remainingQuestions: number;
+  readonly percent: number;
+  readonly estimatedSecondsRemaining?: number;
+}
+
+export interface FormQuizShareSlotProps {
+  readonly evaluation: QuizEvaluationResult;
+  readonly schema: FormSchema;
+  readonly status: "idle" | "sharing" | "shared" | "copied" | "error";
+  readonly supported: boolean;
+  readonly onShare: () => void;
 }
 
 export interface ChoiceGroupSlotProps {
@@ -995,10 +1038,13 @@ export interface FormDraftResumeSlotProps {
 export interface FormRendererSlots {
   readonly renderDraftResume?: (props: FormDraftResumeSlotProps) => ReactNode;
   readonly renderHeader?: (props: { readonly title: string; readonly description?: string }) => ReactNode;
+  readonly renderProgress?: (props: FormProgressSlotProps) => ReactNode;
+  readonly renderQuizShare?: (props: FormQuizShareSlotProps) => ReactNode;
   readonly renderPageHeader?: (props: {
     readonly page: FormPage;
     readonly pageIndex: number;
     readonly totalPages: number;
+    readonly progress: FormProgressSlotProps;
   }) => ReactNode;
   readonly renderField?: (props: {
     readonly question: FormField;
@@ -1011,6 +1057,7 @@ export interface FormRendererSlots {
     readonly totalPages: number;
     readonly canPrev: boolean;
     readonly canNext: boolean;
+    readonly progress: FormProgressSlotProps;
     readonly onPrev: () => void;
     readonly onNext: () => void;
   }) => ReactNode;
@@ -1029,6 +1076,10 @@ export interface FormRendererSlots {
     readonly receipt: SubmissionReceipt;
     readonly onReset?: () => void;
   }) => ReactNode;
+  readonly renderClosed?: (props: {
+    readonly status: "not_yet_open" | "closed" | "limit_reached";
+    readonly message: string;
+  }) => ReactNode;
   readonly renderCharacterCount?: (props: {
     readonly fieldId: string;
     readonly current: number;
@@ -1039,7 +1090,7 @@ export interface FormRendererSlots {
 }
 
 export interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
-  readonly submissionGuards?: readonly SubmissionGuard[];
+  readonly submissionGuards?: readonly (SubmissionGuard | FormSubmissionGuard<TMeta>)[];
   readonly receiptStore?: SubmissionReceiptStore;
   readonly submissionScope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">;
   readonly attemptStore?: SubmissionAttemptStore;
@@ -1048,6 +1099,11 @@ export interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata 
   /** Shared identity configuration used by Controller, Renderer, attempt storage, and receipts. */
   readonly submissionIdentity?: import("./submissionIdentity").SubmissionIdentity<TMeta>;
   readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
+}
+
+export interface FormAcceptanceProps {
+  readonly now?: () => Date;
+  readonly submissionCount?: number | (() => number | Promise<number>);
 }
 
 export type BeforeSubmit = (

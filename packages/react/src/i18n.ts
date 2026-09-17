@@ -27,7 +27,12 @@ export const BUILDER_TRANSLATION_ALIASES: Readonly<Record<string, string>> = {
   "builder.fields.typeRadio": "builder.fieldType.radio",
   "builder.fields.typeCheckbox": "builder.fieldType.checkbox",
   "builder.fields.typeSelect": "builder.fieldType.select",
-  "builder.fields.typeMultiSelect": "builder.fieldType.multi-select"
+  "builder.fields.typeMultiSelect": "builder.fieldType.multi-select",
+  "builder.fields.typeDate": "builder.fieldType.date",
+  "builder.fields.typeTime": "builder.fieldType.time",
+  "builder.fields.typeEmail": "builder.fieldType.email",
+  "builder.fields.typeTel": "builder.fieldType.tel",
+  "builder.fields.typeUrl": "builder.fieldType.url"
 };
 
 export function isTranslationUnresolved(result: unknown, key: string, aliases: readonly string[] = []): boolean {

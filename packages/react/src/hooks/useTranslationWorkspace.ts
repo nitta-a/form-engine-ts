@@ -142,7 +142,7 @@ export interface UseTranslationWorkspaceResult {
   readonly error?: TranslationWorkspaceError;
 }
 
-type LocalizedProperty = "title" | "description" | "completionMessage";
+type LocalizedProperty = "title" | "description" | "completionMessage" | "closedMessage" | "notYetOpenMessage";
 
 function updateTranslationMap(
   translations: FormSchema["translations"],

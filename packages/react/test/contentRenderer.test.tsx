@@ -178,6 +178,46 @@ describe("ContentRenderer", () => {
     expect(screen.queryByRole("heading", { name: "Poll results" })).not.toBeInTheDocument();
   });
 
+  it("derives closed-only poll results from form acceptance status", async () => {
+    const initialPoll = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
+    const poll = {
+      ...initialPoll,
+      submissionSettings: { closeAt: "2026-09-17T00:00:00.000Z" },
+      metadata: contentMetadataToJson({ mode: "poll", poll: { resultVisibility: "closed_only" } })
+    };
+    const loadResults = vi.fn(
+      async () =>
+        ({
+          formId: poll.id,
+          formVersion: poll.version,
+          submissionCount: 2,
+          questions: [
+            {
+              fieldId: poll.fields[0]?.id ?? "question-1",
+              kind: "radio" as const,
+              answeredCount: 2,
+              unansweredCount: 0,
+              options: [
+                { id: "option-1", count: 2, percentageOfSubmissions: 100 },
+                { id: "option-2", count: 0, percentageOfSubmissions: 0 }
+              ]
+            }
+          ]
+        }) satisfies FormAnalytics
+    );
+    render(
+      <ContentRenderer
+        schema={poll}
+        acceptance={{ now: () => new Date("2026-09-17T00:00:00.000Z") }}
+        contentModeOptions={{ poll: { adapter: { loadResults, canVote: async () => false }, canViewResults: true } }}
+      />
+    );
+    expect(screen.getByText("This form is closed.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Poll results" })).toBeInTheDocument();
+    expect(screen.getByText("2 votes (100%)")).toBeInTheDocument();
+    expect(loadResults).toHaveBeenCalledOnce();
+  });
+
   it("renders inline results for multi-select poll choices", async () => {
     const initialPoll = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
     const initialField = initialPoll.fields[0];

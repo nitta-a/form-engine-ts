@@ -142,6 +142,15 @@ export function createMemoryStorageAdapter(
         .sort((left, right) => left.submittedAt.localeCompare(right.submittedAt) || left.id.localeCompare(right.id))
         .map(cloneSubmission);
     },
+    async countSubmissions(formId, formVersion, options) {
+      return [...submissions.values()].filter(
+        (submission) =>
+          submission.formId === formId &&
+          (formVersion === undefined || submission.formVersion === formVersion) &&
+          (options?.since === undefined || submission.submittedAt >= options.since) &&
+          (options?.until === undefined || submission.submittedAt <= options.until)
+      ).length;
+    },
     async listSubmissionPage(formId, options = {}) {
       const pageSize = normalizeSubmissionPageSize(options.pageSize);
       const cursor = options.cursor === undefined ? undefined : decodeSubmissionCursor(options.cursor);

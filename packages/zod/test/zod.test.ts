@@ -74,6 +74,46 @@ describe("createZodFormSchema", () => {
     expect(result).toEqual({ success: true, data: validValues });
   });
 
+  it("maps typed string fields to string values and Core format issues", () => {
+    const typed: FormSchema = {
+      id: "typed-zod",
+      version: 1,
+      title: "Typed fields",
+      fields: [
+        { id: "date", type: "date", title: "Date", required: true },
+        { id: "time", type: "time", title: "Time", required: true },
+        { id: "email", type: "email", title: "Email", required: true },
+        { id: "tel", type: "tel", title: "Phone", required: true },
+        { id: "url", type: "url", title: "URL", required: true }
+      ]
+    };
+    const validator = createZodFormSchema(typed);
+    expect(
+      validator.safeParse({
+        date: "2026-09-17",
+        time: "09:30",
+        email: "person@example.com",
+        tel: "+81 3-1234-5678",
+        url: "https://example.com"
+      })
+    ).toEqual({
+      success: true,
+      data: {
+        date: "2026-09-17",
+        time: "09:30",
+        email: "person@example.com",
+        tel: "+81 3-1234-5678",
+        url: "https://example.com"
+      }
+    });
+    const invalid = validator.safeParse({ date: "bad", time: "bad", email: "bad", tel: "bad", url: "example.com" });
+    expect(
+      issues(invalid).filter(
+        (issue) => issue.code === "custom" && "params" in issue && issue.params?.formEngineCode === "invalid_format"
+      )
+    ).toHaveLength(5);
+  });
+
   it.each([
     [{ ...validValues, text: " " }, "required"],
     [{ ...validValues, text: "A" }, "min_length"],

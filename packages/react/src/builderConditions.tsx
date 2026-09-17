@@ -13,6 +13,9 @@ export function conditionOperators(field: FormField): readonly ConditionOperator
   if (field.type === "text" || field.type === "textarea") {
     return ["equals", "not_equals", "contains", "not_empty"];
   }
+  if (field.type === "date" || field.type === "time") {
+    return ["equals", "not_equals", "greater_than", "less_than", "not_empty"];
+  }
   return ["equals", "not_equals", "not_empty"];
 }
 

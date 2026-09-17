@@ -62,6 +62,7 @@ const DEFAULT_MESSAGES: Record<ValidationCode, string> = {
   invalid_option: "validation.invalidOption",
   min_selections: "validation.minSelections",
   max_selections: "validation.maxSelections",
+  invalid_format: "validation.invalidFormat",
   unknown_field: "validation.unknownField"
 };
 
@@ -84,6 +85,26 @@ function isEmpty(field: FormField, value: FormValue): boolean {
   if (field.type === "checkbox") return value !== true;
   if (field.type === "multi-select") return Array.isArray(value) && value.length === 0;
   return false;
+}
+
+function isValidDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return (
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() + 1 === Number(match[2]) &&
+    date.getUTCDate() === Number(match[3])
+  );
+}
+
+function isValidTime(value: string): boolean {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (match === null) return false;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+  return hours < 24 && minutes < 60 && seconds < 60;
 }
 
 function validateField(field: FormField, value: FormValue, issues: ValidationIssue[]): void {
@@ -110,6 +131,52 @@ function validateField(field: FormField, value: FormValue, issues: ValidationIss
     }
     if (field.pattern !== undefined && !new RegExp(field.pattern).test(normalized)) {
       addIssue(issues, field, "pattern");
+    }
+    return;
+  }
+
+  if (
+    field.type === "date" ||
+    field.type === "time" ||
+    field.type === "email" ||
+    field.type === "tel" ||
+    field.type === "url"
+  ) {
+    if (typeof value !== "string") {
+      addIssue(issues, field, "invalid_type");
+      return;
+    }
+    const normalized = value.trim();
+    const validFormat =
+      field.type === "date"
+        ? isValidDate(normalized)
+        : field.type === "time"
+          ? isValidTime(normalized)
+          : field.type === "email"
+            ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
+            : field.type === "tel"
+              ? /^[+()\d][+()\d\s-]*$/.test(normalized)
+              : /^https?:\/\/[^\s]+$/i.test(normalized) &&
+                (() => {
+                  try {
+                    new URL(normalized);
+                    return true;
+                  } catch {
+                    return false;
+                  }
+                })();
+    if (!validFormat) addIssue(issues, field, "invalid_format");
+    if (field.type === "date") {
+      if (field.minDate !== undefined && normalized < field.minDate)
+        addIssue(issues, field, "min", { min: field.minDate });
+      if (field.maxDate !== undefined && normalized > field.maxDate)
+        addIssue(issues, field, "max", { max: field.maxDate });
+    }
+    if (field.type === "time") {
+      if (field.minTime !== undefined && normalized < field.minTime)
+        addIssue(issues, field, "min", { min: field.minTime });
+      if (field.maxTime !== undefined && normalized > field.maxTime)
+        addIssue(issues, field, "max", { max: field.maxTime });
     }
     return;
   }
@@ -170,11 +237,19 @@ function validateField(field: FormField, value: FormValue, issues: ValidationIss
   }
 }
 
+/** Validates one non-empty field value with the same rules used by form submission validation. */
+export function validateFieldValue(field: FormField, value: FormValue): boolean {
+  const issues: ValidationIssue[] = [];
+  validateField(field, value, issues);
+  return issues.length === 0;
+}
+
 export function validateAnswers(schema: FormSchema, values: FormValues): AnswerValidationResult {
   const issues: ValidationIssue[] = [];
   const fields = new Map(schema.fields.map((field) => [field.id, field]));
+  const honeypotFieldId = schema.submissionSettings?.honeypotFieldId;
   for (const key of Object.keys(values)) {
-    if (!fields.has(key)) {
+    if (key !== honeypotFieldId && !fields.has(key)) {
       issues.push({
         fieldId: key,
         code: "unknown_field",

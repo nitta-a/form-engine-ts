@@ -5,11 +5,15 @@ current release and usage information.
 
 ## Latest release
 
-### v7.18.1 — 2026-09-17
+### v8.0.0 — 2026-09-18
 
 - Preserved standard MUI section layout when `muiSlotProps.paper.sx` is customized.
 - Made MongoDB non-atomic form deletion explicit with `allowNonAtomic: true` when transactions are unsupported, including partial-failure reporting.
-- Aligned all public packages to version 7.18.1.
+- Added server-side honeypot context, stable attempt-based option shuffling, submit-time acceptance rechecks, and idempotent retries after response limits are reached.
+- Added customizable quiz sharing and visibility-aware poll embeds for React and MUI.
+- **Breaking:** storage adapters must implement range-aware `countSubmissions(formId, formVersion?, options?)` and atomic `saveSubmissionWithinLimit(submission, maxResponses, options?)`; the paged fallback and process-local capacity lock were removed.
+- Deprecated the legacy client-side React `SubmissionGuard`; use the Core guard contract for server-side submission protection.
+- Aligned all public packages to version 8.0.0.
 
 ### v7.18.0 — 2026-09-17
 

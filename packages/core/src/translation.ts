@@ -25,7 +25,7 @@ export interface TranslationProviderError {
 export interface TranslationSlot {
   readonly kind: "form" | "page" | "field" | "option";
   readonly nodeId: string;
-  readonly property: "title" | "description" | "label" | "completionMessage";
+  readonly property: "title" | "description" | "label" | "completionMessage" | "closedMessage" | "notYetOpenMessage";
   readonly locale: string;
   readonly sourceText: string;
   readonly existingText?: string;
@@ -35,7 +35,7 @@ export interface TranslationSlot {
   readonly target?: {
     readonly kind: "form" | "page" | "field" | "option";
     readonly id?: string;
-    readonly property: "title" | "description" | "label" | "completionMessage";
+    readonly property: "title" | "description" | "label" | "completionMessage" | "closedMessage" | "notYetOpenMessage";
   };
   readonly path?: string;
   readonly sourceTextHash?: string;
@@ -74,7 +74,7 @@ export interface TranslationMigrationContext {
   /** JSON path of the translated property. */
   readonly path: string;
   /** Translated property name. */
-  readonly property: "title" | "description" | "label" | "completionMessage";
+  readonly property: "title" | "description" | "label" | "completionMessage" | "closedMessage" | "notYetOpenMessage";
   /** Kind of node that owns the translated property. */
   readonly nodeKind: "form" | "page" | "field" | "option";
   /** Identifier of the owning node. */
@@ -221,7 +221,7 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw signal.reason ?? new DOMException("The translation was cancelled.", "AbortError");
 }
 
-type LocalizedProperty = "title" | "description" | "completionMessage";
+type LocalizedProperty = "title" | "description" | "completionMessage" | "closedMessage" | "notYetOpenMessage";
 
 function mergeLocalizedText(
   translations: SchemaTranslations | undefined,
@@ -348,6 +348,10 @@ function translationSlots(
   addFormSlot("title", schema.title);
   if (schema.description !== undefined) addFormSlot("description", schema.description);
   if (schema.completionMessage !== undefined) addFormSlot("completionMessage", schema.completionMessage);
+  if (schema.submissionSettings?.closedMessage !== undefined)
+    addFormSlot("closedMessage", schema.submissionSettings.closedMessage);
+  if (schema.submissionSettings?.notYetOpenMessage !== undefined)
+    addFormSlot("notYetOpenMessage", schema.submissionSettings.notYetOpenMessage);
 
   schema.fields.forEach((field, fieldIndex) => {
     const fieldTranslation = localeRecordEntry(field.translations, locale);
@@ -743,6 +747,8 @@ export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string
   if (normalizedTargetLocale === defaultLocale || targetLocale === schema.defaultLocale) return schema;
   const formTranslation = localeRecordEntry(schema.translations, normalizedTargetLocale);
   const completionMessage = formTranslation?.completionMessage ?? schema.completionMessage;
+  const closedMessage = formTranslation?.closedMessage ?? schema.submissionSettings?.closedMessage;
+  const notYetOpenMessage = formTranslation?.notYetOpenMessage ?? schema.submissionSettings?.notYetOpenMessage;
   return {
     ...schema,
     title: formTranslation?.title ?? schema.title,
@@ -750,6 +756,15 @@ export function resolveLocalizedSchema(schema: FormSchema, targetLocale?: string
       ? {}
       : { description: formTranslation?.description ?? schema.description }),
     ...(completionMessage === undefined ? {} : { completionMessage }),
+    ...(schema.submissionSettings === undefined
+      ? {}
+      : {
+          submissionSettings: {
+            ...schema.submissionSettings,
+            ...(closedMessage === undefined ? {} : { closedMessage }),
+            ...(notYetOpenMessage === undefined ? {} : { notYetOpenMessage })
+          }
+        }),
     fields: schema.fields.map((field): FormField => {
       const translation = localeRecordEntry(field.translations, normalizedTargetLocale);
       const localized = {

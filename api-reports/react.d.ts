@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { SubmissionIdFormat, BaseSubmissionMetadata, FormSchema, FormValues, StrictFormSubmission, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, QuestionType, FormField, ChoiceOption, FormPage, DisplayCondition, JsonValue, SchemaIssue, FieldOption, Question, ValidationIssue, ValidationError, QuizEvaluationResult, TranslationStatus, CanonicalTranslationMetadata, FieldType, FormValue, PollRuntimeAdapter, FormAnalytics, QuizQuestionResult, getContentModeDiagnostics, AnswerValidationResult, PollAccessContext, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent } from '@form-engine-ts/core';
+import { SubmissionIdFormat, BaseSubmissionMetadata, FormSchema, FormValues, StrictFormSubmission, FormPolicy, TranslationAdapter, AsyncTranslationAdapter, LocaleOption, TranslationReport, TranslationSlot, PopulateTranslationOptions, TranslationProgress, QuestionType, FormField, ChoiceOption, FormPage, DisplayCondition, JsonValue, SchemaIssue, FieldOption, Question, ValidationIssue, SubmissionGuard as SubmissionGuard$1, QuizEvaluationResult, ValidationError, FormAcceptanceResult, TranslationStatus, CanonicalTranslationMetadata, FieldType, FormValue, PollRuntimeAdapter, FormAnalytics, QuizQuestionResult, getContentModeDiagnostics, AnswerValidationResult, PollAccessContext, FormEngineTranslator, FormEngineMessages, TranslationWorkspaceCustomDictionary, TranslationMissingKeyEvent } from '@form-engine-ts/core';
 export { FormSubmissionError, FormSubmissionSerializedError, QuestionType, SubmissionIdFormat, TranslationWorkspaceCustomDictionary } from '@form-engine-ts/core';
 import * as react from 'react';
 import { ReactNode, ComponentType, KeyboardEvent, MouseEvent, CSSProperties } from 'react';
@@ -377,7 +377,7 @@ interface InputComponentProps extends ComponentBaseProps {
 interface BuilderTextInputProps extends InputComponentProps {
     readonly inputRef?: (element: HTMLInputElement | null) => void;
     readonly inputMode?: "text" | "numeric";
-    readonly type?: "text" | "number";
+    readonly type?: "text" | "number" | "datetime-local";
     readonly min?: number;
     readonly max?: number;
     readonly step?: number;
@@ -614,7 +614,7 @@ interface TranslationComparisonItem {
     readonly path: string;
     readonly nodeId?: string;
     readonly targetKind: "form" | "page" | "field" | "option";
-    readonly targetProperty: "title" | "description" | "label" | "completionMessage";
+    readonly targetProperty: "title" | "description" | "label" | "completionMessage" | "closedMessage" | "notYetOpenMessage";
     readonly nodeTitle?: string;
     readonly sourceText: string;
     readonly translatedText: string;
@@ -849,6 +849,9 @@ interface SubmitContext {
     readonly submittedAt: string;
     readonly metadata?: BaseSubmissionMetadata;
     readonly piiWarningAcknowledged?: boolean;
+    readonly challengeToken?: string;
+    readonly clientKey?: string;
+    readonly honeypotValue?: string;
 }
 interface TypedSubmitContext<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> extends SubmitContext {
     readonly metadata?: TMeta;
@@ -862,6 +865,14 @@ interface FormRendererMessages {
     readonly validationSummaryPlural?: string;
     readonly alreadySubmittedTitle?: string;
     readonly alreadySubmittedMessage?: string;
+    readonly formClosedTitle?: string;
+    readonly formClosedMessage?: string;
+    readonly formNotYetOpenTitle?: string;
+    readonly formNotYetOpenMessage?: string;
+    readonly responseLimitReachedTitle?: string;
+    readonly responseLimitReachedMessage?: string;
+    readonly progressLabel?: string;
+    readonly remainingQuestions?: string;
     readonly serverErrorSummary?: string;
     readonly confirmSensitiveDataTitle?: string;
     readonly confirmSensitiveDataMessage?: string;
@@ -910,6 +921,7 @@ interface FormAfterFormSlotProps {
     readonly schema: FormSchema;
     readonly answers: Readonly<Record<string, unknown>>;
     readonly submitStatus: FormSubmitStatus;
+    readonly acceptanceStatus: FormAcceptanceResult;
     readonly response?: SubmitResponse;
 }
 interface FormServerErrorPayload {
@@ -929,7 +941,9 @@ type SubmissionGuardResult = {
     readonly findings: readonly SensitiveDataFinding[];
     readonly message?: string;
 };
+/** @deprecated Use SubmissionGuard from @form-engine-ts/core for server-side guards with submission context. */
 type SubmissionGuard = (schema: FormSchema, values: Record<string, unknown>) => SubmissionGuardResult | Promise<SubmissionGuardResult>;
+type FormSubmissionGuard<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> = SubmissionGuard$1<TMeta>;
 type FormSuccessRenderMode = "append" | "replace";
 type ChoiceFieldLayoutMode = "default" | "grouped";
 interface ChoiceFieldTypeLayoutMap {
@@ -1098,6 +1112,23 @@ interface FormRendererClassNames {
     readonly submitButton?: string;
     readonly status?: string;
     readonly completion?: string;
+    readonly progress?: string;
+}
+interface FormProgressSlotProps {
+    readonly visiblePages: number;
+    readonly currentPage: number;
+    readonly answeredVisibleQuestions: number;
+    readonly totalVisibleQuestions: number;
+    readonly remainingQuestions: number;
+    readonly percent: number;
+    readonly estimatedSecondsRemaining?: number;
+}
+interface FormQuizShareSlotProps {
+    readonly evaluation: QuizEvaluationResult;
+    readonly schema: FormSchema;
+    readonly status: "idle" | "sharing" | "shared" | "copied" | "error";
+    readonly supported: boolean;
+    readonly onShare: () => void;
 }
 interface ChoiceGroupSlotProps {
     readonly field: Question;
@@ -1143,10 +1174,13 @@ interface FormRendererSlots {
         readonly title: string;
         readonly description?: string;
     }) => ReactNode;
+    readonly renderProgress?: (props: FormProgressSlotProps) => ReactNode;
+    readonly renderQuizShare?: (props: FormQuizShareSlotProps) => ReactNode;
     readonly renderPageHeader?: (props: {
         readonly page: FormPage;
         readonly pageIndex: number;
         readonly totalPages: number;
+        readonly progress: FormProgressSlotProps;
     }) => ReactNode;
     readonly renderField?: (props: {
         readonly question: FormField;
@@ -1159,6 +1193,7 @@ interface FormRendererSlots {
         readonly totalPages: number;
         readonly canPrev: boolean;
         readonly canNext: boolean;
+        readonly progress: FormProgressSlotProps;
         readonly onPrev: () => void;
         readonly onNext: () => void;
     }) => ReactNode;
@@ -1184,6 +1219,10 @@ interface FormRendererSlots {
         readonly receipt: SubmissionReceipt;
         readonly onReset?: () => void;
     }) => ReactNode;
+    readonly renderClosed?: (props: {
+        readonly status: "not_yet_open" | "closed" | "limit_reached";
+        readonly message: string;
+    }) => ReactNode;
     readonly renderCharacterCount?: (props: {
         readonly fieldId: string;
         readonly current: number;
@@ -1193,7 +1232,7 @@ interface FormRendererSlots {
     readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
 interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata> {
-    readonly submissionGuards?: readonly SubmissionGuard[];
+    readonly submissionGuards?: readonly (SubmissionGuard | FormSubmissionGuard<TMeta>)[];
     readonly receiptStore?: SubmissionReceiptStore;
     readonly submissionScope?: Pick<SubmissionReceiptQuery, "deckId" | "sessionId">;
     readonly attemptStore?: SubmissionAttemptStore;
@@ -1202,6 +1241,10 @@ interface SubmissionProtectionProps<TMeta extends BaseSubmissionMetadata = BaseS
     /** Shared identity configuration used by Controller, Renderer, attempt storage, and receipts. */
     readonly submissionIdentity?: SubmissionIdentity<TMeta>;
     readonly onReceiptError?: (error: Error, receipt: SubmissionReceipt) => void;
+}
+interface FormAcceptanceProps {
+    readonly now?: () => Date;
+    readonly submissionCount?: number | (() => number | Promise<number>);
 }
 type BeforeSubmit = (values: Readonly<Record<string, unknown>>) => "continue" | "cancel" | Promise<"continue" | "cancel">;
 
@@ -1261,6 +1304,21 @@ interface FormBuilderProps {
     readonly submissionSettingsOptions?: FormBuilderSubmissionSettingsOptions;
 }
 declare function FormBuilder(props: FormBuilderProps): react.JSX.Element;
+
+interface SharePayload {
+    readonly title: string;
+    readonly text: string;
+    readonly url?: string;
+}
+type ShareStatus = "idle" | "shared" | "copied" | "error";
+interface UseShareOptions {
+    readonly onShare?: (payload: SharePayload) => void | Promise<void>;
+}
+declare function useShare(options?: UseShareOptions): {
+    readonly share: (payload: SharePayload) => Promise<ShareStatus>;
+    readonly status: ShareStatus;
+    readonly supported: boolean;
+};
 
 type SubmissionControllerStatus = "idle" | "submitting" | "success" | "error";
 interface SubmissionControllerState<TResponse = SubmitResponse> {
@@ -1352,6 +1410,7 @@ interface FieldComponentProps {
     readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
     readonly a11y?: FormRendererFieldConfig["a11y"];
     readonly classNames?: FormRendererClassNames;
+    readonly optionOrderSeed?: string;
 }
 type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
 interface FormRendererPresentationProps extends SubmissionProtectionProps {
@@ -1377,6 +1436,12 @@ interface FormRendererPresentationProps extends SubmissionProtectionProps {
     readonly successMessageKey?: string;
     readonly errorMessageKey?: string;
     readonly attemptIdFactory?: () => string;
+    readonly acceptance?: FormAcceptanceProps;
+    readonly challengeToken?: string | (() => string | Promise<string>);
+    readonly clientKey?: string;
+    /** Seed used to keep shuffled choice options stable for a respondent. */
+    readonly optionOrderSeed?: string;
+    readonly estimateSecondsPerQuestion?: number;
     /** Metadata copied into the submission context for typed application integrations. */
     readonly submissionMetadata?: BaseSubmissionMetadata;
     readonly messages?: Partial<FormRendererMessages>;
@@ -1446,6 +1511,15 @@ interface QuizSummaryLabels {
     readonly passed: string;
     readonly notPassed: string;
     readonly reward?: string;
+    readonly share?: string;
+    readonly shared?: string;
+    readonly copied?: string;
+    readonly shareFailed?: string;
+}
+interface QuizShareOptions {
+    readonly url?: string;
+    readonly onShare?: (payload: SharePayload) => void | Promise<void>;
+    readonly buildText?: (evaluation: QuizEvaluationResult, schema: FormSchema) => string;
 }
 interface PollResultLabels {
     readonly title: string;
@@ -1477,6 +1551,11 @@ interface PollResultsErrorProps {
     readonly locale: string;
     readonly labels: Pick<PollResultLabels, "retry" | "loadError">;
 }
+interface PollResultsSlots {
+    readonly loading?: (props: PollResultsLoadingProps) => ReactNode;
+    readonly error?: (props: PollResultsErrorProps) => ReactNode;
+    readonly result?: (props: PollResultViewProps) => ReactNode;
+}
 interface QuizQuestionFeedbackProps {
     readonly question: QuizQuestionResult;
     readonly locale?: string;
@@ -1490,8 +1569,10 @@ interface QuizResultSummaryProps {
     readonly locale?: string;
     readonly labels?: Partial<QuizSummaryLabels>;
     readonly className?: string;
+    readonly share?: QuizShareOptions;
+    readonly renderShare?: (props: FormQuizShareSlotProps) => ReactNode;
 }
-declare function QuizResultSummary({ evaluation, schema, locale, labels, className }: QuizResultSummaryProps): react.JSX.Element;
+declare function QuizResultSummary({ evaluation, schema, locale, labels, className, share, renderShare }: QuizResultSummaryProps): react.JSX.Element;
 interface PollResultViewProps {
     readonly schema: FormSchema;
     readonly analytics: FormAnalytics;
@@ -1508,17 +1589,24 @@ interface PollResultsProps extends Omit<PollResultViewProps, "analytics"> {
     readonly closed: boolean;
     readonly canViewResults: boolean;
     readonly submissionRevision?: number;
+    readonly slots?: PollResultsSlots;
 }
-declare function PollResults({ schema, adapter, submitted, alreadyVoted, closed, canViewResults, submissionRevision, locale, labels, classNames }: PollResultsProps): react.JSX.Element | null;
+declare function PollResults({ schema, adapter, submitted, alreadyVoted, closed, canViewResults, submissionRevision, locale, labels, classNames, slots }: PollResultsProps): string | number | bigint | boolean | Iterable<ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | react.ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | react.JSX.Element | null;
+interface PollResultsEmbedProps extends Omit<PollResultsProps, "submitted" | "alreadyVoted" | "closed" | "canViewResults" | "submissionRevision"> {
+    readonly refreshIntervalMs?: number;
+    readonly closed?: boolean;
+}
+declare function PollResultsEmbed({ refreshIntervalMs, closed, ...props }: PollResultsEmbedProps): string | number | bigint | boolean | Iterable<ReactNode> | Promise<string | number | bigint | boolean | react.ReactPortal | react.ReactElement<unknown, string | react.JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | react.JSX.Element | null;
 interface ContentRendererOptions {
     readonly quiz?: {
         readonly showImmediateFeedback?: boolean;
         readonly feedbackLabels?: Partial<QuizFeedbackLabels>;
         readonly summaryLabels?: Partial<QuizSummaryLabels>;
+        readonly share?: QuizShareOptions;
     };
     readonly poll?: {
         readonly adapter: PollRuntimeAdapter<FormAnalytics>;
-        readonly closed: boolean;
+        readonly closed?: boolean;
         readonly canViewResults: boolean;
         readonly alreadyVoted?: boolean;
         readonly submissionRevision?: number;
@@ -1613,6 +1701,8 @@ declare function usePollResults(props: UsePollResultsProps): {
 
 declare function useTranslationComparison({ schema, sourceLocale, targetLocale, translationAdapter, readOnly, availableLocales, policy, onChange, onTranslationChange, onTranslationReport, onTranslationError, signal, onLocaleAdded, onLocaleRemoved, onLocaleChange, beforeRemoveLocale, confirmRemoveLocale, onTranslationStart, onTranslationSuccess, validateLocale, createTranslationMetadata }: UseTranslationComparisonOptions): UseTranslationComparisonResult;
 
+declare function useVisibilityPolling(callback: () => void, intervalMs?: number, enabled?: boolean): void;
+
 declare const BUILDER_TRANSLATION_KEYS: {
     readonly ADD_FIELD: "builder.actions.addField";
     readonly SELECT_FIELD_TYPE: "builder.fields.selectType";
@@ -1651,4 +1741,4 @@ interface FormEngineI18nProviderProps {
 declare function FormEngineI18nProvider({ locale, fallbackLocale, messages, customCatalogs, customDictionary, onMissingKey, strict, translator: customTranslator, children }: FormEngineI18nProviderProps): react.JSX.Element;
 declare function useFormEngineI18n(): FormEngineI18nContextValue;
 
-export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderBasicSettingsSlotProps, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorPreviewSlotProps, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, BuilderPageConditionEditor, type BuilderPageConditionEditorProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ChoiceOptionAfterSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, ContentRenderer, type ContentRendererClassNames, type ContentRendererOptions, type ContentRendererProps, type ContentRendererSlots, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, type FormAfterFormSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSectionVisibility, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, type FormDraftResumeSlotProps, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, FormProvider, type FormProviderProps, FormRenderer, type FormRendererAppearance, type FormRendererClassNames, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type PollResultItem, type PollResultLabels, PollResultOption, type PollResultOptionProps, PollResultView, type PollResultViewProps, PollResults, type PollResultsErrorProps, type PollResultsLoadingProps, type PollResultsProps, type QuizFeedbackLabels, QuizQuestionFeedback, type QuizQuestionFeedbackProps, QuizResultSummary, type QuizResultSummaryProps, type QuizSummaryLabels, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdentity, type SubmissionIdentityOptions, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedContentRendererProps, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UsePollResultsProps, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, createSubmissionIdentity, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, usePollResults, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, validateLocalePipeline };
+export { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, type BeforeSubmit, type BuilderActionContext, type BuilderActionError, type BuilderActionIconType, type BuilderActionResult, type BuilderBasicSettingsSlotProps, type BuilderButtonProps, type BuilderCheckboxProps, type BuilderErrorMessageProps, type BuilderFactories, type BuilderFieldEditorPreviewSlotProps, type BuilderFieldEditorSlotProps, type BuilderFieldsetProps, type BuilderIconButtonProps, type BuilderIdKind, type BuilderLocalizationSlotProps, type BuilderOptionEditorSlotProps, BuilderPageConditionEditor, type BuilderPageConditionEditorProps, type BuilderPagesSlotProps, type BuilderPolicy, type BuilderSectionProps, type BuilderSelectOption, type BuilderSelectProps, type BuilderSlotActions, type BuilderTextAreaProps, type BuilderTextInputProps, type BuilderTextTarget, type BuilderToolbarSlotProps, type BuilderTranslationActionsSlotProps, type BuilderTranslationKey, type ChoiceFieldLayoutMode, type ChoiceFieldTypeLayoutMap, type ChoiceGroupSlotProps, type ChoiceOptionAfterSlotProps, type ComponentBaseProps, type ConfirmRemoveLocaleSlotProps, ContentRenderer, type ContentRendererClassNames, type ContentRendererOptions, type ContentRendererProps, type ContentRendererSlots, type CreateSubmissionControllerOptions, type CustomLocaleValidator, type FieldA11yOptions, type FieldComponentProps, type FieldComponents, type FieldEditorControlsConfig, type FieldEditorHeaderSlotProps, type FieldEditorMode, type FieldError, type FieldPropertyControlMode, type FieldState, type FieldTypeSelectOptionsConfig, type FieldTypeSelectOptionsContext, type FieldTypeSelectOptionsSorter, type FieldTypeSelectOptionsTransformer, type FieldTypeSelectSlotProps, type FormAcceptanceProps, type FormAfterFormSlotProps, FormBuilder, type FormBuilderActions, type FormBuilderComponents, type FormBuilderFeatures, type FormBuilderOptions, type FormBuilderProps, type FormBuilderResult, type FormBuilderSectionName, type FormBuilderSectionVisibility, type FormBuilderSlots, type FormBuilderSubmissionSettingsOptions, type FormCompletionSlotProps, type FormContextValue, type FormDraftResumeSlotProps, FormEngineI18nContext, type FormEngineI18nContextValue, FormEngineI18nProvider, type FormEngineI18nProviderProps, type FormFieldsSlotProps, type FormProgressSlotProps, FormProvider, type FormProviderProps, type FormQuizShareSlotProps, FormRenderer, type FormRendererAppearance, type FormRendererClassNames, type FormRendererFieldConfig, type FormRendererMessages, type FormRendererPresentationProps, type FormRendererProps, type FormRendererSlotProps, type FormRendererSlots, type FormServerErrorPayload, type FormSubmissionGuard, type FormSubmissionMetadata, type FormSubmitHandler, type FormSubmitState, type FormSubmitStatus, type FormSubmittedAnswerItem, type FormSuccessRenderMode, type IconButtonProps, type InputBoxStyleOptions, type InputComponentProps, type LocaleSelectorProps, type LocaleValidationContext, type LocaleValidationResult, type LocalizationSummaryContext, type ManualTranslationContext, type ManualTranslationTarget, type PollResultItem, type PollResultLabels, PollResultOption, type PollResultOptionProps, PollResultView, type PollResultViewProps, PollResults, PollResultsEmbed, type PollResultsEmbedProps, type PollResultsErrorProps, type PollResultsLoadingProps, type PollResultsProps, type PollResultsSlots, type QuizFeedbackLabels, QuizQuestionFeedback, type QuizQuestionFeedbackProps, QuizResultSummary, type QuizResultSummaryProps, type QuizShareOptions, type QuizSummaryLabels, type RenderSubmitButtonProps, type ScopedSubmissionController, type ScopedSubmissionControllerState, type SelectComponentProps, type SensitiveFindingDisplayMode, type SharePayload, type ShareStatus, type StandaloneFormRendererProps, type SubmissionAttempt, type SubmissionAttemptScope, type SubmissionAttemptStore, type SubmissionConfirmationOptions, type SubmissionConfirmationRecheck, type SubmissionConfirmationRenderMode, type SubmissionConfirmationSlotProps, type SubmissionController, type SubmissionControllerOptions, type SubmissionControllerResult, type SubmissionControllerScope, type SubmissionControllerState, type SubmissionControllerStatus, type SubmissionControllerSubmit, type SubmissionGuard, type SubmissionGuardResult, type SubmissionIdentity, type SubmissionIdentityOptions, type SubmissionProtectionProps, type SubmissionReceipt, type SubmissionReceiptQuery, type SubmissionReceiptStore, type SubmitContext, type SubmitResponse, type SubmitResult, type SubmitStatus, type TargetSpecificLayoutConfig, type TranslationComparisonAppearance, type TranslationComparisonHeaderProps, type TranslationComparisonInputAppearance, type TranslationComparisonInputState, type TranslationComparisonItem, type TranslationComparisonItemIconProps, type TranslationComparisonItemRowProps, type TranslationComparisonLayoutOptions, type TranslationComparisonLayoutSettings, type TranslationComparisonLayoutTarget, type TranslationComparisonLocaleSelectorProps, type TranslationComparisonResponsiveMode, type TranslationComparisonStatusDisplayOptions, type TranslationComparisonSummary, type TranslationEventPayload, type TranslationLayoutOptions, type TranslationSlotChangeEvent, type TranslationSlotRowProps, type TranslationSummary, type TranslationTargetKind, type TranslationWorkspaceActionsProps, type TranslationWorkspaceAppearance, type TranslationWorkspaceError, type TranslationWorkspaceHeaderProps, type TranslationWorkspaceSlots, type TypedContentRendererProps, type TypedFormContextValue, type TypedFormProviderProps, type TypedFormRendererPresentationProps, type TypedFormRendererProps, type TypedFormSubmitHandler, type TypedStandaloneFormRendererProps, type TypedSubmitContext, type UseFormBuilderOptions, type UseFormBuilderResult, type UsePollResultsProps, type UseShareOptions, type UseSubmissionReceiptsResult, type UseTranslationComparisonOptions, type UseTranslationComparisonResult, type UseTranslationWorkspaceOptions, type UseTranslationWorkspaceResult, createLocalStorageSubmissionAttemptStore, createLocalStorageSubmissionReceiptStore, createScopedSubmissionController, createSubmissionController, createSubmissionIdentity, isTranslationUnresolved, resolveChoiceFieldLayout, resolveFieldEditorControls, resolveFieldTypeSelectOptions, resolveInitialFieldType, resolveTranslation, submissionReceiptQueryKey, useField, useForm, useFormBuilder, useFormEngineI18n, usePollResults, useShare, useSubmissionController, useSubmissionReceipts, useTranslationComparison, useTranslationWorkspace, useVisibilityPolling, validateLocalePipeline };

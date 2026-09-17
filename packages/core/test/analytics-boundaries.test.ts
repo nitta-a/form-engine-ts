@@ -26,7 +26,10 @@ const schema: FormSchema = {
     },
     { id: "score", type: "number", title: "Score", required: false, min: 0, max: 10, step: 2 },
     { id: "rating", type: "rating", title: "Rating", required: false, min: 1, max: 5 },
-    { id: "approved", type: "checkbox", title: "Approved", required: false }
+    { id: "approved", type: "checkbox", title: "Approved", required: false },
+    { id: "date", type: "date", title: "Date", required: false, minDate: "2026-01-01", maxDate: "2026-12-31" },
+    { id: "email", type: "email", title: "Email", required: false },
+    { id: "url", type: "url", title: "URL", required: false }
   ]
 };
 
@@ -97,5 +100,20 @@ describe("analytics boundary handling", () => {
       colTotals: { x: 1 },
       grandTotal: 1
     });
+  });
+
+  it("excludes malformed typed strings and out-of-range dates", () => {
+    const analytics = aggregateResponses(schema, [
+      submission("1", { date: "2025-12-31", email: "invalid", url: "example.com" }),
+      submission("2", { date: "2026-06-01", email: "ada@example.com", url: "https://example.com" })
+    ]);
+
+    expect(analytics.questions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldId: "date", answeredCount: 1 }),
+        expect.objectContaining({ fieldId: "email", answeredCount: 1 }),
+        expect.objectContaining({ fieldId: "url", answeredCount: 1 })
+      ])
+    );
   });
 });

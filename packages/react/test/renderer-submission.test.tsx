@@ -166,7 +166,7 @@ describe("FormRenderer submission presentation", () => {
         onSubmit={onSubmit}
         successRenderMode="replace"
         receiptStore={receiptStore}
-        submissionGuards={[async () => ({ status: "confirm", findings: [], message: "Please confirm." })]}
+        submissionGuards={[async () => ({ status: "confirm", findings: [], message: "Please confirm." }) as const]}
       />
     );
 

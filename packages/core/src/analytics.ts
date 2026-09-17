@@ -14,6 +14,7 @@ import type {
   JsonValue,
   QuestionAggregate
 } from "./types";
+import { validateFieldValue } from "./validation";
 import { calculateFieldVisibility, selectVisibleAnswers } from "./visibility";
 
 export interface ChoiceDistributionEntry {
@@ -84,38 +85,9 @@ export function calculateCrossTabulation(
 
 function valueIsValid(field: FormField, value: FormValue): boolean {
   if (value === undefined || value === "") return false;
-  if (field.type === "text" || field.type === "textarea") {
-    if (typeof value !== "string") return false;
-    const normalized = value.trim();
-    if (normalized.length === 0) return false;
-    if (field.minLength !== undefined && normalized.length < field.minLength) return false;
-    if (field.maxLength !== undefined && normalized.length > field.maxLength) return false;
-    return field.pattern === undefined || new RegExp(field.pattern).test(normalized);
-  }
-  if (field.type === "number" || field.type === "rating") {
-    if (typeof value !== "number" || !Number.isFinite(value)) return false;
-    const min = field.type === "rating" ? (field.min ?? 1) : field.min;
-    const max = field.type === "rating" ? (field.max ?? 5) : field.max;
-    if ((min !== undefined && value < min) || (max !== undefined && value > max)) return false;
-    if (field.type === "rating") return Number.isInteger(value);
-    if (field.step === undefined) return true;
-    const quotient = (value - (field.min ?? 0)) / field.step;
-    return Math.abs(quotient - Math.round(quotient)) <= 1e-9;
-  }
-  if (field.type === "checkbox") return typeof value === "boolean";
-  if (!("options" in field)) return false;
-  const allowed = new Set(field.options.map((option) => option.id));
-  if (field.type === "multi-select") {
-    return (
-      Array.isArray(value) &&
-      value.length > 0 &&
-      new Set(value).size === value.length &&
-      value.every((item) => allowed.has(item)) &&
-      (field.minSelections === undefined || value.length >= field.minSelections) &&
-      (field.maxSelections === undefined || value.length <= field.maxSelections)
-    );
-  }
-  return typeof value === "string" && allowed.has(value);
+  if (typeof value === "string" && value.trim().length === 0) return false;
+  if (Array.isArray(value) && value.length === 0) return false;
+  return validateFieldValue(field, value);
 }
 
 function aggregateField(
@@ -131,7 +103,16 @@ function aggregateField(
   const answeredCount = values.filter((value) => value !== undefined).length;
   const base = { fieldId: field.id, answeredCount, unansweredCount: submissions.length - answeredCount };
 
-  if (field.type === "text" || field.type === "textarea") return { ...base, kind: field.type };
+  if (
+    field.type === "text" ||
+    field.type === "textarea" ||
+    field.type === "date" ||
+    field.type === "time" ||
+    field.type === "email" ||
+    field.type === "tel" ||
+    field.type === "url"
+  )
+    return { ...base, kind: field.type };
   if (field.type === "number" || field.type === "rating") {
     const numbers = values.filter((value): value is number => typeof value === "number");
     const total = numbers.reduce((sum, value) => sum + value, 0);
@@ -416,7 +397,16 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
           answeredCount: accumulator.answeredCount,
           unansweredCount: this.#submissionCount - accumulator.answeredCount
         };
-        if (field.type === "text" || field.type === "textarea") return { ...base, kind: field.type };
+        if (
+          field.type === "text" ||
+          field.type === "textarea" ||
+          field.type === "date" ||
+          field.type === "time" ||
+          field.type === "email" ||
+          field.type === "tel" ||
+          field.type === "url"
+        )
+          return { ...base, kind: field.type };
         if (field.type === "number" || field.type === "rating") {
           return {
             ...base,

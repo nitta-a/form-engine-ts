@@ -2,7 +2,12 @@ import type { FormEngineTranslationKey } from "./i18n/keys";
 import type { SensitiveDataFinding } from "./validation";
 
 export interface FormSubmissionSerializedError {
-  readonly code: "VALIDATION_FAILED" | "PII_CONFIRMATION_REQUIRED" | "SUBMISSION_BLOCKED" | "STORAGE_ERROR";
+  readonly code:
+    | "VALIDATION_FAILED"
+    | "PII_CONFIRMATION_REQUIRED"
+    | "SUBMISSION_BLOCKED"
+    | "FORM_CLOSED"
+    | "STORAGE_ERROR";
   readonly messageKey: FormEngineTranslationKey | string;
   readonly messageParams?: Readonly<Record<string, unknown>>;
   readonly fieldErrors?: Readonly<Record<string, string>>;
@@ -83,6 +88,7 @@ export function isFormSubmissionSerializedError(value: unknown): value is FormSu
     (value.code === "VALIDATION_FAILED" ||
       value.code === "PII_CONFIRMATION_REQUIRED" ||
       value.code === "SUBMISSION_BLOCKED" ||
+      value.code === "FORM_CLOSED" ||
       value.code === "STORAGE_ERROR") &&
     typeof value.messageKey === "string" &&
     value.messageKey.length > 0 &&

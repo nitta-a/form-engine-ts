@@ -13,6 +13,11 @@ import type {
 export type SurveyDefinitionQuestionType =
   | "text"
   | "textarea"
+  | "date"
+  | "time"
+  | "email"
+  | "tel"
+  | "url"
   | "number"
   | "rating"
   | "radio"
@@ -42,6 +47,15 @@ export interface SurveyDefinitionTextQuestion extends SurveyDefinitionQuestionBa
   readonly minLength?: number;
   readonly maxLength?: number;
   readonly pattern?: string;
+}
+
+export interface SurveyDefinitionTypedStringQuestion extends SurveyDefinitionQuestionBase {
+  readonly type: "date" | "time" | "email" | "tel" | "url";
+  readonly placeholderKey?: string;
+  readonly minDate?: string;
+  readonly maxDate?: string;
+  readonly minTime?: string;
+  readonly maxTime?: string;
 }
 
 export interface SurveyDefinitionNumberQuestion extends SurveyDefinitionQuestionBase {
@@ -81,6 +95,7 @@ export interface SurveyDefinitionCheckboxQuestion extends SurveyDefinitionQuesti
 
 export type SurveyDefinitionQuestion =
   | SurveyDefinitionTextQuestion
+  | SurveyDefinitionTypedStringQuestion
   | SurveyDefinitionNumberQuestion
   | SurveyDefinitionRatingQuestion
   | SurveyDefinitionChoiceQuestion
@@ -188,6 +203,19 @@ function assertQuestion(question: unknown, path: string): asserts question is Su
     if (question.pattern !== undefined) assertNonEmptyString(question.pattern, `${path}.pattern`);
     return;
   }
+  if (
+    question.type === "date" ||
+    question.type === "time" ||
+    question.type === "email" ||
+    question.type === "tel" ||
+    question.type === "url"
+  ) {
+    if (question.placeholderKey !== undefined) assertNonEmptyString(question.placeholderKey, `${path}.placeholderKey`);
+    for (const key of ["minDate", "maxDate", "minTime", "maxTime"] as const) {
+      if (question[key] !== undefined) assertNonEmptyString(question[key], `${path}.${key}`);
+    }
+    return;
+  }
   if (question.type === "number") {
     assertOptionalFiniteNumber(question.min, `${path}.min`);
     assertOptionalFiniteNumber(question.max, `${path}.max`);
@@ -243,6 +271,23 @@ function questionToField(question: SurveyDefinitionQuestion): FormField {
       ...(question.maxLength === undefined ? {} : { maxLength: question.maxLength }),
       ...(question.pattern === undefined ? {} : { pattern: question.pattern })
     } satisfies TextField;
+  }
+  if (
+    question.type === "date" ||
+    question.type === "time" ||
+    question.type === "email" ||
+    question.type === "tel" ||
+    question.type === "url"
+  ) {
+    return {
+      ...base,
+      type: question.type,
+      ...(question.placeholderKey === undefined ? {} : { placeholderKey: question.placeholderKey }),
+      ...(question.minDate === undefined ? {} : { minDate: question.minDate }),
+      ...(question.maxDate === undefined ? {} : { maxDate: question.maxDate }),
+      ...(question.minTime === undefined ? {} : { minTime: question.minTime }),
+      ...(question.maxTime === undefined ? {} : { maxTime: question.maxTime })
+    } as FormField;
   }
   if (question.type === "number") {
     return {
@@ -341,6 +386,31 @@ function fieldToQuestion(field: FormField): SurveyDefinitionQuestion {
       ...(field.minLength === undefined ? {} : { minLength: field.minLength }),
       ...(field.maxLength === undefined ? {} : { maxLength: field.maxLength }),
       ...(field.pattern === undefined ? {} : { pattern: field.pattern })
+    };
+  }
+  if (
+    field.type === "date" ||
+    field.type === "time" ||
+    field.type === "email" ||
+    field.type === "tel" ||
+    field.type === "url"
+  ) {
+    return {
+      ...base,
+      type: field.type,
+      ...(field.placeholderKey === undefined ? {} : { placeholderKey: field.placeholderKey }),
+      ...(field.type === "date"
+        ? {
+            ...(field.minDate === undefined ? {} : { minDate: field.minDate }),
+            ...(field.maxDate === undefined ? {} : { maxDate: field.maxDate })
+          }
+        : {}),
+      ...(field.type === "time"
+        ? {
+            ...(field.minTime === undefined ? {} : { minTime: field.minTime }),
+            ...(field.maxTime === undefined ? {} : { maxTime: field.maxTime })
+          }
+        : {})
     };
   }
   if (field.type === "number") {

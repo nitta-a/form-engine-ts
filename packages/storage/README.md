@@ -21,6 +21,12 @@ Both adapters implement the required `UnifiedSubmissionStorageAdapter` surface: 
 free-text answer paging, idempotent saving, typed validation, response aggregation, and CSV export. These common
 operations use the same core contracts regardless of the backing database.
 
+## Migration notes
+
+`StorageAdapter`, `TypedStorageAdapter`, and `UnifiedSubmissionStorageAdapter` now require
+`countSubmissions(formId, formVersion?, options?)`. Implementations must apply inclusive `since` and `until` filters
+from `SubmissionQueryOptions`; submission pipelines no longer fall back to scanning every page.
+
 The `./testing` subpath exports framework-independent JSON fixtures and contract runners for pagination,
 idempotency, revision conflicts, translation metadata, CSV, and form deletion. Adapters expose
 `inspectFormDeletion` and `deleteForm` through the lifecycle contract when their implementation supports it;

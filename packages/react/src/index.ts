@@ -6,8 +6,10 @@ export * from "./contentRenderer";
 export * from "./context";
 export * from "./hooks/useFormBuilder";
 export * from "./hooks/usePollResults";
+export * from "./hooks/useShare";
 export * from "./hooks/useTranslationComparison";
 export * from "./hooks/useTranslationWorkspace";
+export * from "./hooks/useVisibilityPolling";
 export * from "./i18n";
 export {
   FormEngineI18nContext,

@@ -90,6 +90,28 @@ describe("MuiContentRenderer", () => {
     expect(screen.queryByText("Not passed")).not.toBeInTheDocument();
   });
 
+  it("forwards quiz share options to the default summary", async () => {
+    const onShare = vi.fn();
+    render(
+      <MuiContentRenderer
+        schema={quizSchema("after_submit")}
+        locale="en"
+        onSubmit={async () => undefined}
+        contentModeOptions={{
+          quiz: { share: { url: "https://example.test/quiz", onShare, buildText: () => "I scored 2 / 2" } }
+        }}
+      />
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Share result" }));
+    expect(onShare).toHaveBeenCalledWith({
+      title: "Quiz",
+      text: "I scored 2 / 2",
+      url: "https://example.test/quiz"
+    });
+  });
+
   it("shows score in the standalone result view without a passing score", () => {
     render(<QuizResultView evaluation={{ totalScore: 2, maxPossibleScore: 2, questions: [] }} />);
     expect(screen.getByText("Total score: 2 / 2")).toBeInTheDocument();

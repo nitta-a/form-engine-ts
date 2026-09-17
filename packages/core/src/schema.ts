@@ -18,7 +18,21 @@ export interface ValidateFormSchemaOptions {
   readonly policy?: FormPolicy;
 }
 
-const FIELD_TYPES = new Set(["text", "textarea", "number", "rating", "select", "multi-select", "checkbox", "radio"]);
+const FIELD_TYPES = new Set([
+  "text",
+  "textarea",
+  "number",
+  "rating",
+  "date",
+  "time",
+  "email",
+  "tel",
+  "url",
+  "select",
+  "multi-select",
+  "checkbox",
+  "radio"
+]);
 const CONDITION_OPERATORS = new Set([
   "equals",
   "not_equals",
@@ -37,6 +51,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function isValidDateValue(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match === null) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return (
+    date.getUTCFullYear() === Number(match[1]) &&
+    date.getUTCMonth() + 1 === Number(match[2]) &&
+    date.getUTCDate() === Number(match[3])
+  );
+}
+
+function isValidTimeValue(value: string): boolean {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (match === null) return false;
+  return Number(match[1]) < 24 && Number(match[2]) < 60 && Number(match[3] ?? 0) < 60;
 }
 
 function localeRecordEntry<T>(record: Readonly<Record<string, T>> | undefined, locale: string): T | undefined {
@@ -127,7 +158,7 @@ function validateLocalizedTextMap(value: unknown, path: string, issues: SchemaIs
       issue(issues, `${path}.${locale}`, "invalid_translation", "Expected a translation object.");
       continue;
     }
-    for (const key of ["title", "description", "completionMessage"] as const) {
+    for (const key of ["title", "description", "completionMessage", "closedMessage", "notYetOpenMessage"] as const) {
       if (translation[key] !== undefined && !isNonEmptyString(translation[key])) {
         issue(issues, `${path}.${locale}.${key}`, "invalid_translation", "Expected non-empty translated text.");
       }
@@ -310,6 +341,36 @@ function validateSubmissionSettings(value: unknown, path: string, issues: Schema
     if (value[key] !== undefined && !isNonEmptyString(value[key]))
       issue(issues, `${path}.${key}`, "invalid_submission_setting", "Expected non-empty text.");
   }
+  for (const key of ["openAt", "closeAt"] as const) {
+    if (
+      value[key] !== undefined &&
+      (typeof value[key] !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value[key]) ||
+        Number.isNaN(Date.parse(value[key])))
+    ) {
+      issue(issues, `${path}.${key}`, "invalid_submission_setting", "Expected an ISO timestamp.");
+    }
+  }
+  if (
+    value.openAt !== undefined &&
+    value.closeAt !== undefined &&
+    Date.parse(String(value.openAt)) >= Date.parse(String(value.closeAt))
+  ) {
+    issue(issues, `${path}.closeAt`, "invalid_submission_setting", "closeAt must be later than openAt.");
+  }
+  if (
+    value.maxResponses !== undefined &&
+    (typeof value.maxResponses !== "number" || !Number.isInteger(value.maxResponses) || value.maxResponses <= 0)
+  ) {
+    issue(issues, `${path}.maxResponses`, "invalid_submission_setting", "Expected a positive integer.");
+  }
+  for (const key of ["closedMessage", "notYetOpenMessage"] as const) {
+    if (value[key] !== undefined && !isNonEmptyString(value[key]))
+      issue(issues, `${path}.${key}`, "invalid_submission_setting", "Expected non-empty text.");
+  }
+  if (value.honeypotFieldId !== undefined && !isNonEmptyString(value.honeypotFieldId)) {
+    issue(issues, `${path}.honeypotFieldId`, "invalid_submission_setting", "Expected a non-empty field ID.");
+  }
 }
 
 function validateField(value: unknown, path: string, issues: SchemaIssue[]): value is FormField {
@@ -379,6 +440,22 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
     }
     if (typeof value.min === "number" && typeof value.max === "number" && value.min > value.max) {
       issue(issues, path, "contradictory_bounds", "min cannot exceed max.");
+    }
+  }
+
+  if (value.type === "date" || value.type === "time") {
+    const keys = value.type === "date" ? (["minDate", "maxDate"] as const) : (["minTime", "maxTime"] as const);
+    const isValid = value.type === "date" ? isValidDateValue : isValidTimeValue;
+    for (const key of keys) {
+      const bound = value[key];
+      if (bound !== undefined && (typeof bound !== "string" || !isValid(bound))) {
+        issue(issues, `${path}.${key}`, "invalid_bound", `Expected a valid ${value.type} value.`);
+      }
+    }
+    const min = value[keys[0]];
+    const max = value[keys[1]];
+    if (typeof min === "string" && typeof max === "string" && min > max) {
+      issue(issues, path, "contradictory_bounds", `${keys[0]} cannot exceed ${keys[1]}.`);
     }
   }
 

@@ -102,7 +102,7 @@ describe("v2.9.6 renderer features", () => {
         schema={summarySchema}
         onSubmit={() => undefined}
         submissionConfirmationRenderMode="dialog"
-        submissionGuards={[() => ({ status: "confirm", findings: [] })]}
+        submissionGuards={[() => ({ status: "confirm", findings: [] }) as const]}
       />
     );
 

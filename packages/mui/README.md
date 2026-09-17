@@ -3,6 +3,12 @@
 Official Material UI v6/v7 integration layer for `@form-engine-ts/react`. `MuiFormBuilder` applies MUI controls and
 layout slots together, disables the React builder CSS classes, and propagates common size and variant settings.
 
+## Migration notes
+
+The legacy client-side React `SubmissionGuard` is deprecated. Use the Core `SubmissionGuard` in the server submission
+pipeline when protection requires `SubmitContext` values such as challenge tokens or honeypot input. Storage adapters
+used by response-limit flows must implement the required, range-aware `countSubmissions(formId, version?, options?)`.
+
 `MuiChoiceGroupSlot` is an exported renderer slot for grouped choice questions. It uses MUI `Paper`, `FormControl`,
 `FormLabel`, and `FormHelperText`, so error state and theme colors follow the active MUI theme:
 

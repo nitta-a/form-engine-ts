@@ -25,17 +25,47 @@ function conditionOperators(field: FormField): readonly ConditionOperator[] {
   if (field.type === "text" || field.type === "textarea") {
     return ["equals", "not_equals", "contains", "not_empty"];
   }
+  if (field.type === "date" || field.type === "time") {
+    return ["equals", "not_equals", "greater_than", "less_than", "not_empty"];
+  }
   return ["equals", "not_equals", "not_empty"];
 }
 
 function isConditionOperator(value: string): value is ConditionOperator {
-  return ["equals", "not_equals", "contains", "not_empty"].some((operator) => operator === value);
+  return ["equals", "not_equals", "contains", "greater_than", "less_than", "not_empty"].some(
+    (operator) => operator === value
+  );
 }
 
 function numericValue(value: string): number | undefined {
   if (value.trim().length === 0) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function updateStringBound(
+  field: FormField,
+  property: "minDate" | "maxDate" | "minTime" | "maxTime",
+  value: string
+): FormField {
+  if (field.type !== "date" && field.type !== "time") return field;
+  if (value.trim().length === 0) {
+    if (field.type === "date") {
+      if (property === "minDate") {
+        const { minDate, ...remaining } = field;
+        return remaining;
+      }
+      const { maxDate, ...remaining } = field;
+      return remaining;
+    }
+    if (property === "minTime") {
+      const { minTime, ...remaining } = field;
+      return remaining;
+    }
+    const { maxTime, ...remaining } = field;
+    return remaining;
+  }
+  return { ...field, [property]: value };
 }
 
 function updateBound(field: FormField, property: "min" | "max", value: string): FormField {
@@ -271,6 +301,34 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                 actions.updateField(field.id, (current) => updateNumberProperty(current, "step", value))
               }
             />
+          ) : null}
+          {field.type === "date" || field.type === "time" ? (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+              <TextInput
+                id={`mui-field-${field.id}-minimum-${field.type}`}
+                label={translate("builder.minimum")}
+                type="text"
+                value={field.type === "date" ? (field.minDate ?? "") : (field.minTime ?? "")}
+                disabled={readOnly}
+                onChange={(value) =>
+                  actions.updateField(field.id, (current) =>
+                    updateStringBound(current, field.type === "date" ? "minDate" : "minTime", value)
+                  )
+                }
+              />
+              <TextInput
+                id={`mui-field-${field.id}-maximum-${field.type}`}
+                label={translate("builder.maximum")}
+                type="text"
+                value={field.type === "date" ? (field.maxDate ?? "") : (field.maxTime ?? "")}
+                disabled={readOnly}
+                onChange={(value) =>
+                  actions.updateField(field.id, (current) =>
+                    updateStringBound(current, field.type === "date" ? "maxDate" : "maxTime", value)
+                  )
+                }
+              />
+            </Stack>
           ) : null}
           {(field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden" ? (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>

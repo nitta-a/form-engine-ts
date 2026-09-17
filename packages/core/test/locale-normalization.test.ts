@@ -32,6 +32,7 @@ describe("locale normalization", () => {
       version: 1,
       title: "Survey",
       completionMessage: "Done",
+      submissionSettings: { closedMessage: "Closed", notYetOpenMessage: "Not open" },
       defaultLocale: "en",
       supportedLocales: ["en", "ja"],
       fields: [
@@ -48,6 +49,8 @@ describe("locale normalization", () => {
     expect(collectTranslationSlots(schema, "ja").map((slot) => slot.path)).toEqual([
       "form.title",
       "form.completionMessage",
+      "form.closedMessage",
+      "form.notYetOpenMessage",
       "fields.q1.title",
       "fields.q1.options.opt1.label"
     ]);

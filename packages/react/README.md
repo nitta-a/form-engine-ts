@@ -86,6 +86,15 @@ For anonymous respondent resume, combine `autoSaveKey` with `draftResume={{}}`. 
 or start over, stores the current page with the answers, and expires resumable drafts after seven days by default. The
 respondent can disable device saving; storage failures never block submission.
 
+The renderer supports native `date`, `time`, `email`, `tel`, and `url` inputs. Its default multi-step progress
+indicator counts visible pages and questions only; `slots.renderProgress` receives answered, total, remaining, and
+percentage values for custom progress UI.
+
+Set `schema.submissionSettings.openAt`, `closeAt`, or `maxResponses` to control response acceptance. The renderer
+accepts an injectable acceptance clock/count context and exposes `slots.renderClosed` for closed, not-yet-open, or
+limit-reached states. `honeypotFieldId`, `challengeToken`, and `clientKey` connect application-side submission
+protection to `SubmitContext`.
+
 `FormProvider` resolves authoring-time translations synchronously whenever `locale` changes. `FormBuilder` includes page
 membership controls and localization editors; pass an `AsyncTranslationAdapter` as `translationAdapter` to enable its
 batch-translation action.
@@ -376,8 +385,9 @@ The completion area contains the submission message and the score returned by
 `SubmitResponse.quizEvaluation` can carry a server-side evaluation (including rewards)
 and takes precedence over local evaluation.
 `PollResults`/`PollResultView`, `QuizQuestionFeedback` and `QuizResultSummary` are
-also exported. Hosts remain responsible for persistence, authorization and vote
-eligibility.
+also exported. `QuizResultSummary` supports Web Share API and clipboard fallback through its `share` option, and
+`PollResultsEmbed` renders read-only poll results without a form with optional interval refresh. Hosts remain
+responsible for persistence, authorization and vote eligibility.
 
 ### Headless回答 renderer
 

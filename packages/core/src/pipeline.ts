@@ -1,4 +1,6 @@
+import { getFormAcceptanceStatus } from "./acceptance";
 import { FormSubmissionError, type FormSubmissionSerializedError } from "./errors";
+import type { SubmissionGuard } from "./guards";
 import { assertValidFormSchema } from "./schema";
 import { type CreateSubmissionOptions, createSubmission, hashFormSubmissionPayload } from "./submission";
 import type {
@@ -52,6 +54,11 @@ export interface SubmissionPipelineOptions<
   readonly piiWarningAcknowledged?: boolean;
   /** Idempotency is enabled by default for pipeline saves. */
   readonly idempotent?: boolean;
+  readonly now?: () => Date;
+  readonly guards?: readonly SubmissionGuard<TMeta>[];
+  readonly challengeToken?: string;
+  readonly clientKey?: string;
+  readonly honeypotValue?: string;
 }
 
 export type SubmissionPipelineResult<TMeta extends BaseSubmissionMetadata | undefined = undefined> =
@@ -142,7 +149,7 @@ function validationFieldErrors(schema: FormSchema, values: FormValues): Readonly
   return fieldErrors;
 }
 
-async function executeSubmissionPipeline<
+async function executeSubmissionPipelineUnlocked<
   TInput,
   TMeta extends BaseSubmissionMetadata | undefined,
   TValues extends Readonly<Record<string, unknown>>
@@ -163,15 +170,44 @@ async function executeSubmissionPipeline<
     values = parsed.data;
   }
 
-  let answers: FormValues;
+  let rawAnswers: FormValues;
   try {
-    answers = toAnswerRecord(values);
+    rawAnswers = toAnswerRecord(values);
   } catch (cause) {
     if (cause instanceof FormSubmissionError) throw cause;
     throw validationError("Submission values are invalid.", cause);
   }
+  const honeypotFieldId = options.schema.submissionSettings?.honeypotFieldId;
+  const answers =
+    honeypotFieldId === undefined
+      ? rawAnswers
+      : Object.fromEntries(Object.entries(rawAnswers).filter(([key]) => key !== honeypotFieldId));
   const fieldErrors = validationFieldErrors(options.schema, answers);
   if (fieldErrors !== undefined) throw validationError("Submission answers are invalid.", undefined, fieldErrors);
+
+  const submittedAt = options.submittedAt ?? (options.now?.() ?? new Date()).toISOString();
+  if (options.guards !== undefined) {
+    const guardContext = {
+      formId: options.schema.id,
+      formVersion: options.schema.version,
+      locale: options.locale,
+      submittedAt,
+      ...(options.challengeToken === undefined ? {} : { challengeToken: options.challengeToken }),
+      ...(options.clientKey === undefined ? {} : { clientKey: options.clientKey }),
+      ...(options.honeypotValue === undefined ? {} : { honeypotValue: options.honeypotValue }),
+      ...(options.metadata === undefined ? {} : { metadata: options.metadata })
+    };
+    for (const guard of options.guards) {
+      const result = await guard({ schema: options.schema, values: rawAnswers, context: guardContext });
+      if (result.status !== "allow") {
+        throw new FormSubmissionError({
+          code: "SUBMISSION_BLOCKED",
+          messageKey: "form.submissionBlocked",
+          formErrors: [result.message ?? "Submission was blocked by a submission guard."]
+        });
+      }
+    }
+  }
 
   const findings = options.privacyEngine?.detect(options.schema, answers) ?? [];
   if (findings.length > 0 && options.piiWarningAcknowledged !== true) {
@@ -196,7 +232,7 @@ async function executeSubmissionPipeline<
     const createOptions: CreateSubmissionOptions = {
       id: options.id,
       locale: options.locale,
-      submittedAt: options.submittedAt ?? new Date().toISOString(),
+      submittedAt,
       ...(definedMetadata === undefined ? {} : { metadata: definedMetadata })
     };
     const created = createSubmission(options.schema, answers, {
@@ -208,13 +244,41 @@ async function executeSubmissionPipeline<
     throw validationError("Submission could not be created.", cause);
   }
 
+  const acceptance = getFormAcceptanceStatus(options.schema, {
+    now: options.now?.() ?? new Date()
+  });
+  if (!acceptance.accepted) {
+    const messageKey =
+      acceptance.status === "not_yet_open"
+        ? "form.notYetOpen"
+        : acceptance.status === "limit_reached"
+          ? "form.responseLimitReached"
+          : "form.closed";
+    throw new FormSubmissionError({
+      code: "FORM_CLOSED",
+      messageKey,
+      formErrors: [messageKey]
+    });
+  }
+
   const saveOptions: SaveSubmissionOptions = { idempotent: options.idempotent ?? true };
-  let saved: undefined | SubmissionSaveResult<TMeta>;
+  const maxResponses = options.schema.submissionSettings?.maxResponses;
+  let saved: undefined | SubmissionSaveResult<TMeta> | { readonly status: "limit_reached" };
   try {
-    saved = await options.storage.saveSubmission(submission, saveOptions);
+    saved =
+      maxResponses === undefined
+        ? await options.storage.saveSubmission(submission, saveOptions)
+        : await options.storage.saveSubmissionWithinLimit(submission, maxResponses, saveOptions);
   } catch (cause) {
     if (cause instanceof FormSubmissionError) throw cause;
     throw storageError(cause);
+  }
+  if (saved?.status === "limit_reached") {
+    throw new FormSubmissionError({
+      code: "FORM_CLOSED",
+      messageKey: "form.responseLimitReached",
+      formErrors: ["form.responseLimitReached"]
+    });
   }
   if (saved !== undefined) return saved;
   return {
@@ -222,6 +286,14 @@ async function executeSubmissionPipeline<
     submission,
     payloadHash: await hashFormSubmissionPayload(submission)
   };
+}
+
+async function executeSubmissionPipeline<
+  TInput,
+  TMeta extends BaseSubmissionMetadata | undefined,
+  TValues extends Readonly<Record<string, unknown>>
+>(options: SubmissionPipelineOptions<TInput, TMeta, TValues>, input: TInput): Promise<SubmissionPipelineResult<TMeta>> {
+  return executeSubmissionPipelineUnlocked(options, input);
 }
 
 /** Runs the complete normalized, validated, privacy-checked, idempotent save flow. */

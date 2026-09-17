@@ -56,6 +56,9 @@ function pagedAdapter(
     },
     async deleteSchema() {},
     async saveSubmission() {},
+    async countSubmissions() {
+      return 0;
+    },
     async listSubmissions() {
       return [];
     },

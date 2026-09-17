@@ -116,6 +116,17 @@ operators include equality, containment, emptiness, and numeric comparisons; the
 `not_empty` forms remain supported. `submissionSettings` can enable pre-submit confirmation and select its
 `dialog`, `inline`, or `replace` presentation.
 
+Core supports `text`, `textarea`, `number`, `rating`, `date`, `time`, `email`, `tel`, `url`, `select`, `radio`,
+`multi-select`, and `checkbox` fields. Date/time fields use `minDate`/`maxDate` or `minTime`/`maxTime`; typed
+string fields receive format validation and native input semantics in the React renderer. Choice fields support
+deterministic `shuffleOptions` ordering, with `FieldOption.pinned` preserving selected positions.
+
+`submissionSettings` supports `openAt`, `closeAt`, `maxResponses`, custom closed/not-yet-open messages, and
+`honeypotFieldId`. `getFormAcceptanceStatus` provides a pure decision, while the submission pipeline rechecks
+acceptance before saving. Storage adapters must implement
+`countSubmissions(formId, formVersion?, { since, until }?)`; the pipeline uses that count directly instead of scanning
+submission pages. Core also exports vendor-neutral honeypot, challenge, and rate-limit guards.
+
 `collectTranslationSlots`, `computeSourceTextHash`, and `getTranslationStatus` expose canonical translation targets
 and missing, translated, stale, or manual states for authoring tools. `populateSchemaTranslations` can populate stale
 and missing entries while preserving manual translations and reports skipped reasons.
