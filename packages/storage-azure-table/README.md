@@ -48,6 +48,10 @@ Applications must migrate legacy data to the canonical `values` contract before 
 source can be supplied per call as `saveSubmission(submission, { validation })`. A source can be a FormSchema, a
 Zod-compatible object with `safeParse`, or an async validator callback.
 
+`saveSubmissionWithinLimit(submission, maxResponses, options?)` uses an ETag-protected capacity entity and an Azure
+Table transaction to update capacity and create the response together. The submission codec must place a form's
+responses in one partition (the default codec does), and the injected client must expose `submitTransaction`.
+
 `listTextAnswerPage` accepts either the legacy single field ID or `TextAnswerPageQueryOptions.fieldIds`. Page size counts
 emitted text items rather than entities. Its opaque Base64 JSON cursor retains the Azure continuation token plus entity
 and field indexes, so a page can resume inside a multi-answer entity without gaps or duplicates. Empty answers do not

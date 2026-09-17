@@ -440,6 +440,12 @@ export interface SubmissionQueryOptions {
 
 export interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
+  /** Atomically saves a submission only while the form version remains below its response limit. */
+  saveSubmissionWithinLimit?(
+    submission: FormSubmission,
+    maxResponses: number,
+    options?: SaveSubmissionOptions
+  ): Promise<undefined | SubmissionSaveResult | { readonly status: "limit_reached" }>;
   countSubmissions(formId: string, formVersion?: number, options?: SubmissionQueryOptions): Promise<number>;
   listSubmissions(
     formId: string,

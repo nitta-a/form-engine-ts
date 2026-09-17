@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v8.0.1 — 2026-09-18
+
+- Implemented `saveSubmissionWithinLimit` across all built-in storage adapters.
+- Preserved idempotent retries at capacity and enforced form-version-scoped limits under concurrent submissions.
+- Added shared response-limit contract coverage and documented each adapter's atomicity requirements.
+- Aligned all public packages to version 8.0.1.
+
 ### v8.0.0 — 2026-09-18
 
 - Preserved standard MUI section layout when `muiSlotProps.paper.sx` is customized.

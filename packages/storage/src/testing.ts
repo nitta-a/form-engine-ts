@@ -133,6 +133,55 @@ export async function runIdempotencyContract(
   );
 }
 
+export async function runResponseLimitContract(adapter: FormStorageAdapter): Promise<void> {
+  const [submission] = createStorageContractFixtures().submissions;
+  if (submission === undefined) throw new Error("Missing fixture");
+  const saveWithinLimit = adapter.saveSubmissionWithinLimit?.bind(adapter);
+  check(saveWithinLimit !== undefined, "adapter must implement saveSubmissionWithinLimit");
+  const created = await saveWithinLimit(submission, 1, { idempotent: true });
+  check(created?.status === "created", "first limited save must be created");
+  const duplicate = await saveWithinLimit(submission, 1, { idempotent: true });
+  check(duplicate?.status === "duplicate", "idempotent retry must succeed after reaching the limit");
+  const conflict = await saveWithinLimit({ ...submission, values: { "question-1": "option-2" } }, 1, {
+    idempotent: true
+  });
+  check(conflict?.status === "conflict", "changed retry must conflict after reaching the limit");
+  const limited = await saveWithinLimit({ ...submission, id: "contract-limit" }, 1, {
+    idempotent: true
+  });
+  check(limited?.status === "limit_reached", "second submission must be rejected at the limit");
+  const nextVersion = await saveWithinLimit(
+    { ...submission, id: "contract-next-version", formVersion: submission.formVersion + 1 },
+    1,
+    { idempotent: true }
+  );
+  check(nextVersion?.status === "created", "response limits must be scoped by form version");
+  const retrySubmission = { ...submission, id: "contract-concurrent-retry", formVersion: submission.formVersion + 2 };
+  const retryResults = await Promise.all([
+    saveWithinLimit(retrySubmission, 1, { idempotent: true }),
+    saveWithinLimit(retrySubmission, 1, { idempotent: true })
+  ]);
+  const retryStatuses = retryResults.map((result) => result?.status).sort();
+  check(
+    JSON.stringify(retryStatuses) === JSON.stringify(["created", "duplicate"]),
+    "concurrent idempotent retries must create once"
+  );
+  const concurrentVersion = submission.formVersion + 3;
+  const capacityResults = await Promise.all([
+    saveWithinLimit({ ...submission, id: "contract-concurrent-a", formVersion: concurrentVersion }, 1, {
+      idempotent: true
+    }),
+    saveWithinLimit({ ...submission, id: "contract-concurrent-b", formVersion: concurrentVersion }, 1, {
+      idempotent: true
+    })
+  ]);
+  const capacityStatuses = capacityResults.map((result) => result?.status).sort();
+  check(
+    JSON.stringify(capacityStatuses) === JSON.stringify(["created", "limit_reached"]),
+    "concurrent submissions must not exceed the response limit"
+  );
+}
+
 export async function runRevisionConflictContract(adapter: VersionedFormStorageAdapter): Promise<void> {
   const { schema, state } = createStorageContractFixtures();
   const planned = createCloneTransitionPlan(

@@ -59,8 +59,11 @@ interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata = Base
         readonly nextCursor?: string;
     }>;
 }
-type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<MongoDbStorageAdapter, "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage" | "aggregateResponses" | "exportResponsesToCsv" | "validateSubmission"> & {
+type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<MongoDbStorageAdapter, "saveSubmission" | "saveSubmissionWithinLimit" | "listSubmissionPage" | "listTextAnswerPage" | "aggregateResponses" | "exportResponsesToCsv" | "validateSubmission"> & {
     readonly saveSubmission: (submission: FormSubmission<TMeta>, options?: SaveSubmissionOptions) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+    readonly saveSubmissionWithinLimit: (submission: FormSubmission<TMeta>, maxResponses: number, options?: SaveSubmissionOptions) => Promise<undefined | SubmissionSaveResult<TMeta> | {
+        readonly status: "limit_reached";
+    }>;
     readonly listSubmissionPage: (formId: string, options?: _form_engine_ts_core.TypedSubmissionPageQueryOptions<TMeta>) => Promise<_form_engine_ts_core.TypedSubmissionPage<TMeta>>;
     readonly listTextAnswerPage: (formId: string, fieldIdOrOptions?: string | TextAnswerPageQueryOptions, options?: TextAnswerPageQueryOptions) => Promise<TypedTextAnswerPage<TMeta>>;
     readonly fetchPage: (formId: string, options?: {

@@ -1,10 +1,18 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine-ts/core";
+import type {
+  FormSchema,
+  FormStorageAdapter,
+  FormSubmission,
+  FormValue,
+  SaveSubmissionOptions,
+  SubmissionSaveResult
+} from "@form-engine-ts/core";
 import {
   assertValidFormSchema,
   createFormLifecycleAdapter,
   type FormLifecycleBackend,
   type FormLifecycleOptions,
   type FormResource,
+  hashFormSubmissionPayload,
   type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
@@ -305,6 +313,65 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [stored.id, stored.formId, stored.formVersion, stored.locale, stored.submittedAt, JSON.stringify(stored)]
       );
+    },
+    async saveSubmissionWithinLimit(
+      submission: FormSubmission,
+      maxResponses: number,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult | { readonly status: "limit_reached" }> {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      await ensureReady();
+      const stored = parseSubmission(submission, `input "${String(submission?.id)}"`);
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      const idempotent = saveOptions.idempotent === true;
+      const existingRow = await boundStatement(
+        options.db,
+        `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
+         FROM ${responsesTable} WHERE response_id = ? LIMIT 1`,
+        [stored.id]
+      ).first<SubmissionRow>();
+      if (existingRow !== null) {
+        if (saveOptions.idempotent !== true) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+        const existing = parseSubmissionRow(existingRow, 0);
+        const existingPayloadHash = await hashFormSubmissionPayload(existing);
+        if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: existing, payloadHash };
+        return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+      }
+      const inserted = await boundStatement(
+        options.db,
+        `INSERT INTO ${responsesTable}
+          (response_id, form_id, form_version, locale, submitted_at, submission_json)
+         SELECT ?, ?, ?, ?, ?, ?
+         WHERE (SELECT COUNT(*) FROM ${responsesTable} WHERE form_id = ? AND form_version = ?) < ?
+         RETURNING response_id`,
+        [
+          stored.id,
+          stored.formId,
+          stored.formVersion,
+          stored.locale,
+          stored.submittedAt,
+          JSON.stringify(stored),
+          stored.formId,
+          stored.formVersion,
+          maxResponses
+        ]
+      ).first<{ readonly response_id: string }>();
+      if (inserted === null) {
+        const racedRow = await boundStatement(
+          options.db,
+          `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
+           FROM ${responsesTable} WHERE response_id = ? LIMIT 1`,
+          [stored.id]
+        ).first<SubmissionRow>();
+        if (racedRow === null) return { status: "limit_reached" };
+        if (!idempotent) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+        const raced = parseSubmissionRow(racedRow, 0);
+        const existingPayloadHash = await hashFormSubmissionPayload(raced);
+        if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: raced, payloadHash };
+        return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+      }
+      if (saveOptions.idempotent === true) return { status: "created", submission: stored, payloadHash };
     },
     async listSubmissions(formId, formVersion, queryOptions) {
       await ensureReady();

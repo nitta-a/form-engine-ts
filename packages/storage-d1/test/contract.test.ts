@@ -1,4 +1,9 @@
-import { runLifecycleContract, runStorageContract, storageContractScope } from "@form-engine-ts/storage/testing";
+import {
+  runLifecycleContract,
+  runResponseLimitContract,
+  runStorageContract,
+  storageContractScope
+} from "@form-engine-ts/storage/testing";
 import { createContractSqlDatabase } from "../../../scripts/storage-contract-sql";
 import { createD1Storage, type D1DatabaseLike, type D1PreparedStatementLike } from "../src";
 
@@ -28,5 +33,13 @@ it("passes shared JSON and non-atomic lifecycle vectors", async () => {
     await runLifecycleContract(second.adapter);
   } finally {
     second.database.close();
+  }
+});
+it("atomically enforces response limit contract vectors", async () => {
+  const value = fixture();
+  try {
+    await runResponseLimitContract(value.adapter);
+  } finally {
+    value.database.close();
   }
 });

@@ -56,6 +56,9 @@ function pagedAdapter(
     },
     async deleteSchema() {},
     async saveSubmission() {},
+    async saveSubmissionWithinLimit() {
+      return { status: "limit_reached" };
+    },
     async countSubmissions() {
       return 0;
     },

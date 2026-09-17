@@ -13,6 +13,7 @@ import {
   type FormLifecycleBackend,
   type FormLifecycleOptions,
   type FormResource,
+  hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize,
   type ValidateFormSchemaOptions
@@ -129,6 +130,27 @@ export function createMemoryStorageAdapter(
     async saveSubmission(submission: FormSubmission) {
       if (submissions.has(submission.id)) throw new Error(`A submission with ID "${submission.id}" already exists.`);
       submissions.set(submission.id, cloneSubmission(submission));
+    },
+    async saveSubmissionWithinLimit(submission, maxResponses, saveOptions = {}) {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      const stored = cloneSubmission(submission);
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      const existing = submissions.get(submission.id);
+      if (existing !== undefined) {
+        if (saveOptions.idempotent !== true) throw new Error(`A submission with ID "${submission.id}" already exists.`);
+        const existingPayloadHash = await hashFormSubmissionPayload(existing);
+        if (existingPayloadHash === payloadHash)
+          return { status: "duplicate", submission: cloneSubmission(existing), payloadHash };
+        return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+      }
+      const count = [...submissions.values()].filter(
+        (candidate) => candidate.formId === submission.formId && candidate.formVersion === submission.formVersion
+      ).length;
+      if (count >= maxResponses) return { status: "limit_reached" };
+      submissions.set(stored.id, stored);
+      if (saveOptions.idempotent === true)
+        return { status: "created", submission: cloneSubmission(stored), payloadHash };
     },
     async listSubmissions(formId, formVersion, options) {
       return [...submissions.values()]

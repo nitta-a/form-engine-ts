@@ -1,10 +1,18 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission, FormValue } from "@form-engine-ts/core";
+import type {
+  FormSchema,
+  FormStorageAdapter,
+  FormSubmission,
+  FormValue,
+  SaveSubmissionOptions,
+  SubmissionSaveResult
+} from "@form-engine-ts/core";
 import {
   assertValidFormSchema,
   createFormLifecycleAdapter,
   type FormLifecycleBackend,
   type FormLifecycleOptions,
   type FormResource,
+  hashFormSubmissionPayload,
   type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
@@ -272,6 +280,47 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
          VALUES (?, ?, ?, ?, ?, ?)`,
         [stored.id, stored.formId, stored.formVersion, stored.locale, stored.submittedAt, JSON.stringify(stored)]
       );
+    },
+    async saveSubmissionWithinLimit(
+      submission: FormSubmission,
+      maxResponses: number,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult | { readonly status: "limit_reached" }> {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      await ensureReady();
+      if (options.db.transaction === undefined)
+        throw Object.assign(new Error("SQLite transactions are required for atomic response limits."), {
+          code: "transaction_unsupported"
+        });
+      const stored = parseSubmission(submission, `input "${String(submission?.id)}"`);
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      return options.db.transaction(async (db) => {
+        const existingRow = await db.get<SubmissionRow>(
+          `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
+           FROM ${responsesTable} WHERE response_id = ?`,
+          [stored.id]
+        );
+        if (existingRow !== undefined) {
+          if (saveOptions.idempotent !== true) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+          const existing = parseSubmissionRow(existingRow, 0);
+          const existingPayloadHash = await hashFormSubmissionPayload(existing);
+          if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: existing, payloadHash };
+          return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+        }
+        const row = await db.get<{ readonly count: number }>(
+          `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE form_id = ? AND form_version = ?`,
+          [stored.formId, stored.formVersion]
+        );
+        if (Number(row?.count ?? 0) >= maxResponses) return { status: "limit_reached" };
+        await db.run(
+          `INSERT INTO ${responsesTable}
+            (response_id, form_id, form_version, locale, submitted_at, submission_json)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [stored.id, stored.formId, stored.formVersion, stored.locale, stored.submittedAt, JSON.stringify(stored)]
+        );
+        if (saveOptions.idempotent === true) return { status: "created", submission: stored, payloadHash };
+      });
     },
     async listSubmissions(formId, formVersion, queryOptions) {
       await ensureReady();

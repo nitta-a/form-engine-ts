@@ -1,4 +1,11 @@
-import type { FormSchema, FormSubmission, FormValue, PagedSubmissionStorageAdapter } from "@form-engine-ts/core";
+import type {
+  FormSchema,
+  FormSubmission,
+  FormValue,
+  PagedSubmissionStorageAdapter,
+  SaveSubmissionOptions,
+  SubmissionSaveResult
+} from "@form-engine-ts/core";
 import {
   assertValidFormSchema,
   createFormLifecycleAdapter,
@@ -7,6 +14,7 @@ import {
   type FormLifecycleBackend,
   type FormLifecycleOptions,
   type FormResource,
+  hashFormSubmissionPayload,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize,
   type ValidateFormSchemaOptions
@@ -279,6 +287,51 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
          VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb)`,
         [stored.id, stored.formId, stored.formVersion, stored.locale, stored.submittedAt, JSON.stringify(stored)]
       );
+    },
+    async saveSubmissionWithinLimit(
+      submission: FormSubmission,
+      maxResponses: number,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult | { readonly status: "limit_reached" }> {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      await ensureReady();
+      if (options.client.transaction === undefined)
+        throw Object.assign(new Error("PostgreSQL transactions are required for atomic response limits."), {
+          code: "transaction_unsupported"
+        });
+      const stored = parseSubmission(submission, `input "${String(submission?.id)}"`);
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      return options.client.transaction(async (client) => {
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`${stored.formId}@${stored.formVersion}`]);
+        const existingResult = await client.query(
+          `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
+           FROM ${responsesTable} WHERE response_id = $1`,
+          [stored.id]
+        );
+        const existingRow = existingResult.rows[0];
+        if (existingRow !== undefined) {
+          if (saveOptions.idempotent !== true) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+          const existing = parseSubmissionRow(existingRow, 0);
+          const existingPayloadHash = await hashFormSubmissionPayload(existing);
+          if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: existing, payloadHash };
+          return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+        }
+        const countResult = await client.query(
+          `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE form_id = $1 AND form_version = $2`,
+          [stored.formId, stored.formVersion]
+        );
+        const countRow = countResult.rows[0];
+        const count = isRecord(countRow) ? Number(countRow.count ?? 0) : 0;
+        if (count >= maxResponses) return { status: "limit_reached" };
+        await client.query(
+          `INSERT INTO ${responsesTable}
+            (response_id, form_id, form_version, locale, submitted_at, submission_json)
+           VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb)`,
+          [stored.id, stored.formId, stored.formVersion, stored.locale, stored.submittedAt, JSON.stringify(stored)]
+        );
+        if (saveOptions.idempotent === true) return { status: "created", submission: stored, payloadHash };
+      });
     },
     async listSubmissions(formId, formVersion, queryOptions) {
       await ensureReady();

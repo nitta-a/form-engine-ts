@@ -27,18 +27,24 @@ operations use the same core contracts regardless of the backing database.
 `countSubmissions(formId, formVersion?, options?)`. Implementations must apply inclusive `since` and `until` filters
 from `SubmissionQueryOptions`; submission pipelines no longer fall back to scanning every page.
 
+Built-in adapters also expose `saveSubmissionWithinLimit(submission, maxResponses, options?)`. This operation checks
+capacity and saves atomically for one form version, preserves idempotent duplicate/conflict results, and returns
+`{ status: "limit_reached" }` without writing when full. Database adapters require their documented transaction or
+conditional-write capability; they throw `transaction_unsupported` rather than performing a racy check-then-save.
+
 The `./testing` subpath exports framework-independent JSON fixtures and contract runners for pagination,
 idempotency, revision conflicts, translation metadata, CSV, and form deletion. Adapters expose
 `inspectFormDeletion` and `deleteForm` through the lifecycle contract when their implementation supports it;
 transactional deletion is required by default and `allowNonAtomic: true` is an explicit fallback.
 
-| Package | 7.18.x contract status |
+| Package | v8 contract status |
 | --- | --- |
-| `storage-memory` | lifecycle, pagination, idempotency |
-| `storage-mongodb` | lifecycle, version state/events, transactions |
-| `storage-azure-table` | lifecycle, pagination; no native transaction |
-| `storage-postgres` / `storage-sqlite` / `storage-d1` | lifecycle, pagination; transaction depends on injected client |
-| `storage-localstorage` | lifecycle, pagination; non-atomic only |
+| `storage-memory` | lifecycle, pagination, idempotency, process-local atomic response limits |
+| `storage-mongodb` | lifecycle, version state/events, transaction-backed response limits |
+| `storage-azure-table` | lifecycle, pagination, same-partition transactional response limits |
+| `storage-postgres` / `storage-sqlite` | lifecycle, pagination, transaction-backed response limits |
+| `storage-d1` | lifecycle, pagination, single-statement conditional response limits |
+| `storage-localstorage` | lifecycle, pagination, same-JavaScript-agent response limits |
 
 Existing `StorageAdapter` methods remain valid. To migrate, pass `schemaValidation` to an adapter when
 Content Mode policy must be enforced at persistence, then use `inspectFormDeletion` before deletion and

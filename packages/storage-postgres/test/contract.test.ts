@@ -1,11 +1,18 @@
-import { runLifecycleContract, runStorageContract, storageContractScope } from "@form-engine-ts/storage/testing";
+import {
+  runLifecycleContract,
+  runResponseLimitContract,
+  runStorageContract,
+  storageContractScope
+} from "@form-engine-ts/storage/testing";
 import { createContractSqlDatabase } from "../../../scripts/storage-contract-sql";
 import { createPostgresStorage, type PostgresClientLike } from "../src";
 
 function fixture() {
   const { database, execute } = createContractSqlDatabase();
   const client: PostgresClientLike = {
-    query: async (sql, params) => ({ rows: execute(sql, params) }),
+    query: async (sql, params) => ({
+      rows: sql.startsWith("SELECT pg_advisory_xact_lock") ? [] : execute(sql, params)
+    }),
     async transaction(operation) {
       database.exec("BEGIN");
       try {
@@ -36,6 +43,14 @@ it("passes shared JSON, pagination and lifecycle vectors", async () => {
     await runLifecycleContract(second.adapter);
   } finally {
     second.database.close();
+  }
+});
+it("atomically enforces response limit contract vectors", async () => {
+  const value = fixture();
+  try {
+    await runResponseLimitContract(value.adapter);
+  } finally {
+    value.database.close();
   }
 });
 it("rolls back deletion when a later statement fails", async () => {

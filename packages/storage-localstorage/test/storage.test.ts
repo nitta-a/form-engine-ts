@@ -1,5 +1,10 @@
 import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
-import { runLifecycleContract, runStorageContract, storageContractScope } from "@form-engine-ts/storage/testing";
+import {
+  runLifecycleContract,
+  runResponseLimitContract,
+  runStorageContract,
+  storageContractScope
+} from "@form-engine-ts/storage/testing";
 import { createLocalStorageAdapter, type StorageLike } from "../src";
 
 function createStorage(): StorageLike {
@@ -149,6 +154,10 @@ function contractLocalStorage() {
 }
 it("passes the shared JSON vectors", async () => {
   await runStorageContract(createLocalStorageAdapter("contract_", contractLocalStorage()));
+});
+
+it("enforces response limit contract vectors", async () => {
+  await runResponseLimitContract(createLocalStorageAdapter("limit_", contractLocalStorage()));
 });
 it("passes the shared scoped deletion vectors", async () => {
   await runLifecycleContract(

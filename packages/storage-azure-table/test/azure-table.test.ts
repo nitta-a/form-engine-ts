@@ -3,6 +3,7 @@ import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
 import {
   runIdempotencyContract,
   runLifecycleContract,
+  runResponseLimitContract,
   runStorageContract,
   storageContractScope
 } from "@form-engine-ts/storage/testing";
@@ -34,7 +35,7 @@ function createClientStub() {
     async getEntity(partitionKey, rowKey) {
       const entity = entities.get(key(partitionKey, rowKey));
       if (entity === undefined) throw { statusCode: 404 };
-      return clone(entity);
+      return { ...clone(entity), etag: JSON.stringify(entity) };
     },
     listEntities(options) {
       if (options?.queryOptions?.filter !== undefined) filters.push(options.queryOptions.filter);
@@ -67,6 +68,24 @@ function createClientStub() {
       const current = entities.get(key(partitionKey, rowKey));
       if (options?.etag !== undefined && options.etag !== JSON.stringify(current)) throw { statusCode: 412 };
       entities.delete(key(partitionKey, rowKey));
+    },
+    async submitTransaction(actions) {
+      const next = new Map(entities);
+      for (const action of actions) {
+        const [kind, entity, , actionOptions] = action;
+        const entityKey = key(String(entity.partitionKey), String(entity.rowKey));
+        if (kind === "create") {
+          if (next.has(entityKey)) throw { statusCode: 409 };
+          next.set(entityKey, clone(entity));
+          continue;
+        }
+        const current = next.get(entityKey);
+        if (current === undefined || actionOptions?.etag !== JSON.stringify(current)) throw { statusCode: 412 };
+        next.set(entityKey, clone(entity));
+      }
+      entities.clear();
+      for (const [entityKey, entity] of next) entities.set(entityKey, entity);
+      return { subResponses: [] };
     }
   };
   return { client, entities, filters, pageRequests };
@@ -454,6 +473,9 @@ describe("createAzureTableStorage", () => {
 describe("shared storage contracts", () => {
   it("passes JSON and pagination vectors", async () => {
     await runStorageContract(createAzureTableStorage({ client: createClientStub().client }));
+  });
+  it("atomically enforces response limit vectors", async () => {
+    await runResponseLimitContract(createAzureTableStorage({ client: createClientStub().client }));
   });
   it("passes scoped deletion vectors", async () => {
     await runLifecycleContract(

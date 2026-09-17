@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.0.0** (2026-09-18). All public packages are currently aligned to version `8.0.0`.
-This patch preserves standard MUI section layout when Paper styles are customized and makes MongoDB non-atomic form deletion explicit.
+The latest release is **v8.0.1** (2026-09-18). All public packages are currently aligned to version `8.0.1`.
+This patch implements atomic response-limit saves across the built-in storage adapters.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience

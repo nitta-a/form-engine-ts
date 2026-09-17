@@ -122,6 +122,7 @@ export interface TypedMongoDbStorageAdapter<TMeta extends BaseSubmissionMetadata
 export type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<
   MongoDbStorageAdapter,
   | "saveSubmission"
+  | "saveSubmissionWithinLimit"
   | "listSubmissionPage"
   | "listTextAnswerPage"
   | "aggregateResponses"
@@ -132,6 +133,11 @@ export type TypedMongoDbSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
     submission: FormSubmission<TMeta>,
     options?: SaveSubmissionOptions
   ) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+  readonly saveSubmissionWithinLimit: (
+    submission: FormSubmission<TMeta>,
+    maxResponses: number,
+    options?: SaveSubmissionOptions
+  ) => Promise<undefined | SubmissionSaveResult<TMeta> | { readonly status: "limit_reached" }>;
   readonly listSubmissionPage: (
     formId: string,
     options?: import("@form-engine-ts/core").TypedSubmissionPageQueryOptions<TMeta>
@@ -186,6 +192,11 @@ interface StoredSubmissionDocument extends Document {
   readonly submittedAt: string;
   readonly submission: FormSubmission;
   readonly payloadHash?: string;
+}
+
+interface StoredSubmissionCapacityDocument extends Document {
+  readonly _id: string;
+  readonly revision: number;
 }
 
 interface StoredVersionDocument extends Document {
@@ -505,6 +516,9 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
   const versionEventsCollectionName = "form_version_events";
   const schemas = options.db.collection<StoredSchemaDocument>(schemasCollectionName);
   const submissions = options.db.collection<StoredSubmissionDocument>(responsesCollectionName);
+  const submissionCapacities = options.db.collection<StoredSubmissionCapacityDocument>(
+    `${responsesCollectionName}_capacity`
+  );
   const versions = options.db.collection<StoredVersionDocument>(versionsCollectionName);
   const versionStates = options.db.collection<StoredVersionStateDocument>(versionStatesCollectionName);
   const versionEvents = options.db.collection<StoredVersionEventDocument>(versionEventsCollectionName);
@@ -767,6 +781,104 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       }
       if (saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false) {
         return { status: "created", submission: stored, payloadHash };
+      }
+    },
+    async saveSubmissionWithinLimit(
+      submission: FormSubmission,
+      maxResponses: number,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult | { readonly status: "limit_reached" }> {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      const client = options.db.client;
+      if (client === undefined || typeof client.startSession !== "function")
+        throw Object.assign(new Error("MongoDB transactions are required for atomic response limits."), {
+          code: "transaction_unsupported"
+        });
+      const stored = cloneJson(parseSubmission(submission, `input "${String(submission?.id)}"`));
+      const explicitValidation = saveOptions.validator ?? saveOptions.validation;
+      const configuredValidation =
+        options.submissionValidator ??
+        options.submissionSchema ??
+        options.validator ??
+        options.schema ??
+        options.validation;
+      if (explicitValidation !== undefined) await assertValidFormSubmissionWith(explicitValidation, stored);
+      if (explicitValidation === undefined && configuredValidation !== undefined) {
+        await assertValidFormSubmissionWith(configuredValidation, stored);
+      }
+      if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
+        const schema = await schemas.findOne({ _id: schemaDocumentId(stored.formId, stored.formVersion) });
+        if (schema === null) throw new Error("MongoDB submission schema was not found.");
+        assertValidFormSubmission(
+          parseSchemaDocument(schema, options.schemaValidation),
+          stored,
+          options.schemaValidation
+        );
+      }
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      const idempotent = saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false;
+      const session = client.startSession();
+      if (typeof session.withTransaction !== "function") {
+        await session.endSession();
+        throw Object.assign(new Error("MongoDB transactions are required for atomic response limits."), {
+          code: "transaction_unsupported"
+        });
+      }
+      let result: undefined | SubmissionSaveResult | { readonly status: "limit_reached" };
+      try {
+        await session.withTransaction(async () => {
+          const existingDocument = await submissions.findOne({ _id: stored.id }, { session });
+          if (existingDocument !== null) {
+            if (!idempotent) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+            const existing = parseSubmissionDocument(existingDocument);
+            const existingPayloadHash =
+              typeof existingDocument.payloadHash === "string"
+                ? existingDocument.payloadHash
+                : await hashFormSubmissionPayload(existing);
+            result =
+              existingPayloadHash === payloadHash
+                ? { status: "duplicate", submission: existing, payloadHash }
+                : { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+            return;
+          }
+          const capacityId = `${stored.formId}@${stored.formVersion}`;
+          await submissionCapacities.updateOne(
+            { _id: capacityId },
+            { $inc: { revision: 1 } },
+            { upsert: true, session }
+          );
+          const count = await submissions.countDocuments(
+            { formId: stored.formId, formVersion: stored.formVersion },
+            { session }
+          );
+          if (count >= maxResponses) {
+            result = { status: "limit_reached" };
+            return;
+          }
+          await submissions.insertOne(
+            {
+              _id: stored.id,
+              formId: stored.formId,
+              formVersion: stored.formVersion,
+              submittedAt: stored.submittedAt,
+              payloadHash,
+              submission: stored
+            },
+            { session }
+          );
+          if (idempotent) result = { status: "created", submission: stored, payloadHash };
+        });
+        return result;
+      } catch (error) {
+        if (isTransactionUnsupported(error))
+          throw Object.assign(new Error("MongoDB transactions are required for atomic response limits."), {
+            code: "transaction_unsupported",
+            cause: error
+          });
+        throw error;
+      } finally {
+        await session.endSession();
       }
     },
     async listSubmissions(formId, formVersion, options) {

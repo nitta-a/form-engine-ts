@@ -1,3 +1,4 @@
+import { TransactionAction } from '@azure/data-tables';
 import { BaseSubmissionMetadata, PagedSubmissionStorageAdapter, TextAnswerPageQueryOptions, TextAnswerPage, TypedSubmissionPageQueryOptions, TypedSubmissionPage, FormSubmission, FormSchema, SubmissionPageQueryOptions, FormAnalytics, StorageSubmissionExportOptions, FormSubmissionValidationSource, ValidateFormSchemaOptions, FormLifecycleOptions, FormSubmissionValidator, SaveSubmissionOptions, SubmissionSaveResult, SubmissionFilter, JsonValue, TypedTextAnswerPage } from '@form-engine-ts/core';
 
 interface AzureTableListOptions {
@@ -23,6 +24,7 @@ interface AzureTableClientLike {
     deleteEntity(partitionKey: string, rowKey: string, options?: {
         readonly etag?: string;
     }): Promise<unknown>;
+    readonly submitTransaction?: (actions: TransactionAction[]) => Promise<unknown>;
 }
 type AzureTableSubmissionEntity = Record<string, unknown> & {
     readonly answers?: never;
@@ -97,8 +99,11 @@ interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSu
     readonly exportResponsesToCsv: (schema: FormSchema, options?: StorageSubmissionExportOptions) => Promise<string>;
     readonly validateSubmission: (submission: FormSubmission, source?: FormSubmissionValidationSource) => Promise<void>;
 }
-type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<PagedSubmissionStorageAdapter, "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage"> & {
+type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<PagedSubmissionStorageAdapter, "saveSubmission" | "saveSubmissionWithinLimit" | "listSubmissionPage" | "listTextAnswerPage"> & {
     readonly saveSubmission: (submission: FormSubmission<TMeta>, options?: SaveSubmissionOptions) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+    readonly saveSubmissionWithinLimit: (submission: FormSubmission<TMeta>, maxResponses: number, options?: SaveSubmissionOptions) => Promise<undefined | SubmissionSaveResult<TMeta> | {
+        readonly status: "limit_reached";
+    }>;
     readonly listSubmissionPage: (formId: string, options?: SubmissionPageQueryOptions & {
         readonly filter?: SubmissionFilter | ((submission: FormSubmission<TMeta>) => boolean);
         readonly metadataFilters?: TMeta extends BaseSubmissionMetadata ? Partial<TMeta> : Readonly<Record<string, JsonValue>>;

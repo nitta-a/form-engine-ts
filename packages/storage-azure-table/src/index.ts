@@ -1,3 +1,4 @@
+import type { TransactionAction } from "@azure/data-tables";
 import type {
   BaseSubmissionMetadata,
   FormAnalytics,
@@ -60,6 +61,7 @@ export interface AzureTableClientLike {
   getEntity(partitionKey: string, rowKey: string): Promise<Record<string, unknown>>;
   listEntities(options?: AzureTableListOptions): AzureTableEntityIterator;
   deleteEntity(partitionKey: string, rowKey: string, options?: { readonly etag?: string }): Promise<unknown>;
+  readonly submitTransaction?: (actions: TransactionAction[]) => Promise<unknown>;
 }
 
 export type AzureTableSubmissionEntity = Record<string, unknown> & { readonly answers?: never };
@@ -149,12 +151,17 @@ export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata =
 
 export type TypedAzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata | undefined = undefined> = Omit<
   PagedSubmissionStorageAdapter,
-  "saveSubmission" | "listSubmissionPage" | "listTextAnswerPage"
+  "saveSubmission" | "saveSubmissionWithinLimit" | "listSubmissionPage" | "listTextAnswerPage"
 > & {
   readonly saveSubmission: (
     submission: FormSubmission<TMeta>,
     options?: SaveSubmissionOptions
   ) => Promise<undefined | SubmissionSaveResult<TMeta>>;
+  readonly saveSubmissionWithinLimit: (
+    submission: FormSubmission<TMeta>,
+    maxResponses: number,
+    options?: SaveSubmissionOptions
+  ) => Promise<undefined | SubmissionSaveResult<TMeta> | { readonly status: "limit_reached" }>;
   readonly listSubmissionPage: (
     formId: string,
     options?: SubmissionPageQueryOptions & {
@@ -720,6 +727,10 @@ function isDuplicateEntityError(error: unknown): boolean {
   );
 }
 
+function isPreconditionFailed(error: unknown): boolean {
+  return isRecord(error) && (error.statusCode === 412 || error.code === "UpdateConditionNotSatisfied");
+}
+
 function matchesBuiltInFilters(
   submission: FormSubmission,
   formId: string,
@@ -961,6 +972,128 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
       if (saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false) {
         return { status: "created", submission: stored, payloadHash };
       }
+    },
+    async saveSubmissionWithinLimit(
+      submission: FormSubmission,
+      maxResponses: number,
+      saveOptions: SaveSubmissionOptions = {}
+    ): Promise<undefined | SubmissionSaveResult | { readonly status: "limit_reached" }> {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      ensureWritable();
+      const stored = parseSubmission(submission, `input ${String(submission?.id)}`);
+      const explicitValidation = saveOptions.validator ?? saveOptions.validation;
+      const configuredValidation =
+        options.submissionValidator ??
+        options.submissionSchema ??
+        options.validator ??
+        options.schema ??
+        options.validation;
+      if (explicitValidation !== undefined) await assertValidFormSubmissionWith(explicitValidation, stored);
+      if (explicitValidation === undefined && configuredValidation !== undefined) {
+        await assertValidFormSubmissionWith(configuredValidation, stored);
+      }
+      if (options.validateSubmissions === true || saveOptions.validateAgainstSchema === true) {
+        const schema = parseSchemaEntity(
+          await (await schemaClient(stored.formId)).getEntity(stored.formId, schemaRowKey(stored.formVersion))
+        );
+        assertValidFormSubmission(schema, stored, options.schemaValidation);
+      }
+      const client = await submissionClient(stored.formId);
+      if (client.submitTransaction === undefined)
+        throw Object.assign(new Error("Azure Table transactions are required for atomic response limits."), {
+          code: "transaction_unsupported"
+        });
+      const partitionKey = codec.createPartitionKey(stored);
+      if (codec.createPartitionKeyFromQuery(stored.formId, { version: stored.formVersion }) !== partitionKey)
+        throw new Error("Atomic response limits require one Azure Table partition per form.");
+      const rowKey = codec.createRowKey(stored);
+      const payloadHash = await hashFormSubmissionPayload(stored);
+      const keys = physicalKeyNames(options.fieldMapping);
+      const createdEntity = codec.createEntity(stored);
+      assertCanonicalSubmissionEntity(createdEntity);
+      const submissionEntity = {
+        ...mappedSubmissionEntity(createdEntity, stored, options.fieldMapping, valueCodec),
+        payloadHash,
+        partitionKey,
+        rowKey,
+        [keys.partitionKey]: partitionKey,
+        [keys.rowKey]: rowKey
+      };
+      const idempotent = saveOptions.idempotent ?? options.idempotentSubmissions ?? options.idempotency ?? false;
+      try {
+        const existingEntity = await client.getEntity(partitionKey, rowKey);
+        if (!idempotent) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+        const existing = parseSubmissionEntity(existingEntity, codec, options.fieldMapping, valueCodec);
+        const existingPayloadHash =
+          typeof existingEntity.payloadHash === "string"
+            ? existingEntity.payloadHash
+            : await hashFormSubmissionPayload(existing);
+        if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: existing, payloadHash };
+        return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+      } catch (error) {
+        if (!isNotFound(error)) throw error;
+      }
+      const capacityRowKey = `capacity_${stored.formVersion}`;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        let capacity: Record<string, unknown>;
+        try {
+          capacity = await client.getEntity(partitionKey, capacityRowKey);
+        } catch (error) {
+          if (!isNotFound(error)) throw error;
+          const count = await adapter.countSubmissions(stored.formId, stored.formVersion);
+          try {
+            await client.createEntity({ partitionKey, rowKey: capacityRowKey, kind: "capacity", count });
+          } catch (createError) {
+            if (!isDuplicateEntityError(createError)) throw createError;
+          }
+          continue;
+        }
+        const count = await adapter.countSubmissions(stored.formId, stored.formVersion);
+        if (count >= maxResponses) return { status: "limit_reached" };
+        if (typeof capacity.etag !== "string") throw new Error("Azure Table capacity entity is missing an ETag.");
+        const actions: TransactionAction[] = [
+          [
+            "update",
+            { ...capacity, partitionKey, rowKey: capacityRowKey, count: count + 1 },
+            "Replace",
+            { etag: capacity.etag }
+          ],
+          ["create", submissionEntity]
+        ];
+        try {
+          await client.submitTransaction(actions);
+          if (idempotent) return { status: "created", submission: stored, payloadHash };
+          return;
+        } catch (error) {
+          if (isPreconditionFailed(error)) {
+            try {
+              const racedEntity = await client.getEntity(partitionKey, rowKey);
+              if (!idempotent) throw new Error(`A submission with ID "${stored.id}" already exists.`);
+              const raced = parseSubmissionEntity(racedEntity, codec, options.fieldMapping, valueCodec);
+              const existingPayloadHash =
+                typeof racedEntity.payloadHash === "string"
+                  ? racedEntity.payloadHash
+                  : await hashFormSubmissionPayload(raced);
+              if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: raced, payloadHash };
+              return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+            } catch (lookupError) {
+              if (!isNotFound(lookupError)) throw lookupError;
+            }
+            continue;
+          }
+          if (!idempotent || !isDuplicateEntityError(error)) throw error;
+          const existingEntity = await client.getEntity(partitionKey, rowKey);
+          const existing = parseSubmissionEntity(existingEntity, codec, options.fieldMapping, valueCodec);
+          const existingPayloadHash =
+            typeof existingEntity.payloadHash === "string"
+              ? existingEntity.payloadHash
+              : await hashFormSubmissionPayload(existing);
+          if (existingPayloadHash === payloadHash) return { status: "duplicate", submission: existing, payloadHash };
+          return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
+        }
+      }
+      throw new Error("Azure Table response capacity update conflicted too many times.");
     },
     async listSubmissions(formId, formVersion, queryOptions: SubmissionQueryOptions = {}) {
       return listSubmissionCandidates(formId, {

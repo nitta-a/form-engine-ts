@@ -32,3 +32,6 @@ Schemas use a `(form_id, form_version)` primary key and JSONB payload. Responses
 `listSubmissionPage(formId, { version, pageSize, cursor, since, until, locale })` uses a parameterized keyset query over
 `submitted_at, response_id`. Its opaque cursor handles equal timestamps without `OFFSET` gaps or duplicates.
 `metadataFilters` and custom `filter` predicates are applied before page sizing.
+
+`saveSubmissionWithinLimit(submission, maxResponses, options?)` requires the injected client's `transaction` method.
+It uses a transaction-scoped advisory lock per form version before checking capacity and inserting the response.

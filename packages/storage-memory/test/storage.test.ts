@@ -1,5 +1,10 @@
 import type { FormSubmission } from "@form-engine-ts/core";
-import { runLifecycleContract, runStorageContract, storageContractScope } from "@form-engine-ts/storage/testing";
+import {
+  runLifecycleContract,
+  runResponseLimitContract,
+  runStorageContract,
+  storageContractScope
+} from "@form-engine-ts/storage/testing";
 import { createMemoryStorageAdapter } from "../src";
 
 function submission(id: string, version = 1, formId = "form", submittedAt?: string): FormSubmission {
@@ -158,6 +163,10 @@ describe("createMemoryStorageAdapter", () => {
 describe("shared storage contracts", () => {
   it("passes JSON and pagination vectors", async () => {
     await runStorageContract(createMemoryStorageAdapter());
+  });
+
+  it("atomically enforces response limit contract vectors", async () => {
+    await runResponseLimitContract(createMemoryStorageAdapter());
   });
   it("passes scoped atomic deletion vectors", async () => {
     await runLifecycleContract(createMemoryStorageAdapter({ lifecycle: { scope: storageContractScope } }));

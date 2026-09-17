@@ -5,6 +5,7 @@ import {
   type FormLifecycleBackend,
   type FormLifecycleOptions,
   type FormResource,
+  hashFormSubmissionPayload,
   type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
@@ -144,6 +145,32 @@ export function createLocalStorageAdapter(
       const key = submissionKey(submission.id);
       if (storage.getItem(key) !== null) throw new Error(`A submission with ID "${submission.id}" already exists.`);
       storage.setItem(key, JSON.stringify(submission));
+    },
+    async saveSubmissionWithinLimit(submission, maxResponses, saveOptions = {}) {
+      if (!Number.isInteger(maxResponses) || maxResponses < 1)
+        throw new RangeError("maxResponses must be a positive integer.");
+      const key = submissionKey(submission.id);
+      const payloadHash = await hashFormSubmissionPayload(submission);
+      const existingValue = storage.getItem(key);
+      if (existingValue !== null) {
+        if (saveOptions.idempotent !== true) throw new Error(`A submission with ID "${submission.id}" already exists.`);
+        const existing = parseSubmission(existingValue, key);
+        const existingPayloadHash = await hashFormSubmissionPayload(existing);
+        if (existingPayloadHash === payloadHash)
+          return { status: "duplicate", submission: cloneJson(existing), payloadHash };
+        return { status: "conflict", submissionId: submission.id, payloadHash, existingPayloadHash };
+      }
+      const count = prefixedKeys(submissionPrefix).reduce((total, key) => {
+        const value = storage.getItem(key);
+        if (value === null) return total;
+        const candidate = parseSubmission(value, key);
+        return (
+          total + (candidate.formId === submission.formId && candidate.formVersion === submission.formVersion ? 1 : 0)
+        );
+      }, 0);
+      if (count >= maxResponses) return { status: "limit_reached" };
+      storage.setItem(key, JSON.stringify(submission));
+      if (saveOptions.idempotent === true) return { status: "created", submission: cloneJson(submission), payloadHash };
     },
     async listSubmissions(formId, formVersion, options) {
       return prefixedKeys(submissionPrefix)

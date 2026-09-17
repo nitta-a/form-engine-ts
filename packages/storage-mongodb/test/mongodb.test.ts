@@ -9,6 +9,7 @@ import {
 import {
   runIdempotencyContract,
   runLifecycleContract,
+  runResponseLimitContract,
   runRevisionConflictContract,
   runStorageContract,
   storageContractScope
@@ -731,6 +732,9 @@ describe("createMongoDbStorage", () => {
 describe("shared storage contracts", () => {
   it("passes JSON and pagination vectors", async () => {
     await runStorageContract(createMongoDbStorage({ db: createDbStub().db }));
+  });
+  it("atomically enforces response limit vectors", async () => {
+    await runResponseLimitContract(createMongoDbStorage({ db: createDbStub().db }));
   });
   it("passes scoped deletion vectors", async () => {
     await runLifecycleContract(
