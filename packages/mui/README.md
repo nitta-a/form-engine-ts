@@ -62,7 +62,10 @@ English catalog, so application dictionaries can remove residual English UI text
 callbacks. `TargetLocaleHeaderToolbar` uses the same icons for its add-language selector and remove action, and accepts
 the same icon overrides. It separates registered-language switching/removal from the independent `AddLocaleDropdown`;
 a single registered language is shown as a non-interactive chip. `i18n.customDictionary` supports locale names, status
-labels, placeholders, headers, and message overrides.
+labels, placeholders, headers, and message overrides. When no target locale is configured, comparison rows and progress
+controls are replaced by the localized empty state; customize it with `emptyState` or `slots.renderEmptyState`. Use
+`slots.renderLocaleToolbar` to replace the complete locale toolbar, and `slots.renderColumnHeader` plus
+`appearance.sourceColumn`/`targetColumn` to customize the two columns.
 
 `MuiSurveyResponseSummaryDomain` is the opt-in MUI renderer for response summaries from
 `@form-engine-ts/custom-survey-client`. It groups questions into MUI `Card` components, renders choice distributions

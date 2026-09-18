@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.0.1** (2026-09-18). All public packages are currently aligned to version `8.0.1`.
-This patch implements atomic response-limit saves across the built-in storage adapters.
+The latest release is **v8.0.2** (2026-09-18). All public packages are currently aligned to version `8.0.2`.
+This patch adds customizable empty-state, locale-toolbar, and column-header surfaces to the translation comparison workspace.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -395,8 +395,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v7.18.1**（2026-09-17）です。公開パッケージはすべてバージョン `7.18.1` に揃えています。
-本パッチでは、PaperのスタイルをカスタマイズしてもMUI標準のセクションレイアウトを維持し、MongoDBの非atomicなフォーム削除を明示指定できるようにしました。
+最新版は **v8.0.2**（2026-09-18）です。公開パッケージはすべてバージョン `8.0.2` に揃えています。
+本パッチでは、翻訳比較ワークスペースの空状態、言語ツールバー、列ヘッダーをカスタマイズできるようにしました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

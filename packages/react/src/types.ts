@@ -424,6 +424,11 @@ export interface TranslationComparisonHeaderProps {
   readonly report?: TranslationReport;
   readonly progress?: TranslationProgress;
   readonly onCancel?: () => void;
+  readonly hasTargetLocale?: boolean;
+  readonly canTranslateAll?: boolean;
+  readonly completionPercentage?: number;
+  readonly error?: import("./hooks/useTranslationWorkspace").TranslationWorkspaceError;
+  readonly onRetry?: () => void;
 }
 
 export interface TranslationComparisonLocaleSelectorProps {
@@ -827,6 +832,14 @@ export interface InputBoxStyleOptions {
   readonly borderRadius?: number | string;
 }
 
+export interface TranslationComparisonColumnAppearance {
+  readonly backgroundColor?: string;
+  readonly borderColor?: string;
+  readonly borderWidth?: number | string;
+  readonly borderRadius?: number | string;
+  readonly padding?: number | string;
+}
+
 export type TranslationComparisonResponsiveMode = "stack" | "columns" | "scroll";
 
 export type TranslationComparisonLayoutTarget = "title" | "completionMessage" | "question" | "option";
@@ -891,6 +904,8 @@ export interface TranslationComparisonAppearance {
   readonly input?: TranslationComparisonInputAppearance;
   readonly sourceInput?: InputBoxStyleOptions;
   readonly targetInput?: InputBoxStyleOptions;
+  readonly sourceColumn?: TranslationComparisonColumnAppearance;
+  readonly targetColumn?: TranslationComparisonColumnAppearance;
   readonly layout?: TranslationComparisonLayoutOptions;
   readonly status?: TranslationComparisonStatusDisplayOptions;
 }

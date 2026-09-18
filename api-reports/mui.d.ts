@@ -519,6 +519,49 @@ interface TranslationLocaleActionsProps {
 declare function TargetLocaleHeaderToolbar({ supportedLocales, currentLocale, availableLocales, onSelectLocale, onAddLocale, onRemoveLocale, disabled, selectionLabel, addLabel, removeLabel, addIcon, removeIcon, getLocaleDisplayName }: TargetLocaleToolbarProps): react.JSX.Element;
 declare const TargetLocaleSelector: typeof TargetLocaleHeaderToolbar;
 
+interface TranslationComparisonEmptyStateOptions {
+    readonly title?: string;
+    readonly description?: string;
+    readonly action?: string;
+}
+interface TranslationComparisonEmptyStateProps {
+    readonly title: string;
+    readonly description: string;
+    readonly action: string;
+    readonly sourceLocale: string;
+    readonly sourceLocaleLabel: string;
+    readonly availableLocales?: readonly (string | LocaleOption)[];
+    readonly localeCandidates: readonly LocaleOption[];
+    readonly newLocale: string;
+    readonly onNewLocaleChange: (locale: string) => void;
+    readonly onAddLocale: () => void;
+    readonly canAddLocale: boolean;
+    readonly readOnly: boolean;
+}
+interface TranslationComparisonLocaleToolbarProps {
+    readonly sourceLocale: string;
+    readonly sourceLocaleLabel: string;
+    readonly targetLocale: string;
+    readonly targetLocaleLabel: string;
+    readonly targetLocales: readonly string[];
+    readonly localeOptions: readonly LocaleOption[];
+    readonly localeCandidates: readonly LocaleOption[];
+    readonly newLocale: string;
+    readonly onNewLocaleChange: (locale: string) => void;
+    readonly onTargetLocaleChange: (locale: string) => void;
+    readonly onAddLocale: () => void;
+    readonly onRemoveLocale: () => void;
+    readonly localeSelectorMode: "tabs" | "select";
+    readonly actions: TranslationLocaleActionsProps;
+    readonly readOnly: boolean;
+}
+interface TranslationComparisonColumnHeaderProps {
+    readonly side: "source" | "target";
+    readonly label: string;
+    readonly locale: string;
+    readonly localeLabel: string;
+    readonly readOnly: boolean;
+}
 interface TranslationComparisonWorkspaceProps {
     readonly schema: FormSchema;
     readonly sourceLocale?: string;
@@ -548,9 +591,13 @@ interface TranslationComparisonWorkspaceProps {
     readonly renderItemIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
     readonly getTranslationSlotIcon?: (props: TranslationComparisonItemIconProps) => ReactNode;
     readonly appearance?: TranslationComparisonAppearance;
+    readonly emptyState?: TranslationComparisonEmptyStateOptions;
     readonly i18n?: MuiFormEngineI18nOptions;
     readonly slots?: {
         readonly renderHeader?: (props: TranslationComparisonHeaderProps) => ReactNode;
+        readonly renderEmptyState?: (props: TranslationComparisonEmptyStateProps) => ReactNode;
+        readonly renderLocaleToolbar?: (props: TranslationComparisonLocaleToolbarProps) => ReactNode;
+        readonly renderColumnHeader?: (props: TranslationComparisonColumnHeaderProps) => ReactNode;
         readonly renderTargetLocaleSelector?: (props: TranslationComparisonLocaleSelectorProps) => ReactNode;
         readonly renderLocaleActions?: (props: TranslationLocaleActionsProps) => ReactNode;
         readonly renderItemRow?: (props: TranslationComparisonItemRowProps) => ReactNode;
@@ -598,4 +645,4 @@ interface TranslationWorkspaceProps {
 }
 declare function TranslationWorkspace(props: TranslationWorkspaceProps): react.JSX.Element;
 
-export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, ContentModeSettings, type ContentModeSettingsProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, type MuiComponentSlotProps, type MuiContentModeControls, type MuiContentModeOptions, MuiContentModeSettingsSlot, MuiContentRenderer, type MuiContentRendererOptions, type MuiContentRendererProps, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorPreviewSlot, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormBuilderValidationIssue, type MuiFormBuilderValidationState, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiPagesEditor, type MuiPagesEditorProps, MuiPagesEditorSlot, type MuiPollRendererOptions, type MuiPollResultItem, MuiPollResultView, type MuiPollResultViewProps, type MuiPollResultViewSlotProps, type MuiPollResultViewSlots, MuiPollResults, MuiPollResultsEmbed, type MuiPollResultsEmbedProps, type MuiPollResultsProps, type MuiPollResultsSlotProps, type MuiPollResultsSlots, type MuiQuizRendererOptions, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, QuizFieldEditor, QuizOptionEditor, QuizResultView, type QuizResultViewLabels, type QuizResultViewProps, type QuizResultViewSlotProps, type QuizResultViewSlots, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, type TypedMuiContentRendererProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiContentModeSettingsSlot, createMuiErrorMessageAdapter, createMuiFieldEditorPreviewSlot, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiPagesEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };
+export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, ContentModeSettings, type ContentModeSettingsProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, type MuiBuilderOverrides, type MuiBuilderSlotProps, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, type MuiComponentSlotProps, type MuiContentModeControls, type MuiContentModeOptions, MuiContentModeSettingsSlot, MuiContentRenderer, type MuiContentRendererOptions, type MuiContentRendererProps, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorPreviewSlot, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormBuilderValidationIssue, type MuiFormBuilderValidationState, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiPagesEditor, type MuiPagesEditorProps, MuiPagesEditorSlot, type MuiPollRendererOptions, type MuiPollResultItem, MuiPollResultView, type MuiPollResultViewProps, type MuiPollResultViewSlotProps, type MuiPollResultViewSlots, MuiPollResults, MuiPollResultsEmbed, type MuiPollResultsEmbedProps, type MuiPollResultsProps, type MuiPollResultsSlotProps, type MuiPollResultsSlots, type MuiQuizRendererOptions, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, QuizFieldEditor, QuizOptionEditor, QuizResultView, type QuizResultViewLabels, type QuizResultViewProps, type QuizResultViewSlotProps, type QuizResultViewSlots, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, type TranslationComparisonColumnHeaderProps, type TranslationComparisonEmptyStateOptions, type TranslationComparisonEmptyStateProps, type TranslationComparisonLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, type TypedMuiContentRendererProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiContentModeSettingsSlot, createMuiErrorMessageAdapter, createMuiFieldEditorPreviewSlot, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiPagesEditorSlot, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

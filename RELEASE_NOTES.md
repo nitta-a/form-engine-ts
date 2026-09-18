@@ -5,6 +5,13 @@ current release and usage information.
 
 ## Latest release
 
+### v8.0.2 — 2026-09-18
+
+- Added customizable empty-state, locale-toolbar, and column-header surfaces to the MUI translation comparison workspace.
+- Added source and target column appearance options plus actionable header state for translation progress and retry controls.
+- Added localized English and Japanese copy for the comparison empty state.
+- Aligned all public packages to version 8.0.2.
+
 ### v8.0.1 — 2026-09-18
 
 - Implemented `saveSubmissionWithinLimit` across all built-in storage adapters.

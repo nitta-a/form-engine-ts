@@ -294,6 +294,7 @@ export type TranslationWorkspaceDetailedKey =
 
 export type TranslationComparisonTranslationKey =
   | "workspace.comparison.title"
+  | "workspace.comparison.emptyStateTitle"
   | "workspace.comparison.sourceHeader"
   | "workspace.comparison.targetHeader"
   | "workspace.comparison.property.title"

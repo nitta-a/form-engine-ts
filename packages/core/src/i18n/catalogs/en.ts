@@ -286,6 +286,7 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.empty.noTargetLocales": "No target languages are configured.",
   "workspace.empty.noSlotsToTranslate": "There are no translation slots for this language.",
   "workspace.comparison.title": "Translation comparison workspace",
+  "workspace.comparison.emptyStateTitle": "Start translating",
   "workspace.comparison.sourceHeader": "Source ({{locale}})",
   "workspace.comparison.targetHeader": "Translation ({{locale}})",
   "workspace.comparison.property.title": "Title",

@@ -1,4 +1,4 @@
-import type { FormSchema } from "@form-engine-ts/core";
+import type { AsyncTranslationAdapter, FormSchema } from "@form-engine-ts/core";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { TargetLocaleHeaderToolbar, TranslationComparisonWorkspace } from "../src";
 
@@ -14,6 +14,11 @@ const schema: FormSchema = {
 const multiLocaleSchema: FormSchema = {
   ...schema,
   supportedLocales: ["en", "ja", "fr"]
+};
+
+const sourceOnlySchema: FormSchema = {
+  ...schema,
+  supportedLocales: ["en"]
 };
 
 describe("TranslationComparisonWorkspace", () => {
@@ -273,5 +278,160 @@ describe("TranslationComparisonWorkspace", () => {
     expect(screen.getByText("訳文 (ja) · タイトル")).toBeInTheDocument();
     expect(screen.queryByText("訳文 (ja) · Name")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "訳文 (ja) · Name" })).toBeInTheDocument();
+  });
+
+  it("shows an actionable empty state until a target locale is added", () => {
+    const onLocaleAdded = vi.fn();
+    render(
+      <TranslationComparisonWorkspace
+        schema={sourceOnlySchema}
+        availableLocales={[{ locale: "ja", label: "Japanese" }]}
+        emptyState={{ title: "Begin translation", description: "Choose a language.", action: "Add target" }}
+        onLocaleAdded={onLocaleAdded}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    expect(screen.getByTestId("translation-comparison-empty-state")).toHaveTextContent("Begin translation");
+    expect(screen.getByText("Choose a language.")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Translate all" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("translation-source-column-header")).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Select a locale to add" }));
+    fireEvent.click(screen.getByRole("option", { name: "Japanese" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add target" }));
+
+    expect(onLocaleAdded).toHaveBeenCalledWith("ja");
+    expect(screen.queryByTestId("translation-comparison-empty-state")).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    expect(screen.getByTestId("translation-source-column-header")).toBeInTheDocument();
+  });
+
+  it("passes resolved empty-state props and prevents read-only locale mutations", () => {
+    const onLocaleAdded = vi.fn();
+    const renderEmptyState = vi.fn(({ title, description, action, canAddLocale, readOnly }) => (
+      <div data-testid="custom-empty-state">
+        {title}|{description}|{action}|{String(canAddLocale)}|{String(readOnly)}
+      </div>
+    ));
+    render(
+      <TranslationComparisonWorkspace
+        schema={sourceOnlySchema}
+        availableLocales={["ja"]}
+        readOnly
+        onLocaleAdded={onLocaleAdded}
+        slots={{ renderEmptyState }}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    expect(screen.getByTestId("custom-empty-state")).toHaveTextContent(
+      "Start translating|No target languages are configured.|Add language|false|true"
+    );
+    expect(renderEmptyState).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceLocale: "en", localeCandidates: [expect.objectContaining({ locale: "ja" })] })
+    );
+    expect(onLocaleAdded).not.toHaveBeenCalled();
+  });
+
+  it("lets a unified locale toolbar replace the existing locale slots", () => {
+    const renderTargetLocaleSelector = vi.fn();
+    const renderLocaleActions = vi.fn();
+    const renderLocaleToolbar = vi.fn((props) => (
+      <button type="button" onClick={() => props.onTargetLocaleChange("fr")}>
+        {props.sourceLocaleLabel} to {props.targetLocaleLabel}
+      </button>
+    ));
+    render(
+      <TranslationComparisonWorkspace
+        schema={multiLocaleSchema}
+        targetLocale="ja"
+        availableLocales={["de"]}
+        slots={{ renderLocaleToolbar, renderTargetLocaleSelector, renderLocaleActions }}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "en to ja" })).toBeInTheDocument();
+    expect(renderLocaleToolbar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceLocale: "en",
+        targetLocale: "ja",
+        targetLocales: ["ja", "fr"],
+        localeSelectorMode: "tabs",
+        actions: expect.objectContaining({ add: expect.any(Object), remove: expect.any(Object) })
+      })
+    );
+    expect(renderTargetLocaleSelector).not.toHaveBeenCalled();
+    expect(renderLocaleActions).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "en to ja" }));
+    expect(screen.getByText("Translation (fr)")).toBeInTheDocument();
+  });
+
+  it("customizes column headers and applies source and target column appearance", () => {
+    const renderColumnHeader = vi.fn(({ side, localeLabel, readOnly }) => (
+      <div>{`${side}:${localeLabel}:${String(readOnly)}`}</div>
+    ));
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        appearance={{
+          sourceColumn: { backgroundColor: "#eeeeee", borderColor: "#111111", borderWidth: 2, padding: "12px" },
+          targetColumn: { backgroundColor: "#ffffff", borderColor: "#222222", borderWidth: 1, padding: "8px" }
+        }}
+        slots={{ renderColumnHeader }}
+        i18n={{ locale: "en" }}
+      />
+    );
+
+    expect(screen.getByText("source:en:true")).toBeInTheDocument();
+    expect(screen.getByText("target:ja:false")).toBeInTheDocument();
+    expect(renderColumnHeader).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("translation-source-column-header")).toHaveStyle({
+      backgroundColor: "#eeeeee",
+      borderColor: "#111111",
+      borderWidth: "2px",
+      padding: "12px"
+    });
+    expect(screen.getByTestId("translation-target-column-form-title")).toHaveStyle({
+      backgroundColor: "#ffffff",
+      borderColor: "#222222",
+      borderWidth: "1px",
+      padding: "8px"
+    });
+  });
+
+  it("provides actionable translation state to a custom header", () => {
+    const translationAdapter: AsyncTranslationAdapter = {
+      translateText: vi.fn(async (text: string) => `ja:${text}`),
+      translateBatch: vi.fn(async (texts: readonly string[]) => texts.map((text) => `ja:${text}`))
+    };
+    const renderHeader = vi.fn((props) => (
+      <div data-testid="custom-header">
+        {String(props.hasTargetLocale)}|{String(props.canTranslateAll)}|{String(props.completionPercentage)}|
+        {String(props.error)}|{String(props.onRetry)}
+      </div>
+    ));
+    render(
+      <TranslationComparisonWorkspace
+        schema={schema}
+        targetLocale="ja"
+        translationAdapter={translationAdapter}
+        slots={{ renderHeader }}
+      />
+    );
+
+    expect(screen.getByTestId("custom-header")).toHaveTextContent("true|true|0|undefined|undefined");
+    expect(renderHeader).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hasTargetLocale: true,
+        canTranslateAll: true,
+        completionPercentage: 0,
+        onTranslateAll: expect.any(Function),
+        onCancel: expect.any(Function)
+      })
+    );
   });
 });

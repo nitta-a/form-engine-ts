@@ -2,6 +2,7 @@ import type { FormEngineTranslationKey } from "../keys";
 
 export const JA_COMPARISON_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   "workspace.comparison.title": "翻訳比較ワークスペース",
+  "workspace.comparison.emptyStateTitle": "翻訳を始める",
   "workspace.comparison.sourceHeader": "原文 ({{locale}})",
   "workspace.comparison.targetHeader": "訳文 ({{locale}})",
   "workspace.comparison.property.title": "タイトル",
@@ -300,6 +301,7 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "workspace.empty.noTargetLocales": "翻訳先の言語が設定されていません。",
   "workspace.empty.noSlotsToTranslate": "この言語には翻訳項目がありません。",
   "workspace.comparison.title": "翻訳比較ワークスペース",
+  "workspace.comparison.emptyStateTitle": "翻訳を始める",
   "workspace.comparison.sourceHeader": "原文 ({{locale}})",
   "workspace.comparison.targetHeader": "訳文 ({{locale}})",
   "workspace.comparison.property.title": "タイトル",

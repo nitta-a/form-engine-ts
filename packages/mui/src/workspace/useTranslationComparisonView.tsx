@@ -137,15 +137,34 @@ export function useTranslationComparisonView(
   };
   const errorMessage =
     comparison.error === undefined ? undefined : workspaceErrorMessage(comparison.error, translate, getLocaleLabel);
+  const hasTargetLocale = comparison.targetLocales.length > 0;
+  const canTranslateAll =
+    hasTargetLocale &&
+    comparison.items.length > 0 &&
+    translationAdapter !== undefined &&
+    !readOnly &&
+    !comparison.isTranslating;
+  const completionPercentage = hasTargetLocale
+    ? comparison.summary.total === 0
+      ? 100
+      : Math.round((comparison.summary.translated / comparison.summary.total) * 100)
+    : undefined;
+  const translateAll = () => void comparison.translateAll();
+  const canRetry = comparison.error !== undefined && comparison.error.type !== "cancelled" && canTranslateAll;
   const headerProps: TranslationComparisonHeaderProps = {
     sourceLocale: comparison.sourceLocale,
     targetLocale: comparison.targetLocale,
     sourceLocaleLabel,
     targetLocaleLabel,
     summary: comparison.summary,
-    onTranslateAll: () => void comparison.translateAll(),
+    onTranslateAll: translateAll,
     isTranslating: comparison.isTranslating,
     readOnly,
+    hasTargetLocale,
+    canTranslateAll,
+    ...(completionPercentage === undefined ? {} : { completionPercentage }),
+    ...(comparison.error === undefined ? {} : { error: comparison.error }),
+    ...(canRetry ? { onRetry: translateAll } : {}),
     ...(comparison.report === undefined ? {} : { report: comparison.report }),
     ...(comparison.progress === undefined ? {} : { progress: comparison.progress }),
     onCancel: comparison.cancelTranslation
