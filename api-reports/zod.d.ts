@@ -1,10 +1,16 @@
-import { FormSchema, FormValues, FormField, JsonValue } from '@form-engine-ts/core';
+import { FormSchema, FormValues, FormField, RadioTextAnswer, JsonValue } from '@form-engine-ts/core';
 import { z } from 'zod';
 
 interface CreateZodFormSchemaOptions {
     readonly pageIndex?: number;
 }
-type ValueForField<TField extends FormField> = TField["type"] extends "number" | "rating" ? number : TField["type"] extends "checkbox" ? boolean : TField["type"] extends "multi-select" ? readonly string[] : string;
+type RadioTextEnabled<TField extends FormField> = TField extends {
+    readonly type: "radio";
+    readonly options: readonly (infer TOption)[];
+} ? Extract<TOption, {
+    readonly textInput: true;
+}> extends never ? false : true : false;
+type ValueForField<TField extends FormField> = TField["type"] extends "number" | "rating" ? number : TField["type"] extends "checkbox" ? boolean : TField["type"] extends "multi-select" ? readonly string[] : TField["type"] extends "radio" ? RadioTextEnabled<TField> extends true ? string | RadioTextAnswer : string : string;
 type FieldsForSchema<TSchema extends FormSchema> = TSchema["fields"][number];
 type FieldIds<TSchema extends FormSchema> = FieldsForSchema<TSchema>["id"];
 type RequiredFieldIds<TSchema extends FormSchema> = FieldsForSchema<TSchema> extends infer TField ? TField extends FormField ? TField["required"] extends true ? TField["id"] : never : never : never;

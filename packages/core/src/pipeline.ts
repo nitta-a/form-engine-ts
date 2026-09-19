@@ -15,6 +15,7 @@ import type {
   UnifiedSubmissionStorageAdapter
 } from "./types";
 import { type PrivacyEngine, validateAnswers } from "./validation";
+import { isFormValue } from "./value";
 
 export interface SubmissionCodecResult<
   TValues extends Readonly<Record<string, unknown>> = Readonly<Record<string, unknown>>
@@ -116,16 +117,6 @@ function normalizeCodecFailure(error: unknown): FormSubmissionError {
     "Submission values are invalid.",
     error,
     Object.keys(fieldErrors).length ? fieldErrors : undefined
-  );
-}
-
-function isFormValue(value: unknown): value is FormValue {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
   );
 }
 

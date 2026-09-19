@@ -13,7 +13,10 @@ import {
   getFormAcceptanceStatus,
   getFormContentMode,
   isFormSubmissionSerializedError,
+  isFormValue,
+  isRadioTextAnswer,
   type SubmissionGuardContext,
+  selectedOptionId,
   selectVisibleAnswers,
   shuffleOptions,
   type TranslationAdapter,
@@ -60,6 +63,7 @@ import type {
   FormSubmitStatus,
   FormSubmittedAnswerItem,
   FormSuccessRenderMode,
+  RadioTextInputSlotProps,
   RenderSubmitButtonProps,
   SubmissionConfirmationOptions,
   SubmissionConfirmationRenderMode,
@@ -124,6 +128,30 @@ function optionAccessibleName(
   a11y: FieldComponentProps["a11y"]
 ): string {
   return a11y?.optionAriaLabelGenerator?.(option.id, option.label) ?? option.label;
+}
+
+function defaultRadioTextInput({
+  inputId,
+  label,
+  value,
+  disabled,
+  readOnly,
+  onChange
+}: RadioTextInputSlotProps): ReactNode {
+  return (
+    <label className="fe-radio-text-input" htmlFor={inputId}>
+      <span>{label}</span>
+      <input
+        id={inputId}
+        type="text"
+        value={value}
+        disabled={disabled}
+        readOnly={readOnly}
+        aria-label={label}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+    </label>
+  );
 }
 
 function RequiredMark({
@@ -251,6 +279,8 @@ function DefaultField({
   submitStatus,
   submittedValue,
   renderChoiceOptionAfter,
+  renderRadioTextInput,
+  radioTextInputEnabled,
   ...props
 }: FieldComponentProps & {
   readonly groupedChoiceFields: boolean;
@@ -262,9 +292,12 @@ function DefaultField({
   readonly submitStatus?: FormSubmitStatus | undefined;
   readonly submittedValue?: unknown;
   readonly renderChoiceOptionAfter?: FormRendererSlots["renderChoiceOptionAfter"];
+  readonly renderRadioTextInput?: FormRendererSlots["renderRadioTextInput"];
+  readonly radioTextInputEnabled: boolean;
   readonly optionOrderSeed?: string;
 }) {
   const { field, value, setValue, inputId, error, translate } = props;
+  const selectedOption = selectedOptionId(value);
   const orderedOptions =
     "options" in field && field.shuffleOptions === true && props.optionOrderSeed !== undefined
       ? shuffleOptions(field.options, props.optionOrderSeed)
@@ -371,60 +404,85 @@ function DefaultField({
           <div className={joinClassNames("fe-choice-options", props.classNames?.choiceOptions)}>
             {orderedOptions.map((option, index) => {
               const optionId = `${inputId}-${index}`;
-              const checked = isRadio ? value === option.id : selected.includes(option.id);
+              const checked = isRadio ? selectedOption === option.id : selected.includes(option.id);
+              const radioField = field.type === "radio" ? field : undefined;
+              const textInput =
+                radioTextInputEnabled && radioField !== undefined && checked && option.textInput === true
+                  ? (renderRadioTextInput ?? defaultRadioTextInput)({
+                      field: radioField,
+                      option,
+                      inputId: `${optionId}-text`,
+                      value: isRadioTextAnswer(value) && value.optionId === option.id ? value.text : "",
+                      label: translate("form.optionText", { option: option.label }),
+                      ...(disabled === undefined ? {} : { disabled }),
+                      ...(readOnly === undefined ? {} : { readOnly }),
+                      onChange: (text) => setValue({ optionId: option.id, text })
+                    })
+                  : null;
               return (
-                <label
-                  className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)}
-                  htmlFor={optionId}
-                  key={option.id}
-                >
-                  <input
-                    id={optionId}
-                    className={props.classNames?.fieldInput}
-                    name={field.id}
-                    type={isRadio ? "radio" : "checkbox"}
-                    value={option.id}
-                    checked={checked}
-                    aria-label={optionAccessibleName(option, props.a11y)}
-                    aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
-                    aria-invalid={error === undefined ? undefined : true}
-                    aria-required={isRadio && field.required ? true : undefined}
-                    required={isRadio && field.required}
-                    disabled={disabled}
-                    readOnly={readOnly}
-                    onKeyDown={
-                      isRadio
-                        ? (event) => {
-                            if (
-                              event.key !== "ArrowDown" &&
-                              event.key !== "ArrowRight" &&
-                              event.key !== "ArrowUp" &&
-                              event.key !== "ArrowLeft"
-                            )
-                              return;
-                            event.preventDefault();
-                            const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
-                            const nextIndex = (index + offset + orderedOptions.length) % orderedOptions.length;
-                            const nextOption = orderedOptions[nextIndex];
-                            if (nextOption === undefined) return;
-                            setValue(nextOption.id);
-                            document.getElementById(`${inputId}-${nextIndex}`)?.focus();
-                          }
-                        : undefined
-                    }
-                    onChange={(event) => {
-                      if (isRadio) setValue(option.id);
-                      else
-                        setValue(
-                          event.currentTarget.checked
-                            ? [...selected, option.id]
-                            : selected.filter((item) => item !== option.id)
-                        );
-                    }}
-                  />
-                  <span>{option.label}</span>
-                  {renderChoiceOptionAfter?.({ field, option, checked })}
-                </label>
+                <Fragment key={option.id}>
+                  <label
+                    className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)}
+                    htmlFor={optionId}
+                  >
+                    <input
+                      id={optionId}
+                      className={props.classNames?.fieldInput}
+                      name={field.id}
+                      type={isRadio ? "radio" : "checkbox"}
+                      value={option.id}
+                      checked={checked}
+                      aria-label={optionAccessibleName(option, props.a11y)}
+                      aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
+                      aria-invalid={error === undefined ? undefined : true}
+                      aria-required={isRadio && field.required ? true : undefined}
+                      required={isRadio && field.required}
+                      disabled={disabled}
+                      readOnly={readOnly}
+                      onKeyDown={
+                        isRadio
+                          ? (event) => {
+                              if (
+                                event.key !== "ArrowDown" &&
+                                event.key !== "ArrowRight" &&
+                                event.key !== "ArrowUp" &&
+                                event.key !== "ArrowLeft"
+                              )
+                                return;
+                              event.preventDefault();
+                              const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+                              const nextIndex = (index + offset + orderedOptions.length) % orderedOptions.length;
+                              const nextOption = orderedOptions[nextIndex];
+                              if (nextOption === undefined) return;
+                              setValue(
+                                radioTextInputEnabled && nextOption.textInput === true
+                                  ? { optionId: nextOption.id, text: "" }
+                                  : nextOption.id
+                              );
+                              document.getElementById(`${inputId}-${nextIndex}`)?.focus();
+                            }
+                          : undefined
+                      }
+                      onChange={(event) => {
+                        if (isRadio)
+                          setValue(
+                            radioTextInputEnabled && option.textInput === true
+                              ? { optionId: option.id, text: "" }
+                              : option.id
+                          );
+                        else
+                          setValue(
+                            event.currentTarget.checked
+                              ? [...selected, option.id]
+                              : selected.filter((item) => item !== option.id)
+                          );
+                      }}
+                    />
+                    <span>{option.label}</span>
+                    {renderChoiceOptionAfter?.({ field, option, checked })}
+                  </label>
+                  {textInput}
+                </Fragment>
               );
             })}
           </div>
@@ -446,27 +504,46 @@ function DefaultField({
           </legend>
           {orderedOptions.map((option, index) => {
             const optionId = `${inputId}-${index}`;
+            const checked = selectedOption === option.id;
+            const textInput =
+              radioTextInputEnabled && checked && option.textInput === true
+                ? (renderRadioTextInput ?? defaultRadioTextInput)({
+                    field,
+                    option,
+                    inputId: `${optionId}-text`,
+                    value: isRadioTextAnswer(value) && value.optionId === option.id ? value.text : "",
+                    label: translate("form.optionText", { option: option.label }),
+                    ...(disabled === undefined ? {} : { disabled }),
+                    ...(readOnly === undefined ? {} : { readOnly }),
+                    onChange: (text) => setValue({ optionId: option.id, text })
+                  })
+                : null;
             return (
-              <label
-                className={joinClassNames("fe-check-label", props.classNames?.choiceOption)}
-                htmlFor={optionId}
-                key={option.id}
-              >
-                <input
-                  {...ariaProps}
-                  id={optionId}
-                  className={props.classNames?.fieldInput}
-                  name={field.id}
-                  type="radio"
-                  value={option.id}
-                  checked={value === option.id}
-                  aria-label={optionAccessibleName(option, props.a11y)}
-                  required={field.required}
-                  onChange={() => setValue(option.id)}
-                />
-                <span>{option.label}</span>
-                {renderChoiceOptionAfter?.({ field, option, checked: value === option.id })}
-              </label>
+              <Fragment key={option.id}>
+                <label className={joinClassNames("fe-check-label", props.classNames?.choiceOption)} htmlFor={optionId}>
+                  <input
+                    {...ariaProps}
+                    id={optionId}
+                    className={props.classNames?.fieldInput}
+                    name={field.id}
+                    type="radio"
+                    value={option.id}
+                    checked={checked}
+                    aria-label={optionAccessibleName(option, props.a11y)}
+                    required={field.required}
+                    onChange={() =>
+                      setValue(
+                        radioTextInputEnabled && option.textInput === true
+                          ? { optionId: option.id, text: "" }
+                          : option.id
+                      )
+                    }
+                  />
+                  <span>{option.label}</span>
+                  {renderChoiceOptionAfter?.({ field, option, checked })}
+                </label>
+                {textInput}
+              </Fragment>
             );
           })}
           <FieldMessage props={props} />
@@ -844,16 +921,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isFormValue(value: unknown): value is FormValue {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value)) ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
-  );
-}
-
 function displaySubmittedValue(field: FormField, value: unknown, translate: (key: string) => string): string {
   if (value === undefined || value === null) return "";
   if (field.type === "checkbox") return value === true ? translate("form.yes") : translate("form.no");
@@ -861,8 +928,11 @@ function displaySubmittedValue(field: FormField, value: unknown, translate: (key
     const labels = new Map(field.options.map((option) => [option.id, option.label]));
     return value.map((item) => labels.get(item) ?? item).join(", ");
   }
-  if ((field.type === "radio" || field.type === "select") && typeof value === "string") {
-    return field.options.find((option) => option.id === value)?.label ?? value;
+  if (field.type === "radio" || field.type === "select") {
+    const optionId = selectedOptionId(value);
+    if (optionId === undefined) return String(value);
+    const label = field.options.find((option) => option.id === optionId)?.label ?? optionId;
+    return isRadioTextAnswer(value) && value.text.length > 0 ? `${label} — ${value.text}` : label;
   }
   if (Array.isArray(value)) return value.join(", ");
   return String(value);
@@ -2291,6 +2361,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   choiceGroupSlotProps={slotProps?.choiceGroup}
                   renderChoiceGroup={slots.renderChoiceGroup}
                   renderChoiceOptionAfter={slots.renderChoiceOptionAfter}
+                  renderRadioTextInput={slots.renderRadioTextInput}
+                  radioTextInputEnabled={getFormContentMode(form.schema.metadata) === "survey"}
                   disabled={interactionLocked}
                   submitStatus={submitState}
                   {...(submitState === "success" && activeCompletionData.answers[field.id] !== undefined
@@ -2430,6 +2502,7 @@ const RENDERER_MESSAGES: Readonly<Record<string, string>> = {
   "form.no": "No",
   "form.alreadySubmitted": "Already submitted.",
   "form.submitAnother": "Submit another response",
+  "form.optionText": "Additional text for {{option}} (optional)",
   "validation.required": "This field is required."
 };
 
@@ -2447,6 +2520,7 @@ const RENDERER_MESSAGES_JA: Readonly<Record<string, string>> = {
   "form.no": "いいえ",
   "form.alreadySubmitted": "回答済みです",
   "form.submitAnother": "別の回答を送信",
+  "form.optionText": "{{option}}の補足（任意）",
   "validation.required": "この項目は必須です"
 };
 

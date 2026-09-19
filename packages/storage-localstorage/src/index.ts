@@ -6,6 +6,7 @@ import {
   type FormLifecycleOptions,
   type FormResource,
   hashFormSubmissionPayload,
+  isFormValue,
   type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
@@ -52,7 +53,8 @@ function parseSubmission(value: string, key: string): FormSubmission {
     !Number.isInteger(parsed.formVersion) ||
     typeof parsed.locale !== "string" ||
     typeof parsed.submittedAt !== "string" ||
-    !isRecord(parsed.values)
+    !isRecord(parsed.values) ||
+    !Object.values(parsed.values).every(isFormValue)
   ) {
     throw new Error(`Stored submission at "${key}" is invalid.`);
   }

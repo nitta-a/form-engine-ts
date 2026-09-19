@@ -72,6 +72,9 @@ inline style for the default wrapper. The exported `ChoiceGroupSlotProps` includ
 option-list children. Group styling is controlled by the public `--fe-choice-group-*`, `--fe-choice-legend-*`, and
 `--fe-choice-options-gap` CSS custom properties.
 
+In survey-mode radio fields, mark an option with `textInput: true` to render an optional native text input after it.
+Customize that input with `slots.renderRadioTextInput`; changing to another option clears the supplement.
+
 `groupedChoiceFields={true}` remains available as a deprecated compatibility alias.
 
 Define `schema.pages` to enable Back/Next navigation, page validation, conditional page skipping, and an accessible

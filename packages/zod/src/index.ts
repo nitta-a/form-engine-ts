@@ -5,6 +5,7 @@ import {
   type FormSchema,
   type FormValues,
   type JsonValue,
+  type RadioTextAnswer,
   validateAnswers,
   validatePageAnswers
 } from "@form-engine-ts/core";
@@ -29,13 +30,26 @@ export interface CreateZodFormSchemaOptions {
   readonly pageIndex?: number;
 }
 
+type RadioTextEnabled<TField extends FormField> = TField extends {
+  readonly type: "radio";
+  readonly options: readonly (infer TOption)[];
+}
+  ? Extract<TOption, { readonly textInput: true }> extends never
+    ? false
+    : true
+  : false;
+
 type ValueForField<TField extends FormField> = TField["type"] extends "number" | "rating"
   ? number
   : TField["type"] extends "checkbox"
     ? boolean
     : TField["type"] extends "multi-select"
       ? readonly string[]
-      : string;
+      : TField["type"] extends "radio"
+        ? RadioTextEnabled<TField> extends true
+          ? string | RadioTextAnswer
+          : string
+        : string;
 
 type FieldsForSchema<TSchema extends FormSchema> = TSchema["fields"][number];
 type FieldIds<TSchema extends FormSchema> = FieldsForSchema<TSchema>["id"];

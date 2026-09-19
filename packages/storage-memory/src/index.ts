@@ -14,13 +14,14 @@ import {
   type FormLifecycleOptions,
   type FormResource,
   hashFormSubmissionPayload,
+  isRadioTextAnswer,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize,
   type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
 function cloneValue(value: FormValue): FormValue {
-  return Array.isArray(value) ? [...value] : value;
+  return Array.isArray(value) ? [...value] : isRadioTextAnswer(value) ? { ...value } : value;
 }
 
 function cloneValues(values: FormValues): FormValues {

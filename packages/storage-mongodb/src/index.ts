@@ -6,7 +6,6 @@ import type {
   FormSubmission,
   FormSubmissionValidationSource,
   FormSubmissionValidator,
-  FormValue,
   FormVersionRecord,
   FormVersionState,
   JsonValue,
@@ -40,6 +39,8 @@ import {
   type FormLifecycleOptions,
   type FormResource,
   hashFormSubmissionPayload,
+  isFormValue,
+  isRadioTextAnswer,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize,
   type ValidateFormSchemaOptions
@@ -230,16 +231,6 @@ function cloneJson<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFormValue(value: unknown): value is FormValue {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value)) ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
-  );
 }
 
 function parseSubmission(value: unknown, location: string): FormSubmission {
@@ -992,10 +983,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
         ...(options.version === undefined ? {} : { formVersion: options.version }),
         ...(options.locale === undefined ? {} : { "submission.locale": options.locale }),
         ...(submittedAt === undefined ? {} : { submittedAt }),
-        ...(cursor === undefined ? {} : { _id: { $gte: cursor.responseId } }),
-        ...(requestedFieldIds?.length === 1
-          ? { [`submission.values.${requestedFieldIds[0]}`]: { $type: "string" } }
-          : {})
+        ...(cursor === undefined ? {} : { _id: { $gte: cursor.responseId } })
       };
       const serverFilters: Document[] = [baseFilter];
       if (options.filter !== undefined && typeof options.filter !== "function") {
@@ -1017,7 +1005,8 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
               ? Object.entries(submission.values)
               : requestedFieldIds.map((fieldId) => [fieldId, submission.values[fieldId]] as const);
           return entries.flatMap(([fieldId, text]) => {
-            if (typeof text !== "string" || text.length === 0) return [];
+            const answerText = typeof text === "string" ? text : isRadioTextAnswer(text) ? text.text : "";
+            if (answerText.length === 0) return [];
             if (
               cursor !== undefined &&
               (submission.id < cursor.responseId || (submission.id === cursor.responseId && fieldId <= cursor.fieldId))
@@ -1030,7 +1019,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
                 formId: submission.formId,
                 formVersion: submission.formVersion,
                 fieldId,
-                text,
+                text: answerText,
                 ...(submission.locale === undefined ? {} : { locale: submission.locale }),
                 submittedAt: submission.submittedAt,
                 ...(submission.metadata === undefined

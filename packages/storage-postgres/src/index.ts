@@ -1,7 +1,6 @@
 import type {
   FormSchema,
   FormSubmission,
-  FormValue,
   PagedSubmissionStorageAdapter,
   SaveSubmissionOptions,
   SubmissionSaveResult
@@ -15,6 +14,7 @@ import {
   type FormLifecycleOptions,
   type FormResource,
   hashFormSubmissionPayload,
+  isFormValue,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize,
   type ValidateFormSchemaOptions
@@ -51,16 +51,6 @@ interface SubmissionRow {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFormValue(value: unknown): value is FormValue {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value)) ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
-  );
 }
 
 function cloneJson<T>(value: T): T {

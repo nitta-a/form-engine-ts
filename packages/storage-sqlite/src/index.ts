@@ -2,7 +2,6 @@ import type {
   FormSchema,
   FormStorageAdapter,
   FormSubmission,
-  FormValue,
   SaveSubmissionOptions,
   SubmissionSaveResult
 } from "@form-engine-ts/core";
@@ -13,6 +12,7 @@ import {
   type FormLifecycleOptions,
   type FormResource,
   hashFormSubmissionPayload,
+  isFormValue,
   type ValidateFormSchemaOptions
 } from "@form-engine-ts/core";
 
@@ -49,16 +49,6 @@ interface SubmissionRow {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFormValue(value: unknown): value is FormValue {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value)) ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
-  );
 }
 
 function cloneJson<T>(value: T): T {

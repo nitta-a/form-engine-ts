@@ -407,4 +407,33 @@ describe("MUI content result views", () => {
     expect(screen.getByText("集計結果")).toBeInTheDocument();
     for (const progress of screen.getAllByRole("progressbar")) expect(progress).toHaveAttribute("aria-valuenow", "100");
   });
+
+  it("renders and submits optional radio text with the MUI slot", async () => {
+    const schema: FormSchema = {
+      id: "mui-radio-text",
+      version: 1,
+      title: "Radio text",
+      defaultLocale: "en",
+      supportedLocales: ["en"],
+      fields: [
+        {
+          id: "choice",
+          type: "radio",
+          title: "Choice",
+          required: true,
+          options: [
+            { id: "yes", label: "Yes" },
+            { id: "other", label: "Other", textInput: true }
+          ]
+        }
+      ]
+    };
+    const onSubmit = vi.fn(async () => undefined);
+    render(<MuiContentRenderer schema={schema} locale="en" onSubmit={onSubmit} />);
+
+    await userEvent.click(screen.getByRole("radio", { name: "Other" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Additional text for Other (optional)" }), "Details");
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(onSubmit).toHaveBeenCalledWith({ choice: { optionId: "other", text: "Details" } }, expect.anything());
+  });
 });

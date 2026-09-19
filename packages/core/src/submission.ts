@@ -13,6 +13,7 @@ import type {
   StrictFormSubmissionWire
 } from "./types";
 import { type FormSubmissionValidationSource, type SubmissionValidationResult, validateAnswers } from "./validation";
+import { isFormValue, isRadioTextAnswer } from "./value";
 import { selectVisibleAnswers } from "./visibility";
 
 export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
@@ -28,7 +29,10 @@ export interface CreateSubmissionOptions<TMeta extends BaseSubmissionMetadata = 
 
 function cloneValues(values: FormValues): FormValues {
   return Object.fromEntries(
-    Object.entries(values).map(([key, value]) => [key, Array.isArray(value) ? Object.freeze([...value]) : value])
+    Object.entries(values).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? Object.freeze([...value]) : isRadioTextAnswer(value) ? Object.freeze({ ...value }) : value
+    ])
   );
 }
 
@@ -74,16 +78,6 @@ function toFormValues(answers: Readonly<Record<string, unknown>>): FormValues {
     if (isFormValue(value)) values[key] = value;
   }
   return values;
-}
-
-function isFormValue(value: unknown): value is FormValues[string] {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
-  );
 }
 
 export interface ToWireOptions {

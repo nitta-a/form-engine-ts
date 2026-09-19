@@ -32,6 +32,9 @@ section with `submissionSettingsOptions={{ enabled: true }}` and use `layoutOpti
 focuses the active question title only after `activeFieldId` changes, not during the initial mount.
 Pass `activeFieldId={undefined}` explicitly for the common settings view; omit it to retain the single-mode default.
 
+Survey radio options expose an **Allow additional text** checkbox. `MuiContentRenderer` uses the same
+`renderRadioTextInput` slot and provides a MUI `TextField` by default.
+
 `TranslationComparisonWorkspace` provides a responsive source/translation view: two columns at the `md` breakpoint
 and a stacked layout on smaller screens. Its source panel is read-only, while the target panel exposes status badges,
 manual editing, stale-source highlighting, single-slot automatic translation, and standard batch progress, retry, and

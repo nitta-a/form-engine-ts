@@ -121,6 +121,10 @@ Core supports `text`, `textarea`, `number`, `rating`, `date`, `time`, `email`, `
 string fields receive format validation and native input semantics in the React renderer. Choice fields support
 deterministic `shuffleOptions` ordering, with `FieldOption.pinned` preserving selected positions.
 
+For survey radio fields, set `textInput: true` on an option to accept an optional supplement. The submitted value is
+`{ optionId, text }`; the legacy option ID string remains valid when no supplement is entered. Other field types and
+poll/quiz modes reject this setting.
+
 `submissionSettings` supports `openAt`, `closeAt`, `maxResponses`, custom closed/not-yet-open messages, and
 `honeypotFieldId`. `getFormAcceptanceStatus` provides a pure decision, while the submission pipeline rechecks
 acceptance before saving. Storage adapters must implement

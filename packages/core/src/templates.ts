@@ -56,6 +56,37 @@ function templateSchema(locale: string, schema: Omit<FormSchema, "defaultLocale"
 
 const TEMPLATE_DEFINITIONS: readonly TemplateDefinition[] = [
   {
+    id: "radio-text-survey",
+    mode: "survey",
+    name: { en: "Radio with details", ja: "補足入力付きアンケート" },
+    description: {
+      en: "Let respondents add an optional note to one radio choice.",
+      ja: "選択肢を選んだ回答者だけが任意の補足を入力できます。"
+    },
+    schema: (locale) =>
+      templateSchema(locale, {
+        id: "template-radio-text-survey",
+        version: 1,
+        title: schemaText(locale, "Radio with details", "補足入力付きアンケート"),
+        fields: [
+          {
+            id: "reason",
+            type: "radio",
+            title: schemaText(locale, "What would you like to tell us?", "どのようなご意見ですか？"),
+            required: true,
+            options: [
+              { id: "praise", label: schemaText(locale, "Something I liked", "良かった点") },
+              {
+                id: "other",
+                label: schemaText(locale, "Other", "その他"),
+                textInput: true
+              }
+            ]
+          }
+        ]
+      })
+  },
+  {
     id: "satisfaction-survey",
     mode: "survey",
     name: { en: "Satisfaction survey", ja: "満足度調査" },

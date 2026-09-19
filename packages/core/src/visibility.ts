@@ -6,6 +6,7 @@ import type {
   FormSchema,
   FormValues
 } from "./types";
+import { isRadioTextAnswer, selectedOptionId } from "./value";
 
 function isEmpty(value: unknown): boolean {
   if (value === undefined || value === null) return true;
@@ -20,6 +21,8 @@ function normalizeString(value: string): string {
 }
 
 function valuesEqual(left: unknown, right: unknown): boolean {
+  if (isRadioTextAnswer(left) && typeof right === "string") return valuesEqual(left.optionId, right);
+  if (isRadioTextAnswer(right) && typeof left === "string") return valuesEqual(left, right.optionId);
   if (typeof left === "string" && typeof right === "string") return normalizeString(left) === normalizeString(right);
   if (Array.isArray(left) && Array.isArray(right)) {
     return left.length === right.length && left.every((item, index) => valuesEqual(item, right[index]));
@@ -38,8 +41,8 @@ function evaluateFieldCondition(
   if (condition.operator === "is_not_empty" || condition.operator === "not_empty") return !isEmpty(answer);
   if (condition.operator === "contains" || condition.operator === "not_contains") {
     const contains =
-      typeof answer === "string" && typeof condition.value === "string"
-        ? normalizeString(answer).includes(normalizeString(condition.value))
+      (typeof answer === "string" || isRadioTextAnswer(answer)) && typeof condition.value === "string"
+        ? normalizeString(selectedOptionId(answer) ?? "").includes(normalizeString(condition.value))
         : Array.isArray(answer) && answer.some((item) => valuesEqual(item, condition.value));
     return condition.operator === "not_contains" ? !contains : contains;
   }
@@ -190,6 +193,7 @@ function hasProgressAnswer(value: unknown): boolean {
   if (typeof value === "string") return value.trim().length > 0;
   if (typeof value === "number") return Number.isFinite(value);
   if (Array.isArray(value)) return value.length > 0;
+  if (isRadioTextAnswer(value)) return value.optionId.length > 0;
   return value === true;
 }
 

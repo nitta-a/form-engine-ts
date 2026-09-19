@@ -27,5 +27,6 @@ export * from "./templates";
 export * from "./translation";
 export * from "./types";
 export * from "./validation";
+export * from "./value";
 export * from "./versioning";
 export * from "./visibility";

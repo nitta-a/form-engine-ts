@@ -287,6 +287,10 @@ describe("MuiFormBuilder", () => {
     await user.click(within(fieldEditor).getByRole("combobox", { name: /Type/u }));
     await user.click(screen.getByRole("option", { name: "Radio" }));
     await waitFor(() => expect(screen.getByTestId("schema-state")).toHaveTextContent('"type":"radio"'));
+    const textInputCheckbox = screen.getAllByRole("checkbox", { name: "Allow additional text" })[0];
+    if (textInputCheckbox === undefined) throw new Error("Missing radio text input checkbox");
+    await user.click(textInputCheckbox);
+    await waitFor(() => expect(screen.getByTestId("schema-state")).toHaveTextContent('"textInput":true'));
 
     await user.click(screen.getByRole("button", { name: "Move Second up" }));
     await waitFor(() =>

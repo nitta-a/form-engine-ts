@@ -1,4 +1,4 @@
-import type { FormResponse, TextAnswerItem } from "@form-engine-ts/core";
+import { type FormResponse, isRadioTextAnswer, type TextAnswerItem } from "@form-engine-ts/core";
 import type { FreeTextAnswerInput, FreeTextAnswerItem } from "./types";
 
 /** Normalizes Core text-answer pages for translation workflows. */
@@ -17,20 +17,20 @@ export function toFreeTextAnswerItems(items: readonly FreeTextAnswerInput[]): re
       };
     }
     const response: FormResponse = item;
-    return Object.entries(response.answers).flatMap(([fieldId, value]) =>
-      typeof value === "string"
-        ? [
-            {
-              id: `${response.responseId}:${fieldId}`,
-              responseId: response.responseId,
-              fieldId,
-              text: value,
-              sourceLanguage: response.sourceLocale ?? "unknown",
-              ...(response.metadata === undefined ? {} : { metadata: response.metadata })
-            }
-          ]
-        : []
-    );
+    return Object.entries(response.answers).flatMap(([fieldId, value]) => {
+      if (isRadioTextAnswer(value) && value.text.length === 0) return [];
+      if (typeof value !== "string" && !isRadioTextAnswer(value)) return [];
+      return [
+        {
+          id: `${response.responseId}:${fieldId}`,
+          responseId: response.responseId,
+          fieldId,
+          text: typeof value === "string" ? value : value.text,
+          sourceLanguage: response.sourceLocale ?? "unknown",
+          ...(response.metadata === undefined ? {} : { metadata: response.metadata })
+        }
+      ];
+    });
   });
   const seen = new Set<string>();
   for (const item of normalized) {

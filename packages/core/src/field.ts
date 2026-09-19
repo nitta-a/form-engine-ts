@@ -85,6 +85,11 @@ export function transformFieldType(field: FormField, nextType: QuestionType): Fo
   const options = "options" in field && field.options.length > 0 ? field.options : [DEFAULT_OPTION];
   const shuffleOptions = "shuffleOptions" in field && field.shuffleOptions === true ? { shuffleOptions: true } : {};
   if (nextType === "multi-select") {
+    const multiSelectOptions = options.map((option) => {
+      if (option.textInput !== true) return option;
+      const { textInput: _removed, ...remaining } = option;
+      return remaining;
+    });
     const selectionProperties =
       field.type === "multi-select"
         ? {
@@ -92,7 +97,15 @@ export function transformFieldType(field: FormField, nextType: QuestionType): Fo
             ...(field.maxSelections === undefined ? {} : { maxSelections: field.maxSelections })
           }
         : {};
-    return { ...common, ...selectionProperties, ...shuffleOptions, type: nextType, options };
+    return { ...common, ...selectionProperties, ...shuffleOptions, type: nextType, options: multiSelectOptions };
   }
-  return { ...common, ...shuffleOptions, type: nextType, options };
+  const selectOptions =
+    nextType === "select"
+      ? options.map((option) => {
+          if (option.textInput !== true) return option;
+          const { textInput: _removed, ...remaining } = option;
+          return remaining;
+        })
+      : options;
+  return { ...common, ...shuffleOptions, type: nextType, options: selectOptions };
 }

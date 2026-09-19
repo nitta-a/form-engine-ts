@@ -155,6 +155,7 @@ export type ValidationCode =
 export interface FieldOption extends ExtensibleNode {
   readonly id: string;
   readonly label: string;
+  readonly textInput?: boolean;
   readonly pinned?: boolean;
   readonly translations?: Readonly<Record<string, string>>;
 }
@@ -304,7 +305,12 @@ export interface FormSubmissionSettings extends ExtensibleNode {
   readonly honeypotFieldId?: string;
 }
 
-export type FormValue = string | number | boolean | readonly string[] | undefined;
+export interface RadioTextAnswer {
+  readonly optionId: string;
+  readonly text: string;
+}
+
+export type FormValue = string | number | boolean | readonly string[] | RadioTextAnswer | undefined;
 export type FormValues = Readonly<Record<string, FormValue>>;
 
 export interface SchemaIssue {

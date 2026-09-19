@@ -645,6 +645,7 @@ const BUILDER_DEFAULTS: Readonly<Record<string, string>> = {
   "builder.options": "Options",
   "builder.shuffleOptions": "Shuffle options for respondents",
   "builder.pinOption": "Keep this option in place",
+  "builder.optionTextInput": "Allow additional text",
   "builder.openAt": "Open at (ISO timestamp)",
   "builder.closeAt": "Close at (ISO timestamp)",
   "builder.maxResponses": "Maximum responses",
@@ -1305,6 +1306,16 @@ export function FormBuilder(props: FormBuilderProps) {
         headless.updateOption(fieldId, optionId, (option) => {
           if (pinned) return { ...option, pinned: true };
           const { pinned: _removed, ...remaining } = option;
+          return remaining;
+        }),
+      { action: "updateOption", targetId: optionId, params: { fieldId } }
+    );
+  const updateOptionTextInput = (fieldId: string, optionId: string, enabled: boolean) =>
+    executeAction(
+      () =>
+        headless.updateOption(fieldId, optionId, (option) => {
+          if (enabled) return { ...option, textInput: true };
+          const { textInput: _removed, ...remaining } = option;
           return remaining;
         }),
       { action: "updateOption", targetId: optionId, params: { fieldId } }
@@ -2462,6 +2473,15 @@ export function FormBuilder(props: FormBuilderProps) {
                                   onChange={(checked) => updateOptionPinned(field.id, option.id, checked)}
                                   label={translate("builder.pinOption")}
                                 />
+                                {field.type === "radio" && getFormContentMode(schema.metadata) === "survey" ? (
+                                  <Checkbox
+                                    className={builderClass("form-engine-builder__check")}
+                                    checked={option.textInput === true}
+                                    disabled={controls.options === "readOnly"}
+                                    onChange={(checked) => updateOptionTextInput(field.id, option.id, checked)}
+                                    label={translate("builder.optionTextInput")}
+                                  />
+                                ) : null}
                                 {ToolbarSlot === undefined ? (
                                   <>
                                     <IconButton

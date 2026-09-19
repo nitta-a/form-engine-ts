@@ -1030,6 +1030,17 @@ export interface ChoiceOptionAfterSlotProps {
   readonly checked: boolean;
 }
 
+export interface RadioTextInputSlotProps {
+  readonly field: FormField;
+  readonly option: FieldOption;
+  readonly inputId: string;
+  readonly value: string;
+  readonly label: string;
+  readonly disabled?: boolean;
+  readonly readOnly?: boolean;
+  readonly onChange: (value: string) => void;
+}
+
 export interface FormRendererSlotProps {
   readonly choiceGroup?: {
     readonly className?: string;
@@ -1101,6 +1112,7 @@ export interface FormRendererSlots {
     readonly max: number;
   }) => ReactNode;
   readonly renderChoiceOptionAfter?: (props: ChoiceOptionAfterSlotProps) => ReactNode;
+  readonly renderRadioTextInput?: (props: RadioTextInputSlotProps) => ReactNode;
   readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
 

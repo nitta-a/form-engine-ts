@@ -33,6 +33,8 @@ import {
   type FormLifecycleOptions,
   type FormResource,
   hashFormSubmissionPayload,
+  isFormValue,
+  isRadioTextAnswer,
   matchesSubmissionPageFilters,
   normalizeSubmissionPageSize,
   type ValidateFormSchemaOptions
@@ -375,7 +377,11 @@ function submissionTextAnswers(
       ? Object.entries(submission.values)
       : fieldIds.map((id): [string, FormValue] => [id, submission.values[id]]);
   return entries.flatMap(([fieldId, value]) =>
-    typeof value === "string" && value.length > 0 ? [{ fieldId, text: value }] : []
+    typeof value === "string" && value.length > 0
+      ? [{ fieldId, text: value }]
+      : isRadioTextAnswer(value) && value.text.length > 0
+        ? [{ fieldId, text: value.text }]
+        : []
   );
 }
 
@@ -385,16 +391,6 @@ function cloneJson<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isFormValue(value: unknown): value is FormValue {
-  return (
-    value === undefined ||
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value)) ||
-    (Array.isArray(value) && value.every((item) => typeof item === "string"))
-  );
 }
 
 function parseJson(value: unknown, location: string): unknown {

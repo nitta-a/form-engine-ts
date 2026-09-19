@@ -328,6 +328,7 @@ Existing `StorageAdapter`, `aggregateResponses`, and `validateContentMode` APIs 
 - Number fields expose answered/unanswered counts plus minimum, maximum, and average.
 - Rating fields default to integer values from 1 through 5 and share numeric analytics.
 - Select, radio, multi-select, and checkbox fields expose counts and percentages.
+- Survey radio options can set `textInput: true`; the renderer returns `{ optionId, text }` for the selected option and clears the supplement when selection changes.
 - `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
 - `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF and the columns are exactly `submissionId`, `submittedAt`, `locale`, then the schema-order field columns; arrays are JSON-encoded.
 - `escapeCsvCell` neutralizes formula-like strings by default and quotes commas, double quotes, CR, and LF while doubling embedded quotes.
@@ -647,6 +648,7 @@ Storage Adapterには `inspectFormDeletion` / `deleteForm` と `@form-engine-ts/
 - numberフィールドでは回答済み・未回答の件数に加え、最小値、最大値、平均値を公開します。
 - ratingは既定で1～5の整数を扱い、numberと同じ数値集計を行います。
 - select、radio、multi-select、checkboxフィールドでは件数とパーセンテージを公開します。
+- surveyモードのradio選択肢には`textInput: true`を設定でき、選択中だけ補足入力を表示します。送信値は`{ optionId, text }`で、選択を変えると補足を破棄します。
 - `exportResponsesToCsv`はデフォルトで数式形式の文字列を無害化し、UTF-8 BOM付きのRFC 4180 CSVを返します。列は正確に`submissionId`、`submittedAt`、`locale`、続いてスキーマ順の設問列です。BOMを省く場合は`{ withBom: false }`、無害化を無効にする場合は`{ neutralizeFormulas: false }`を渡します。
 - `escapeCsvCell`も同じ数式対策とRFC 4180の引用・内部引用符二重化を行う公開純粋関数です。
 
@@ -670,6 +672,7 @@ aggregation retries and are shown inside each answer input row. The selected vot
 simulate closing, result access and request failures. One-vote identity is scoped to
 this browser and form, across versions; clearing browser data resets it. Production
 hosts must enforce identity/access at persistence. Existing workspaces remain available.
+The Survey template picker includes **Radio with details**, an executable example of an optional supplement on one radio option.
 Published consumers can use the focused MUI `/builder`, `/renderer`, `/survey-summary`
 and `/survey-domain` subpaths while the v7 root export remains compatible.
 For a design-system-neutral respondent screen, import `ContentRenderer` from
@@ -685,7 +688,7 @@ preview の **フォーム一覧** から、共通の Memory / LocalStorage 保�
 操作できます。有効なスキーマを保存してから回答画面を開きます。空のアンケートは最初の
 設問を保存するまで編集中のドラフトとして保持します。投票は公開タイミング4種類と集計だけの
 再試行に対応し、結果は各回答INPUT行の中に進捗・票数・割合として表示します。投票直後は集計取得を待たずに選択肢へ楽観的に反映します。投票済みの回答者には、`after_submit`でも再送信なしに初期表示から結果を表示します。クイズは選択直後・送信後の解説、ローカル／サーバー判定、特典表示に対応します。Coreはmode固有の不正なスキーマを保存前に拒否します。締切・閲覧権限・通信失敗をデモ操作で
-切り替えられます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
+切り替えられます。surveyのテンプレート選択には補足入力付きradioの実行例も含まれます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
 ブラウザーデータを削除するとリセットされます。本番の識別・権限制御は保存処理で強制してください。
 既存デモの各ワークスペースも引き続き利用できます。
 MUIに依存しない回答画面は`@form-engine-ts/react`の`ContentRenderer`を使い、

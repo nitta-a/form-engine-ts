@@ -74,6 +74,20 @@ export function createMuiOptionEditorSlot(options?: MuiAdapterOptions): Componen
             }
           />
         )}
+        {Checkbox === undefined || field.type !== "radio" || getFormContentMode(schema.metadata) !== "survey" ? null : (
+          <Checkbox
+            checked={option.textInput === true}
+            disabled={readOnly}
+            label={translate("builder.optionTextInput")}
+            onChange={(checked) =>
+              actions.updateOption(field.id, option.id, (current) => {
+                if (checked) return { ...current, textInput: true };
+                const { textInput: _removed, ...remaining } = current;
+                return remaining;
+              })
+            }
+          />
+        )}
         {currentLocale.length === 0 ? null : (
           <TextInput
             id={`mui-option-${option.id}-${currentLocale}`}

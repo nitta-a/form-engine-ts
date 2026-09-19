@@ -9,6 +9,7 @@ import type {
   ValidationCode,
   ValidationIssue
 } from "./types";
+import { isRadioTextAnswer, selectedOptionId } from "./value";
 import { calculateFieldVisibility } from "./visibility";
 
 export interface SensitiveDataFinding {
@@ -230,9 +231,19 @@ function validateField(field: FormField, value: FormValue, issues: ValidationIss
     return;
   }
 
-  if (typeof value !== "string") {
+  if (isRadioTextAnswer(value)) {
+    if (field.type !== "radio") {
+      addIssue(issues, field, "invalid_type");
+      return;
+    }
+    const option = field.options.find((candidate) => candidate.id === value.optionId);
+    if (option === undefined || option.textInput !== true) addIssue(issues, field, "invalid_option");
+    return;
+  }
+  const optionId = selectedOptionId(value);
+  if (typeof optionId !== "string") {
     addIssue(issues, field, "invalid_type");
-  } else if (!allowed.has(value)) {
+  } else if (!allowed.has(optionId)) {
     addIssue(issues, field, "invalid_option");
   }
 }

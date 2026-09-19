@@ -20,10 +20,11 @@ import {
   type PollResultsLoadingProps,
   type QuizResultSummaryProps,
   type QuizShareOptions,
+  type RadioTextInputSlotProps,
   type TypedFormRendererProps,
   useShare
 } from "@form-engine-ts/react";
-import { Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, Typography } from "@mui/material";
+import { Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, TextField, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import { muiContentTranslation } from "./contentTranslation";
 import { MuiFormBuilderContext } from "./context";
@@ -363,6 +364,22 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
       contentSlots?.renderDraftResume ??
       ((draft) => <MuiDraftResume props={draft} locale={locale} {...(i18n === undefined ? {} : { i18n })} />),
     renderChoiceGroup: slots?.renderChoiceGroup ?? MuiChoiceGroupSlot,
+    renderRadioTextInput:
+      contentSlots?.renderRadioTextInput ??
+      ((input: RadioTextInputSlotProps) => (
+        <TextField
+          {...muiOptions?.muiSlotProps?.textField}
+          id={input.inputId}
+          label={input.label}
+          value={input.value}
+          disabled={input.disabled}
+          slotProps={{ input: { readOnly: input.readOnly } }}
+          size={muiOptions?.size ?? "medium"}
+          variant={muiOptions?.variant ?? "outlined"}
+          fullWidth={muiOptions?.inputFullWidth ?? muiOptions?.fullWidth ?? true}
+          onChange={(event) => input.onChange(event.currentTarget.value)}
+        />
+      )),
     renderQuizFeedback:
       contentSlots?.renderQuizFeedback ??
       ((feedback) => (

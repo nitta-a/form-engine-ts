@@ -15,6 +15,7 @@ import type {
   QuestionAggregate
 } from "./types";
 import { validateFieldValue } from "./validation";
+import { selectedOptionId } from "./value";
 import { calculateFieldVisibility, selectVisibleAnswers } from "./visibility";
 
 export interface ChoiceDistributionEntry {
@@ -40,7 +41,10 @@ export function calculateChoiceDistribution(
   const counts = new Map<string, number>();
   for (const response of responses) {
     const value = response.values[questionId];
-    const selections = new Set(Array.isArray(value) ? value : typeof value === "string" && value !== "" ? [value] : []);
+    const selection = selectedOptionId(value);
+    const selections = new Set(
+      Array.isArray(value) ? value : selection === undefined || selection === "" ? [] : [selection]
+    );
     for (const selection of selections) counts.set(selection, (counts.get(selection) ?? 0) + 1);
   }
   return Object.fromEntries(
@@ -71,9 +75,9 @@ export function calculateCrossTabulation(
   const colTotals: Record<string, number> = {};
   let grandTotal = 0;
   for (const response of responses) {
-    const row = response.values[rowQuestionId];
-    const col = response.values[colQuestionId];
-    if (typeof row !== "string" || row.length === 0 || typeof col !== "string" || col.length === 0) continue;
+    const row = selectedOptionId(response.values[rowQuestionId]);
+    const col = selectedOptionId(response.values[colQuestionId]);
+    if (row === undefined || row.length === 0 || col === undefined || col.length === 0) continue;
     matrix[row] ??= {};
     matrix[row][col] = (matrix[row][col] ?? 0) + 1;
     rowTotals[row] = (rowTotals[row] ?? 0) + 1;
@@ -141,7 +145,8 @@ function aggregateField(
   if (!("options" in field)) throw new TypeError(`Field ${field.id} cannot be aggregated.`);
   const optionCounts = new Map(field.options.map((option) => [option.id, 0]));
   for (const value of values) {
-    const selections = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+    const selection = selectedOptionId(value);
+    const selections = Array.isArray(value) ? value : selection === undefined ? [] : [selection];
     for (const selection of selections) optionCounts.set(selection, (optionCounts.get(selection) ?? 0) + 1);
   }
   const aggregate: ChoiceQuestionAggregate = {
@@ -319,7 +324,8 @@ class IncrementalResponseAccumulator implements ResponseAccumulator {
         if (candidate === true) accumulator.trueCount += 1;
         if (candidate === false) accumulator.falseCount += 1;
       } else if ("options" in field) {
-        const selections = Array.isArray(candidate) ? candidate : typeof candidate === "string" ? [candidate] : [];
+        const selection = selectedOptionId(candidate);
+        const selections = Array.isArray(candidate) ? candidate : selection === undefined ? [] : [selection];
         for (const selection of selections) {
           accumulator.optionCounts.set(selection, (accumulator.optionCounts.get(selection) ?? 0) + 1);
         }

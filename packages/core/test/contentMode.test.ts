@@ -18,8 +18,9 @@ describe("content modes", () => {
   it("provides localized templates and creates independent schemas", () => {
     const english = getFormTemplates({ locale: "en" });
     const japanese = getFormTemplates({ locale: "ja-JP" });
-    expect(english).toHaveLength(4);
+    expect(english).toHaveLength(5);
     expect(japanese.map((template) => template.name)).toEqual([
+      "補足入力付きアンケート",
       "満足度調査",
       "意見改善提案",
       "人気投票",

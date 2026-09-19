@@ -27,6 +27,7 @@ export type ContentModeConstraintCode =
   | "POLL_SINGLE_FIELD_REQUIRED"
   | "POLL_INVALID_FIELD_TYPE"
   | "POLL_MIN_OPTIONS_REQUIRED"
+  | "RADIO_TEXT_INPUT_SURVEY_ONLY"
   | "QUIZ_CORRECT_OPTION_MISSING"
   | "QUIZ_INVALID_CORRECT_OPTION";
 
@@ -138,6 +139,7 @@ export function validateContentModeConstraints(
     unsupported_field_type:
       getFormContentMode(schema.metadata) === "poll" ? "POLL_INVALID_FIELD_TYPE" : "CONTENT_MODE_CONSTRAINT",
     options_minimum: "POLL_MIN_OPTIONS_REQUIRED",
+    radio_text_input: "RADIO_TEXT_INPUT_SURVEY_ONLY",
     correct_option_missing: "QUIZ_CORRECT_OPTION_MISSING"
   };
   const issues = diagnostics.map(({ path, code, message }) => {
@@ -152,9 +154,11 @@ export function validateContentModeConstraints(
     const suffix =
       code === "unsupported_field_type"
         ? ".type"
-        : code === "correct_option_missing"
-          ? ".metadata.quiz.correctOptionId"
-          : ".options";
+        : code === "radio_text_input"
+          ? ".options"
+          : code === "correct_option_missing"
+            ? ".metadata.quiz.correctOptionId"
+            : ".options";
     return { path: index < 0 ? path : `fields[${index}]${suffix}`, code: mappedCode, message };
   });
   return { valid: issues.length === 0, issues };
@@ -234,6 +238,7 @@ export type ContentModeIssueCode =
   | "quiz_field_count"
   | "unsupported_field_type"
   | "options_minimum"
+  | "radio_text_input"
   | "correct_option_missing"
   | "points_type"
   | "explanation_type"
@@ -276,6 +281,8 @@ export function getContentModeDiagnostics(
       options.length > settings.maxOptionsPerField
     )
       add(field.id, "options_maximum", "Too many options for the configured maximum.");
+    if (mode !== "survey" && field.type === "radio" && options?.some((option) => option.textInput === true))
+      add(field.id, "radio_text_input", "Option text input is supported only in survey mode.");
     if (mode !== "quiz") continue;
     if (settings.evaluateQuiz !== undefined) continue;
     if (field.type !== "radio") {

@@ -1,4 +1,9 @@
-import { type FormSchema, FormSubmissionError, type FormSubmissionSerializedError } from "@form-engine-ts/core";
+import {
+  type FormSchema,
+  FormSubmissionError,
+  type FormSubmissionSerializedError,
+  isRadioTextAnswer
+} from "@form-engine-ts/core";
 
 export interface SensitiveDataFinding {
   readonly fieldId: string;
@@ -156,8 +161,13 @@ export function createStandardPrivacyDetector(config: PrivacyDetectorConfig = {}
     detect(schema, values) {
       const findings: SensitiveDataFinding[] = [];
       for (const field of schema.fields) {
-        if (field.type !== "text" && field.type !== "textarea") continue;
-        const value = values[field.id];
+        const rawValue = values[field.id];
+        const value =
+          field.type === "radio" && isRadioTextAnswer(rawValue)
+            ? rawValue.text
+            : field.type === "text" || field.type === "textarea"
+              ? rawValue
+              : undefined;
         if (typeof value !== "string" || value.length === 0) continue;
         for (const rule of rules) findings.push(...detectRule(field.id, value, rule));
         for (const detector of customDetectors) findings.push(...detector(field.id, value));

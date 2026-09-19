@@ -209,7 +209,12 @@ function validateOptionalNonNegativeInteger(
   return true;
 }
 
-function validateOptions(value: unknown, path: string, issues: SchemaIssue[]): value is FieldOption[] {
+function validateOptions(
+  value: unknown,
+  path: string,
+  issues: SchemaIssue[],
+  allowTextInput = false
+): value is FieldOption[] {
   if (!Array.isArray(value) || value.length === 0) {
     issue(issues, path, "invalid_options", "Expected at least one option.");
     return false;
@@ -232,6 +237,13 @@ function validateOptions(value: unknown, path: string, issues: SchemaIssue[]): v
     }
     if (!isNonEmptyString(option.label)) {
       issue(issues, `${optionPath}.label`, "invalid_label", "Expected a non-empty option label.");
+    }
+    if (option.textInput !== undefined) {
+      if (typeof option.textInput !== "boolean") {
+        issue(issues, `${optionPath}.textInput`, "invalid_option", "Expected a boolean.");
+      } else if (option.textInput && !allowTextInput) {
+        issue(issues, `${optionPath}.textInput`, "invalid_option", "Text input is supported only for radio fields.");
+      }
     }
     if (option.translations !== undefined)
       validateOptionTranslations(option.translations, `${optionPath}.translations`, issues);
@@ -472,7 +484,7 @@ function validateField(value: unknown, path: string, issues: SchemaIssue[]): val
   }
 
   if (value.type === "select" || value.type === "radio" || value.type === "multi-select") {
-    validateOptions(value.options, `${path}.options`, issues);
+    validateOptions(value.options, `${path}.options`, issues, value.type === "radio");
   }
   if (value.type === "multi-select") {
     const minValid = validateOptionalNonNegativeInteger(value.minSelections, `${path}.minSelections`, issues);
