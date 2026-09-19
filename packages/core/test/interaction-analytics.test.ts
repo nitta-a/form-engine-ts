@@ -130,4 +130,26 @@ describe("aggregateInteractionEvents", () => {
 
     expect(aggregateInteractionEvents(events).fields[0]?.completionRate).toBe(64);
   });
+
+  it("counts each field once per validation event", () => {
+    const events: FormInteractionEvent[] = [
+      event("present", "field.presented", "session", undefined, { fieldId: "question-1", fieldType: "text" }),
+      event("failure-1", "validation.failed", "session", undefined, {
+        scope: "form",
+        issues: [
+          { fieldId: "question-1", code: "required" },
+          { fieldId: "question-1", code: "pattern" }
+        ]
+      }),
+      event("failure-2", "validation.failed", "session", undefined, {
+        scope: "form",
+        issues: [{ fieldId: "question-1", code: "pattern" }]
+      })
+    ];
+
+    expect(aggregateInteractionEvents(events).fields[0]).toMatchObject({
+      validationFailureCount: 2,
+      validationFailureSessionCount: 1
+    });
+  });
 });

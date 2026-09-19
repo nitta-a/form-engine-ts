@@ -69,13 +69,17 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
   const focusedFieldsRef = useRef(new Set<string>());
   const completedFieldsRef = useRef(new Set<string>());
   const viewedPagesRef = useRef(new Set<string>());
+  const completedPagesRef = useRef(new Set<string>());
   const pageStartedAtRef = useRef(new Map<string, number>());
+  const fieldPresentedAtRef = useRef(new Map<string, number>());
   const fieldStartedAtRef = useRef(new Map<string, number>());
+  const trackPendingRef = useRef(Promise.resolve());
+  const sessionIdentityRef = useRef({ formId: schema.id, formVersion: schema.version, sessionId: options?.sessionId });
 
   const emit = useCallback(
-    (input: EventInput): void => {
+    (input: EventInput): FormInteractionEvent | undefined => {
       const currentOptions = optionsRef.current;
-      if (currentOptions === undefined) return;
+      if (currentOptions === undefined) return undefined;
       const event: FormInteractionEvent = {
         ...input,
         eventId: randomId(),
@@ -88,21 +92,20 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
         elapsedMs: Math.max(0, now() - sessionStartedAtRef.current),
         ...(currentOptions.context === undefined ? {} : { context: currentOptions.context })
       };
-      try {
-        void Promise.resolve(currentOptions.adapter.track(event)).catch((error: unknown) => {
-          try {
-            currentOptions.onError?.(error, event);
-          } catch {
-            // Telemetry error handlers must not affect form interaction.
-          }
-        });
-      } catch (error) {
+      const reportError = (error: unknown) => {
         try {
           currentOptions.onError?.(error, event);
         } catch {
           // Telemetry error handlers must not affect form interaction.
         }
+      };
+      try {
+        const trackPromise = Promise.resolve(currentOptions.adapter.track(event)).catch(reportError);
+        trackPendingRef.current = trackPendingRef.current.then(() => trackPromise);
+      } catch (error) {
+        reportError(error);
       }
+      return event;
     },
     [schema.id, schema.version]
   );
@@ -125,6 +128,8 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
       emit({ type: "page.viewed", pageId });
     };
     const pageCompleted = (pageId: string) => {
+      if (completedPagesRef.current.has(pageId)) return;
+      completedPagesRef.current.add(pageId);
       const startedAt = pageStartedAtRef.current.get(pageId);
       pageStartedAtRef.current.delete(pageId);
       emit({
@@ -136,6 +141,7 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
     const fieldPresented = (field: FormField, pageId?: string) => {
       if (optionsRef.current?.capture?.fieldPresented === false || presentedFieldsRef.current.has(field.id)) return;
       presentedFieldsRef.current.add(field.id);
+      fieldPresentedAtRef.current.set(field.id, now());
       emit({
         type: "field.presented",
         fieldId: field.id,
@@ -163,7 +169,7 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
       )
         return;
       completedFieldsRef.current.add(field.id);
-      const startedAt = fieldStartedAtRef.current.get(field.id);
+      const startedAt = fieldStartedAtRef.current.get(field.id) ?? fieldPresentedAtRef.current.get(field.id);
       const fallbackStartedAt = startedAt ?? sessionStartedAtRef.current;
       emit({
         type: "field.completed",
@@ -207,11 +213,49 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
   }, [emit]);
 
   useEffect(() => {
+    const currentIdentity = sessionIdentityRef.current;
+    if (
+      currentIdentity.formId === schema.id &&
+      currentIdentity.formVersion === schema.version &&
+      currentIdentity.sessionId === options?.sessionId
+    )
+      return;
+
+    sessionIdentityRef.current = { formId: schema.id, formVersion: schema.version, sessionId: options?.sessionId };
+    sessionIdRef.current = options?.sessionId ?? randomId();
+    sessionStartedAtRef.current = now();
+    sequenceRef.current = 0;
+    viewedRef.current = false;
+    startedRef.current = false;
+    submittedRef.current = false;
+    exitedRef.current = false;
+    presentedFieldsRef.current.clear();
+    focusedFieldsRef.current.clear();
+    completedFieldsRef.current.clear();
+    viewedPagesRef.current.clear();
+    completedPagesRef.current.clear();
+    pageStartedAtRef.current.clear();
+    fieldPresentedAtRef.current.clear();
+    fieldStartedAtRef.current.clear();
+  }, [options?.sessionId, schema.id, schema.version]);
+
+  useEffect(() => {
     mountedRef.current = true;
     const exit = () => {
       if (!viewedRef.current || submittedRef.current || exitedRef.current) return;
       exitedRef.current = true;
-      emit({ type: "form.exited", reason: "pagehide" });
+      const event = emit({ type: "form.exited", reason: "pagehide" });
+      const currentOptions = optionsRef.current;
+      if (event === undefined || currentOptions?.adapter.flush === undefined) return;
+      void trackPendingRef.current
+        .then(() => currentOptions.adapter.flush?.())
+        .catch((error: unknown) => {
+          try {
+            currentOptions.onError?.(error, event);
+          } catch {
+            // Telemetry error handlers must not affect form interaction.
+          }
+        });
     };
     globalThis.addEventListener("pagehide", exit);
     return () => {
@@ -220,7 +264,18 @@ export function useFormTelemetry(schema: FormSchema, options?: FormTelemetryOpti
       globalThis.setTimeout(() => {
         if (mountedRef.current || !viewedRef.current || submittedRef.current || exitedRef.current) return;
         exitedRef.current = true;
-        emit({ type: "form.exited", reason: "unmount" });
+        const event = emit({ type: "form.exited", reason: "unmount" });
+        const currentOptions = optionsRef.current;
+        if (event === undefined || currentOptions?.adapter.flush === undefined) return;
+        void trackPendingRef.current
+          .then(() => currentOptions.adapter.flush?.())
+          .catch((error: unknown) => {
+            try {
+              currentOptions.onError?.(error, event);
+            } catch {
+              // Telemetry error handlers must not affect form interaction.
+            }
+          });
       }, 0);
     };
   }, [emit]);

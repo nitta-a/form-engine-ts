@@ -9,6 +9,8 @@ current release and usage information.
 - Added optional React `FormRenderer` telemetry integration with adapter failure isolation, event deduplication, and
   StrictMode-safe lifecycle tracking.
 - Added a Preview Interaction Analytics panel showing form, page, and field funnel metrics.
+- Corrected Interaction Telemetry page completion, field duration fallback, session reset, validation failure counting,
+  and exit flushing without changing its public analytics contracts.
 
 - Added the provider-agnostic Core AuthoringSuggestion contract with deterministic IDs at apply time, policy/schema
   validation, immutable preview/apply, partial selection, and stale-schema rejection.

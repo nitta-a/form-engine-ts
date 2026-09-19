@@ -127,6 +127,10 @@ Events contain form, page, field, validation-code, timing, and funnel informatio
 question labels, option labels, or validation messages. The adapter contract is vendor-neutral; the host application owns
 delivery and retention.
 
+For explicitly defined pages, `page.completed` means that the page passed validation. The final page emits it before
+`form.submitted` or `form.submit_failed`; field duration prefers focus-to-completion and falls back to
+presented-to-completion.
+
 Add `pages` to partition every field into an accessible wizard and use `validatePageAnswers(schema, pageIndex, values)`
 for step-scoped validation. Schemas without `pages` remain single-page forms.
 

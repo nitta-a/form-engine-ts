@@ -166,8 +166,9 @@ export function aggregateInteractionEvents(
       if (!state.completed.has(event.sessionId)) state.completed.set(event.sessionId, event.durationMs);
     }
     if (event.type !== "validation.failed") continue;
-    for (const issue of event.issues) {
-      const state = fields.get(issue.fieldId);
+    const failedFieldIds = new Set(event.issues.map((issue) => issue.fieldId));
+    for (const fieldId of failedFieldIds) {
+      const state = fields.get(fieldId);
       if (state === undefined) continue;
       state.validationFailureCount += 1;
       state.validationFailureSessions.add(event.sessionId);

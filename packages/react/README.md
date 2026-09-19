@@ -57,6 +57,8 @@ const adapter: FormTelemetryAdapter = {
 ```
 
 Telemetry adapter failures are reported through `telemetry.onError` and never block input, navigation, or submission.
+Explicit schema pages emit `page.completed` after validation; the final page emits it before submission success or
+failure. Field duration uses focus-to-completion, falling back to presented-to-completion when focus is unavailable.
 
 ## Selective imports
 

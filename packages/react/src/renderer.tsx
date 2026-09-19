@@ -1916,6 +1916,14 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         ...(submissionMetadata === undefined ? {} : { metadata: submissionMetadata })
       };
       const result = await form.submit(beforeSubmit, submitContext);
+      if (
+        result.status !== "invalid" &&
+        result.status !== "cancelled" &&
+        activePage !== undefined &&
+        activeVisibleIndex === visiblePageIndexes.length - 1
+      ) {
+        telemetryRuntime.pageCompleted(activePage.id);
+      }
       if (result.status === "invalid") {
         if (validation.valid) telemetryRuntime.validationFailed("form", result.issues);
         const invalidPageIndex = pages?.findIndex((page) =>

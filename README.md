@@ -375,6 +375,7 @@ validation messages by default; adapter failures never block form interaction.
 - Number fields expose answered/unanswered counts plus minimum, maximum, and average.
 - Rating fields default to integer values from 1 through 5 and share numeric analytics.
 - Select, radio, multi-select, and checkbox fields expose counts and percentages.
+- `page.completed` means that an explicit schema page passed validation; the final page emits it before `form.submitted` (or `form.submit_failed`). Field duration uses focus-to-completion, then presented-to-completion when focus is unavailable.
 - Survey radio options can set `textInput: true`; the renderer returns `{ optionId, text }` for the selected option and clears the supplement when selection changes.
 - `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
 - `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF and the columns are exactly `submissionId`, `submittedAt`, `locale`, then the schema-order field columns; arrays are JSON-encoded.
@@ -716,6 +717,8 @@ Interaction Telemetryは回答送信後の分析とは分離された、フォ�
 `FormRenderer`へ`FormTelemetryAdapter`を注入すると、表示、開始、ページ、設問、検証、送信、離脱イベントを収集でき、
 `aggregateInteractionEvents(events)`でフォーム・ページ・設問単位のファネルを集計できます。既定のイベントには回答値、
 ラベル、検証メッセージを含めず、Adapterの失敗がフォーム操作を止めることもありません。
+明示したページの`page.completed`は検証通過を意味し、最終ページでは`form.submitted`（または`form.submit_failed`）の前に発火します。
+設問時間はfocusから完了までを優先し、focusを取得できない場合は表示から完了までを使います。
 
 #### 7.18.x の拡張APIと移行
 
