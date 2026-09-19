@@ -1,6 +1,7 @@
 export * from "./acceptance";
 export * from "./aggregation";
 export * from "./analytics";
+export * from "./authoring";
 export * from "./contentMode";
 export * from "./crossFormAnalytics";
 export * from "./errors";

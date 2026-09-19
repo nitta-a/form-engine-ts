@@ -3,6 +3,10 @@
 Official Material UI v6/v7 integration layer for `@form-engine-ts/react`. `MuiFormBuilder` applies MUI controls and
 layout slots together, disables the React builder CSS classes, and propagates common size and variant settings.
 
+`MuiAuthoringPrompt` and `MuiAuthoringSuggestionPreview` provide the standard prompt, per-operation selection, preview,
+apply, reject, loading, and validation-error surfaces for `useAuthoringAssistant`. They only render the injected Core
+contract; Azure OpenAI, OpenAI, and other provider SDKs remain application dependencies.
+
 ## Migration notes
 
 The legacy client-side React `SubmissionGuard` is deprecated. Use the Core `SubmissionGuard` in the server submission

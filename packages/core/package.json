@@ -30,6 +30,11 @@
       "import": "./dist/analytics.js",
       "require": "./dist/analytics.cjs"
     },
+    "./authoring": {
+      "types": "./dist/authoring/index.d.ts",
+      "import": "./dist/authoring/index.js",
+      "require": "./dist/authoring/index.cjs"
+    },
     "./content-mode": {
       "types": "./dist/contentMode.d.ts",
       "import": "./dist/contentMode.js",
@@ -182,7 +187,7 @@
     "zod": "^4.0.0"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean && tsup src/aggregation.ts src/analytics.ts src/contentMode.ts src/crossFormAnalytics.ts src/errors.ts src/events.ts src/field.ts src/fieldTypes.ts src/i18n/index.ts src/i18n/catalogs/en.ts src/i18n/catalogs/ja.ts src/i18n/keys.ts src/i18n/translator.ts src/lifecycle.ts src/locale.ts src/mapping.ts src/pagination.ts src/pipeline.ts src/policy.ts src/responseSummary.ts src/sanitization.ts src/schema.ts src/submission.ts src/translation.ts src/types.ts src/validation.ts src/versioning.ts src/visibility.ts --format esm,cjs --dts",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && tsup src/authoring/index.ts src/aggregation.ts src/analytics.ts src/contentMode.ts src/crossFormAnalytics.ts src/errors.ts src/events.ts src/field.ts src/fieldTypes.ts src/i18n/index.ts src/i18n/catalogs/en.ts src/i18n/catalogs/ja.ts src/i18n/keys.ts src/i18n/translator.ts src/lifecycle.ts src/locale.ts src/mapping.ts src/pagination.ts src/pipeline.ts src/policy.ts src/responseSummary.ts src/sanitization.ts src/schema.ts src/submission.ts src/translation.ts src/types.ts src/validation.ts src/versioning.ts src/visibility.ts --format esm,cjs --dts",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"

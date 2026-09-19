@@ -8,18 +8,21 @@ import {
   type FormVersionState,
   validateFormSchema
 } from "@form-engine-ts/core";
+import { MuiAuthoringPrompt, MuiAuthoringSuggestionPreview } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
   type BuilderTranslationActionsSlotProps,
   FormBuilder,
   type FormBuilderComponents,
+  useAuthoringAssistant,
   useFormBuilder
 } from "@form-engine-ts/react";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 import { useBuilderPreview } from "./BuilderPreviewContext";
+import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
 import { previewPolicy } from "./previewPolicy";
 
 function PreviewMuiButton({
@@ -289,6 +292,41 @@ function DomainApiDemo({ schema }: { readonly schema: FormSchema }) {
   );
 }
 
+function AuthoringAssistantDemo({
+  schema,
+  onChange
+}: {
+  readonly schema: FormSchema;
+  readonly onChange: (schema: FormSchema) => void;
+}) {
+  const assistant = useAuthoringAssistant({
+    schema,
+    adapter: mockAuthoringAssistantAdapter,
+    policy: previewPolicy,
+    onChange
+  });
+  return (
+    <fieldset className="authoring-assistant-demo">
+      <legend>AI Authoring Assistant (mock provider)</legend>
+      <MuiAuthoringPrompt
+        disabled={assistant.status === "generating"}
+        onSubmit={(request) => void assistant.suggest(request)}
+      />
+      {assistant.status === "generating" ? <output>Generating suggestion…</output> : null}
+      {assistant.error === undefined ? null : <output role="alert">{assistant.error.code}</output>}
+      {assistant.suggestion !== undefined && assistant.preview !== undefined ? (
+        <MuiAuthoringSuggestionPreview
+          suggestion={assistant.suggestion}
+          preview={assistant.preview}
+          loading={assistant.status === "applying"}
+          onApply={(operationIds) => assistant.apply(operationIds)}
+          onReject={assistant.reject}
+        />
+      ) : null}
+    </fieldset>
+  );
+}
+
 export function BuilderPanel() {
   const { schema, locale, workspaceReady, changeSchema } = usePreviewWorkspace();
   const {
@@ -335,6 +373,7 @@ export function BuilderPanel() {
           {translationReport === null ? null : <output>{translationReport}</output>}
         </fieldset>
         <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
+        <AuthoringAssistantDemo schema={schema} onChange={changeSchema} />
         <DomainApiDemo schema={schema} />
         <fieldset className="renderer-demo-controls">
           <legend>v2.4 MUI-compatible Builder components</legend>

@@ -24,6 +24,33 @@ const result = validateAnswers(schema, { name: "Ada" });
 if (!result.valid) console.error(result.issues);
 ```
 
+## AI authoring suggestions
+
+Core keeps AI provider code outside the library. An application injects an `AuthoringAssistantAdapter` that returns
+operations, then previews and applies them only after policy and schema validation. Suggestions carry a deterministic
+`baseSchemaHash`; applying one after the form changed returns a stale-schema error. Added field and option IDs are
+created by the apply boundary, never by the provider.
+
+```ts
+import {
+  applyAuthoringSuggestion,
+  computeAuthoringSchemaHash,
+  previewAuthoringSuggestion,
+  type AuthoringSuggestion
+} from "@form-engine-ts/core";
+
+const suggestion: AuthoringSuggestion = await adapter.generate({ intent: "add_questions", prompt, schema });
+const preview = previewAuthoringSuggestion(schema, suggestion, policy);
+if (preview.valid) {
+  const result = applyAuthoringSuggestion(schema, suggestion, ["question-1"], { policy });
+  if (result.success) save(result.schema);
+}
+```
+
+The MVP supports independent `addField`, `updateField`, `updateForm`, `addOption`, and `updateOption` operations.
+Removal, moving, pages, conditions, locale/translation, submission settings, and direct Azure/OpenAI SDK usage stay
+in the host application.
+
 ## Built-in templates
 
 Core includes four purpose-oriented templates for survey, poll, and quiz creation. Select them by mode and locale,

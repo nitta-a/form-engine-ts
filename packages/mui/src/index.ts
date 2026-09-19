@@ -1,4 +1,5 @@
 export * from "./adapters";
+export * from "./authoring";
 export * from "./builderProps";
 export * from "./ContentModeSettings";
 export * from "./components";

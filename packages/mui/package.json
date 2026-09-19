@@ -25,6 +25,11 @@
       "import": "./dist/builder.js",
       "require": "./dist/builder.cjs"
     },
+    "./authoring": {
+      "types": "./dist/authoring/index.d.ts",
+      "import": "./dist/authoring/index.js",
+      "require": "./dist/authoring/index.cjs"
+    },
     "./renderer": {
       "types": "./dist/renderer.d.ts",
       "import": "./dist/renderer.js",
@@ -60,7 +65,7 @@
     "typescript"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/custom-survey-client --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom && tsup src/builder.ts src/renderer.ts src/survey-summary.ts src/survey-domain.ts --format esm,cjs --dts --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/custom-survey-client --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/custom-survey-client --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom && tsup src/authoring/index.ts src/builder.ts src/renderer.ts src/survey-summary.ts src/survey-domain.ts --format esm,cjs --dts --external @emotion/react --external @emotion/styled --external @form-engine-ts/core --external @form-engine-ts/custom-survey-client --external @form-engine-ts/react --external @mui/icons-material --external @mui/material --external react --external react-dom",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"

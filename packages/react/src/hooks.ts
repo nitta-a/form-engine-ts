@@ -1,3 +1,4 @@
+export * from "./hooks/useAuthoringAssistant";
 export * from "./hooks/useFormBuilder";
 export * from "./hooks/usePollResults";
 export * from "./hooks/useTranslationComparison";

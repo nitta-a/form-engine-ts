@@ -3,6 +3,13 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## Unreleased
+
+- Added the provider-agnostic Core AuthoringSuggestion contract with deterministic IDs at apply time, policy/schema
+  validation, immutable preview/apply, partial selection, and stale-schema rejection.
+- Added the React `useAuthoringAssistant` controller, MUI prompt/preview components, and a deterministic Preview mock
+  adapter. Real AI providers and QualityIssue integration remain application responsibilities.
+
 ## Latest release
 
 ### v8.0.2 — 2026-09-18

@@ -4,6 +4,7 @@ export * from "./BuilderPageConditionEditor";
 export * from "./builder";
 export * from "./contentRenderer";
 export * from "./context";
+export * from "./hooks/useAuthoringAssistant";
 export * from "./hooks/useFormBuilder";
 export * from "./hooks/usePollResults";
 export * from "./hooks/useShare";

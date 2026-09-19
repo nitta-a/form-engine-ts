@@ -1080,6 +1080,166 @@ interface AggregationReport {
     }[];
 }
 
+type AuthoringIntent = "generate_form" | "add_questions" | "improve_text" | "generate_options" | "rewrite_field";
+type AuthoringTarget = {
+    readonly kind: "form";
+} | {
+    readonly kind: "field";
+    readonly fieldId: string;
+} | {
+    readonly kind: "option";
+    readonly fieldId: string;
+    readonly optionId: string;
+};
+interface AuthoringRequest {
+    readonly intent: AuthoringIntent;
+    readonly prompt?: string;
+    readonly target?: AuthoringTarget;
+    readonly context?: Readonly<Record<string, JsonValue>>;
+    /** Providers may use the schema supplied by the controller as grounding context. */
+    readonly schema?: FormSchema;
+}
+interface AuthoringAssistantAdapter {
+    generate?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
+    /** Compatibility alias for adapters that prefer an explicit method name. */
+    generateSuggestion?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
+}
+interface AuthoringOptionInput {
+    readonly label: string;
+    readonly textInput?: boolean;
+    readonly pinned?: boolean;
+}
+/** A field proposed by AI. IDs are deliberately absent and are assigned on apply. */
+interface AuthoringFieldInput {
+    readonly type: QuestionType;
+    readonly title: string;
+    readonly description?: string;
+    readonly required?: boolean;
+    readonly translationKey?: string;
+    readonly messages?: FormField["messages"];
+    readonly placeholderKey?: string;
+    readonly minLength?: number;
+    readonly maxLength?: number;
+    readonly pattern?: string;
+    readonly minDate?: string;
+    readonly maxDate?: string;
+    readonly minTime?: string;
+    readonly maxTime?: string;
+    readonly min?: number;
+    readonly max?: number;
+    readonly step?: number;
+    readonly shuffleOptions?: boolean;
+    readonly minSelections?: number;
+    readonly maxSelections?: number;
+    readonly options?: readonly AuthoringOptionInput[];
+}
+interface AddFieldOperation {
+    readonly operationId: string;
+    readonly type: "addField";
+    readonly field: AuthoringFieldInput;
+    readonly pageId?: string;
+}
+type AuthoringFieldPatch = Readonly<{
+    readonly title?: string;
+    readonly description?: string;
+    readonly required?: boolean;
+    readonly placeholderKey?: string;
+    readonly minLength?: number;
+    readonly maxLength?: number;
+    readonly pattern?: string;
+    readonly minDate?: string;
+    readonly maxDate?: string;
+    readonly minTime?: string;
+    readonly maxTime?: string;
+    readonly min?: number;
+    readonly max?: number;
+    readonly step?: number;
+    readonly shuffleOptions?: boolean;
+    readonly minSelections?: number;
+    readonly maxSelections?: number;
+    readonly messages?: FormField["messages"];
+}>;
+interface UpdateFieldOperation {
+    readonly operationId: string;
+    readonly type: "updateField";
+    readonly fieldId: string;
+    readonly patch: AuthoringFieldPatch;
+}
+interface UpdateFormOperation {
+    readonly operationId: string;
+    readonly type: "updateForm";
+    readonly patch: Readonly<Partial<Pick<FormSchema, "title" | "description" | "completionMessage" | "submitLabelKey">>>;
+}
+interface AddOptionOperation {
+    readonly operationId: string;
+    readonly type: "addOption";
+    readonly fieldId: string;
+    readonly option: AuthoringOptionInput;
+}
+interface UpdateOptionOperation {
+    readonly operationId: string;
+    readonly type: "updateOption";
+    readonly fieldId: string;
+    readonly optionId: string;
+    readonly patch: Readonly<Partial<Pick<FieldOption, "label" | "textInput" | "pinned">>>;
+}
+type AuthoringOperation = AddFieldOperation | UpdateFieldOperation | UpdateFormOperation | AddOptionOperation | UpdateOptionOperation;
+interface AuthoringSuggestion {
+    readonly id: string;
+    readonly summary: string;
+    readonly operations: readonly AuthoringOperation[];
+    readonly rationale?: string;
+    readonly baseSchemaHash: string;
+}
+type AuthoringValidationCode = "invalid_suggestion" | "duplicate_operation_id" | "unsupported_operation" | "stale_schema" | "field_not_found" | "option_not_found" | "page_not_found" | "disallowed_field_type" | "max_fields_exceeded" | "max_options_exceeded" | "max_text_length_exceeded" | "schema_invalid" | "policy_violation";
+interface AuthoringValidationIssue {
+    readonly code: AuthoringValidationCode;
+    readonly operationId?: string;
+    readonly path?: string;
+    readonly message: string;
+}
+interface AuthoringValidationResult {
+    readonly valid: boolean;
+    readonly issues: readonly AuthoringValidationIssue[];
+}
+interface AuthoringPreview {
+    readonly valid: boolean;
+    readonly baseSchemaHash: string;
+    readonly schema: FormSchema;
+    readonly operations: readonly AuthoringOperation[];
+    readonly issues: readonly AuthoringValidationIssue[];
+}
+type AuthoringApplyError = {
+    readonly code: "stale_schema";
+    readonly issues: readonly AuthoringValidationIssue[];
+} | {
+    readonly code: "validation_failed";
+    readonly issues: readonly AuthoringValidationIssue[];
+} | {
+    readonly code: "apply_failed";
+    readonly issues: readonly AuthoringValidationIssue[];
+};
+type AuthoringApplyResult = {
+    readonly success: true;
+    readonly schema: FormSchema;
+    readonly appliedOperationIds: readonly string[];
+} | {
+    readonly success: false;
+    readonly error: AuthoringApplyError;
+};
+interface AuthoringApplyOptions {
+    readonly policy?: FormPolicy;
+    readonly idFactory?: (kind: "field" | "option", existingIds: ReadonlySet<string>) => string;
+}
+
+declare function applyAuthoringSuggestion(schema: FormSchema, suggestion: AuthoringSuggestion, selectedOperationIds?: readonly string[], options?: AuthoringApplyOptions): AuthoringApplyResult;
+
+/** Deterministic, local fingerprint for stale-suggestion protection. */
+declare function computeAuthoringSchemaHash(schema: FormSchema): string;
+
+declare function validateAuthoringSuggestion(suggestion: AuthoringSuggestion, schema: FormSchema, policy?: FormPolicy): AuthoringValidationResult;
+declare function previewAuthoringSuggestion(schema: FormSchema, suggestion: AuthoringSuggestion, policy?: FormPolicy): AuthoringPreview;
+
 type CrossFormSkipReason = "schema_missing" | "invalid_answers" | "not_quiz" | "evaluation_failed";
 interface CrossFormAnalyticsOptions<TSubmission extends FormSubmission = FormSubmission> {
     readonly policy?: FormPolicy;
@@ -1758,4 +1918,4 @@ interface FormProgress {
 }
 declare function calculateProgress(schema: FormSchema, currentAnswers: Readonly<Record<string, unknown>>, currentPageIndex?: number): FormProgress;
 
-export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type ContentModeConstraintCode, type ContentModeConstraintIssue, type ContentModeDiagnostic, type ContentModeIssue, type ContentModeIssueCode, type ContentModeSettings, type ContentModeValidationResult, type ContentResultTranslationKey, type CreateSchemaFromTemplateOptions, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossFormAnalytics, type CrossFormAnalyticsOptions, type CrossFormScoreSummary, type CrossFormSkipReason, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, type CustomFormMetadata, DEFAULT_FIELD_TYPE_DEFINITIONS, type DateField, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type EmailField, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAcceptanceResult, type FormAcceptanceStatus, type FormAnalytics, type FormContentMode, type FormDeletionCounts, type FormDeletionInspection, type FormDeletionRequest, type FormDeletionResult, type FormDeletionScope, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormLifecycleAdapter, type FormLifecycleBackend, type FormLifecycleOptions, type FormPage, type FormPolicy, type FormProgress, type FormResource, type FormResourceKind, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionValidationSource, type FormSubmissionValidator, type FormSubmissionValidatorResult, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormTemplate, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, type GetFormTemplatesOptions, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PollAccessContext, type PollMetadata, type PollRuntimeAdapter, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type QuizEvaluationResult, type QuizFieldMetadata, type QuizMetadata, type QuizQuestionEvaluation, type QuizQuestionResult, type QuizResult, type RadioTextAnswer, type RateLimiter, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type ResponseSummaryData, type ResponseSummaryInput, type ResponseSummaryLabels, type ResponseSummaryLanguageAggregate, type ResponseSummaryQuestion, type ResponseSummarySkipReason, type Result, type SanitizeSchemaOptions, type SaveSubmissionOptions, type SchemaDomainCodec, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StorageSubmissionExportOptions, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCodec, type SubmissionCodecFailure, type SubmissionCodecResult, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionGuard, type SubmissionGuardContext, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionPipeline, type SubmissionPipelineOptions, type SubmissionPipelineResult, type SubmissionQueryOptions, type SubmissionSaveResult, type SubmissionSchema, type SubmissionValidationResult, type TelField, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TimeField, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TrpcFormSubmissionErrorData, type TrpcProcedureType, type TrpcSubmissionErrorAdapter, type TrpcSubmissionErrorFormatter, type TrpcSubmissionErrorFormatterOptions, type TrpcSubmissionErrorIntegration, type TrpcSubmissionErrorShape, type TypedExtensibleNode, type TypedFormSchema, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type TypedTextAnswerItem, type TypedTextAnswerPage, type UnifiedSubmissionStorageAdapter, type UrlField, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateForms, aggregateResponses, applyTransitionPlan, assertValidFormSchema, assertValidFormSubmission, assertValidFormSubmissionWith, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, calculateProgress, canShowPollResults, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeSourceTextHash, contentMetadataToJson, createChallengeGuard, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createFormLifecycleAdapter, createFormSubmissionSchema, createHoneypotGuard, createInitialSchemaByMode, createMemoryRateLimiter, createPublishTransitionPlan, createRateLimitGuard, createResponseAccumulator, createSchemaDomainCodec, createSchemaFromTemplate, createSubmission, createSubmissionId, createSubmissionPayloadHash, createSubmissionPipeline, createTrpcSubmissionErrorAdapter, createTrpcSubmissionErrorFormatter, createTrpcSubmissionErrorIntegration, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, deserializeSubmissionErrorFromTrpc, dispatchWebhook, emptyFormDeletionCounts, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, evaluateQuiz, evaluateQuizLocally, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, getContentModeDiagnostics, getContentModePolicy, getFormAcceptanceStatus, getFormContentMode, getFormTemplates, getTranslationStatus, getTrpcSubmissionErrorData, hashFormSubmissionPayload, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isFormValue, isManualTranslationMetadata, isQuestionVisible, isRadioTextAnswer, isSubmissionUlid, iterateSubmissionPages, jsonValuesEqual, mapField, mapOption, mapPage, mapSchema, mapSchemaNode, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, normalizeTranslationMetadata, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, publishDraft, readPollMetadata, readQuizFieldMetadata, readQuizMetadata, removeLocaleFromSchema, resolveContentModeSettings, resolveFormTranslation, resolveLocalizedSchema, runSubmissionPipeline, sanitizeSchema, selectVisibleAnswers, selectedOptionId, serializeSubmissionError, serializeSubmissionErrorForTrpc, shuffleOptions, toFormSubmissionWire, toResponseSummary, transformFieldType, trpcSubmissionErrorAdapter, validateAnswers, validateContentMode, validateContentModeConstraints, validateFieldValue, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };
+export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AddFieldOperation, type AddOptionOperation, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type AuthoringApplyError, type AuthoringApplyOptions, type AuthoringApplyResult, type AuthoringAssistantAdapter, type AuthoringFieldInput, type AuthoringFieldPatch, type AuthoringIntent, type AuthoringOperation, type AuthoringOptionInput, type AuthoringPreview, type AuthoringRequest, type AuthoringSuggestion, type AuthoringTarget, type AuthoringValidationCode, type AuthoringValidationIssue, type AuthoringValidationResult, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type ContentModeConstraintCode, type ContentModeConstraintIssue, type ContentModeDiagnostic, type ContentModeIssue, type ContentModeIssueCode, type ContentModeSettings, type ContentModeValidationResult, type ContentResultTranslationKey, type CreateSchemaFromTemplateOptions, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossFormAnalytics, type CrossFormAnalyticsOptions, type CrossFormScoreSummary, type CrossFormSkipReason, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, type CustomFormMetadata, DEFAULT_FIELD_TYPE_DEFINITIONS, type DateField, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type EmailField, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAcceptanceResult, type FormAcceptanceStatus, type FormAnalytics, type FormContentMode, type FormDeletionCounts, type FormDeletionInspection, type FormDeletionRequest, type FormDeletionResult, type FormDeletionScope, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormLifecycleAdapter, type FormLifecycleBackend, type FormLifecycleOptions, type FormPage, type FormPolicy, type FormProgress, type FormResource, type FormResourceKind, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionValidationSource, type FormSubmissionValidator, type FormSubmissionValidatorResult, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormTemplate, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, type GetFormTemplatesOptions, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PollAccessContext, type PollMetadata, type PollRuntimeAdapter, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type QuizEvaluationResult, type QuizFieldMetadata, type QuizMetadata, type QuizQuestionEvaluation, type QuizQuestionResult, type QuizResult, type RadioTextAnswer, type RateLimiter, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type ResponseSummaryData, type ResponseSummaryInput, type ResponseSummaryLabels, type ResponseSummaryLanguageAggregate, type ResponseSummaryQuestion, type ResponseSummarySkipReason, type Result, type SanitizeSchemaOptions, type SaveSubmissionOptions, type SchemaDomainCodec, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StorageSubmissionExportOptions, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCodec, type SubmissionCodecFailure, type SubmissionCodecResult, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionGuard, type SubmissionGuardContext, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionPipeline, type SubmissionPipelineOptions, type SubmissionPipelineResult, type SubmissionQueryOptions, type SubmissionSaveResult, type SubmissionSchema, type SubmissionValidationResult, type TelField, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TimeField, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TrpcFormSubmissionErrorData, type TrpcProcedureType, type TrpcSubmissionErrorAdapter, type TrpcSubmissionErrorFormatter, type TrpcSubmissionErrorFormatterOptions, type TrpcSubmissionErrorIntegration, type TrpcSubmissionErrorShape, type TypedExtensibleNode, type TypedFormSchema, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type TypedTextAnswerItem, type TypedTextAnswerPage, type UnifiedSubmissionStorageAdapter, type UpdateFieldOperation, type UpdateFormOperation, type UpdateOptionOperation, type UrlField, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateForms, aggregateResponses, applyAuthoringSuggestion, applyTransitionPlan, assertValidFormSchema, assertValidFormSubmission, assertValidFormSubmissionWith, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, calculateProgress, canShowPollResults, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeAuthoringSchemaHash, computeSourceTextHash, contentMetadataToJson, createChallengeGuard, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createFormLifecycleAdapter, createFormSubmissionSchema, createHoneypotGuard, createInitialSchemaByMode, createMemoryRateLimiter, createPublishTransitionPlan, createRateLimitGuard, createResponseAccumulator, createSchemaDomainCodec, createSchemaFromTemplate, createSubmission, createSubmissionId, createSubmissionPayloadHash, createSubmissionPipeline, createTrpcSubmissionErrorAdapter, createTrpcSubmissionErrorFormatter, createTrpcSubmissionErrorIntegration, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, deserializeSubmissionErrorFromTrpc, dispatchWebhook, emptyFormDeletionCounts, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, evaluateQuiz, evaluateQuizLocally, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, getContentModeDiagnostics, getContentModePolicy, getFormAcceptanceStatus, getFormContentMode, getFormTemplates, getTranslationStatus, getTrpcSubmissionErrorData, hashFormSubmissionPayload, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isFormValue, isManualTranslationMetadata, isQuestionVisible, isRadioTextAnswer, isSubmissionUlid, iterateSubmissionPages, jsonValuesEqual, mapField, mapOption, mapPage, mapSchema, mapSchemaNode, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, normalizeTranslationMetadata, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, previewAuthoringSuggestion, publishDraft, readPollMetadata, readQuizFieldMetadata, readQuizMetadata, removeLocaleFromSchema, resolveContentModeSettings, resolveFormTranslation, resolveLocalizedSchema, runSubmissionPipeline, sanitizeSchema, selectVisibleAnswers, selectedOptionId, serializeSubmissionError, serializeSubmissionErrorForTrpc, shuffleOptions, toFormSubmissionWire, toResponseSummary, transformFieldType, trpcSubmissionErrorAdapter, validateAnswers, validateAuthoringSuggestion, validateContentMode, validateContentModeConstraints, validateFieldValue, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };
