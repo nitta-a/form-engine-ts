@@ -1,19 +1,10 @@
-import {
-  type AuthoringAssistantAdapter,
-  type AuthoringSuggestion,
-  computeAuthoringSchemaHash
-} from "@form-engine-ts/core";
+import type { AuthoringAssistantAdapter, AuthoringSuggestion } from "@form-engine-ts/core";
 
 /** Deterministic provider used by the preview app; real AI stays in the host app. */
 export const mockAuthoringAssistantAdapter: AuthoringAssistantAdapter = {
   async generate(request, signal): Promise<AuthoringSuggestion> {
     if (signal?.aborted) throw new DOMException("The request was cancelled.", "AbortError");
-    const schemaHash =
-      typeof request.context?.schemaHash === "string"
-        ? request.context.schemaHash
-        : request.schema === undefined
-          ? undefined
-          : computeAuthoringSchemaHash(request.schema);
+    const schemaHash = typeof request.context?.schemaHash === "string" ? request.context.schemaHash : undefined;
     if (schemaHash === undefined) throw new Error("Mock authoring requires an authoring context.");
     const prompt = request.prompt?.toLowerCase() ?? "";
     const firstField = Array.isArray(request.context?.fields)

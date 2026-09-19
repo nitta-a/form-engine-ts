@@ -15,11 +15,9 @@ const schema: FormSchema = {
 
 describe("useAuthoringAssistant", () => {
   it("moves from generating to ready and applies selected operations", async () => {
-    let receivedSchema: FormSchema | undefined;
     let receivedContext: Readonly<Record<string, unknown>> | undefined;
     const adapter: AuthoringAssistantAdapter = {
       generate: async (request) => {
-        receivedSchema = request.schema;
         receivedContext = request.context;
         return {
           id: "s1",
@@ -39,11 +37,12 @@ describe("useAuthoringAssistant", () => {
       await promise;
     });
     expect(result.current.status).toBe("ready");
-    expect(receivedSchema).toBeUndefined();
     expect(receivedContext).toMatchObject({
       schemaHash: computeAuthoringSchemaHash(schema),
       form: { contentMode: "survey" }
     });
+    expect(receivedContext).not.toHaveProperty("answers");
+    expect(receivedContext).not.toHaveProperty("submission");
     act(() => {
       result.current.clearSelection();
     });

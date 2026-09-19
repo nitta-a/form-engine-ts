@@ -69,11 +69,23 @@ export function MuiAuthoringSuggestionPreview({
         ? selectedOperationIds.filter((value) => value !== id)
         : [...selectedOperationIds, id]
     );
-  const formatValue = (value: unknown): string => {
-    if (value === undefined) return "—";
-    if (typeof value === "boolean") return value ? "Required" : "Optional";
+  const formatValue = (value: unknown, key: string): string => {
+    if (value === undefined) return text("authoring.preview.value.none", "—");
+    if (typeof value === "boolean") {
+      const translationKey =
+        key === "required"
+          ? value
+            ? "authoring.preview.value.required"
+            : "authoring.preview.value.optional"
+          : value
+            ? "authoring.preview.value.enabled"
+            : "authoring.preview.value.disabled";
+      const fallback = key === "required" ? (value ? "Required" : "Optional") : value ? "Enabled" : "Disabled";
+      return text(translationKey, fallback);
+    }
+    if (key === "type" && typeof value === "string") return text(`builder.fieldType.${value}`, value);
     if (typeof value === "string" || typeof value === "number") return String(value);
-    return "—";
+    return text("authoring.preview.value.none", "—");
   };
   const property = (value: AuthoringOperationPreview["before"], key: string): unknown => {
     if (value?.kind === "form") return Reflect.get(value, key);
@@ -82,30 +94,46 @@ export function MuiAuthoringSuggestionPreview({
     return undefined;
   };
   const propertyLabel = (key: string): string => {
-    if (key === "title") return "Question";
-    if (key === "description") return "Description";
-    if (key === "required") return "Required";
-    if (key === "label") return "Option";
-    if (key === "completionMessage") return "Completion message";
-    return key;
+    const translations: Readonly<Record<string, readonly [string, string]>> = {
+      type: ["authoring.preview.property.type", "Type"],
+      title: ["authoring.preview.property.title", "Question"],
+      description: ["authoring.preview.property.description", "Description"],
+      required: ["authoring.preview.property.required", "Required"],
+      label: ["authoring.preview.property.option", "Option"],
+      completionMessage: ["authoring.preview.property.completionMessage", "Completion message"],
+      submitLabelKey: ["authoring.preview.property.submitLabel", "Submit label"],
+      minLength: ["builder.minimumLength", "Minimum length"],
+      maxLength: ["builder.maximumLength", "Maximum length"],
+      shuffleOptions: ["builder.shuffleOptions", "Shuffle options"],
+      minSelections: ["validation.minSelections", "Minimum selections"],
+      maxSelections: ["validation.maxSelections", "Maximum selections"]
+    };
+    const [translationKey, fallback] = translations[key] ?? [key, key];
+    return text(translationKey, fallback);
   };
   const previewRows = (item: AuthoringOperationPreview): readonly (readonly [string, string, string])[] => {
     const operation = item.operation;
-    if (operation.type === "addField")
-      return [
-        ["Type", operation.field.type, operation.field.type],
-        ["Question", "—", operation.field.title]
+    if (operation.type === "addField") {
+      const rows: Array<readonly [string, unknown]> = [
+        ["type", operation.field.type],
+        ["title", operation.field.title]
       ];
-    if (operation.type === "addOption") return [["Option", "—", operation.option.label]];
+      if (operation.field.description !== undefined) rows.push(["description", operation.field.description]);
+      if (operation.field.required !== undefined) rows.push(["required", operation.field.required]);
+      for (const option of operation.field.options ?? []) rows.push(["label", option.label]);
+      return rows.map(([key, value]) => [key, formatValue(undefined, key), formatValue(value, key)]);
+    }
+    if (operation.type === "addOption")
+      return [["label", formatValue(undefined, "label"), formatValue(operation.option.label, "label")]];
     const patch = operation.patch;
     return Object.entries(patch).map(([key, value]) => [
-      propertyLabel(key),
-      formatValue(property(item.before, key)),
-      formatValue(operation.type === "updateOption" ? value : property(item.after, key))
+      key,
+      formatValue(property(item.before, key), key),
+      formatValue(operation.type === "updateOption" ? value : property(item.after, key), key)
     ]);
   };
   return (
-    <Card component="section" aria-label="Authoring suggestion preview">
+    <Card component="section" aria-label={text("authoring.preview.label", "Authoring suggestion preview")}>
       <CardContent>
         <Stack spacing={1}>
           <Typography variant="h6">{suggestion.summary}</Typography>
@@ -146,8 +174,8 @@ export function MuiAuthoringSuggestionPreview({
                 return (
                   <Stack sx={{ pl: 4 }} spacing={0.25}>
                     {previewRows(item).map(([label, before, after]) => (
-                      <Stack key={label} direction="row" spacing={1}>
-                        <Typography variant="caption">{label}</Typography>
+                      <Stack key={`${label}\u0000${before}\u0000${after}`} direction="row" spacing={1}>
+                        <Typography variant="caption">{propertyLabel(label)}</Typography>
                         <Typography variant="caption">
                           {text("authoring.preview.before", "Before", labels?.before)}: {before}
                         </Typography>

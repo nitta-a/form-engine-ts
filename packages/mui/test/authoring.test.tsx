@@ -190,4 +190,47 @@ describe("authoring MUI components", () => {
     expect(screen.getByText(/Updated question/u)).toBeInTheDocument();
     expect(screen.getAllByRole("checkbox")[2]).toBeDisabled();
   });
+
+  it("localizes preview properties, boolean values, and added options", () => {
+    const add: AuthoringSuggestion = {
+      ...suggestion,
+      operations: [
+        {
+          operationId: "add-choice",
+          type: "addField",
+          field: {
+            type: "radio",
+            title: "満足度",
+            required: true,
+            options: [{ label: "満足" }, { label: "不満" }]
+          }
+        }
+      ]
+    };
+    const addOperation = add.operations[0];
+    if (addOperation === undefined) throw new Error("Expected an add-field operation.");
+    const addPreview: AuthoringPreview = {
+      ...preview,
+      operations: add.operations,
+      operationPreviews: [{ operationId: "add-choice", operation: addOperation, valid: true, issues: [] }]
+    };
+    render(
+      <FormEngineI18nProvider locale="ja">
+        <MuiAuthoringSuggestionPreview
+          suggestion={add}
+          preview={addPreview}
+          selectedOperationIds={["add-choice"]}
+          onSelectionChange={vi.fn()}
+          onApply={vi.fn()}
+          onReject={vi.fn()}
+        />
+      </FormEngineI18nProvider>
+    );
+    expect(screen.getByRole("region", { name: "AI提案のプレビュー" })).toBeInTheDocument();
+    expect(screen.getByText("質問形式")).toBeInTheDocument();
+    expect(screen.getByText("質問文")).toBeInTheDocument();
+    expect(screen.getByText("必須回答")).toBeInTheDocument();
+    expect(screen.getAllByText("選択肢")).toHaveLength(2);
+    expect(screen.getByText(/単一選択/u)).toBeInTheDocument();
+  });
 });

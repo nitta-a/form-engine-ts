@@ -7,7 +7,7 @@ export interface ApplyAndRecheckQualityResult<TApply, TQuality> {
 }
 
 export async function applyAndRecheckQuality<TApply extends { readonly success: boolean }, TQuality>(
-  apply: () => TApply | Promise<TApply | undefined>,
+  apply: () => TApply | undefined | Promise<TApply | undefined>,
   recheck: () => Promise<TQuality>
 ): Promise<ApplyAndRecheckQualityResult<TApply, TQuality>> {
   const applyResult = await apply();

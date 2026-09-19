@@ -13,6 +13,8 @@ export interface AuthoringContext extends Readonly<Record<string, JsonValue>> {
   readonly fields: readonly JsonValue[];
 }
 
+const forbiddenContextKeys = new Set(["answers", "submission", "responses", "analytics"]);
+
 function fieldContext(field: FormSchema["fields"][number]): JsonValue {
   return {
     id: field.id,
@@ -43,6 +45,21 @@ function policyContext(policy: FormPolicy | undefined): JsonValue | undefined {
   };
 }
 
+function filterContextValue(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) return value.map(filterContextValue);
+  if (value === null || typeof value !== "object") return value;
+  const filtered: Record<string, JsonValue> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (!forbiddenContextKeys.has(key)) filtered[key] = filterContextValue(child);
+  }
+  return filtered;
+}
+
+function requestContext(context: AuthoringRequest["context"]): JsonValue | undefined {
+  if (context === undefined) return undefined;
+  return filterContextValue(context);
+}
+
 export function buildAuthoringContext({ schema, request, policy }: BuildAuthoringContextOptions): AuthoringContext {
   const targetFieldId =
     request.target?.kind === "field" || request.target?.kind === "option" ? request.target.fieldId : undefined;
@@ -53,6 +70,7 @@ export function buildAuthoringContext({ schema, request, policy }: BuildAuthorin
       ? schema.fields
       : schema.fields.slice(Math.max(0, targetIndex - 1), Math.min(schema.fields.length, targetIndex + 2));
   const resolvedPolicy = policyContext(policy);
+  const resolvedRequestContext = requestContext(request.context);
   return {
     intent: request.intent,
     schemaHash: computeAuthoringSchemaHash(schema),
@@ -68,6 +86,6 @@ export function buildAuthoringContext({ schema, request, policy }: BuildAuthorin
     fields: fields.map(fieldContext),
     ...(resolvedPolicy === undefined ? {} : { policy: resolvedPolicy }),
     ...(request.target === undefined ? {} : { target: request.target }),
-    ...(request.context === undefined ? {} : { requestContext: request.context })
+    ...(resolvedRequestContext === undefined ? {} : { requestContext: resolvedRequestContext })
   };
 }

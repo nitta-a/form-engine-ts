@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AUTHORING_SUGGESTION_JSON_SCHEMA,
   type AuthoringOperation,
   type AuthoringSuggestion,
   applyAuthoringSuggestion,
@@ -225,6 +226,10 @@ describe("authoring suggestions", () => {
       appliedOperationIds: []
     });
     expect(parseAuthoringSuggestion(value)).toEqual(value);
+    expect(AUTHORING_SUGGESTION_JSON_SCHEMA).toMatchObject({
+      type: "object",
+      properties: { operations: { type: "array" } }
+    });
     expect(() => parseAuthoringSuggestion({ ...value, operations: [{ type: "removeField" }] })).toThrow(
       "Invalid authoring suggestion"
     );
@@ -240,7 +245,16 @@ describe("authoring suggestions", () => {
           { id: "q3", type: "text", title: "Three", required: false }
         ]
       },
-      request: { intent: "rewrite_field", target: { kind: "field", fieldId: "q2" } },
+      request: {
+        intent: "rewrite_field",
+        target: { kind: "field", fieldId: "q2" },
+        context: {
+          product: "survey",
+          answers: { q1: "secret" },
+          nested: { submission: "secret", safe: { responses: [], label: "kept" } },
+          analytics: {}
+        }
+      },
       policy: { maxTextLength: 120, allowedFieldTypes: ["text"] }
     });
     expect(context.fields).toEqual([
@@ -251,5 +265,9 @@ describe("authoring suggestions", () => {
     expect(context.form).toMatchObject({ contentMode: "survey" });
     expect(context.policy).toMatchObject({ maxTextLength: 120, allowedFieldTypes: ["text"] });
     expect(context).not.toHaveProperty("answers");
+    expect(context).not.toHaveProperty("submission");
+    expect(context).not.toHaveProperty("responses");
+    expect(context).not.toHaveProperty("analytics");
+    expect(context.requestContext).toEqual({ product: "survey", nested: { safe: { label: "kept" } } });
   });
 });

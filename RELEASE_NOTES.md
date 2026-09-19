@@ -9,11 +9,14 @@ current release and usage information.
   validation, immutable preview/apply, partial selection, and stale-schema rejection.
 - Made `AuthoringAssistantAdapter.generate()` and operation previews required, added structured response parsing, bounded
   authoring context extraction, explicit preview options, and valid Core no-op semantics for empty selection.
-- Added controlled MUI selection, field-type-aware actions, human-readable before/after rows, localized operation labels,
-  and disabled invalid operations.
+- Added controlled MUI selection, field-type-aware actions, human-readable before/after rows, localized operation and
+  property/value labels including added choice options, and disabled invalid operations.
 - Added `createAuthoringRequestFromQualityIssue()` and an optional `SurveyQualityPanel` AI-fix action. Provider SDKs and
   credentials remain server-side application responsibilities. Added `applyAndRecheckQuality()` for a successful apply →
-  quality recheck flow without coupling the Core authoring and Quality domains.
+  quality recheck flow without coupling the Core authoring and Quality domains. The quality panel uses the existing
+  custom-survey translation scope for default actions and empty states.
+- Removed the complete schema from the public `AuthoringRequest` boundary; providers receive only bounded authoring
+  context, with answer-shaped context keys excluded.
 
 ## Latest release
 

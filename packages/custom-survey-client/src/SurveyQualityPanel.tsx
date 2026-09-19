@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useSurveyTranslation } from "./provider";
 import type { QualityCheckResult, QualityIssue, QualityIssueDecision } from "./types";
 
 export interface SurveyQualityPanelProps {
@@ -29,7 +30,8 @@ function defaultIssue(
   issue: QualityIssue,
   decision: QualityIssueDecision | undefined,
   onDecide: SurveyQualityPanelProps["onDecide"],
-  onRequestAiFix: SurveyQualityPanelProps["onRequestAiFix"]
+  onRequestAiFix: SurveyQualityPanelProps["onRequestAiFix"],
+  text: (key: string, fallback: string) => string
 ): React.JSX.Element {
   const accept = () => onDecide?.(issue, "accept");
   const reject = () => onDecide?.(issue, "reject");
@@ -41,16 +43,16 @@ function defaultIssue(
       {onDecide === undefined ? null : (
         <span>
           <button type="button" onClick={accept}>
-            Accept
+            {text("quality.accept", "Accept")}
           </button>
           <button type="button" onClick={reject}>
-            Reject
+            {text("quality.reject", "Reject")}
           </button>
         </span>
       )}
       {onRequestAiFix === undefined ? null : (
         <button type="button" onClick={() => onRequestAiFix(issue)}>
-          Fix with AI
+          {text("quality.fixWithAi", "Fix with AI")}
         </button>
       )}
     </div>
@@ -66,9 +68,16 @@ export function SurveyQualityPanel({
   render,
   slots
 }: SurveyQualityPanelProps): React.JSX.Element {
+  const translation = useSurveyTranslation();
+  const text = (key: string, fallback: string): string => {
+    const translated = translation.customSurvey(key);
+    return translated === key || translated === `customSurvey:${key}` ? fallback : translated;
+  };
   if (render !== undefined) return <>{render(result)}</>;
-  if (result === undefined) return <>{slots?.empty?.() ?? <p>No quality check has been run.</p>}</>;
-  if (result.issues.length === 0) return <>{slots?.empty?.() ?? <p>Quality check passed.</p>}</>;
+  if (result === undefined)
+    return <>{slots?.empty?.() ?? <p>{text("quality.notRun", "No quality check has been run.")}</p>}</>;
+  if (result.issues.length === 0)
+    return <>{slots?.empty?.() ?? <p>{text("quality.passed", "Quality check passed.")}</p>}</>;
   return (
     <ul>
       {result.issues.map((issue) => {
@@ -80,9 +89,9 @@ export function SurveyQualityPanel({
           <li key={surveyQualityIssueKey(issue)}>
             {decision === undefined
               ? (slots?.issue?.({ issue, accept, reject, requestAiFix }) ??
-                defaultIssue(issue, decision, onDecide, onRequestAiFix))
+                defaultIssue(issue, decision, onDecide, onRequestAiFix, text))
               : (slots?.issue?.({ issue, decision, accept, reject, requestAiFix }) ??
-                defaultIssue(issue, decision, onDecide, onRequestAiFix))}
+                defaultIssue(issue, decision, onDecide, onRequestAiFix, text))}
           </li>
         );
       })}

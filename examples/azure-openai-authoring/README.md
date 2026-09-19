@@ -51,4 +51,6 @@ export async function POST(request: Request): Promise<Response> {
 ```
 
 The client can use the preview app's `createHttpAuthoringAssistantAdapter()` or an equivalent `fetch` adapter. The
-server must still apply Core policy/schema validation before persistence; this endpoint never receives submission answers.
+request contains only the intent, prompt, target, and bounded context produced by `useAuthoringAssistant`; it does not
+contain the complete `FormSchema`. The server must still apply Core policy/schema validation before persistence, and this
+endpoint must reject or omit submission answers, responses, analytics, and provider credentials.

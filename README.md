@@ -81,6 +81,19 @@ write `FormSchema` directly, generated field/option IDs are assigned by Core, an
 stay outside the browser. `createAuthoringRequestFromQualityIssue()` can turn a survey quality issue into a targeted
 rewrite or option-generation request.
 `applyAndRecheckQuality()` reruns the existing quality adapter only after a successful selected-operation apply.
+`SurveyQualityPanel` uses the existing custom-survey translation scope for its default quality actions and empty states,
+with English fallbacks when those keys are not configured.
+
+The recommended flow is:
+
+```text
+Host UI → useAuthoringAssistant → AuthoringAssistantAdapter → host server API → AI provider
+         → AuthoringSuggestion → parse → preview → human approval → apply
+```
+
+`AuthoringRequest` contains only intent, prompt, target, and bounded context. It intentionally has no complete
+`FormSchema`; keep provider secrets server-side, never include answers, submissions, responses, or analytics in context,
+and persist only the validated Core apply result.
 
 ```tsx
 const assistant = useAuthoringAssistant({ schema, adapter, policy, onChange: setSchema });
@@ -452,6 +465,19 @@ AI AuthoringはProviderに依存しません。サーバー側のAdapterが`Auth
 認証情報はブラウザー外に置き、`createAuthoringRequestFromQualityIssue()`で品質問題から質問修正や選択肢生成の
 依頼を作成できます。
 `applyAndRecheckQuality()`を使うと、選択した操作の適用成功後だけ既存のQuality adapterを再実行できます。
+`SurveyQualityPanel`の標準アクションと空状態は既存のcustom-survey翻訳scopeを使い、キーが未設定の場合は英語へ
+フォールバックします。
+
+推奨フローは次のとおりです。
+
+```text
+Host UI → useAuthoringAssistant → AuthoringAssistantAdapter → Host Server API → AI Provider
+         → AuthoringSuggestion → parse → preview → human approval → apply
+```
+
+`AuthoringRequest`はintent、prompt、target、bounded contextだけを持ち、完全な`FormSchema`は含みません。
+Providerの認証情報をブラウザーへ渡さず、answers・submission・responses・analyticsをcontextへ含めず、Coreで
+検証・適用した結果だけを保存してください。
 
 ```tsx
 const assistant = useAuthoringAssistant({ schema, adapter, policy, onChange: setSchema });

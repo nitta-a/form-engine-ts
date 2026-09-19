@@ -12,8 +12,6 @@ export interface AuthoringRequest {
   readonly prompt?: string;
   readonly target?: AuthoringTarget;
   readonly context?: Readonly<Record<string, JsonValue>>;
-  /** Providers may use the schema supplied by the controller as grounding context. */
-  readonly schema?: FormSchema;
 }
 
 export interface AuthoringAssistantAdapter {

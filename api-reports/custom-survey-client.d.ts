@@ -1174,7 +1174,7 @@ interface ApplyAndRecheckQualityResult<TApply, TQuality> {
 }
 declare function applyAndRecheckQuality<TApply extends {
     readonly success: boolean;
-}, TQuality>(apply: () => TApply | Promise<TApply | undefined>, recheck: () => Promise<TQuality>): Promise<ApplyAndRecheckQualityResult<TApply, TQuality>>;
+}, TQuality>(apply: () => TApply | undefined | Promise<TApply | undefined>, recheck: () => Promise<TQuality>): Promise<ApplyAndRecheckQualityResult<TApply, TQuality>>;
 declare function createAuthoringRequestFromQualityIssue(issue: QualityIssue, schema: FormSchema): AuthoringRequest;
 
 interface SurveyQualityCheckAdapter<TVersion, TState = unknown, TResponse = unknown> {
