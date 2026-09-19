@@ -18,7 +18,7 @@ export interface AuthoringRequest {
 
 export interface AuthoringAssistantAdapter {
   generate?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
-  /** Compatibility alias for adapters that prefer an explicit method name. */
+  /** @deprecated Use generate. Kept for adapters published before the canonical method name. */
   generateSuggestion?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
 }
 
@@ -151,11 +151,32 @@ export interface AuthoringValidationResult {
   readonly issues: readonly AuthoringValidationIssue[];
 }
 
+export type AuthoringPreviewValue =
+  | {
+      readonly kind: "form";
+      readonly title?: string;
+      readonly description?: string;
+      readonly completionMessage?: string;
+      readonly submitLabelKey?: string;
+    }
+  | { readonly kind: "field"; readonly field?: FormField | AuthoringFieldInput }
+  | { readonly kind: "option"; readonly option?: FieldOption | AuthoringOptionInput };
+
+export interface AuthoringOperationPreview {
+  readonly operationId: string;
+  readonly operation: AuthoringOperation;
+  readonly valid: boolean;
+  readonly before?: AuthoringPreviewValue;
+  readonly after?: AuthoringPreviewValue;
+  readonly issues: readonly AuthoringValidationIssue[];
+}
+
 export interface AuthoringPreview {
   readonly valid: boolean;
   readonly baseSchemaHash: string;
   readonly schema: FormSchema;
   readonly operations: readonly AuthoringOperation[];
+  readonly operationPreviews?: readonly AuthoringOperationPreview[];
   readonly issues: readonly AuthoringValidationIssue[];
 }
 

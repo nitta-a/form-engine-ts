@@ -34,6 +34,11 @@ describe("useAuthoringAssistant", () => {
     });
     expect(result.current.status).toBe("ready");
     act(() => {
+      result.current.clearSelection();
+    });
+    expect(result.current.preview?.valid).toBe(true);
+    expect(result.current.preview?.operations).toHaveLength(0);
+    act(() => {
       result.current.apply(["form"]);
     });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ title: "Updated" }));
@@ -121,11 +126,29 @@ describe("useAuthoringAssistant", () => {
       await result.current.suggest({ intent: "improve_text" });
     });
     rerender({ currentSchema: { ...schema, title: "Changed elsewhere" } });
+    await waitFor(() => expect(result.current.isStale).toBe(true));
+    expect(result.current.preview?.issues[0]?.code).toBe("stale_schema");
     let applied: ReturnType<typeof result.current.apply>;
     act(() => {
       applied = result.current.apply();
     });
     expect(applied).toMatchObject({ success: false, error: { code: "stale_schema" } });
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("aborts provider work when unmounted", async () => {
+    let signal: AbortSignal | undefined;
+    const adapter: AuthoringAssistantAdapter = {
+      generate: (_request, nextSignal) => {
+        signal = nextSignal;
+        return new Promise<never>(() => undefined);
+      }
+    };
+    const pendingHook = renderHook(() => useAuthoringAssistant({ schema, adapter, onChange: vi.fn() }));
+    act(() => {
+      void pendingHook.result.current.suggest({ intent: "generate_form" });
+    });
+    pendingHook.unmount();
+    expect(signal?.aborted).toBe(true);
   });
 });

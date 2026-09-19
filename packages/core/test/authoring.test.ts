@@ -146,6 +146,34 @@ describe("authoring suggestions", () => {
     expect(validateAuthoringSuggestion(addText, base, { maxTextLength: 3 }).valid).toBe(false);
   });
 
+  it("previews only selected operations and exposes before/after values", () => {
+    const value = suggestion([
+      { operationId: "one", type: "updateField", fieldId: "q1", patch: { title: "Updated" } },
+      { operationId: "two", type: "updateForm", patch: { title: "Form" } }
+    ]);
+    const preview = previewAuthoringSuggestion(base, value, ["one"]);
+    expect(preview.valid).toBe(true);
+    expect(preview.operations.map((operation) => operation.operationId)).toEqual(["one"]);
+    const operationPreviews = preview.operationPreviews ?? [];
+    expect(operationPreviews).toHaveLength(2);
+    expect(operationPreviews[0]).toMatchObject({
+      operationId: "one",
+      before: { kind: "field", field: { title: "Question" } },
+      after: { kind: "field", field: { title: "Updated" } }
+    });
+  });
+
+  it("allows a valid selected operation when another operation exceeds a cumulative limit", () => {
+    const value = suggestion([
+      { operationId: "one", type: "addField", field: { type: "text", title: "One" } },
+      { operationId: "two", type: "addField", field: { type: "text", title: "Two" } }
+    ]);
+    const preview = previewAuthoringSuggestion(base, value, ["one"], { maxFields: 2 });
+    expect(preview.valid).toBe(true);
+    expect(preview.schema.fields).toHaveLength(2);
+    expect((preview.operationPreviews ?? []).find((item) => item.operationId === "two")?.valid).toBe(true);
+  });
+
   it("preserves page membership and rejects runtime-only protected properties", () => {
     const paged = { ...base, pages: [{ id: "page-1", title: "Page", questionIds: ["q1"] }] };
     const add = suggestion([

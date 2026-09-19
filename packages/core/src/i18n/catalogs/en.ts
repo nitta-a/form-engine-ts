@@ -1,6 +1,18 @@
 import type { FormEngineTranslationKey } from "../keys";
 
 export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = Object.freeze({
+  "authoring.prompt.label": "Describe the form change",
+  "authoring.prompt.submit": "Ask AI",
+  "authoring.preview.selectAll": "Select all",
+  "authoring.preview.apply": "Apply selected",
+  "authoring.preview.reject": "Reject",
+  "authoring.preview.before": "Before",
+  "authoring.preview.after": "After",
+  "authoring.preview.invalid": "Invalid",
+  "authoring.action.ai": "✨ AI",
+  "authoring.action.rewrite": "Improve question",
+  "authoring.action.shorten": "Shorten",
+  "authoring.action.generateOptions": "Generate options",
   "builder.content.mode": "Content type",
   "builder.content.survey": "Survey",
   "builder.content.poll": "Poll",

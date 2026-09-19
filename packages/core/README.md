@@ -41,15 +41,28 @@ import {
 
 const suggestion: AuthoringSuggestion = await adapter.generate({ intent: "add_questions", prompt, schema });
 const preview = previewAuthoringSuggestion(schema, suggestion, policy);
+// Re-preview a subset after the user unchecks an operation.
+const selectedPreview = previewAuthoringSuggestion(schema, suggestion, ["question-1"], policy);
 if (preview.valid) {
   const result = applyAuthoringSuggestion(schema, suggestion, ["question-1"], { policy });
   if (result.success) save(result.schema);
 }
 ```
 
+`preview.operationPreviews` contains operation-level validation plus optional before/after values for form, field, and
+option changes. The selected-operation overload keeps the schema hash check and cumulative policy validation intact.
+
 The MVP supports independent `addField`, `updateField`, `updateForm`, `addOption`, and `updateOption` operations.
 Removal, moving, pages, conditions, locale/translation, submission settings, and direct Azure/OpenAI SDK usage stay
 in the host application.
+
+For a server-backed provider, keep credentials in the host server and inject a small HTTP adapter. The preview app
+includes `createHttpAuthoringAssistantAdapter()` as a reference; the server endpoint should return an
+`AuthoringSuggestion` structured response, which Core validates before apply.
+
+Security responsibilities remain with the host application: do not put provider API keys in the browser, keep Azure
+OpenAI/OpenAI/Bedrock calls server-side, never let this package manage provider credentials, and always validate an AI
+response through `previewAuthoringSuggestion`/`applyAuthoringSuggestion` before persisting it.
 
 ## Built-in templates
 

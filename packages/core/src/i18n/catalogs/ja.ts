@@ -16,6 +16,18 @@ export const JA_COMPARISON_MESSAGES: Readonly<Record<string, string>> = Object.f
 });
 
 export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = Object.freeze({
+  "authoring.prompt.label": "フォームの変更内容を入力",
+  "authoring.prompt.submit": "AIに依頼",
+  "authoring.preview.selectAll": "すべて選択",
+  "authoring.preview.apply": "選択した変更を適用",
+  "authoring.preview.reject": "却下",
+  "authoring.preview.before": "変更前",
+  "authoring.preview.after": "変更後",
+  "authoring.preview.invalid": "無効",
+  "authoring.action.ai": "✨ AI",
+  "authoring.action.rewrite": "質問文を改善",
+  "authoring.action.shorten": "短くする",
+  "authoring.action.generateOptions": "選択肢を生成",
   "builder.content.mode": "フォーム種別",
   "builder.content.survey": "アンケート",
   "builder.content.poll": "投票",

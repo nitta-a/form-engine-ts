@@ -3,6 +3,9 @@ import { applyAuthoringSuggestion } from "./apply";
 import { computeAuthoringSchemaHash } from "./hash";
 import type {
   AuthoringOperation,
+  AuthoringOperationPreview,
+  AuthoringPreview,
+  AuthoringPreviewValue,
   AuthoringSuggestion,
   AuthoringValidationIssue,
   AuthoringValidationResult
@@ -46,6 +49,10 @@ const fieldPatchKeys = new Set(
 );
 const optionKeys = new Set(["label", "textInput", "pinned"]);
 const formPatchKeys = new Set(["title", "description", "completionMessage", "submitLabelKey"]);
+
+function isOperationIds(value: readonly string[] | FormPolicy | undefined): value is readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
 
 function issue(
   code: AuthoringValidationIssue["code"],
@@ -350,31 +357,77 @@ export function validateAuthoringSuggestion(
 export function previewAuthoringSuggestion(
   schema: FormSchema,
   suggestion: AuthoringSuggestion,
+  selectedOperationIdsOrPolicy?: readonly string[] | FormPolicy,
   policy?: FormPolicy
-): import("./types").AuthoringPreview {
-  const validation = validateAuthoringSuggestion(suggestion, schema, policy);
-  if (!validation.valid)
+): AuthoringPreview {
+  const selectedOperationIds = isOperationIds(selectedOperationIdsOrPolicy) ? selectedOperationIdsOrPolicy : undefined;
+  let resolvedPolicy: FormPolicy | undefined;
+  if (selectedOperationIdsOrPolicy === undefined || isOperationIds(selectedOperationIdsOrPolicy))
+    resolvedPolicy = policy;
+  else resolvedPolicy = selectedOperationIdsOrPolicy;
+  const selected =
+    selectedOperationIds === undefined
+      ? suggestion.operations
+      : suggestion.operations.filter((operation) => selectedOperationIds.includes(operation.operationId));
+  const selectedSuggestion = { ...suggestion, operations: selected };
+  const validation = validateAuthoringSuggestion(selectedSuggestion, schema, resolvedPolicy);
+  const applied = validation.valid
+    ? applyAuthoringSuggestion(
+        schema,
+        selectedSuggestion,
+        undefined,
+        resolvedPolicy === undefined ? {} : { policy: resolvedPolicy }
+      )
+    : undefined;
+  const issues = applied !== undefined && !applied.success ? applied.error.issues : validation.issues;
+  const operationPreviews = suggestion.operations.map((operation) => {
+    const isSelected = selected.some((candidate) => candidate.operationId === operation.operationId);
+    const operationValidation = isSelected
+      ? validation
+      : validateAuthoringSuggestion({ ...suggestion, operations: [operation] }, schema, resolvedPolicy);
+    const operationIssues = operationValidation.issues.filter((item) => item.operationId === operation.operationId);
+    const commonIssues = operationValidation.issues.filter((item) => item.operationId === undefined);
+    const preview = operationPreview(schema, operation);
     return {
-      valid: false,
-      baseSchemaHash: suggestion.baseSchemaHash,
-      schema,
-      operations: suggestion.operations,
-      issues: validation.issues
-    };
-  const applied = applyAuthoringSuggestion(schema, suggestion, undefined, policy === undefined ? {} : { policy });
-  if (!applied.success)
-    return {
-      valid: false,
-      baseSchemaHash: suggestion.baseSchemaHash,
-      schema,
-      operations: suggestion.operations,
-      issues: applied.error.issues
-    };
+      operationId: operation.operationId,
+      operation,
+      valid: operationIssues.length === 0 && commonIssues.length === 0,
+      ...(preview.before === undefined ? {} : { before: preview.before }),
+      ...(preview.after === undefined ? {} : { after: preview.after }),
+      issues: [...commonIssues, ...operationIssues]
+    } satisfies AuthoringOperationPreview;
+  });
   return {
-    valid: true,
+    valid: validation.valid && (applied === undefined || applied.success),
     baseSchemaHash: suggestion.baseSchemaHash,
-    schema: applied.schema,
-    operations: suggestion.operations,
-    issues: []
+    schema: applied?.success ? applied.schema : schema,
+    operations: selected,
+    operationPreviews,
+    issues
+  };
+}
+
+function operationPreview(
+  schema: FormSchema,
+  operation: AuthoringOperation
+): { readonly before?: AuthoringPreviewValue; readonly after?: AuthoringPreviewValue } {
+  if (operation.type === "addField") return { after: { kind: "field", field: operation.field } };
+  if (operation.type === "updateForm") {
+    const before = { kind: "form", ...schema } satisfies AuthoringPreviewValue;
+    return { before, after: { kind: "form", ...schema, ...operation.patch } };
+  }
+  const field = schema.fields.find((candidate) => candidate.id === operation.fieldId);
+  if (operation.type === "addOption") return { after: { kind: "option", option: operation.option } };
+  if (field === undefined) return {};
+  if (operation.type === "updateField")
+    return {
+      before: { kind: "field", field },
+      after: { kind: "field", field: { ...field, ...operation.patch } as typeof field }
+    };
+  if (!("options" in field)) return {};
+  const option = field.options.find((candidate) => candidate.id === operation.optionId);
+  return {
+    ...(option === undefined ? {} : { before: { kind: "option", option } }),
+    ...(option === undefined ? {} : { after: { kind: "option", option: { ...option, ...operation.patch } } })
   };
 }

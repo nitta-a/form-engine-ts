@@ -1,4 +1,5 @@
 import {
+  type AuthoringIntent,
   cloneVersionToDraft,
   createPublishTransitionPlan,
   createResponseAccumulator,
@@ -8,7 +9,7 @@ import {
   type FormVersionState,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { MuiAuthoringPrompt, MuiAuthoringSuggestionPreview } from "@form-engine-ts/mui";
+import { MuiAuthoringFieldAction, MuiAuthoringPrompt, MuiAuthoringSuggestionPreview } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
@@ -299,6 +300,7 @@ function AuthoringAssistantDemo({
   readonly schema: FormSchema;
   readonly onChange: (schema: FormSchema) => void;
 }) {
+  const [intent, setIntent] = useState<AuthoringIntent>("add_questions");
   const assistant = useAuthoringAssistant({
     schema,
     adapter: mockAuthoringAssistantAdapter,
@@ -308,10 +310,31 @@ function AuthoringAssistantDemo({
   return (
     <fieldset className="authoring-assistant-demo">
       <legend>AI Authoring Assistant (mock provider)</legend>
+      <label>
+        Intent
+        <select
+          aria-label="AI intent"
+          value={intent}
+          onChange={(event) => setIntent(event.target.value as AuthoringIntent)}
+        >
+          <option value="add_questions">Add questions</option>
+          <option value="generate_form">Generate form</option>
+          <option value="rewrite_field">Rewrite field</option>
+          <option value="generate_options">Generate options</option>
+        </select>
+      </label>
       <MuiAuthoringPrompt
         disabled={assistant.status === "generating"}
+        intent={intent}
         onSubmit={(request) => void assistant.suggest(request)}
       />
+      {schema.fields[0] === undefined ? null : (
+        <MuiAuthoringFieldAction
+          field={schema.fields[0]}
+          disabled={assistant.status === "generating"}
+          onRequest={(request) => void assistant.suggest(request)}
+        />
+      )}
       {assistant.status === "generating" ? <output>Generating suggestion…</output> : null}
       {assistant.error === undefined ? null : <output role="alert">{assistant.error.code}</output>}
       {assistant.suggestion !== undefined && assistant.preview !== undefined ? (
@@ -319,10 +342,17 @@ function AuthoringAssistantDemo({
           suggestion={assistant.suggestion}
           preview={assistant.preview}
           loading={assistant.status === "applying"}
+          selectedOperationIds={assistant.selectedOperationIds}
+          onSelectionChange={assistant.setSelectedOperationIds}
           onApply={(operationIds) => assistant.apply(operationIds)}
           onReject={assistant.reject}
         />
       ) : null}
+      {assistant.suggestion === undefined ? null : (
+        <button type="button" onClick={() => onChange({ ...schema, title: `${schema.title} (edited)` })}>
+          Make schema stale
+        </button>
+      )}
     </fieldset>
   );
 }

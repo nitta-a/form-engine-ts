@@ -17,6 +17,7 @@ export {
   type FormEngineI18nContextValue,
   FormEngineI18nProvider,
   type FormEngineI18nProviderProps,
+  FormEngineI18nProviderScopeContext,
   useFormEngineI18n
 } from "./i18n/provider";
 export * from "./receipt";

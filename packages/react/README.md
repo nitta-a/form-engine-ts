@@ -159,8 +159,9 @@ options. Its completion-message editors cover both source and locale text. `tran
 `onTranslationReport` expose automatic-translation policy and reporting.
 
 `useAuthoringAssistant({ schema, adapter, policy, onChange })` coordinates provider-agnostic AI suggestions. It exposes
-`generating`/`ready`/`applying`/`error` state, cancellation, preview data, selected-operation apply, reject, and stale
-schema protection. The adapter remains an application concern; the hook never sends a schema mutation directly to a model.
+`generating`/`ready`/`applying`/`error` state, cancellation, preview data, `selectedOperationIds` with selection helpers,
+selected-operation apply, reject, and stale schema protection. The adapter remains an application concern; the hook never
+sends a schema mutation directly to a model.
 
 Visual-builder field creation uses `defaultFieldType` when it is allowed, otherwise the first allowed policy type, then
 `text` when unrestricted. The add button is disabled when no type is allowed or `maxFields` is reached.
