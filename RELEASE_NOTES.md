@@ -3,7 +3,7 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
-## Unreleased
+## v8.1.0 — 2026-09-20
 
 - Added privacy-preserving Core Interaction Telemetry events and `aggregateInteractionEvents()` funnel analytics.
 - Added deterministic Core Optimization Insights with configurable sample and metric thresholds, including submit-failure

@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.0.2** (2026-09-18). All public packages are currently aligned to version `8.0.2`.
-This patch adds customizable empty-state, locale-toolbar, and column-header surfaces to the translation comparison workspace.
+The latest release is **v8.1.0** (2026-09-20). All public packages are currently aligned to version `8.1.0`.
+This release adds privacy-preserving interaction telemetry, deterministic optimization insights, version comparison, and provider-agnostic authoring assistance.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -348,7 +348,7 @@ const result = answerSchema.safeParse(candidateAnswers);
 
 Zod failures use the field ID as their path and expose the Core validation code, translation message key, and interpolation values in custom issue parameters. Hidden answers are ignored during validation but are not transformed out of successful parse results.
 
-### 7.18.x extended APIs and migration
+### Extended APIs and migration
 
 Use `FormPolicy.contentMode` from `@form-engine-ts/core` to configure question counts, option counts, and allowed field types. Poll now defaults to at least one question with no upper bound; preserve the old single-question rule with `{ contentMode: { maxFields: 1 } }` and pass the same policy to storage, Builder, and answer validation. The `mapSchema` helpers preserve unknown metadata, translation metadata, pages, and conditions.
 
@@ -356,9 +356,9 @@ Storage adapters expose `inspectFormDeletion` and `deleteForm` through the lifec
 
 | Package group | Supported version |
 | --- | --- |
-| Core / React / MUI | 7.18.x |
-| Storage (Memory, MongoDB, Azure Table, Postgres, SQLite, D1, LocalStorage) | 7.18.x |
-| Translator / Zod / Privacy | 7.18.x (existing contracts) |
+| Core / React / MUI | 8.1.x |
+| Storage (Memory, MongoDB, Azure Table, Postgres, SQLite, D1, LocalStorage) | 8.1.x |
+| Translator / Zod / Privacy | 8.1.x (existing contracts) |
 
 Existing `StorageAdapter`, `aggregateResponses`, and `validateContentMode` APIs remain available. Adopt the new lifecycle, cross-form aggregation, and mapping contracts incrementally.
 
@@ -454,8 +454,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v8.0.2**（2026-09-18）です。公開パッケージはすべてバージョン `8.0.2` に揃えています。
-本パッチでは、翻訳比較ワークスペースの空状態、言語ツールバー、列ヘッダーをカスタマイズできるようにしました。
+最新版は **v8.1.0**（2026-09-20）です。公開パッケージはすべてバージョン `8.1.0` に揃えています。
+本リリースでは、プライバシー保護型インタラクションテレメトリー、決定的な最適化インサイト、version比較、ベンダー非依存のauthoring支援を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
