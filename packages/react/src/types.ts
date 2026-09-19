@@ -6,9 +6,12 @@ import type {
   FieldOption,
   FormAcceptanceResult,
   FormField,
+  FormInteractionEvent,
   FormPage,
   FormPolicy,
   FormSchema,
+  FormTelemetryAdapter,
+  FormTelemetryContextValue,
   FormValues,
   JsonValue,
   LocaleOption,
@@ -26,10 +29,23 @@ import type {
   ValidationIssue
 } from "@form-engine-ts/core";
 
-export type { FormSubmissionSerializedError } from "@form-engine-ts/core";
+export type { FormInteractionEvent, FormSubmissionSerializedError, FormTelemetryAdapter } from "@form-engine-ts/core";
 export { FormSubmissionError } from "@form-engine-ts/core";
 
 import type { SensitiveDataFinding } from "@form-engine-ts/privacy";
+
+export interface FormTelemetryOptions {
+  readonly adapter: FormTelemetryAdapter;
+  readonly sessionId?: string;
+  readonly context?: Readonly<Record<string, FormTelemetryContextValue>>;
+  readonly capture?: {
+    readonly fieldPresented?: boolean;
+    readonly fieldFocus?: boolean;
+    readonly validation?: boolean;
+  };
+  readonly onError?: (error: unknown, event: FormInteractionEvent) => void;
+}
+
 import type {
   ComponentType,
   CSSProperties,

@@ -111,8 +111,17 @@ function AnalyticsDetails({
 }
 
 export function AnalyticsPanel() {
-  const { analytics, schema, submissions, locale, downloadCsv, storage, isClearing, resetResponses } =
-    usePreviewWorkspace();
+  const {
+    analytics,
+    interactionAnalytics,
+    schema,
+    submissions,
+    locale,
+    downloadCsv,
+    storage,
+    isClearing,
+    resetResponses
+  } = usePreviewWorkspace();
   const t = (key: string) => mockTranslator.translate(key, locale) ?? key;
   const textFields = schema.fields.filter((field) => field.type === "text" || field.type === "textarea");
   const singleChoiceFields = schema.fields.filter(
@@ -169,6 +178,73 @@ export function AnalyticsPanel() {
           onReset={resetResponses}
         />
       </div>
+      <section className="analytics-tool" aria-labelledby="interaction-analytics-heading">
+        <h3 id="interaction-analytics-heading">Interaction Analytics</h3>
+        <dl className="metric-grid">
+          <div>
+            <dt>Viewed</dt>
+            <dd>{interactionAnalytics.funnel.viewedCount}</dd>
+          </div>
+          <div>
+            <dt>Started</dt>
+            <dd>{interactionAnalytics.funnel.startedCount}</dd>
+          </div>
+          <div>
+            <dt>Submitted</dt>
+            <dd>{interactionAnalytics.funnel.submittedCount}</dd>
+          </div>
+          <div>
+            <dt>Abandoned</dt>
+            <dd>{interactionAnalytics.funnel.abandonedCount}</dd>
+          </div>
+        </dl>
+        {interactionAnalytics.pages.length === 0 ? null : (
+          <table>
+            <caption>Pages</caption>
+            <thead>
+              <tr>
+                <th scope="col">Page</th>
+                <th scope="col">Viewed</th>
+                <th scope="col">Completed</th>
+                <th scope="col">Completion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {interactionAnalytics.pages.map((page) => (
+                <tr key={page.pageId}>
+                  <th scope="row">{page.pageId}</th>
+                  <td>{page.viewedCount}</td>
+                  <td>{page.completedCount}</td>
+                  <td>{page.completionRate.toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {interactionAnalytics.fields.length === 0 ? null : (
+          <table>
+            <caption>Questions</caption>
+            <thead>
+              <tr>
+                <th scope="col">Field</th>
+                <th scope="col">Presented</th>
+                <th scope="col">Completed</th>
+                <th scope="col">Completion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {interactionAnalytics.fields.map((field) => (
+                <tr key={field.fieldId}>
+                  <th scope="row">{field.fieldId}</th>
+                  <td>{field.presentedCount}</td>
+                  <td>{field.completedCount}</td>
+                  <td>{field.completionRate.toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
       <section className="analytics-tool" aria-labelledby="cross-tab-heading">
         <h3 id="cross-tab-heading">{t("preview.crossTab")}</h3>
         <div className="analytics-tool-controls">

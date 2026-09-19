@@ -5,6 +5,11 @@ current release and usage information.
 
 ## Unreleased
 
+- Added privacy-preserving Core Interaction Telemetry events and `aggregateInteractionEvents()` funnel analytics.
+- Added optional React `FormRenderer` telemetry integration with adapter failure isolation, event deduplication, and
+  StrictMode-safe lifecycle tracking.
+- Added a Preview Interaction Analytics panel showing form, page, and field funnel metrics.
+
 - Added the provider-agnostic Core AuthoringSuggestion contract with deterministic IDs at apply time, policy/schema
   validation, immutable preview/apply, partial selection, and stale-schema rejection.
 - Made `AuthoringAssistantAdapter.generate()` and operation previews required, added structured response parsing, bounded

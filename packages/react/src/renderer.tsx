@@ -40,6 +40,7 @@ import {
 } from "react";
 import { createLocalStorageSubmissionAttemptStore, type SubmissionAttempt } from "./attempt";
 import { FormProvider, useForm } from "./context";
+import { useFormTelemetry } from "./hooks/useFormTelemetry";
 import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "./i18n/provider";
 import type { SubmissionReceipt } from "./receipt";
 import type { ScopedSubmissionController, SubmissionController } from "./submission";
@@ -63,6 +64,7 @@ import type {
   FormSubmitStatus,
   FormSubmittedAnswerItem,
   FormSuccessRenderMode,
+  FormTelemetryOptions,
   RadioTextInputSlotProps,
   RenderSubmitButtonProps,
   SubmissionConfirmationOptions,
@@ -836,6 +838,7 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly slots?: FormRendererSlots;
   /** Optional controller used directly for submission lifecycle, retry, and attempt identity. */
   readonly controller?: SubmissionController<SubmitResponse> | ScopedSubmissionController<BaseSubmissionMetadata>;
+  readonly telemetry?: FormTelemetryOptions;
   /** @deprecated Use controller instead. */
   readonly submissionController?:
     | SubmissionController<SubmitResponse>
@@ -1115,9 +1118,11 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   attemptStore: providedAttemptStore,
   submissionIdentity,
   onReceiptError,
+  telemetry,
   slots = {}
 }: TypedFormRendererPresentationProps<TMeta>) {
   const form = useForm<TMeta>();
+  const telemetryRuntime = useFormTelemetry(form.schema, telemetry);
   const idFormat = submissionIdentity?.idFormat ?? providedIdFormat;
   const receiptStore = submissionIdentity?.receiptStore ?? providedReceiptStore;
   const submissionScope =
@@ -1298,6 +1303,28 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   const submitState: FormSubmitStatus = confirmation === null && !guardsPending ? form.submitStatus : "confirming";
   const interactionLocked = submitState === "confirming" || submitState === "submitting";
   const isReplaceMode = successRenderMode === "replace" || hideFormOnSuccess;
+  const telemetryFormVisible =
+    receiptLoaded &&
+    receipt === null &&
+    acceptanceStatus.accepted &&
+    (draftResume === undefined || autoSaveKey === undefined || draftResumeState === "ready");
+
+  useEffect(() => {
+    if (telemetryFormVisible && formRef.current !== null) telemetryRuntime.formViewed();
+  }, [telemetryFormVisible, telemetryRuntime]);
+
+  useEffect(() => {
+    if (!telemetryFormVisible || formRef.current === null || activePage === undefined) return;
+    telemetryRuntime.pageViewed(activePage.id);
+  }, [activePage, telemetryFormVisible, telemetryRuntime]);
+
+  useEffect(() => {
+    if (!telemetryFormVisible || formRef.current === null) return;
+    for (const field of form.schema.fields) {
+      if (form.visibility[field.id] !== true || (fieldIds !== undefined && !fieldIds.has(field.id))) continue;
+      telemetryRuntime.fieldPresented(field, activePage?.id);
+    }
+  }, [activePage?.id, fieldIds, form.schema.fields, form.visibility, telemetryFormVisible, telemetryRuntime]);
 
   const resolveMessage = useCallback(
     (
@@ -1698,15 +1725,26 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     setCurrentPageIndex(pageIndex);
   };
 
+  const handlePrevious = () => {
+    if (interactionLocked) return;
+    telemetryRuntime.start();
+    goToPage(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
+  };
+
   const handleNext = () => {
     if (interactionLocked) return;
+    telemetryRuntime.start();
     const result = form.validatePage(currentPageIndex);
     if (!result.valid) {
+      telemetryRuntime.validationFailed("page", result.issues, activePage?.id);
       focusFirstIssue(result.issues[0]?.fieldId);
       return;
     }
     const nextPageIndex = visiblePageIndexes[activeVisibleIndex + 1];
-    if (nextPageIndex !== undefined) goToPage(nextPageIndex);
+    if (nextPageIndex !== undefined) {
+      if (activePage !== undefined) telemetryRuntime.pageCompleted(activePage.id);
+      goToPage(nextPageIndex);
+    }
   };
 
   const runSubmissionGuards = async (
@@ -1803,6 +1841,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     }
     const validation = validateAnswers(form.schema, form.values);
     const firstInvalidFieldId = validation.issues[0]?.fieldId;
+    if (!validation.valid) telemetryRuntime.validationFailed("form", validation.issues);
     const submittedAt = new Date().toISOString();
     const resolvedChallengeToken = typeof challengeToken === "function" ? await challengeToken() : challengeToken;
     const guardValues = {
@@ -1878,6 +1917,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       };
       const result = await form.submit(beforeSubmit, submitContext);
       if (result.status === "invalid") {
+        if (validation.valid) telemetryRuntime.validationFailed("form", result.issues);
         const invalidPageIndex = pages?.findIndex((page) =>
           firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
         );
@@ -1886,6 +1926,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         return result;
       }
       if (result.status === "error") {
+        telemetryRuntime.submitFailed();
         const payload =
           result.error instanceof FormSubmissionError
             ? result.error.payload
@@ -1908,6 +1949,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         return result;
       }
       if (result.status !== "success") return result;
+      telemetryRuntime.submitted();
       const submittedAnswers = { ...form.values };
       const submittedItems = buildSubmittedItems(
         form.schema,
@@ -1968,7 +2010,17 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitState === "submitting" || submitState === "confirming" || submitState === "success") return;
+    telemetryRuntime.submitAttempted();
     void submitValues();
+  };
+
+  const handleFieldFocus = (event: React.FocusEvent<HTMLFormElement>) => {
+    if (!(event.target instanceof Element)) return;
+    const fieldId = event.target.closest<HTMLElement>("[data-field-id]")?.dataset.fieldId;
+    if (fieldId === undefined) return;
+    const field = form.schema.fields.find((candidate) => candidate.id === fieldId);
+    if (field === undefined || form.visibility[field.id] !== true) return;
+    telemetryRuntime.fieldFocused(field, activePage?.id);
   };
 
   const confirmSubmission = () => {
@@ -2002,7 +2054,10 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       isSubmitting: submitState === "submitting",
       submitStatus: submitState,
       disabled: interactionLocked || submitState === "success",
-      onSubmit: () => void submitValues()
+      onSubmit: () => {
+        telemetryRuntime.submitAttempted();
+        void submitValues();
+      }
     };
     return (
       slots.renderSubmitButton?.(submitButtonProps) ?? (
@@ -2242,6 +2297,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         data-mode={getFormContentMode(form.schema.metadata)}
         data-submit-status={submitState}
         onSubmit={handleSubmit}
+        onFocusCapture={handleFieldFocus}
         aria-hidden={confirmation !== null && confirmationRenderMode === "dialog" ? true : undefined}
       >
         {honeypotFieldId === undefined ? null : (
@@ -2325,7 +2381,10 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                 field,
                 value: form.values[field.id],
                 error,
-                setValue: (value) => form.setValue(field.id, value),
+                setValue: (value) => {
+                  telemetryRuntime.fieldValueChanged(field, value, activePage?.id);
+                  form.setValue(field.id, value);
+                },
                 translate: fieldTranslate,
                 inputId: `${prefix}-${field.id}`,
                 errorId: `${prefix}-${field.id}-error`,
@@ -2344,7 +2403,10 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                       question: field,
                       value: form.values[field.id],
                       onChange: (value) => {
-                        if (isFormValue(value)) form.setValue(field.id, value);
+                        if (isFormValue(value)) {
+                          telemetryRuntime.fieldValueChanged(field, value, activePage?.id);
+                          form.setValue(field.id, value);
+                        }
                       },
                       ...(error === undefined ? {} : { error })
                     })}
@@ -2410,9 +2472,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               canPrev,
               canNext,
               progress,
-              onPrev: () => {
-                if (!interactionLocked) goToPage(visiblePageIndexes[activeVisibleIndex - 1] ?? 0);
-              },
+              onPrev: handlePrevious,
               onNext: handleNext
             }) ?? (
               <>
@@ -2421,7 +2481,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                     className={joinClassNames("btn-prev", classNames?.previousButton)}
                     type="button"
                     disabled={interactionLocked}
-                    onClick={() => goToPage(visiblePageIndexes[activeVisibleIndex - 1] ?? 0)}
+                    onClick={handlePrevious}
                   >
                     {form.translate("form.back")}
                   </button>

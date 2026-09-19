@@ -20,6 +20,7 @@ export function RespondentPanel() {
   const {
     storageKind,
     storage,
+    telemetryAdapter,
     isClearing,
     simulateServerError,
     setStorageKind,
@@ -122,6 +123,7 @@ export function RespondentPanel() {
       errorMessageKey="preview.error"
       appearance={choiceFieldAppearance}
       successRenderMode={successRenderMode}
+      telemetry={{ adapter: telemetryAdapter }}
       autoSaveKey={`form-engine-preview-draft:${storageKind}:${schema.id}:${schema.version}`}
       {...(getFormContentMode(schema.metadata) === "survey" ? { draftResume: {} } : {})}
       beforeSubmit={() => {

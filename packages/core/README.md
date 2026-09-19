@@ -107,6 +107,26 @@ and `@form-engine-ts/core/i18n/ja` without importing them from an application fe
 
 ## Multi-step, localization, analytics, and events
 
+### Interaction Telemetry
+
+Interaction Telemetry is separate from submission analytics and records form behavior without answer content:
+
+```ts
+import { aggregateInteractionEvents, type FormTelemetryAdapter } from "@form-engine-ts/core";
+
+const adapter: FormTelemetryAdapter = {
+  track(event) {
+    console.log(event);
+  }
+};
+
+const analytics = aggregateInteractionEvents(events);
+```
+
+Events contain form, page, field, validation-code, timing, and funnel information, but do not include answer values,
+question labels, option labels, or validation messages. The adapter contract is vendor-neutral; the host application owns
+delivery and retention.
+
 Add `pages` to partition every field into an accessible wizard and use `validatePageAnswers(schema, pageIndex, values)`
 for step-scoped validation. Schemas without `pages` remain single-page forms.
 

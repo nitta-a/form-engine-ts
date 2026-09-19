@@ -364,6 +364,11 @@ Existing `StorageAdapter`, `aggregateResponses`, and `validateContentMode` APIs 
 
 ### Analytics semantics
 
+Interaction Telemetry is a separate, privacy-preserving model for form behavior. Inject a `FormTelemetryAdapter` into
+`FormRenderer` to collect view, start, page, field, validation, submit, and exit events, then use
+`aggregateInteractionEvents(events)` for form, page, and field funnels. Events do not include answer values, labels, or
+validation messages by default; adapter failures never block form interaction.
+
 - Percentages use all valid submissions as the denominator.
 - Multi-select percentages describe the share of submissions choosing each option and may total more than 100%.
 - Text and textarea analytics expose only answered/unanswered counts; free-text content is never copied into aggregates.
@@ -706,6 +711,11 @@ const result = answerSchema.safeParse(candidateAnswers);
 Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補間値をcustom paramsに保持します。非表示回答は検証対象外ですが、成功したparse結果からは削除されません。
 
 ### 分析の仕様
+
+Interaction Telemetryは回答送信後の分析とは分離された、フォーム操作専用のプライバシー配慮モデルです。
+`FormRenderer`へ`FormTelemetryAdapter`を注入すると、表示、開始、ページ、設問、検証、送信、離脱イベントを収集でき、
+`aggregateInteractionEvents(events)`でフォーム・ページ・設問単位のファネルを集計できます。既定のイベントには回答値、
+ラベル、検証メッセージを含めず、Adapterの失敗がフォーム操作を止めることもありません。
 
 #### 7.18.x の拡張APIと移行
 

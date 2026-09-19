@@ -1,11 +1,14 @@
 import {
+  aggregateInteractionEvents,
   aggregateResponses,
   createSubmission,
   exportResponsesToCsvStream,
+  type FormInteractionEvent,
   type FormSchema,
   type FormStorageAdapter,
   type FormSubmission,
   FormSubmissionError,
+  type FormTelemetryAdapter,
   type FormValues
 } from "@form-engine-ts/core";
 import type { SubmitContext } from "@form-engine-ts/react";
@@ -28,6 +31,9 @@ export interface PreviewWorkspaceContextValue {
   readonly isClearing: boolean;
   readonly resetStatus: { readonly kind: "success" | "error"; readonly message: string } | null;
   readonly analytics: ReturnType<typeof aggregateResponses>;
+  readonly interactionEvents: readonly FormInteractionEvent[];
+  readonly interactionAnalytics: ReturnType<typeof aggregateInteractionEvents>;
+  readonly telemetryAdapter: FormTelemetryAdapter;
   readonly simulateServerError: boolean;
   readonly setLocale: (locale: string) => void;
   readonly setStorageKind: (kind: StorageKind) => void;
@@ -46,6 +52,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   const [storageKind, setStorageKind] = useState<StorageKind>("memory");
   const [schema, setSchema] = useState<FormSchema>(customerFeedbackSchema);
   const [submissions, setSubmissions] = useState<readonly FormSubmission[]>([]);
+  const [interactionEvents, setInteractionEvents] = useState<readonly FormInteractionEvent[]>([]);
   const [locale, setLocale] = useState("en");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
@@ -57,6 +64,11 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   } | null>(null);
   const storage: FormStorageAdapter = storageKind === "memory" ? memoryStorage : localStorage;
   const analytics = useMemo(() => aggregateResponses(schema, submissions), [schema, submissions]);
+  const telemetryAdapter = useMemo<FormTelemetryAdapter>(
+    () => ({ track: (event) => setInteractionEvents((current) => [...current, event]) }),
+    []
+  );
+  const interactionAnalytics = useMemo(() => aggregateInteractionEvents(interactionEvents), [interactionEvents]);
 
   const translate = useCallback((key: string) => mockTranslator.translate(key, locale) ?? key, [locale]);
 
@@ -68,6 +80,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       const nextSubmissions = await adapter.listSubmissions(nextSchema.id, nextSchema.version);
       setSchema(nextSchema);
       setSubmissions(nextSubmissions);
+      setInteractionEvents([]);
       setLoadError(null);
       setResetStatus(null);
     } catch (cause) {
@@ -83,6 +96,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   const changeSchema = useCallback(
     (nextSchema: FormSchema) => {
       setSchema(nextSchema);
+      setInteractionEvents([]);
       setResetStatus(null);
       void storage
         .saveSchema(nextSchema)
@@ -150,6 +164,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
     setIsClearing(true);
     setResetStatus(null);
     setSubmissions([]);
+    setInteractionEvents([]);
     try {
       if (storage.clearResponses === undefined) throw new Error(translate("preview.resetUnavailable"));
       await storage.clearResponses(schema.id);
@@ -178,6 +193,9 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       isClearing,
       resetStatus,
       analytics,
+      interactionAnalytics,
+      interactionEvents,
+      telemetryAdapter,
       simulateServerError,
       setLocale,
       setStorageKind,
@@ -192,6 +210,8 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       changeSchema,
       downloadCsv,
       isClearing,
+      interactionAnalytics,
+      interactionEvents,
       loadError,
       locale,
       resetResponses,
@@ -202,6 +222,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       storageKind,
       submissions,
       submit,
+      telemetryAdapter,
       workspaceReady
     ]
   );

@@ -39,6 +39,25 @@ export function ContactForm() {
 
 Use any compatible `TranslationAdapter` in place of the mock translator.
 
+## Interaction Telemetry
+
+Inject a vendor-neutral adapter when the form should record view, start, page, field, validation, submit, and exit
+events. Interaction Telemetry is separate from Submission Analytics and does not include answer values by default:
+
+```tsx
+import type { FormTelemetryAdapter } from "@form-engine-ts/core";
+
+const adapter: FormTelemetryAdapter = {
+  track(event) {
+    console.log(event);
+  }
+};
+
+<FormRenderer schema={schema} telemetry={{ adapter }} onSubmit={submit} />;
+```
+
+Telemetry adapter failures are reported through `telemetry.onError` and never block input, navigation, or submission.
+
 ## Selective imports
 
 The root import remains supported. For smaller consumer module graphs, import a focused entry instead:
