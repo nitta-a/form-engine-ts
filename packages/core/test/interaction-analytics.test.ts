@@ -23,6 +23,21 @@ function event(
 }
 
 describe("aggregateInteractionEvents", () => {
+  it("counts distinct submit failures and exposes failure rates", () => {
+    const analytics = aggregateInteractionEvents([
+      event("s1-attempt", "form.submit_attempted", "s1"),
+      event("s1-failed", "form.submit_failed", "s1"),
+      event("s1-failed-duplicate", "form.submit_failed", "s1"),
+      event("s2-attempt", "form.submit_attempted", "s2"),
+      event("s2-submitted", "form.submitted", "s2")
+    ]);
+    expect(analytics.funnel).toMatchObject({
+      submitAttemptedCount: 2,
+      submitFailedCount: 1,
+      submitFailureRate: 50
+    });
+  });
+
   it("deduplicates events and uses presented fields as the completion denominator", () => {
     const events: FormInteractionEvent[] = [
       event("s1-view", "form.viewed", "s1"),

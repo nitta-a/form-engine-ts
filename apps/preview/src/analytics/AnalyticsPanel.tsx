@@ -1,6 +1,8 @@
 import {
+  analyzeInteractionAnalytics,
   calculateCrossTabulation,
   calculateFieldVisibility,
+  compareInteractionAnalytics,
   dispatchWebhook,
   type FormEvent,
   type FormSchema,
@@ -143,6 +145,21 @@ export function AnalyticsPanel() {
   );
   const rowField = singleChoiceFields.find((field) => field.id === effectiveRowId);
   const colField = singleChoiceFields.find((field) => field.id === effectiveColId);
+  const optimizationReport = useMemo(
+    () =>
+      analyzeInteractionAnalytics(interactionAnalytics, {
+        minimumSamples: { form: 1, page: 1, field: 1 }
+      }),
+    [interactionAnalytics]
+  );
+  const comparisonFixture = useMemo(
+    () =>
+      compareInteractionAnalytics(interactionAnalytics, {
+        ...interactionAnalytics,
+        formVersion: interactionAnalytics.formVersion + 1
+      }),
+    [interactionAnalytics]
+  );
 
   const simulateWebhook = async () => {
     const event: FormEvent = {
@@ -244,6 +261,41 @@ export function AnalyticsPanel() {
             </tbody>
           </table>
         )}
+      </section>
+      <section className="analytics-tool" aria-labelledby="optimization-insights-heading">
+        <h3 id="optimization-insights-heading">Optimization Insights</h3>
+        {optimizationReport.insights.length === 0 ? (
+          <p>No threshold breaches detected.</p>
+        ) : (
+          <ul>
+            {optimizationReport.insights.map((insight) => (
+              <li key={insight.id}>
+                <code>{insight.targetId ?? "form"}</code> · {insight.type}: {insight.observedValue.toFixed(1)}{" "}
+                (threshold {insight.threshold})
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section className="analytics-tool" aria-labelledby="interaction-comparison-heading">
+        <h3 id="interaction-comparison-heading">Version Comparison API Fixture</h3>
+        <p>
+          v{comparisonFixture.beforeVersion} → v{comparisonFixture.afterVersion}
+        </p>
+        <dl className="metric-grid">
+          <div>
+            <dt>Before</dt>
+            <dd>{comparisonFixture.funnel.startRate.before.toFixed(1)}%</dd>
+          </div>
+          <div>
+            <dt>After</dt>
+            <dd>{comparisonFixture.funnel.startRate.after.toFixed(1)}%</dd>
+          </div>
+          <div>
+            <dt>Delta</dt>
+            <dd>{comparisonFixture.funnel.startRate.deltaPercentagePoints.toFixed(1)} percentage points</dd>
+          </div>
+        </dl>
       </section>
       <section className="analytics-tool" aria-labelledby="cross-tab-heading">
         <h3 id="cross-tab-heading">{t("preview.crossTab")}</h3>

@@ -10,11 +10,14 @@ export interface FormInteractionFunnel {
   readonly viewedCount: number;
   readonly startedCount: number;
   readonly submitAttemptedCount: number;
+  readonly submitFailedCount?: number;
   readonly submittedCount: number;
   readonly abandonedCount: number;
   readonly startRate: number;
   readonly submissionRateFromView: number;
   readonly submissionRateFromStart: number;
+  readonly abandonmentRate?: number;
+  readonly submitFailureRate?: number;
 }
 
 export interface PageInteractionAnalytics {
@@ -51,6 +54,7 @@ interface SessionState {
   readonly viewed: boolean;
   readonly started: boolean;
   readonly submitAttempted: boolean;
+  readonly submitFailed: boolean;
   readonly submitted: boolean;
   readonly exited: boolean;
   readonly lastOccurredAt: number;
@@ -89,6 +93,7 @@ function updateSession(sessions: Map<string, SessionState>, event: FormInteracti
     viewed: false,
     started: false,
     submitAttempted: false,
+    submitFailed: false,
     submitted: false,
     exited: false,
     lastOccurredAt: eventTime(event)
@@ -98,6 +103,7 @@ function updateSession(sessions: Map<string, SessionState>, event: FormInteracti
     viewed: current.viewed || event.type === "form.viewed",
     started: current.started || event.type === "form.started",
     submitAttempted: current.submitAttempted || event.type === "form.submit_attempted",
+    submitFailed: current.submitFailed || event.type === "form.submit_failed",
     submitted: current.submitted || event.type === "form.submitted",
     exited: current.exited || event.type === "form.exited",
     lastOccurredAt: Math.max(current.lastOccurredAt, eventTime(event))
@@ -196,16 +202,22 @@ export function aggregateInteractionEvents(
   const submitAttemptedCount = new Set(
     [...sessions].filter(([, state]) => state.submitAttempted).map(([sessionId]) => sessionId)
   ).size;
+  const submitFailedCount = new Set(
+    [...sessions].filter(([, state]) => state.submitFailed).map(([sessionId]) => sessionId)
+  ).size;
   const submittedCount = submittedSessions.size;
   const funnel: FormInteractionFunnel = {
     viewedCount,
     startedCount,
     submitAttemptedCount,
+    submitFailedCount,
     submittedCount,
     abandonedCount: abandonedSessions.size,
     startRate: percentage(startedCount, viewedCount),
     submissionRateFromView: percentage(submittedCount, viewedCount),
-    submissionRateFromStart: percentage(submittedCount, startedCount)
+    submissionRateFromStart: percentage(submittedCount, startedCount),
+    abandonmentRate: percentage(abandonedSessions.size, startedCount),
+    submitFailureRate: percentage(submitFailedCount, submitAttemptedCount)
   };
 
   return {

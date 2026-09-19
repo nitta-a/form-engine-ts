@@ -102,8 +102,9 @@ import { EN_MESSAGES } from "@form-engine-ts/core/i18n/en";
 ```
 
 Core also provides subpaths for analytics, aggregation, visibility, pipeline, submission, policy, translation,
-versioning, and the other public top-level modules. Locale catalogs are available from `@form-engine-ts/core/i18n/en`
-and `@form-engine-ts/core/i18n/ja` without importing them from an application feature entry.
+versioning, interaction comparison, optimization insights, and the other public top-level modules. Locale catalogs are
+available from `@form-engine-ts/core/i18n/en` and `@form-engine-ts/core/i18n/ja` without importing them from an
+application feature entry.
 
 ## Multi-step, localization, analytics, and events
 
@@ -130,6 +131,38 @@ delivery and retention.
 For explicitly defined pages, `page.completed` means that the page passed validation. The final page emits it before
 `form.submitted` or `form.submit_failed`; field duration prefers focus-to-completion and falls back to
 presented-to-completion.
+
+### Optimization Insights and Version Comparison
+
+Optimization Insights are deterministic, metric-based diagnostics. They do not infer why respondents behaved a certain
+way and never include answer values, labels, question text, or validation messages.
+
+```ts
+import { aggregateInteractionEvents, analyzeInteractionAnalytics } from "@form-engine-ts/core";
+
+const analytics = aggregateInteractionEvents(events);
+const report = analyzeInteractionAnalytics(analytics, {
+  minimumSamples: { field: 50 },
+  thresholds: { lowFieldCompletionRate: 70, highValidationFailureRate: 20 }
+});
+```
+
+The default minimum samples are 30 form-level observations, 20 page views, and 20 field presentations. Rate thresholds
+use percentages from 0 to 100. Defaults are 50% for low start rate, 50% for abandonment, 40% for page drop-off, 50%
+for field focus, 70% for field completion, 20% for validation friction, and 10% for submit failures. Duration
+thresholds are opt-in milliseconds, so slow-completion insights are not emitted unless a duration threshold is supplied.
+Insight IDs are deterministic for a form version, type, scope, and target.
+
+Compare two versions without assigning a success judgment:
+
+```ts
+import { compareInteractionAnalytics } from "@form-engine-ts/core";
+
+const comparison = compareInteractionAnalytics(version3Analytics, version4Analytics);
+```
+
+Pages and fields are matched by ID. Added and removed entities are reported, rate changes are percentage-point deltas,
+and duration changes are millisecond deltas (`after - before`). The versions must belong to the same form ID.
 
 Add `pages` to partition every field into an accessible wizard and use `validatePageAnswers(schema, pageIndex, values)`
 for step-scoped validation. Schemas without `pages` remain single-page forms.

@@ -6,6 +6,10 @@ current release and usage information.
 ## Unreleased
 
 - Added privacy-preserving Core Interaction Telemetry events and `aggregateInteractionEvents()` funnel analytics.
+- Added deterministic Core Optimization Insights with configurable sample and metric thresholds, including submit-failure
+  and validation-friction diagnostics.
+- Added same-form Interaction Analytics Version Comparison with percentage-point rate deltas, duration deltas, and
+  matched, added, and removed page/field metrics.
 - Added optional React `FormRenderer` telemetry integration with adapter failure isolation, event deduplication, and
   StrictMode-safe lifecycle tracking.
 - Added a Preview Interaction Analytics panel showing form, page, and field funnel metrics.

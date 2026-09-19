@@ -376,6 +376,14 @@ validation messages by default; adapter failures never block form interaction.
 - Rating fields default to integer values from 1 through 5 and share numeric analytics.
 - Select, radio, multi-select, and checkbox fields expose counts and percentages.
 - `page.completed` means that an explicit schema page passed validation; the final page emits it before `form.submitted` (or `form.submit_failed`). Field duration uses focus-to-completion, then presented-to-completion when focus is unavailable.
+- `analyzeInteractionAnalytics(analytics, options)` emits deterministic, privacy-safe Optimization Insights for low start,
+  abandonment, page drop-off, field focus/completion, validation friction, submit failures, and opt-in slow completion.
+  Rate thresholds use 0–100 percentages; the default minimum samples are 30 form-level observations, 20 page views, and
+  20 field presentations. Default rate thresholds are 50% low start, 50% abandonment, 40% page drop-off, 50% field
+  focus, 70% field completion, 20% validation friction, and 10% submit failure. Slow-completion thresholds are opt-in.
+- `compareInteractionAnalytics(before, after)` compares the same form across versions. Pages and fields match by ID;
+  added/removed entities are preserved, rate changes are percentage-point deltas, and duration changes are `after - before`
+  milliseconds. The API reports metrics only and does not infer success or statistical significance.
 - Survey radio options can set `textInput: true`; the renderer returns `{ optionId, text }` for the selected option and clears the supplement when selection changes.
 - `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
 - `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF and the columns are exactly `submissionId`, `submittedAt`, `locale`, then the schema-order field columns; arrays are JSON-encoded.
@@ -719,6 +727,15 @@ Interaction Telemetryは回答送信後の分析とは分離された、フォ�
 ラベル、検証メッセージを含めず、Adapterの失敗がフォーム操作を止めることもありません。
 明示したページの`page.completed`は検証通過を意味し、最終ページでは`form.submitted`（または`form.submit_failed`）の前に発火します。
 設問時間はfocusから完了までを優先し、focusを取得できない場合は表示から完了までを使います。
+
+`analyzeInteractionAnalytics(analytics, options)` は、開始率低下、離脱、ページ離脱、設問のfocus/completion低下、
+検証摩擦、送信失敗、明示的な時間超過を決定論的でプライバシー安全なOptimization Insightとして返します。
+率のthresholdは0〜100のパーセントで、既定の最小サンプル数はフォーム単位30、ページ20、設問20です。
+既定の率thresholdは開始率低下50%、離脱50%、ページ離脱40%、focus低下50%、completion低下70%、検証摩擦20%、送信失敗10%です。
+時間超過のthresholdは明示した場合だけ有効です。
+
+`compareInteractionAnalytics(before, after)` は同じFormのVersion間を比較します。ページと設問はIDで対応付け、
+追加・削除を保持します。率はpercentage-point差、時間は`after - before`のミリ秒差で、成功判定や統計的有意差は推測しません。
 
 #### 7.18.x の拡張APIと移行
 

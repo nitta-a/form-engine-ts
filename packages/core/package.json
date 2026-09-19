@@ -60,6 +60,16 @@
       "import": "./dist/interactionAnalytics.js",
       "require": "./dist/interactionAnalytics.cjs"
     },
+    "./interaction-comparison": {
+      "types": "./dist/interactionComparison.d.ts",
+      "import": "./dist/interactionComparison.js",
+      "require": "./dist/interactionComparison.cjs"
+    },
+    "./optimization-insights": {
+      "types": "./dist/optimizationInsights.d.ts",
+      "import": "./dist/optimizationInsights.js",
+      "require": "./dist/optimizationInsights.cjs"
+    },
     "./field": {
       "types": "./dist/field.d.ts",
       "import": "./dist/field.js",
@@ -197,7 +207,7 @@
     "zod": "^4.0.0"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean && tsup src/authoring/index.ts src/aggregation.ts src/analytics.ts src/contentMode.ts src/crossFormAnalytics.ts src/errors.ts src/events.ts src/field.ts src/fieldTypes.ts src/i18n/index.ts src/i18n/catalogs/en.ts src/i18n/catalogs/ja.ts src/i18n/keys.ts src/i18n/translator.ts src/interactionAnalytics.ts src/lifecycle.ts src/locale.ts src/mapping.ts src/pagination.ts src/pipeline.ts src/policy.ts src/responseSummary.ts src/sanitization.ts src/schema.ts src/submission.ts src/telemetry.ts src/translation.ts src/types.ts src/validation.ts src/versioning.ts src/visibility.ts --format esm,cjs --dts",
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && tsup src/authoring/index.ts src/aggregation.ts src/analytics.ts src/contentMode.ts src/crossFormAnalytics.ts src/errors.ts src/events.ts src/field.ts src/fieldTypes.ts src/i18n/index.ts src/i18n/catalogs/en.ts src/i18n/catalogs/ja.ts src/i18n/keys.ts src/i18n/translator.ts src/interactionAnalytics.ts src/interactionComparison.ts src/lifecycle.ts src/locale.ts src/mapping.ts src/optimizationInsights.ts src/pagination.ts src/pipeline.ts src/policy.ts src/responseSummary.ts src/sanitization.ts src/schema.ts src/submission.ts src/telemetry.ts src/translation.ts src/types.ts src/validation.ts src/versioning.ts src/visibility.ts --format esm,cjs --dts",
     "check": "biome check . && tsc --noEmit",
     "test": "vitest run --globals",
     "typecheck": "tsc --noEmit"

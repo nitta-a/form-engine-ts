@@ -17,6 +17,11 @@ describe("preview application respondent and analytics workspaces", () => {
     await submitCompleteResponse(user);
     await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
     expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("1");
+    expect(screen.getByRole("heading", { name: "Optimization Insights" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Version Comparison API Fixture" })).toBeInTheDocument();
+    expect(screen.getByText("Before")).toBeInTheDocument();
+    expect(screen.getByText("After")).toBeInTheDocument();
+    expect(screen.getByText("Delta")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reset responses" }));
     expect(screen.getByRole("group", { name: /Delete every response/ })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
