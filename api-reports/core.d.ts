@@ -2019,7 +2019,7 @@ interface SchemaDomainCodec<TDomain, TSchema extends FormSchema = FormSchema> {
 declare function createSchemaDomainCodec<TDomain, TSchema extends FormSchema = FormSchema>(codec: SchemaDomainCodec<TDomain, TSchema>, options?: ValidateFormSchemaOptions): SchemaDomainCodec<TDomain, TSchema>;
 
 type FormOptimizationInsightType = "low_start_rate" | "high_form_abandonment" | "high_page_dropoff" | "low_field_focus_rate" | "low_field_completion_rate" | "high_validation_friction" | "high_submit_failure_rate" | "slow_page_completion" | "slow_field_completion";
-type FormOptimizationMetric = "startRate" | "abandonmentRate" | "completionRate" | "focusRate" | "validationFailureRate" | "submitFailureRate" | "averageCompletionMs";
+type FormOptimizationMetric = "startRate" | "abandonmentRate" | "completionRate" | "dropoffRate" | "focusRate" | "validationFailureRate" | "submitFailureRate" | "averageCompletionMs";
 interface FormOptimizationInsight {
     readonly id: string;
     readonly type: FormOptimizationInsightType;
@@ -2063,7 +2063,6 @@ declare const DEFAULT_OPTIMIZATION_THRESHOLDS: {
     readonly lowStartRate: 50;
     readonly highAbandonmentRate: 50;
     readonly highPageDropoffRate: 40;
-    readonly lowFieldFocusRate: 50;
     readonly lowFieldCompletionRate: 70;
     readonly highValidationFailureRate: 20;
     readonly highSubmitFailureRate: 10;

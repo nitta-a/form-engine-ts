@@ -15,6 +15,8 @@ current release and usage information.
 - Added a Preview Interaction Analytics panel showing form, page, and field funnel metrics.
 - Corrected Interaction Telemetry page completion, field duration fallback, session reset, validation failure counting,
   and exit flushing without changing its public analytics contracts.
+- Corrected page drop-off insight metric semantics, made field-focus diagnostics opt-in, validated optimization
+  thresholds and sample sizes, and added public API verification to CI.
 
 - Added the provider-agnostic Core AuthoringSuggestion contract with deterministic IDs at apply time, policy/schema
   validation, immutable preview/apply, partial selection, and stale-schema rejection.

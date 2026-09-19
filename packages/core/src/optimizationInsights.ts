@@ -19,6 +19,7 @@ export type FormOptimizationMetric =
   | "startRate"
   | "abandonmentRate"
   | "completionRate"
+  | "dropoffRate"
   | "focusRate"
   | "validationFailureRate"
   | "submitFailureRate"
@@ -72,11 +73,57 @@ export const DEFAULT_OPTIMIZATION_THRESHOLDS = {
   lowStartRate: 50,
   highAbandonmentRate: 50,
   highPageDropoffRate: 40,
-  lowFieldFocusRate: 50,
   lowFieldCompletionRate: 70,
   highValidationFailureRate: 20,
   highSubmitFailureRate: 10
 } as const satisfies OptimizationInsightThresholds;
+
+const PERCENTAGE_THRESHOLD_KEYS = [
+  "lowStartRate",
+  "highAbandonmentRate",
+  "highPageDropoffRate",
+  "lowFieldFocusRate",
+  "lowFieldCompletionRate",
+  "highValidationFailureRate",
+  "highSubmitFailureRate"
+] as const satisfies readonly (keyof OptimizationInsightThresholds)[];
+
+const DURATION_THRESHOLD_KEYS = [
+  "slowPageCompletionMs",
+  "slowFieldCompletionMs"
+] as const satisfies readonly (keyof OptimizationInsightThresholds)[];
+
+function validateOptimizationThresholds(thresholds: OptimizationInsightThresholds): void {
+  for (const key of PERCENTAGE_THRESHOLD_KEYS) {
+    const value = thresholds[key];
+    if (value !== undefined && (!Number.isFinite(value) || value < 0 || value > 100)) {
+      throw new TypeError(`Optimization threshold "${key}" must be a finite number between 0 and 100.`);
+    }
+  }
+  for (const key of DURATION_THRESHOLD_KEYS) {
+    const value = thresholds[key];
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+      throw new TypeError(`Optimization threshold "${key}" must be a finite non-negative number.`);
+    }
+  }
+}
+
+function validateMinimumSamples(minimumSamples: OptimizationInsightOptions["minimumSamples"]): void {
+  for (const key of ["form", "page", "field"] as const) {
+    const value = minimumSamples?.[key];
+    if (value !== undefined && (!Number.isFinite(value) || !Number.isInteger(value) || value < 0)) {
+      throw new TypeError(`Optimization minimumSamples "${key}" must be a finite non-negative integer.`);
+    }
+  }
+}
+
+function resolveOptimizationOptions(options: OptimizationInsightOptions) {
+  const minimumSamples = { ...DEFAULT_OPTIMIZATION_MINIMUM_SAMPLES, ...options.minimumSamples };
+  const thresholds = { ...DEFAULT_OPTIMIZATION_THRESHOLDS, ...options.thresholds };
+  validateMinimumSamples(minimumSamples);
+  validateOptimizationThresholds(thresholds);
+  return { minimumSamples, thresholds };
+}
 
 function rate(count: number, total: number): number {
   return total === 0 ? 0 : (count / total) * 100;
@@ -181,7 +228,7 @@ function addPageInsights(
       minimumSamples,
       "high_page_dropoff",
       "page",
-      "completionRate",
+      "dropoffRate",
       page.viewedCount,
       100 - page.completionRate,
       thresholds.highPageDropoffRate,
@@ -267,8 +314,7 @@ export function analyzeInteractionAnalytics(
   analytics: FormInteractionAnalytics,
   options: OptimizationInsightOptions = {}
 ): FormOptimizationReport {
-  const minimumSamples = { ...DEFAULT_OPTIMIZATION_MINIMUM_SAMPLES, ...options.minimumSamples };
-  const thresholds = { ...DEFAULT_OPTIMIZATION_THRESHOLDS, ...options.thresholds };
+  const { minimumSamples, thresholds } = resolveOptimizationOptions(options);
   const insights: FormOptimizationInsight[] = [];
   addFormInsights(insights, analytics, minimumSamples.form, thresholds);
   for (const page of analytics.pages) addPageInsights(insights, analytics, minimumSamples.page, thresholds, page);

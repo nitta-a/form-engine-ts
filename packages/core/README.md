@@ -148,9 +148,11 @@ const report = analyzeInteractionAnalytics(analytics, {
 ```
 
 The default minimum samples are 30 form-level observations, 20 page views, and 20 field presentations. Rate thresholds
-use percentages from 0 to 100. Defaults are 50% for low start rate, 50% for abandonment, 40% for page drop-off, 50%
-for field focus, 70% for field completion, 20% for validation friction, and 10% for submit failures. Duration
-thresholds are opt-in milliseconds, so slow-completion insights are not emitted unless a duration threshold is supplied.
+use percentages from 0 to 100. Defaults are 50% for low start rate, 50% for abandonment, 40% for page drop-off, 70%
+for field completion, 20% for validation friction, and 10% for submit failures. Page `dropoffRate` is defined as
+`100 - completionRate`. Field-focus diagnostics are opt-in through `lowFieldFocusRate` because focus capture may be
+disabled or unavailable for custom renderers. Duration thresholds are opt-in milliseconds, so slow-completion insights
+are not emitted unless a duration threshold is supplied.
 Insight IDs are deterministic for a form version, type, scope, and target.
 
 Compare two versions without assigning a success judgment:

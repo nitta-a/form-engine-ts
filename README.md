@@ -379,8 +379,10 @@ validation messages by default; adapter failures never block form interaction.
 - `analyzeInteractionAnalytics(analytics, options)` emits deterministic, privacy-safe Optimization Insights for low start,
   abandonment, page drop-off, field focus/completion, validation friction, submit failures, and opt-in slow completion.
   Rate thresholds use 0–100 percentages; the default minimum samples are 30 form-level observations, 20 page views, and
-  20 field presentations. Default rate thresholds are 50% low start, 50% abandonment, 40% page drop-off, 50% field
-  focus, 70% field completion, 20% validation friction, and 10% submit failure. Slow-completion thresholds are opt-in.
+  20 field presentations. Default rate thresholds are 50% low start, 50% abandonment, 40% page drop-off, 70% field
+  completion, 20% validation friction, and 10% submit failure. `dropoffRate` is `100 - completionRate`; field-focus
+  diagnostics are opt-in because focus capture may be disabled or unavailable for custom renderers. Slow-completion
+  thresholds are opt-in.
 - `compareInteractionAnalytics(before, after)` compares the same form across versions. Pages and fields match by ID;
   added/removed entities are preserved, rate changes are percentage-point deltas, and duration changes are `after - before`
   milliseconds. The API reports metrics only and does not infer success or statistical significance.
@@ -731,8 +733,9 @@ Interaction Telemetryは回答送信後の分析とは分離された、フォ�
 `analyzeInteractionAnalytics(analytics, options)` は、開始率低下、離脱、ページ離脱、設問のfocus/completion低下、
 検証摩擦、送信失敗、明示的な時間超過を決定論的でプライバシー安全なOptimization Insightとして返します。
 率のthresholdは0〜100のパーセントで、既定の最小サンプル数はフォーム単位30、ページ20、設問20です。
-既定の率thresholdは開始率低下50%、離脱50%、ページ離脱40%、focus低下50%、completion低下70%、検証摩擦20%、送信失敗10%です。
-時間超過のthresholdは明示した場合だけ有効です。
+既定の率thresholdは開始率低下50%、離脱50%、ページ離脱40%、completion低下70%、検証摩擦20%、送信失敗10%です。
+`dropoffRate`は`100 - completionRate`です。focus計測は無効またはcustom rendererで利用できない場合があるため、
+設問focus低下の診断は`lowFieldFocusRate`を明示した場合だけ有効です。時間超過のthresholdも明示した場合だけ有効です。
 
 `compareInteractionAnalytics(before, after)` は同じFormのVersion間を比較します。ページと設問はIDで対応付け、
 追加・削除を保持します。率はpercentage-point差、時間は`after - before`のミリ秒差で、成功判定や統計的有意差は推測しません。

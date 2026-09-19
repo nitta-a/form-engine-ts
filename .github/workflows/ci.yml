@@ -45,5 +45,8 @@ jobs:
       - name: Check package exports
         run: pnpm package:check
 
+      - name: Check public API
+        run: pnpm api:check
+
       - name: Test
         run: pnpm test

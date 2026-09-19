@@ -1,5 +1,5 @@
 import type { FormInteractionAnalytics, FormInteractionEvent } from "../src";
-import { aggregateInteractionEvents, analyzeInteractionAnalytics } from "../src";
+import { aggregateInteractionEvents, analyzeInteractionAnalytics, DEFAULT_OPTIMIZATION_THRESHOLDS } from "../src";
 
 function analytics(): FormInteractionAnalytics {
   return {
@@ -109,11 +109,91 @@ describe("analyzeInteractionAnalytics", () => {
       observedValue: 20,
       threshold: 10
     });
+    expect(report.insights.find((insight) => insight.type === "high_page_dropoff")).toMatchObject({
+      metric: "dropoffRate",
+      observedValue: 60,
+      threshold: 50
+    });
     expect(report.insights.every((insight) => !("answer" in insight) && !("title" in insight))).toBe(true);
     expect(analyzeInteractionAnalytics(input, options)).toEqual(report);
     expect(report.insights.find((insight) => insight.targetId === "q1")?.id).toBe(
       "form-1:3:high_validation_friction:field:q1"
     );
+  });
+
+  it("keeps field focus diagnostics opt-in", () => {
+    const base = analytics();
+    const field = base.fields[0];
+    if (field === undefined) throw new Error("Expected field fixture.");
+    const input = { ...base, fields: [{ ...field, focusedCount: 0, focusRate: 0 }] };
+    expect(DEFAULT_OPTIMIZATION_THRESHOLDS).not.toHaveProperty("lowFieldFocusRate");
+    const defaultInsights = analyzeInteractionAnalytics(input, {
+      minimumSamples: { form: 1, page: 1, field: 1 }
+    }).insights;
+    expect(defaultInsights.some((insight) => insight.type === "low_field_focus_rate")).toBe(false);
+
+    const optInInsights = analyzeInteractionAnalytics(input, {
+      minimumSamples: { field: 1 },
+      thresholds: { lowFieldFocusRate: 50 }
+    }).insights;
+    expect(optInInsights.some((insight) => insight.type === "low_field_focus_rate")).toBe(true);
+  });
+
+  it("reports page drop-off as its own metric", () => {
+    const base = analytics();
+    const page = base.pages[0];
+    if (page === undefined) throw new Error("Expected page fixture.");
+    const input = { ...base, pages: [{ ...page, viewedCount: 100, completedCount: 40, completionRate: 40 }] };
+    const report = analyzeInteractionAnalytics(input, {
+      minimumSamples: { page: 1 },
+      thresholds: { highPageDropoffRate: 50 }
+    });
+    expect(report.insights.find((insight) => insight.type === "high_page_dropoff")).toMatchObject({
+      metric: "dropoffRate",
+      observedValue: 60,
+      threshold: 50
+    });
+    expect(
+      analyzeInteractionAnalytics(input, {
+        minimumSamples: { page: 1 },
+        thresholds: { highPageDropoffRate: 60 }
+      }).insights.some((insight) => insight.type === "high_page_dropoff")
+    ).toBe(false);
+  });
+
+  it("validates optimization thresholds and sample sizes", () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, 101]) {
+      expect(() => analyzeInteractionAnalytics(analytics(), { thresholds: { lowStartRate: value } })).toThrow(
+        'Optimization threshold "lowStartRate" must be a finite number between 0 and 100.'
+      );
+    }
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1]) {
+      expect(() => analyzeInteractionAnalytics(analytics(), { thresholds: { slowPageCompletionMs: value } })).toThrow(
+        'Optimization threshold "slowPageCompletionMs" must be a finite non-negative number.'
+      );
+    }
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5]) {
+      expect(() => analyzeInteractionAnalytics(analytics(), { minimumSamples: { field: value } })).toThrow(
+        'Optimization minimumSamples "field" must be a finite non-negative integer.'
+      );
+    }
+
+    expect(() =>
+      analyzeInteractionAnalytics(analytics(), {
+        minimumSamples: { form: 0, page: 0, field: 0 },
+        thresholds: {
+          lowStartRate: 0,
+          highAbandonmentRate: 100,
+          highPageDropoffRate: 0,
+          lowFieldFocusRate: 100,
+          lowFieldCompletionRate: 0,
+          highValidationFailureRate: 100,
+          highSubmitFailureRate: 0,
+          slowPageCompletionMs: 0,
+          slowFieldCompletionMs: 0
+        }
+      })
+    ).not.toThrow();
   });
 
   it("uses strict thresholds, skips small samples and does not invent duration insights", () => {
