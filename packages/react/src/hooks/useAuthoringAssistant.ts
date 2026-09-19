@@ -5,9 +5,11 @@ import {
   type AuthoringRequest,
   type AuthoringSuggestion,
   applyAuthoringSuggestion,
+  buildAuthoringContext,
   computeAuthoringSchemaHash,
   type FormPolicy,
   type FormSchema,
+  parseAuthoringSuggestion,
   previewAuthoringSuggestion
 } from "@form-engine-ts/core";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -46,6 +48,10 @@ export interface UseAuthoringAssistantResult {
   readonly cancel: () => void;
 }
 
+function validOperationIds(preview: AuthoringPreview): readonly string[] {
+  return preview.operationPreviews.filter((item) => item.valid).map((item) => item.operationId);
+}
+
 export function useAuthoringAssistant(options: UseAuthoringAssistantOptions): UseAuthoringAssistantResult {
   const { schema, adapter, policy, onChange, idFactory } = options;
   const [status, setStatus] = useState<AuthoringAssistantStatus>("idle");
@@ -67,7 +73,10 @@ export function useAuthoringAssistant(options: UseAuthoringAssistantOptions): Us
 
   useEffect(() => {
     if (suggestion === undefined || suggestion.baseSchemaHash === schemaHash) return;
-    const stalePreview = previewAuthoringSuggestion(schema, suggestion, selectedOperationIds, policy);
+    const stalePreview = previewAuthoringSuggestion(schema, suggestion, {
+      operationIds: selectedOperationIds,
+      ...(policy === undefined ? {} : { policy })
+    });
     setPreview(stalePreview);
     setStatus("error");
     setError({
@@ -83,7 +92,10 @@ export function useAuthoringAssistant(options: UseAuthoringAssistantOptions): Us
     (operationIds: readonly string[]) => {
       setSelectedOperationIdsState(operationIds);
       if (suggestion !== undefined) {
-        const nextPreview = previewAuthoringSuggestion(schema, suggestion, operationIds, policy);
+        const nextPreview = previewAuthoringSuggestion(schema, suggestion, {
+          operationIds,
+          ...(policy === undefined ? {} : { policy })
+        });
         setPreview(nextPreview);
         if (nextPreview.valid) {
           setStatus("ready");
@@ -123,32 +135,49 @@ export function useAuthoringAssistant(options: UseAuthoringAssistantOptions): Us
       setPreview(undefined);
       setSelectedOperationIdsState([]);
       try {
-        const generate = adapter.generate ?? adapter.generateSuggestion;
-        if (generate === undefined) throw new TypeError("Authoring adapter must provide generate().");
-        const next = await generate({ ...request, schema }, nextController.signal);
+        const nextResponse = await adapter.generate(
+          {
+            ...request,
+            context: buildAuthoringContext({ schema, request, ...(policy === undefined ? {} : { policy }) })
+          },
+          nextController.signal
+        );
         if (nextController.signal.aborted || requestId.current !== nextRequestId) return undefined;
-        if (
-          next === null ||
-          typeof next !== "object" ||
-          typeof next.id !== "string" ||
-          typeof next.summary !== "string" ||
-          typeof next.baseSchemaHash !== "string" ||
-          !Array.isArray(next.operations)
-        ) {
+        let next: AuthoringSuggestion;
+        try {
+          next = parseAuthoringSuggestion(nextResponse);
+        } catch (cause) {
           setStatus("error");
-          setError({ code: "invalid_response", cause: next });
+          setError({ code: "invalid_response", cause });
           return undefined;
         }
-        const nextPreview = previewAuthoringSuggestion(schema, next, policy);
+        const initialPreview = previewAuthoringSuggestion(schema, next, {
+          ...(policy === undefined ? {} : { policy })
+        });
+        const initialSelection = validOperationIds(initialPreview);
+        const nextPreview = previewAuthoringSuggestion(schema, next, {
+          operationIds: initialSelection,
+          ...(policy === undefined ? {} : { policy })
+        });
         controller.current = undefined;
         setSuggestion(next);
         setPreview(nextPreview);
-        setSelectedOperationIdsState(next.operations.map((operation) => operation.operationId));
-        if (!nextPreview.valid) {
+        setSelectedOperationIdsState(initialSelection);
+        if (!initialPreview.valid) {
           setStatus("error");
           setError({
-            code: "validation_failure",
-            cause: { success: false, error: { code: "validation_failed", issues: nextPreview.issues } }
+            code: initialPreview.issues.some((issue) => issue.code === "stale_schema")
+              ? "stale_schema"
+              : "validation_failure",
+            cause: {
+              success: false,
+              error: {
+                code: initialPreview.issues.some((issue) => issue.code === "stale_schema")
+                  ? "stale_schema"
+                  : "validation_failed",
+                issues: initialPreview.issues
+              }
+            }
           });
         } else setStatus("ready");
         return next;
@@ -202,9 +231,8 @@ export function useAuthoringAssistant(options: UseAuthoringAssistantOptions): Us
     [selectedOperationIds, setSelectedOperationIds]
   );
   const selectAll = useCallback(() => {
-    if (suggestion !== undefined)
-      setSelectedOperationIds(suggestion.operations.map((operation) => operation.operationId));
-  }, [setSelectedOperationIds, suggestion]);
+    if (preview !== undefined) setSelectedOperationIds(validOperationIds(preview));
+  }, [preview, setSelectedOperationIds]);
   const clearSelection = useCallback(() => setSelectedOperationIds([]), [setSelectedOperationIds]);
   const applySelected = useCallback(() => apply(selectedOperationIds), [apply, selectedOperationIds]);
 

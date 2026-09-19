@@ -42,16 +42,37 @@ describe("authoring MUI components", () => {
     expect(onSubmit).toHaveBeenCalledWith({ intent: "add_questions", prompt: "Create a survey" });
 
     const onApply = vi.fn();
+    const onSelectionChange = vi.fn();
     render(
-      <MuiAuthoringSuggestionPreview suggestion={suggestion} preview={preview} onApply={onApply} onReject={vi.fn()} />
+      <MuiAuthoringSuggestionPreview
+        suggestion={suggestion}
+        preview={preview}
+        selectedOperationIds={["one", "two"]}
+        onSelectionChange={onSelectionChange}
+        onApply={onApply}
+        onReject={vi.fn()}
+      />
     );
     const checkboxes = screen.getAllByRole("checkbox");
     expect(checkboxes).toHaveLength(3);
     const secondCheckbox = checkboxes.slice(1, 2)[0];
     if (secondCheckbox === undefined) throw new Error("Expected an operation checkbox.");
     fireEvent.click(secondCheckbox);
-    fireEvent.click(screen.getByRole("button", { name: "Apply selected" }));
-    expect(onApply).toHaveBeenCalledWith(["two"]);
+    expect(onSelectionChange).toHaveBeenCalledWith(["two"]);
+
+    const apply = vi.fn();
+    render(
+      <MuiAuthoringSuggestionPreview
+        suggestion={suggestion}
+        preview={preview}
+        selectedOperationIds={["two"]}
+        onSelectionChange={vi.fn()}
+        onApply={apply}
+        onReject={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Apply selected" }).at(-1) as HTMLElement);
+    expect(apply).toHaveBeenCalledWith(["two"]);
   });
 
   it("builds intent and target-aware requests", () => {
@@ -103,12 +124,70 @@ describe("authoring MUI components", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "✨ AI" }));
-    fireEvent.click(screen.getByRole("button", { name: "Generate answer options" }));
+    expect(screen.queryByRole("button", { name: "Generate answer options" })).not.toBeInTheDocument();
+    render(
+      <MuiAuthoringFieldAction
+        field={{ id: "q1", type: "radio", title: "Question", required: false, options: [] }}
+        onRequest={onRequest}
+      />
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "✨ AI" }).at(-1) as HTMLElement);
+    fireEvent.click(screen.getAllByRole("button", { name: "Generate answer options" }).at(-1) as HTMLElement);
     expect(onRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         intent: "generate_options",
         target: { kind: "field", fieldId: "q1" }
       })
     );
+  });
+
+  it("shows readable deltas and disables invalid operations", () => {
+    const update = {
+      operationId: "rewrite",
+      type: "updateField" as const,
+      fieldId: "q1",
+      patch: { title: "Updated question", required: true }
+    };
+    const invalid = {
+      operationId: "invalid",
+      type: "updateField" as const,
+      fieldId: "missing",
+      patch: { title: "Missing" }
+    };
+    const fieldSuggestion: AuthoringSuggestion = { ...suggestion, operations: [update, invalid] };
+    const fieldPreview: AuthoringPreview = {
+      ...preview,
+      operations: [update],
+      valid: true,
+      operationPreviews: [
+        {
+          operationId: "rewrite",
+          operation: update,
+          valid: true,
+          before: { kind: "field", field: { id: "q1", type: "text", title: "Question", required: false } },
+          after: { kind: "field", field: { id: "q1", type: "text", title: "Updated question", required: true } },
+          issues: []
+        },
+        {
+          operationId: "invalid",
+          operation: invalid,
+          valid: false,
+          issues: [{ code: "field_not_found", message: "Missing" }]
+        }
+      ],
+      issues: []
+    };
+    render(
+      <MuiAuthoringSuggestionPreview
+        suggestion={fieldSuggestion}
+        preview={fieldPreview}
+        selectedOperationIds={["rewrite"]}
+        onSelectionChange={vi.fn()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/Updated question/u)).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")[2]).toBeDisabled();
   });
 });

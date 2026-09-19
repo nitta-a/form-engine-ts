@@ -204,8 +204,8 @@ interface MuiAuthoringSuggestionPreviewProps {
     readonly error?: string;
     readonly onApply: (operationIds: readonly string[]) => void;
     readonly onReject: () => void;
-    readonly selectedOperationIds?: readonly string[];
-    readonly onSelectionChange?: (operationIds: readonly string[]) => void;
+    readonly selectedOperationIds: readonly string[];
+    readonly onSelectionChange: (operationIds: readonly string[]) => void;
     readonly labels?: Partial<{
         readonly selectAll: string;
         readonly apply: string;
@@ -214,7 +214,7 @@ interface MuiAuthoringSuggestionPreviewProps {
         readonly after: string;
     }>;
 }
-declare function MuiAuthoringSuggestionPreview({ suggestion, preview, loading, error, onApply, onReject, selectedOperationIds: controlledSelected, onSelectionChange, labels }: MuiAuthoringSuggestionPreviewProps): react.JSX.Element;
+declare function MuiAuthoringSuggestionPreview({ suggestion, preview, loading, error, onApply, onReject, selectedOperationIds, onSelectionChange, labels }: MuiAuthoringSuggestionPreviewProps): react.JSX.Element;
 
 interface MuiBuilderOverrides {
     readonly components?: Partial<FormBuilderComponents>;

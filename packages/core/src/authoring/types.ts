@@ -17,9 +17,7 @@ export interface AuthoringRequest {
 }
 
 export interface AuthoringAssistantAdapter {
-  generate?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
-  /** @deprecated Use generate. Kept for adapters published before the canonical method name. */
-  generateSuggestion?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
+  generate: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
 }
 
 export interface AuthoringOptionInput {
@@ -176,8 +174,14 @@ export interface AuthoringPreview {
   readonly baseSchemaHash: string;
   readonly schema: FormSchema;
   readonly operations: readonly AuthoringOperation[];
-  readonly operationPreviews?: readonly AuthoringOperationPreview[];
+  readonly operationPreviews: readonly AuthoringOperationPreview[];
   readonly issues: readonly AuthoringValidationIssue[];
+}
+
+export interface AuthoringPreviewOptions {
+  readonly operationIds?: readonly string[];
+  readonly policy?: FormPolicy;
+  readonly idFactory?: AuthoringApplyOptions["idFactory"];
 }
 
 export type AuthoringApplyError =

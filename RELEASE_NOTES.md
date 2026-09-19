@@ -7,8 +7,13 @@ current release and usage information.
 
 - Added the provider-agnostic Core AuthoringSuggestion contract with deterministic IDs at apply time, policy/schema
   validation, immutable preview/apply, partial selection, and stale-schema rejection.
-- Added the React `useAuthoringAssistant` controller, MUI prompt/preview components, and a deterministic Preview mock
-  adapter. Real AI providers and QualityIssue integration remain application responsibilities.
+- Made `AuthoringAssistantAdapter.generate()` and operation previews required, added structured response parsing, bounded
+  authoring context extraction, explicit preview options, and valid Core no-op semantics for empty selection.
+- Added controlled MUI selection, field-type-aware actions, human-readable before/after rows, localized operation labels,
+  and disabled invalid operations.
+- Added `createAuthoringRequestFromQualityIssue()` and an optional `SurveyQualityPanel` AI-fix action. Provider SDKs and
+  credentials remain server-side application responsibilities. Added `applyAndRecheckQuality()` for a successful apply →
+  quality recheck flow without coupling the Core authoring and Quality domains.
 
 ## Latest release
 

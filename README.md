@@ -75,6 +75,35 @@ windows and limits, vendor-neutral submission guards, and optimized response cou
 Quiz authors can enable or disable the passing-score threshold; when it is disabled, respondent results omit total score
 and pass/fail status.
 
+AI Authoring is provider-neutral: an injected server-backed adapter returns an `AuthoringSuggestion`, Core parses and
+validates it, and the UI shows a controlled Before/After preview before applying selected operations. Providers never
+write `FormSchema` directly, generated field/option IDs are assigned by Core, and answer data and provider credentials
+stay outside the browser. `createAuthoringRequestFromQualityIssue()` can turn a survey quality issue into a targeted
+rewrite or option-generation request.
+`applyAndRecheckQuality()` reruns the existing quality adapter only after a successful selected-operation apply.
+
+```tsx
+const assistant = useAuthoringAssistant({ schema, adapter, policy, onChange: setSchema });
+
+<MuiAuthoringPrompt intent="rewrite_field" target={{ kind: "field", fieldId: "q1" }} onSubmit={assistant.suggest} />
+<MuiAuthoringSuggestionPreview
+  suggestion={assistant.suggestion}
+  preview={assistant.preview}
+  selectedOperationIds={assistant.selectedOperationIds}
+  onSelectionChange={assistant.setSelectedOperationIds}
+  onApply={assistant.apply}
+  onReject={assistant.reject}
+/>
+```
+
+Keep provider credentials and calls server-side. Send the bounded authoring context, never submission answers, and persist
+only a validated Core apply result.
+
+At the Core boundary, use `parseAuthoringSuggestion()` and
+`previewAuthoringSuggestion(schema, suggestion, { operationIds, policy })` before applying anything. A quality fix can be
+composed as `createAuthoringRequestFromQualityIssue(issue, schema)` followed by
+`applyAndRecheckQuality(() => assistant.applySelected(), quality.run)`.
+
 The Core package includes four bilingual purpose templates (satisfaction, improvements, popular choice, and
 understanding check). A host can filter them with `getFormTemplates({ mode, locale })` and create an independent schema
 with `createSchemaFromTemplate({ template, id, title })`; blank forms continue to use `createInitialSchemaByMode`.
@@ -416,6 +445,35 @@ Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と�
 `date`・`time`・`email`・`tel`・`url`の型付き質問、選択肢シャッフル、受付期間・回答上限、
 ベンダー非依存のsubmission guard、storage adapterの回答数取得にも対応します。
 クイズでは合格ラインの設定有無を切り替えられ、未設定の場合は回答結果に合計点と合否を表示しません。
+
+AI AuthoringはProviderに依存しません。サーバー側のAdapterが`AuthoringSuggestion`を返し、Coreが構造とPolicyを
+検証した後、UIがcontrolledな変更前/変更後Previewを表示し、利用者が選んだ操作だけを適用します。Providerが
+`FormSchema`を直接書き換えることはなく、Field/Option IDはCoreが適用時に発行します。回答データとProviderの
+認証情報はブラウザー外に置き、`createAuthoringRequestFromQualityIssue()`で品質問題から質問修正や選択肢生成の
+依頼を作成できます。
+`applyAndRecheckQuality()`を使うと、選択した操作の適用成功後だけ既存のQuality adapterを再実行できます。
+
+```tsx
+const assistant = useAuthoringAssistant({ schema, adapter, policy, onChange: setSchema });
+
+<MuiAuthoringPrompt intent="rewrite_field" target={{ kind: "field", fieldId: "q1" }} onSubmit={assistant.suggest} />
+<MuiAuthoringSuggestionPreview
+  suggestion={assistant.suggestion}
+  preview={assistant.preview}
+  selectedOperationIds={assistant.selectedOperationIds}
+  onSelectionChange={assistant.setSelectedOperationIds}
+  onApply={assistant.apply}
+  onReject={assistant.reject}
+/>
+```
+
+Providerの認証情報と呼び出しはサーバー側に置き、boundedなAuthoring contextだけを送り、回答データを送らず、
+Coreで検証・適用した結果だけを保存してください。
+
+Core境界では`parseAuthoringSuggestion()`と
+`previewAuthoringSuggestion(schema, suggestion, { operationIds, policy })`を通してから適用します。Quality問題は
+`createAuthoringRequestFromQualityIssue(issue, schema)`で依頼に変換し、
+`applyAndRecheckQuality(() => assistant.applySelected(), quality.run)`で適用成功後に再チェックできます。
 
 Coreパッケージには、満足度、意見改善、人気投票、理解度チェックの4種類の日英対応目的別テンプレートが
 含まれます。利用側は`getFormTemplates({ mode, locale })`で種別と言語を絞り、

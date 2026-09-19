@@ -266,7 +266,7 @@ declare function pipeResponsesToCsvStream(schema: FormSchema, submissions: Async
 declare function exportResponsesToCsv(schema: FormSchema, responses: readonly FormSubmission[], options?: CsvExportOptions): string;
 declare function exportResponsesToCsv<TMeta extends BaseSubmissionMetadata>(schema: FormSchema, responses: readonly FormSubmission<TMeta>[], options?: MetadataCsvExportOptions<TMeta>): string;
 
-type KnownBuilderTranslationKey = "authoring.prompt.label" | "authoring.prompt.submit" | "authoring.preview.selectAll" | "authoring.preview.apply" | "authoring.preview.reject" | "authoring.preview.before" | "authoring.preview.after" | "authoring.preview.invalid" | "authoring.action.ai" | "authoring.action.rewrite" | "authoring.action.shorten" | "authoring.action.generateOptions" | "builder.content.mode" | "builder.content.survey" | "builder.content.poll" | "builder.content.quiz" | "builder.content.pollSettings" | "builder.content.quizSettings" | "builder.content.resultVisibility" | "builder.content.after_submit" | "builder.content.always" | "builder.content.closed_only" | "builder.content.private" | "builder.content.strictOneVotePerUser" | "builder.content.showExplanation" | "builder.content.immediate" | "builder.content.enablePassingScore" | "builder.content.passingScore" | "builder.content.correctAnswer" | "builder.content.explanation" | "builder.content.points" | "builder.content.validationTitle" | "builder.content.validation.poll_field_count" | "builder.content.validation.quiz_field_count" | "builder.content.validation.unsupported_field_type" | "builder.content.validation.options_minimum" | "builder.content.validation.correct_option_missing" | "builder.content.validation.points_type" | "builder.content.validation.explanation_type" | "builder.content.validation.points_range" | "builder.content.validation.poll_result_visibility" | "builder.content.validation.poll_strict_one_vote" | "builder.content.validation.quiz_explanation_timing" | "builder.content.validation.quiz_passing_score" | "builder.formTitle" | "builder.formDescription" | "builder.completionMessage" | "builder.addQuestion" | "builder.actions.addField" | "builder.actions.deleteField" | "builder.actions.moveUp" | "builder.actions.moveDown" | "builder.actions.add" | "builder.actions.delete" | "builder.actions.edit" | "builder.actions.settings" | "builder.actions.translate" | "builder.actions.close" | "builder.actions.dragHandle" | "builder.fields.selectType" | "builder.fields.typeText" | "builder.fields.typeTextarea" | "builder.fields.typeNumber" | "builder.fields.typeRadio" | "builder.fields.typeCheckbox" | "builder.fields.typeSelect" | "builder.fields.typeRating" | "builder.fields.typeMultiSelect" | "builder.fields.typeDate" | "builder.fields.typeTime" | "builder.fields.typeEmail" | "builder.fields.typeTel" | "builder.fields.typeUrl" | "builder.fieldType.text" | "builder.fieldType.textarea" | "builder.fieldType.number" | "builder.fieldType.radio" | "builder.fieldType.checkbox" | "builder.fieldType.select" | "builder.fieldType.rating" | "builder.fieldType.multi-select" | "builder.fieldType.date" | "builder.fieldType.time" | "builder.fieldType.email" | "builder.fieldType.tel" | "builder.fieldType.url" | "builder.fieldTypeDescription.text" | "builder.fieldTypeDescription.textarea" | "builder.fieldTypeDescription.number" | "builder.fieldTypeDescription.radio" | "builder.fieldTypeDescription.checkbox" | "builder.fieldTypeDescription.select" | "builder.fieldTypeDescription.rating" | "builder.fieldTypeDescription.multi-select" | "builder.fieldTypeDescription.date" | "builder.fieldTypeDescription.time" | "builder.fieldTypeDescription.email" | "builder.fieldTypeDescription.tel" | "builder.fieldTypeDescription.url" | "builder.fieldCategory.text" | "builder.fieldCategory.choice" | "builder.fieldCategory.number" | "builder.fieldCategory.advanced" | "builder.required" | "builder.options" | "builder.shuffleOptions" | "builder.pinOption" | "builder.optionTextInput" | "builder.openAt" | "builder.closeAt" | "builder.maxResponses" | "builder.closedMessage" | "builder.notYetOpenMessage" | "builder.honeypotFieldId" | "builder.localization.title" | "builder.localization" | "builder.localization.addLocale" | "builder.localization.selectLocaleToAdd" | "builder.localization.defaultLocale" | "builder.localization.translateAll" | "builder.localization.noLocalesConfigured" | "builder.localization.localesConfiguredSummary" | "builder.localization.allLocalesAdded" | "builder.localization.maxLocalesReached" | "builder.submissionSettings.title" | "builder.submissionSettings.showConfirmation" | "builder.submissionSettings.renderMode" | "builder.formBuilder" | "builder.basicSettings" | "builder.description" | "builder.moveUp" | "builder.moveDown" | "builder.delete" | "builder.deleteAction" | "builder.questionTitle" | "builder.questionTitlePlaceholder" | "builder.newQuestionTitle" | "builder.type" | "builder.minimum" | "builder.maximum" | "builder.minimumLength" | "builder.maximumLength" | "builder.pattern" | "builder.step" | "builder.optionLabel" | "builder.optionLabelPlaceholder" | "builder.newOptionLabel" | "builder.remove" | "builder.addOption" | "builder.displayCondition" | "builder.alwaysVisible" | "builder.conditionOperator" | "builder.conditionValue" | "builder.conditionTrue" | "builder.conditionFalse" | "builder.pages" | "builder.enablePages" | "builder.addPage" | "builder.splitPage" | "builder.newPage" | "builder.pageTitle" | "builder.pageDescription" | "builder.pageQuestion" | "builder.pageQuestionToMove" | "builder.noPageQuestions" | "builder.pageDeleteMoves" | "builder.pageDeleteLast" | "builder.questionPage" | "builder.pageCondition" | "builder.unassigned" | "builder.defaultLocale" | "builder.supportedLocales" | "builder.addLocale" | "builder.editLocale" | "builder.autoTranslate" | "builder.translating" | "builder.translationLocale" | "builder.selectLocale" | "builder.selectLocaleToAdd" | "builder.translation" | "builder.translatedFormTitle" | "builder.translatedFormDescription" | "builder.translatedCompletionMessage" | "builder.translatedQuestionTitle" | "builder.translatedDescription" | "builder.translationUnavailable" | "builder.operator.equals" | "builder.operator.not_equals" | "builder.operator.contains" | "builder.operator.not_empty" | "builder.showConfirmationBeforeSubmit" | "builder.confirmationRenderMode";
+type KnownBuilderTranslationKey = "authoring.prompt.label" | "authoring.prompt.submit" | "authoring.preview.selectAll" | "authoring.preview.apply" | "authoring.preview.reject" | "authoring.preview.before" | "authoring.preview.after" | "authoring.preview.invalid" | "authoring.action.ai" | "authoring.action.rewrite" | "authoring.action.shorten" | "authoring.action.generateOptions" | "authoring.operation.addField" | "authoring.operation.updateField" | "authoring.operation.updateForm" | "authoring.operation.addOption" | "authoring.operation.updateOption" | "builder.content.mode" | "builder.content.survey" | "builder.content.poll" | "builder.content.quiz" | "builder.content.pollSettings" | "builder.content.quizSettings" | "builder.content.resultVisibility" | "builder.content.after_submit" | "builder.content.always" | "builder.content.closed_only" | "builder.content.private" | "builder.content.strictOneVotePerUser" | "builder.content.showExplanation" | "builder.content.immediate" | "builder.content.enablePassingScore" | "builder.content.passingScore" | "builder.content.correctAnswer" | "builder.content.explanation" | "builder.content.points" | "builder.content.validationTitle" | "builder.content.validation.poll_field_count" | "builder.content.validation.quiz_field_count" | "builder.content.validation.unsupported_field_type" | "builder.content.validation.options_minimum" | "builder.content.validation.correct_option_missing" | "builder.content.validation.points_type" | "builder.content.validation.explanation_type" | "builder.content.validation.points_range" | "builder.content.validation.poll_result_visibility" | "builder.content.validation.poll_strict_one_vote" | "builder.content.validation.quiz_explanation_timing" | "builder.content.validation.quiz_passing_score" | "builder.formTitle" | "builder.formDescription" | "builder.completionMessage" | "builder.addQuestion" | "builder.actions.addField" | "builder.actions.deleteField" | "builder.actions.moveUp" | "builder.actions.moveDown" | "builder.actions.add" | "builder.actions.delete" | "builder.actions.edit" | "builder.actions.settings" | "builder.actions.translate" | "builder.actions.close" | "builder.actions.dragHandle" | "builder.fields.selectType" | "builder.fields.typeText" | "builder.fields.typeTextarea" | "builder.fields.typeNumber" | "builder.fields.typeRadio" | "builder.fields.typeCheckbox" | "builder.fields.typeSelect" | "builder.fields.typeRating" | "builder.fields.typeMultiSelect" | "builder.fields.typeDate" | "builder.fields.typeTime" | "builder.fields.typeEmail" | "builder.fields.typeTel" | "builder.fields.typeUrl" | "builder.fieldType.text" | "builder.fieldType.textarea" | "builder.fieldType.number" | "builder.fieldType.radio" | "builder.fieldType.checkbox" | "builder.fieldType.select" | "builder.fieldType.rating" | "builder.fieldType.multi-select" | "builder.fieldType.date" | "builder.fieldType.time" | "builder.fieldType.email" | "builder.fieldType.tel" | "builder.fieldType.url" | "builder.fieldTypeDescription.text" | "builder.fieldTypeDescription.textarea" | "builder.fieldTypeDescription.number" | "builder.fieldTypeDescription.radio" | "builder.fieldTypeDescription.checkbox" | "builder.fieldTypeDescription.select" | "builder.fieldTypeDescription.rating" | "builder.fieldTypeDescription.multi-select" | "builder.fieldTypeDescription.date" | "builder.fieldTypeDescription.time" | "builder.fieldTypeDescription.email" | "builder.fieldTypeDescription.tel" | "builder.fieldTypeDescription.url" | "builder.fieldCategory.text" | "builder.fieldCategory.choice" | "builder.fieldCategory.number" | "builder.fieldCategory.advanced" | "builder.required" | "builder.options" | "builder.shuffleOptions" | "builder.pinOption" | "builder.optionTextInput" | "builder.openAt" | "builder.closeAt" | "builder.maxResponses" | "builder.closedMessage" | "builder.notYetOpenMessage" | "builder.honeypotFieldId" | "builder.localization.title" | "builder.localization" | "builder.localization.addLocale" | "builder.localization.selectLocaleToAdd" | "builder.localization.defaultLocale" | "builder.localization.translateAll" | "builder.localization.noLocalesConfigured" | "builder.localization.localesConfiguredSummary" | "builder.localization.allLocalesAdded" | "builder.localization.maxLocalesReached" | "builder.submissionSettings.title" | "builder.submissionSettings.showConfirmation" | "builder.submissionSettings.renderMode" | "builder.formBuilder" | "builder.basicSettings" | "builder.description" | "builder.moveUp" | "builder.moveDown" | "builder.delete" | "builder.deleteAction" | "builder.questionTitle" | "builder.questionTitlePlaceholder" | "builder.newQuestionTitle" | "builder.type" | "builder.minimum" | "builder.maximum" | "builder.minimumLength" | "builder.maximumLength" | "builder.pattern" | "builder.step" | "builder.optionLabel" | "builder.optionLabelPlaceholder" | "builder.newOptionLabel" | "builder.remove" | "builder.addOption" | "builder.displayCondition" | "builder.alwaysVisible" | "builder.conditionOperator" | "builder.conditionValue" | "builder.conditionTrue" | "builder.conditionFalse" | "builder.pages" | "builder.enablePages" | "builder.addPage" | "builder.splitPage" | "builder.newPage" | "builder.pageTitle" | "builder.pageDescription" | "builder.pageQuestion" | "builder.pageQuestionToMove" | "builder.noPageQuestions" | "builder.pageDeleteMoves" | "builder.pageDeleteLast" | "builder.questionPage" | "builder.pageCondition" | "builder.unassigned" | "builder.defaultLocale" | "builder.supportedLocales" | "builder.addLocale" | "builder.editLocale" | "builder.autoTranslate" | "builder.translating" | "builder.translationLocale" | "builder.selectLocale" | "builder.selectLocaleToAdd" | "builder.translation" | "builder.translatedFormTitle" | "builder.translatedFormDescription" | "builder.translatedCompletionMessage" | "builder.translatedQuestionTitle" | "builder.translatedDescription" | "builder.translationUnavailable" | "builder.operator.equals" | "builder.operator.not_equals" | "builder.operator.contains" | "builder.operator.not_empty" | "builder.showConfirmationBeforeSubmit" | "builder.confirmationRenderMode";
 type BuilderTranslationKey = KnownBuilderTranslationKey;
 type RendererTranslationKey = "renderer.submitButton" | "renderer.submittingButton" | "renderer.retryButton" | "renderer.requiredField" | "renderer.validationSummary" | "renderer.validationSummaryPlural" | "renderer.alreadySubmittedTitle" | "renderer.alreadySubmittedMessage" | "renderer.serverErrorSummary" | "renderer.confirmSensitiveDataTitle" | "renderer.confirmSensitiveDataMessage" | "renderer.confirmButton" | "renderer.cancelButton" | "renderer.draftResumeTitle" | "renderer.draftResumeMessage" | "renderer.draftResumeContinue" | "renderer.draftResumeStartOver" | "renderer.draftResumeEnabled" | "renderer.draftResumeDisabled" | "renderer.draftSaved" | "renderer.draftSaveFailed" | "renderer.draftDeleteFailed" | "form.submit" | "form.submitting" | "form.back" | "form.next" | "form.step" | "form.draftRestored" | "form.submissionBlocked" | "form.confirmSensitiveData" | "form.confirmSubmission" | "form.cancelSubmission" | "form.yes" | "form.no" | "form.alreadySubmitted" | "form.submitAnother" | "form.closed" | "form.notYetOpen" | "form.responseLimitReached" | "form.optionText" | "validation.required" | "validation.invalidOption" | "validation.invalidType" | "validation.max" | "validation.maxLength" | "validation.maxSelections" | "validation.min" | "validation.minLength" | "validation.minSelections" | "validation.pattern" | "validation.invalidFormat" | "validation.sensitiveData" | "validation.step" | "validation.unknownField";
 type ContentResultTranslationKey = "content.results.totalScore" | "content.results.passed" | "content.results.notPassed" | "content.results.correct" | "content.results.incorrect" | "content.results.correctOption" | "content.results.pollResults" | "content.results.votes" | "content.results.loading" | "content.results.retry" | "content.results.loadError" | "content.results.invalidQuiz";
@@ -1100,9 +1100,7 @@ interface AuthoringRequest {
     readonly schema?: FormSchema;
 }
 interface AuthoringAssistantAdapter {
-    generate?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
-    /** Compatibility alias for adapters that prefer an explicit method name. */
-    generateSuggestion?: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
+    generate: (request: AuthoringRequest, signal?: AbortSignal) => Promise<AuthoringSuggestion>;
 }
 interface AuthoringOptionInput {
     readonly label: string;
@@ -1228,8 +1226,13 @@ interface AuthoringPreview {
     readonly baseSchemaHash: string;
     readonly schema: FormSchema;
     readonly operations: readonly AuthoringOperation[];
-    readonly operationPreviews?: readonly AuthoringOperationPreview[];
+    readonly operationPreviews: readonly AuthoringOperationPreview[];
     readonly issues: readonly AuthoringValidationIssue[];
+}
+interface AuthoringPreviewOptions {
+    readonly operationIds?: readonly string[];
+    readonly policy?: FormPolicy;
+    readonly idFactory?: AuthoringApplyOptions["idFactory"];
 }
 type AuthoringApplyError = {
     readonly code: "stale_schema";
@@ -1256,11 +1259,231 @@ interface AuthoringApplyOptions {
 
 declare function applyAuthoringSuggestion(schema: FormSchema, suggestion: AuthoringSuggestion, selectedOperationIds?: readonly string[], options?: AuthoringApplyOptions): AuthoringApplyResult;
 
+interface BuildAuthoringContextOptions {
+    readonly schema: FormSchema;
+    readonly request: AuthoringRequest;
+    readonly policy?: FormPolicy;
+}
+interface AuthoringContext extends Readonly<Record<string, JsonValue>> {
+    readonly fields: readonly JsonValue[];
+}
+declare function buildAuthoringContext({ schema, request, policy }: BuildAuthoringContextOptions): AuthoringContext;
+
 /** Deterministic, local fingerprint for stale-suggestion protection. */
 declare function computeAuthoringSchemaHash(schema: FormSchema): string;
 
+declare const AuthoringSuggestionSchema: z.ZodObject<{
+    id: z.ZodString;
+    summary: z.ZodString;
+    operations: z.ZodArray<z.ZodDiscriminatedUnion<[z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"addField">;
+        field: z.ZodObject<{
+            type: z.ZodEnum<{
+                number: "number";
+                text: "text";
+                select: "select";
+                radio: "radio";
+                "multi-select": "multi-select";
+                textarea: "textarea";
+                date: "date";
+                time: "time";
+                email: "email";
+                tel: "tel";
+                url: "url";
+                rating: "rating";
+                checkbox: "checkbox";
+            }>;
+            title: z.ZodString;
+            description: z.ZodOptional<z.ZodString>;
+            required: z.ZodOptional<z.ZodBoolean>;
+            translationKey: z.ZodOptional<z.ZodString>;
+            messages: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+            placeholderKey: z.ZodOptional<z.ZodString>;
+            minLength: z.ZodOptional<z.ZodNumber>;
+            maxLength: z.ZodOptional<z.ZodNumber>;
+            pattern: z.ZodOptional<z.ZodString>;
+            minDate: z.ZodOptional<z.ZodString>;
+            maxDate: z.ZodOptional<z.ZodString>;
+            minTime: z.ZodOptional<z.ZodString>;
+            maxTime: z.ZodOptional<z.ZodString>;
+            min: z.ZodOptional<z.ZodNumber>;
+            max: z.ZodOptional<z.ZodNumber>;
+            step: z.ZodOptional<z.ZodNumber>;
+            shuffleOptions: z.ZodOptional<z.ZodBoolean>;
+            minSelections: z.ZodOptional<z.ZodNumber>;
+            maxSelections: z.ZodOptional<z.ZodNumber>;
+            options: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                label: z.ZodString;
+                textInput: z.ZodOptional<z.ZodBoolean>;
+                pinned: z.ZodOptional<z.ZodBoolean>;
+            }, z.core.$strict>>>;
+        }, z.core.$strict>;
+        pageId: z.ZodOptional<z.ZodString>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"updateField">;
+        fieldId: z.ZodString;
+        patch: z.ZodObject<{
+            title: z.ZodOptional<z.ZodString>;
+            description: z.ZodOptional<z.ZodString>;
+            required: z.ZodOptional<z.ZodBoolean>;
+            placeholderKey: z.ZodOptional<z.ZodString>;
+            minLength: z.ZodOptional<z.ZodNumber>;
+            maxLength: z.ZodOptional<z.ZodNumber>;
+            pattern: z.ZodOptional<z.ZodString>;
+            minDate: z.ZodOptional<z.ZodString>;
+            maxDate: z.ZodOptional<z.ZodString>;
+            minTime: z.ZodOptional<z.ZodString>;
+            maxTime: z.ZodOptional<z.ZodString>;
+            min: z.ZodOptional<z.ZodNumber>;
+            max: z.ZodOptional<z.ZodNumber>;
+            step: z.ZodOptional<z.ZodNumber>;
+            shuffleOptions: z.ZodOptional<z.ZodBoolean>;
+            minSelections: z.ZodOptional<z.ZodNumber>;
+            maxSelections: z.ZodOptional<z.ZodNumber>;
+            messages: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+        }, z.core.$strict>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"updateForm">;
+        patch: z.ZodObject<{
+            title: z.ZodOptional<z.ZodString>;
+            description: z.ZodOptional<z.ZodString>;
+            completionMessage: z.ZodOptional<z.ZodString>;
+            submitLabelKey: z.ZodOptional<z.ZodString>;
+        }, z.core.$strict>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"addOption">;
+        fieldId: z.ZodString;
+        option: z.ZodObject<{
+            label: z.ZodString;
+            textInput: z.ZodOptional<z.ZodBoolean>;
+            pinned: z.ZodOptional<z.ZodBoolean>;
+        }, z.core.$strict>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"updateOption">;
+        fieldId: z.ZodString;
+        optionId: z.ZodString;
+        patch: z.ZodObject<{
+            label: z.ZodOptional<z.ZodString>;
+            textInput: z.ZodOptional<z.ZodBoolean>;
+            pinned: z.ZodOptional<z.ZodBoolean>;
+        }, z.core.$strict>;
+    }, z.core.$strict>], "type">>;
+    rationale: z.ZodOptional<z.ZodString>;
+    baseSchemaHash: z.ZodString;
+}, z.core.$strict>;
+declare const AUTHORING_SUGGESTION_JSON_SCHEMA: z.core.ZodStandardJSONSchemaPayload<z.ZodObject<{
+    id: z.ZodString;
+    summary: z.ZodString;
+    operations: z.ZodArray<z.ZodDiscriminatedUnion<[z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"addField">;
+        field: z.ZodObject<{
+            type: z.ZodEnum<{
+                number: "number";
+                text: "text";
+                select: "select";
+                radio: "radio";
+                "multi-select": "multi-select";
+                textarea: "textarea";
+                date: "date";
+                time: "time";
+                email: "email";
+                tel: "tel";
+                url: "url";
+                rating: "rating";
+                checkbox: "checkbox";
+            }>;
+            title: z.ZodString;
+            description: z.ZodOptional<z.ZodString>;
+            required: z.ZodOptional<z.ZodBoolean>;
+            translationKey: z.ZodOptional<z.ZodString>;
+            messages: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+            placeholderKey: z.ZodOptional<z.ZodString>;
+            minLength: z.ZodOptional<z.ZodNumber>;
+            maxLength: z.ZodOptional<z.ZodNumber>;
+            pattern: z.ZodOptional<z.ZodString>;
+            minDate: z.ZodOptional<z.ZodString>;
+            maxDate: z.ZodOptional<z.ZodString>;
+            minTime: z.ZodOptional<z.ZodString>;
+            maxTime: z.ZodOptional<z.ZodString>;
+            min: z.ZodOptional<z.ZodNumber>;
+            max: z.ZodOptional<z.ZodNumber>;
+            step: z.ZodOptional<z.ZodNumber>;
+            shuffleOptions: z.ZodOptional<z.ZodBoolean>;
+            minSelections: z.ZodOptional<z.ZodNumber>;
+            maxSelections: z.ZodOptional<z.ZodNumber>;
+            options: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                label: z.ZodString;
+                textInput: z.ZodOptional<z.ZodBoolean>;
+                pinned: z.ZodOptional<z.ZodBoolean>;
+            }, z.core.$strict>>>;
+        }, z.core.$strict>;
+        pageId: z.ZodOptional<z.ZodString>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"updateField">;
+        fieldId: z.ZodString;
+        patch: z.ZodObject<{
+            title: z.ZodOptional<z.ZodString>;
+            description: z.ZodOptional<z.ZodString>;
+            required: z.ZodOptional<z.ZodBoolean>;
+            placeholderKey: z.ZodOptional<z.ZodString>;
+            minLength: z.ZodOptional<z.ZodNumber>;
+            maxLength: z.ZodOptional<z.ZodNumber>;
+            pattern: z.ZodOptional<z.ZodString>;
+            minDate: z.ZodOptional<z.ZodString>;
+            maxDate: z.ZodOptional<z.ZodString>;
+            minTime: z.ZodOptional<z.ZodString>;
+            maxTime: z.ZodOptional<z.ZodString>;
+            min: z.ZodOptional<z.ZodNumber>;
+            max: z.ZodOptional<z.ZodNumber>;
+            step: z.ZodOptional<z.ZodNumber>;
+            shuffleOptions: z.ZodOptional<z.ZodBoolean>;
+            minSelections: z.ZodOptional<z.ZodNumber>;
+            maxSelections: z.ZodOptional<z.ZodNumber>;
+            messages: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+        }, z.core.$strict>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"updateForm">;
+        patch: z.ZodObject<{
+            title: z.ZodOptional<z.ZodString>;
+            description: z.ZodOptional<z.ZodString>;
+            completionMessage: z.ZodOptional<z.ZodString>;
+            submitLabelKey: z.ZodOptional<z.ZodString>;
+        }, z.core.$strict>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"addOption">;
+        fieldId: z.ZodString;
+        option: z.ZodObject<{
+            label: z.ZodString;
+            textInput: z.ZodOptional<z.ZodBoolean>;
+            pinned: z.ZodOptional<z.ZodBoolean>;
+        }, z.core.$strict>;
+    }, z.core.$strict>, z.ZodObject<{
+        operationId: z.ZodString;
+        type: z.ZodLiteral<"updateOption">;
+        fieldId: z.ZodString;
+        optionId: z.ZodString;
+        patch: z.ZodObject<{
+            label: z.ZodOptional<z.ZodString>;
+            textInput: z.ZodOptional<z.ZodBoolean>;
+            pinned: z.ZodOptional<z.ZodBoolean>;
+        }, z.core.$strict>;
+    }, z.core.$strict>], "type">>;
+    rationale: z.ZodOptional<z.ZodString>;
+    baseSchemaHash: z.ZodString;
+}, z.core.$strict>>;
+declare function parseAuthoringSuggestion(value: unknown): AuthoringSuggestion;
+
 declare function validateAuthoringSuggestion(suggestion: AuthoringSuggestion, schema: FormSchema, policy?: FormPolicy): AuthoringValidationResult;
-declare function previewAuthoringSuggestion(schema: FormSchema, suggestion: AuthoringSuggestion, selectedOperationIdsOrPolicy?: readonly string[] | FormPolicy, policy?: FormPolicy): AuthoringPreview;
+declare function previewAuthoringSuggestion(schema: FormSchema, suggestion: AuthoringSuggestion, options?: AuthoringPreviewOptions): AuthoringPreview;
 
 type CrossFormSkipReason = "schema_missing" | "invalid_answers" | "not_quiz" | "evaluation_failed";
 interface CrossFormAnalyticsOptions<TSubmission extends FormSubmission = FormSubmission> {
@@ -1940,4 +2163,4 @@ interface FormProgress {
 }
 declare function calculateProgress(schema: FormSchema, currentAnswers: Readonly<Record<string, unknown>>, currentPageIndex?: number): FormProgress;
 
-export { type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AddFieldOperation, type AddOptionOperation, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type AuthoringApplyError, type AuthoringApplyOptions, type AuthoringApplyResult, type AuthoringAssistantAdapter, type AuthoringFieldInput, type AuthoringFieldPatch, type AuthoringIntent, type AuthoringOperation, type AuthoringOperationPreview, type AuthoringOptionInput, type AuthoringPreview, type AuthoringPreviewValue, type AuthoringRequest, type AuthoringSuggestion, type AuthoringTarget, type AuthoringValidationCode, type AuthoringValidationIssue, type AuthoringValidationResult, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type ContentModeConstraintCode, type ContentModeConstraintIssue, type ContentModeDiagnostic, type ContentModeIssue, type ContentModeIssueCode, type ContentModeSettings, type ContentModeValidationResult, type ContentResultTranslationKey, type CreateSchemaFromTemplateOptions, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossFormAnalytics, type CrossFormAnalyticsOptions, type CrossFormScoreSummary, type CrossFormSkipReason, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, type CustomFormMetadata, DEFAULT_FIELD_TYPE_DEFINITIONS, type DateField, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type EmailField, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAcceptanceResult, type FormAcceptanceStatus, type FormAnalytics, type FormContentMode, type FormDeletionCounts, type FormDeletionInspection, type FormDeletionRequest, type FormDeletionResult, type FormDeletionScope, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormLifecycleAdapter, type FormLifecycleBackend, type FormLifecycleOptions, type FormPage, type FormPolicy, type FormProgress, type FormResource, type FormResourceKind, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionValidationSource, type FormSubmissionValidator, type FormSubmissionValidatorResult, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormTemplate, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, type GetFormTemplatesOptions, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PollAccessContext, type PollMetadata, type PollRuntimeAdapter, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type QuizEvaluationResult, type QuizFieldMetadata, type QuizMetadata, type QuizQuestionEvaluation, type QuizQuestionResult, type QuizResult, type RadioTextAnswer, type RateLimiter, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type ResponseSummaryData, type ResponseSummaryInput, type ResponseSummaryLabels, type ResponseSummaryLanguageAggregate, type ResponseSummaryQuestion, type ResponseSummarySkipReason, type Result, type SanitizeSchemaOptions, type SaveSubmissionOptions, type SchemaDomainCodec, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StorageSubmissionExportOptions, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCodec, type SubmissionCodecFailure, type SubmissionCodecResult, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionGuard, type SubmissionGuardContext, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionPipeline, type SubmissionPipelineOptions, type SubmissionPipelineResult, type SubmissionQueryOptions, type SubmissionSaveResult, type SubmissionSchema, type SubmissionValidationResult, type TelField, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TimeField, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TrpcFormSubmissionErrorData, type TrpcProcedureType, type TrpcSubmissionErrorAdapter, type TrpcSubmissionErrorFormatter, type TrpcSubmissionErrorFormatterOptions, type TrpcSubmissionErrorIntegration, type TrpcSubmissionErrorShape, type TypedExtensibleNode, type TypedFormSchema, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type TypedTextAnswerItem, type TypedTextAnswerPage, type UnifiedSubmissionStorageAdapter, type UpdateFieldOperation, type UpdateFormOperation, type UpdateOptionOperation, type UrlField, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateForms, aggregateResponses, applyAuthoringSuggestion, applyTransitionPlan, assertValidFormSchema, assertValidFormSubmission, assertValidFormSubmissionWith, assertVersionMutable, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, calculateProgress, canShowPollResults, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeAuthoringSchemaHash, computeSourceTextHash, contentMetadataToJson, createChallengeGuard, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createFormLifecycleAdapter, createFormSubmissionSchema, createHoneypotGuard, createInitialSchemaByMode, createMemoryRateLimiter, createPublishTransitionPlan, createRateLimitGuard, createResponseAccumulator, createSchemaDomainCodec, createSchemaFromTemplate, createSubmission, createSubmissionId, createSubmissionPayloadHash, createSubmissionPipeline, createTrpcSubmissionErrorAdapter, createTrpcSubmissionErrorFormatter, createTrpcSubmissionErrorIntegration, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, deserializeSubmissionErrorFromTrpc, dispatchWebhook, emptyFormDeletionCounts, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, evaluateQuiz, evaluateQuizLocally, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, getContentModeDiagnostics, getContentModePolicy, getFormAcceptanceStatus, getFormContentMode, getFormTemplates, getTranslationStatus, getTrpcSubmissionErrorData, hashFormSubmissionPayload, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isFormValue, isManualTranslationMetadata, isQuestionVisible, isRadioTextAnswer, isSubmissionUlid, iterateSubmissionPages, jsonValuesEqual, mapField, mapOption, mapPage, mapSchema, mapSchemaNode, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, normalizeTranslationMetadata, paginateWithFilter, pipeResponsesToCsvStream, populateSchemaTranslations, previewAuthoringSuggestion, publishDraft, readPollMetadata, readQuizFieldMetadata, readQuizMetadata, removeLocaleFromSchema, resolveContentModeSettings, resolveFormTranslation, resolveLocalizedSchema, runSubmissionPipeline, sanitizeSchema, selectVisibleAnswers, selectedOptionId, serializeSubmissionError, serializeSubmissionErrorForTrpc, shuffleOptions, toFormSubmissionWire, toResponseSummary, transformFieldType, trpcSubmissionErrorAdapter, validateAnswers, validateAuthoringSuggestion, validateContentMode, validateContentModeConstraints, validateFieldValue, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };
+export { AUTHORING_SUGGESTION_JSON_SCHEMA, type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AddFieldOperation, type AddOptionOperation, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type AuthoringApplyError, type AuthoringApplyOptions, type AuthoringApplyResult, type AuthoringAssistantAdapter, type AuthoringContext, type AuthoringFieldInput, type AuthoringFieldPatch, type AuthoringIntent, type AuthoringOperation, type AuthoringOperationPreview, type AuthoringOptionInput, type AuthoringPreview, type AuthoringPreviewOptions, type AuthoringPreviewValue, type AuthoringRequest, type AuthoringSuggestion, AuthoringSuggestionSchema, type AuthoringTarget, type AuthoringValidationCode, type AuthoringValidationIssue, type AuthoringValidationResult, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuildAuthoringContextOptions, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type ContentModeConstraintCode, type ContentModeConstraintIssue, type ContentModeDiagnostic, type ContentModeIssue, type ContentModeIssueCode, type ContentModeSettings, type ContentModeValidationResult, type ContentResultTranslationKey, type CreateSchemaFromTemplateOptions, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossFormAnalytics, type CrossFormAnalyticsOptions, type CrossFormScoreSummary, type CrossFormSkipReason, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, type CustomFormMetadata, DEFAULT_FIELD_TYPE_DEFINITIONS, type DateField, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, EN_MESSAGES, type EmailField, type ExtensibleNode, type FieldConstraintRule, type FieldDisplayCondition, type FieldOption, type FieldType, type FieldTypeDefinition, type FormAcceptanceResult, type FormAcceptanceStatus, type FormAnalytics, type FormContentMode, type FormDeletionCounts, type FormDeletionInspection, type FormDeletionRequest, type FormDeletionResult, type FormDeletionScope, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormField, type FormLifecycleAdapter, type FormLifecycleBackend, type FormLifecycleOptions, type FormPage, type FormPolicy, type FormProgress, type FormResource, type FormResourceKind, type FormResponse, type FormSchema, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionValidationSource, type FormSubmissionValidator, type FormSubmissionValidatorResult, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormTemplate, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, type GetFormTemplatesOptions, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptionAggregate, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PollAccessContext, type PollMetadata, type PollRuntimeAdapter, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type QuizEvaluationResult, type QuizFieldMetadata, type QuizMetadata, type QuizQuestionEvaluation, type QuizQuestionResult, type QuizResult, type RadioTextAnswer, type RateLimiter, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type ResponseSummaryData, type ResponseSummaryInput, type ResponseSummaryLabels, type ResponseSummaryLanguageAggregate, type ResponseSummaryQuestion, type ResponseSummarySkipReason, type Result, type SanitizeSchemaOptions, type SaveSubmissionOptions, type SchemaDomainCodec, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StorageSubmissionExportOptions, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCodec, type SubmissionCodecFailure, type SubmissionCodecResult, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionGuard, type SubmissionGuardContext, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionPipeline, type SubmissionPipelineOptions, type SubmissionPipelineResult, type SubmissionQueryOptions, type SubmissionSaveResult, type SubmissionSchema, type SubmissionValidationResult, type TelField, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TimeField, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TrpcFormSubmissionErrorData, type TrpcProcedureType, type TrpcSubmissionErrorAdapter, type TrpcSubmissionErrorFormatter, type TrpcSubmissionErrorFormatterOptions, type TrpcSubmissionErrorIntegration, type TrpcSubmissionErrorShape, type TypedExtensibleNode, type TypedFormSchema, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type TypedTextAnswerItem, type TypedTextAnswerPage, type UnifiedSubmissionStorageAdapter, type UpdateFieldOperation, type UpdateFormOperation, type UpdateOptionOperation, type UrlField, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateForms, aggregateResponses, applyAuthoringSuggestion, applyTransitionPlan, assertValidFormSchema, assertValidFormSubmission, assertValidFormSubmissionWith, assertVersionMutable, buildAuthoringContext, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, calculateProgress, canShowPollResults, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, computeAuthoringSchemaHash, computeSourceTextHash, contentMetadataToJson, createChallengeGuard, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createFormLifecycleAdapter, createFormSubmissionSchema, createHoneypotGuard, createInitialSchemaByMode, createMemoryRateLimiter, createPublishTransitionPlan, createRateLimitGuard, createResponseAccumulator, createSchemaDomainCodec, createSchemaFromTemplate, createSubmission, createSubmissionId, createSubmissionPayloadHash, createSubmissionPipeline, createTrpcSubmissionErrorAdapter, createTrpcSubmissionErrorFormatter, createTrpcSubmissionErrorIntegration, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, deserializeSubmissionErrorFromTrpc, dispatchWebhook, emptyFormDeletionCounts, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, evaluateQuiz, evaluateQuizLocally, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, getContentModeDiagnostics, getContentModePolicy, getFormAcceptanceStatus, getFormContentMode, getFormTemplates, getTranslationStatus, getTrpcSubmissionErrorData, hashFormSubmissionPayload, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isFormValue, isManualTranslationMetadata, isQuestionVisible, isRadioTextAnswer, isSubmissionUlid, iterateSubmissionPages, jsonValuesEqual, mapField, mapOption, mapPage, mapSchema, mapSchemaNode, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, normalizeTranslationMetadata, paginateWithFilter, parseAuthoringSuggestion, pipeResponsesToCsvStream, populateSchemaTranslations, previewAuthoringSuggestion, publishDraft, readPollMetadata, readQuizFieldMetadata, readQuizMetadata, removeLocaleFromSchema, resolveContentModeSettings, resolveFormTranslation, resolveLocalizedSchema, runSubmissionPipeline, sanitizeSchema, selectVisibleAnswers, selectedOptionId, serializeSubmissionError, serializeSubmissionErrorForTrpc, shuffleOptions, toFormSubmissionWire, toResponseSummary, transformFieldType, trpcSubmissionErrorAdapter, validateAnswers, validateAuthoringSuggestion, validateContentMode, validateContentModeConstraints, validateFieldValue, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };

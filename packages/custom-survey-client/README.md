@@ -417,6 +417,13 @@ const quality = useSurveyQualityController({
 });
 ```
 
+Quality issues can request a provider-neutral authoring fix with
+`createAuthoringRequestFromQualityIssue(issue, schema)`. After the user applies
+the selected suggestion, compose the existing apply callback with
+`applyAndRecheckQuality(() => assistant.applySelected(), quality.run)` so a
+successful apply immediately starts a fresh quality check; failed or empty
+applies do not recheck.
+
 The v7.2 names remain available for migration. New code should use the
 domain/controller names and root exports; feature folders (`editor/*`,
 `response/*`, `quality/*`, `workflow/*`, `mapping/*`, and `shared/*`) are

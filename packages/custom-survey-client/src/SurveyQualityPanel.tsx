@@ -5,6 +5,7 @@ export interface SurveyQualityPanelProps {
   readonly result?: QualityCheckResult;
   readonly decisions?: Readonly<Record<string, QualityIssueDecision>>;
   readonly onDecide?: (issue: QualityIssue, decision: QualityIssueDecision) => void;
+  readonly onRequestAiFix?: (issue: QualityIssue) => void;
   readonly render?: (result: QualityCheckResult | undefined) => ReactNode;
   readonly slots?: SurveyQualityPanelSlots;
 }
@@ -16,6 +17,7 @@ export interface SurveyQualityPanelSlots {
     readonly decision?: QualityIssueDecision;
     readonly accept: () => void;
     readonly reject: () => void;
+    readonly requestAiFix: () => void;
   }) => ReactNode;
 }
 
@@ -26,7 +28,8 @@ export function surveyQualityIssueKey(issue: QualityIssue): string {
 function defaultIssue(
   issue: QualityIssue,
   decision: QualityIssueDecision | undefined,
-  onDecide: SurveyQualityPanelProps["onDecide"]
+  onDecide: SurveyQualityPanelProps["onDecide"],
+  onRequestAiFix: SurveyQualityPanelProps["onRequestAiFix"]
 ): React.JSX.Element {
   const accept = () => onDecide?.(issue, "accept");
   const reject = () => onDecide?.(issue, "reject");
@@ -45,6 +48,11 @@ function defaultIssue(
           </button>
         </span>
       )}
+      {onRequestAiFix === undefined ? null : (
+        <button type="button" onClick={() => onRequestAiFix(issue)}>
+          Fix with AI
+        </button>
+      )}
     </div>
   );
 }
@@ -54,6 +62,7 @@ export function SurveyQualityPanel({
   result,
   decisions = {},
   onDecide,
+  onRequestAiFix,
   render,
   slots
 }: SurveyQualityPanelProps): React.JSX.Element {
@@ -66,11 +75,14 @@ export function SurveyQualityPanel({
         const decision = decisions[surveyQualityIssueKey(issue)];
         const accept = () => onDecide?.(issue, "accept");
         const reject = () => onDecide?.(issue, "reject");
+        const requestAiFix = () => onRequestAiFix?.(issue);
         return (
           <li key={surveyQualityIssueKey(issue)}>
             {decision === undefined
-              ? (slots?.issue?.({ issue, accept, reject }) ?? defaultIssue(issue, decision, onDecide))
-              : (slots?.issue?.({ issue, decision, accept, reject }) ?? defaultIssue(issue, decision, onDecide))}
+              ? (slots?.issue?.({ issue, accept, reject, requestAiFix }) ??
+                defaultIssue(issue, decision, onDecide, onRequestAiFix))
+              : (slots?.issue?.({ issue, decision, accept, reject, requestAiFix }) ??
+                defaultIssue(issue, decision, onDecide, onRequestAiFix))}
           </li>
         );
       })}

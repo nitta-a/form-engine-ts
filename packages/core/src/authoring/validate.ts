@@ -5,6 +5,7 @@ import type {
   AuthoringOperation,
   AuthoringOperationPreview,
   AuthoringPreview,
+  AuthoringPreviewOptions,
   AuthoringPreviewValue,
   AuthoringSuggestion,
   AuthoringValidationIssue,
@@ -49,10 +50,6 @@ const fieldPatchKeys = new Set(
 );
 const optionKeys = new Set(["label", "textInput", "pinned"]);
 const formPatchKeys = new Set(["title", "description", "completionMessage", "submitLabelKey"]);
-
-function isOperationIds(value: readonly string[] | FormPolicy | undefined): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
-}
 
 function issue(
   code: AuthoringValidationIssue["code"],
@@ -357,14 +354,9 @@ export function validateAuthoringSuggestion(
 export function previewAuthoringSuggestion(
   schema: FormSchema,
   suggestion: AuthoringSuggestion,
-  selectedOperationIdsOrPolicy?: readonly string[] | FormPolicy,
-  policy?: FormPolicy
+  options: AuthoringPreviewOptions = {}
 ): AuthoringPreview {
-  const selectedOperationIds = isOperationIds(selectedOperationIdsOrPolicy) ? selectedOperationIdsOrPolicy : undefined;
-  let resolvedPolicy: FormPolicy | undefined;
-  if (selectedOperationIdsOrPolicy === undefined || isOperationIds(selectedOperationIdsOrPolicy))
-    resolvedPolicy = policy;
-  else resolvedPolicy = selectedOperationIdsOrPolicy;
+  const { operationIds: selectedOperationIds, policy: resolvedPolicy, idFactory } = options;
   const selected =
     selectedOperationIds === undefined
       ? suggestion.operations
@@ -372,12 +364,10 @@ export function previewAuthoringSuggestion(
   const selectedSuggestion = { ...suggestion, operations: selected };
   const validation = validateAuthoringSuggestion(selectedSuggestion, schema, resolvedPolicy);
   const applied = validation.valid
-    ? applyAuthoringSuggestion(
-        schema,
-        selectedSuggestion,
-        undefined,
-        resolvedPolicy === undefined ? {} : { policy: resolvedPolicy }
-      )
+    ? applyAuthoringSuggestion(schema, selectedSuggestion, undefined, {
+        ...(resolvedPolicy === undefined ? {} : { policy: resolvedPolicy }),
+        ...(idFactory === undefined ? {} : { idFactory })
+      })
     : undefined;
   const issues = applied !== undefined && !applied.success ? applied.error.issues : validation.issues;
   const operationPreviews = suggestion.operations.map((operation) => {

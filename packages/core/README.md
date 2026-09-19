@@ -34,31 +34,38 @@ created by the apply boundary, never by the provider.
 ```ts
 import {
   applyAuthoringSuggestion,
+  buildAuthoringContext,
   computeAuthoringSchemaHash,
+  parseAuthoringSuggestion,
   previewAuthoringSuggestion,
   type AuthoringSuggestion
 } from "@form-engine-ts/core";
 
-const suggestion: AuthoringSuggestion = await adapter.generate({ intent: "add_questions", prompt, schema });
-const preview = previewAuthoringSuggestion(schema, suggestion, policy);
+const request = { intent: "add_questions", prompt } as const;
+const suggestion: AuthoringSuggestion = parseAuthoringSuggestion(
+  await adapter.generate({ ...request, context: buildAuthoringContext({ schema, request, policy }) })
+);
+const preview = previewAuthoringSuggestion(schema, suggestion, { policy });
 // Re-preview a subset after the user unchecks an operation.
-const selectedPreview = previewAuthoringSuggestion(schema, suggestion, ["question-1"], policy);
+const selectedPreview = previewAuthoringSuggestion(schema, suggestion, { operationIds: ["question-1"], policy });
 if (preview.valid) {
   const result = applyAuthoringSuggestion(schema, suggestion, ["question-1"], { policy });
   if (result.success) save(result.schema);
 }
 ```
 
-`preview.operationPreviews` contains operation-level validation plus optional before/after values for form, field, and
-option changes. The selected-operation overload keeps the schema hash check and cumulative policy validation intact.
+`preview.operationPreviews` contains operation-level validation plus before/after values for form, field, and option
+changes. Empty `operationIds` is a valid Core no-op; UI adapters disable Apply for that state. `buildAuthoringContext`
+returns only form metadata, content mode, policy limits, target-neighbor fields, and option labels, so answer data is not part of provider context. The React hook sends this bounded context and does not include the full schema in the provider request.
 
 The MVP supports independent `addField`, `updateField`, `updateForm`, `addOption`, and `updateOption` operations.
 Removal, moving, pages, conditions, locale/translation, submission settings, and direct Azure/OpenAI SDK usage stay
 in the host application.
 
 For a server-backed provider, keep credentials in the host server and inject a small HTTP adapter. The preview app
-includes `createHttpAuthoringAssistantAdapter()` as a reference; the server endpoint should return an
-`AuthoringSuggestion` structured response, which Core validates before apply.
+includes `createHttpAuthoringAssistantAdapter()` as a client reference; the server endpoint should return an
+`AuthoringSuggestion` structured response and run `parseAuthoringSuggestion()` before returning it. Azure OpenAI,
+OpenAI, and other provider SDKs belong in that server endpoint or host application, not in Core.
 
 Security responsibilities remain with the host application: do not put provider API keys in the browser, keep Azure
 OpenAI/OpenAI/Bedrock calls server-side, never let this package manage provider credentials, and always validate an AI

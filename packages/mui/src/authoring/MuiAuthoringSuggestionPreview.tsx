@@ -1,4 +1,4 @@
-import type { AuthoringPreview, AuthoringSuggestion } from "@form-engine-ts/core";
+import type { AuthoringOperationPreview, AuthoringPreview, AuthoringSuggestion } from "@form-engine-ts/core";
 import { FormEngineI18nProviderScopeContext, useFormEngineI18n } from "@form-engine-ts/react";
 import CheckBoxIcon from "@mui/icons-material/CheckBox";
 import CheckBoxOutlineBlankIcon from "@mui/icons-material/CheckBoxOutlineBlank";
@@ -9,7 +9,7 @@ import Checkbox from "@mui/material/Checkbox";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext } from "react";
 
 const fallbackProviderScope = createContext(false);
 
@@ -20,8 +20,8 @@ export interface MuiAuthoringSuggestionPreviewProps {
   readonly error?: string;
   readonly onApply: (operationIds: readonly string[]) => void;
   readonly onReject: () => void;
-  readonly selectedOperationIds?: readonly string[];
-  readonly onSelectionChange?: (operationIds: readonly string[]) => void;
+  readonly selectedOperationIds: readonly string[];
+  readonly onSelectionChange: (operationIds: readonly string[]) => void;
   readonly labels?: Partial<{
     readonly selectAll: string;
     readonly apply: string;
@@ -38,7 +38,7 @@ export function MuiAuthoringSuggestionPreview({
   error,
   onApply,
   onReject,
-  selectedOperationIds: controlledSelected,
+  selectedOperationIds,
   onSelectionChange,
   labels
 }: MuiAuthoringSuggestionPreviewProps) {
@@ -47,35 +47,62 @@ export function MuiAuthoringSuggestionPreview({
   const text = (key: string, fallback: string, override?: string) =>
     override ?? (hasProvider ? translator(key) : fallback);
   const operationLabel = (operation: AuthoringSuggestion["operations"][number]): string => {
-    if (operation.type === "addField") return `${operation.type}: ${operation.field.type} — ${operation.field.title}`;
-    if (operation.type === "updateField") return `${operation.type}: ${operation.patch.title ?? operation.fieldId}`;
-    if (operation.type === "updateForm") return `${operation.type}: ${operation.patch.title ?? "form settings"}`;
-    if (operation.type === "addOption") return `${operation.type}: ${operation.option.label}`;
-    return `${operation.type}: ${operation.patch.label ?? operation.optionId}`;
+    if (operation.type === "addField")
+      return `${text("authoring.operation.addField", "Add question")}: ${operation.field.title}`;
+    if (operation.type === "updateField")
+      return `${text("authoring.operation.updateField", "Update question")}: ${operation.fieldId}`;
+    if (operation.type === "updateForm") return text("authoring.operation.updateForm", "Update form settings");
+    if (operation.type === "addOption")
+      return `${text("authoring.operation.addOption", "Add option")}: ${operation.option.label}`;
+    return `${text("authoring.operation.updateOption", "Update option")}: ${operation.optionId}`;
   };
-  const allIds = useMemo(
-    () => suggestion.operations.map((operation) => operation.operationId),
-    [suggestion.operations]
-  );
-  const [internalSelected, setInternalSelected] = useState<readonly string[]>(allIds);
-  useEffect(() => setInternalSelected(allIds), [allIds]);
-  const selected = controlledSelected ?? internalSelected;
-  const setSelected = (next: readonly string[]) => {
-    setInternalSelected(next);
-    onSelectionChange?.(next);
-  };
-  const allSelected = selected.length === allIds.length;
+  const operationPreviews = preview.operationPreviews;
+  const validIds = operationPreviews.filter((item) => item.valid).map((item) => item.operationId);
+  const selectedPreviews = operationPreviews.filter((item) => selectedOperationIds.includes(item.operationId));
+  const selectedValid =
+    selectedOperationIds.every((id) => validIds.includes(id)) && selectedPreviews.every((item) => item.valid);
+  const allSelected = validIds.length > 0 && validIds.every((id) => selectedOperationIds.includes(id));
+  const setSelected = (next: readonly string[]) => onSelectionChange(next);
   const toggle = (id: string) =>
-    setSelected(selected.includes(id) ? selected.filter((value) => value !== id) : [...selected, id]);
-  const operationPreviews = preview.operationPreviews ?? [];
-  const selectedPreviews = operationPreviews.filter((item) => selected.includes(item.operationId));
-  const selectedValid = selectedPreviews.every((item) => item.valid);
-  const previewText = (value: (typeof operationPreviews)[number]["before"]): string => {
-    if (value === undefined) return "None";
-    if (value.kind === "form") return value.title ?? value.description ?? value.completionMessage ?? "Form settings";
-    if (value.kind === "field")
-      return "field" in value && value.field !== undefined ? JSON.stringify(value.field) : "None";
-    return "option" in value && value.option !== undefined ? JSON.stringify(value.option) : "None";
+    setSelected(
+      selectedOperationIds.includes(id)
+        ? selectedOperationIds.filter((value) => value !== id)
+        : [...selectedOperationIds, id]
+    );
+  const formatValue = (value: unknown): string => {
+    if (value === undefined) return "—";
+    if (typeof value === "boolean") return value ? "Required" : "Optional";
+    if (typeof value === "string" || typeof value === "number") return String(value);
+    return "—";
+  };
+  const property = (value: AuthoringOperationPreview["before"], key: string): unknown => {
+    if (value?.kind === "form") return Reflect.get(value, key);
+    if (value?.kind === "field") return value.field === undefined ? undefined : Reflect.get(value.field, key);
+    if (value?.kind === "option") return value.option === undefined ? undefined : Reflect.get(value.option, key);
+    return undefined;
+  };
+  const propertyLabel = (key: string): string => {
+    if (key === "title") return "Question";
+    if (key === "description") return "Description";
+    if (key === "required") return "Required";
+    if (key === "label") return "Option";
+    if (key === "completionMessage") return "Completion message";
+    return key;
+  };
+  const previewRows = (item: AuthoringOperationPreview): readonly (readonly [string, string, string])[] => {
+    const operation = item.operation;
+    if (operation.type === "addField")
+      return [
+        ["Type", operation.field.type, operation.field.type],
+        ["Question", "—", operation.field.title]
+      ];
+    if (operation.type === "addOption") return [["Option", "—", operation.option.label]];
+    const patch = operation.patch;
+    return Object.entries(patch).map(([key, value]) => [
+      propertyLabel(key),
+      formatValue(property(item.before, key)),
+      formatValue(operation.type === "updateOption" ? value : property(item.after, key))
+    ]);
   };
   return (
     <Card component="section" aria-label="Authoring suggestion preview">
@@ -93,8 +120,8 @@ export function MuiAuthoringSuggestionPreview({
             control={
               <Checkbox
                 checked={allSelected}
-                indeterminate={selected.length > 0 && !allSelected}
-                onChange={() => setSelected(allSelected ? [] : allIds)}
+                indeterminate={selectedOperationIds.length > 0 && !allSelected}
+                onChange={() => setSelected(allSelected ? [] : validIds)}
               />
             }
             label={text("authoring.preview.selectAll", "Select all", labels?.selectAll)}
@@ -106,7 +133,8 @@ export function MuiAuthoringSuggestionPreview({
                   <Checkbox
                     icon={<CheckBoxOutlineBlankIcon />}
                     checkedIcon={<CheckBoxIcon />}
-                    checked={selected.includes(operation.operationId)}
+                    checked={selectedOperationIds.includes(operation.operationId)}
+                    disabled={!operationPreviews.find((item) => item.operationId === operation.operationId)?.valid}
                     onChange={() => toggle(operation.operationId)}
                   />
                 }
@@ -117,12 +145,17 @@ export function MuiAuthoringSuggestionPreview({
                 if (item === undefined) return null;
                 return (
                   <Stack sx={{ pl: 4 }} spacing={0.25}>
-                    <Typography variant="caption">
-                      {text("authoring.preview.before", "Before", labels?.before)}: {previewText(item.before)}
-                    </Typography>
-                    <Typography variant="caption">
-                      {text("authoring.preview.after", "After", labels?.after)}: {previewText(item.after)}
-                    </Typography>
+                    {previewRows(item).map(([label, before, after]) => (
+                      <Stack key={label} direction="row" spacing={1}>
+                        <Typography variant="caption">{label}</Typography>
+                        <Typography variant="caption">
+                          {text("authoring.preview.before", "Before", labels?.before)}: {before}
+                        </Typography>
+                        <Typography variant="caption">
+                          {text("authoring.preview.after", "After", labels?.after)}: {after}
+                        </Typography>
+                      </Stack>
+                    ))}
                     {!item.valid ? (
                       <Typography color="error">{item.issues.map((issue) => issue.message).join(" ")}</Typography>
                     ) : null}
@@ -134,8 +167,8 @@ export function MuiAuthoringSuggestionPreview({
           <Stack direction="row" spacing={1}>
             <Button
               variant="contained"
-              disabled={loading || !preview.valid || !selectedValid || selected.length === 0}
-              onClick={() => onApply(selected)}
+              disabled={loading || !preview.valid || !selectedValid || selectedOperationIds.length === 0}
+              onClick={() => onApply(selectedOperationIds)}
             >
               {text("authoring.preview.apply", "Apply selected", labels?.apply)}
             </Button>

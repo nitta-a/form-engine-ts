@@ -20,16 +20,17 @@ const prompts: Record<MuiAuthoringFieldActionName, string> = {
   shorten: "Shorten this question",
   "generate-options": "Generate answer options"
 };
+const choiceFieldTypes = new Set(["select", "radio", "multi-select"]);
 
-export function MuiAuthoringFieldAction({
-  field,
-  onRequest,
-  actions = ["rewrite", "shorten", "generate-options"],
-  disabled = false
-}: MuiAuthoringFieldActionProps) {
+export function MuiAuthoringFieldAction({ field, onRequest, actions, disabled = false }: MuiAuthoringFieldActionProps) {
   const { translator } = useFormEngineI18n();
   const hasProvider = useContext(FormEngineI18nProviderScopeContext ?? fallbackProviderScope);
   const [open, setOpen] = useState(false);
+  const resolvedActions = actions ?? [
+    "rewrite",
+    "shorten",
+    ...(choiceFieldTypes.has(field.type) ? ["generate-options" as const] : [])
+  ];
   const text = (key: string, fallback: string) => (hasProvider ? translator(key) : fallback);
   const request = (action: MuiAuthoringFieldActionName) => {
     const intent = action === "generate-options" ? "generate_options" : "rewrite_field";
@@ -46,7 +47,7 @@ export function MuiAuthoringFieldAction({
         {text("authoring.action.ai", "✨ AI")}
       </Button>
       {open
-        ? actions.map((action) => (
+        ? resolvedActions.map((action) => (
             <Button key={action} size="small" disabled={disabled} onClick={() => request(action)}>
               {text(
                 action === "rewrite"

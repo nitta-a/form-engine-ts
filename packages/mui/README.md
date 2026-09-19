@@ -4,13 +4,16 @@ Official Material UI v6/v7 integration layer for `@form-engine-ts/react`. `MuiFo
 layout slots together, disables the React builder CSS classes, and propagates common size and variant settings.
 
 `MuiAuthoringPrompt` and `MuiAuthoringSuggestionPreview` provide the standard prompt, per-operation selection, preview,
-apply, reject, loading, and validation-error surfaces for `useAuthoringAssistant`. Pass `intent`/`target` to build a
+apply, reject, loading, and validation-error surfaces for `useAuthoringAssistant`. `MuiAuthoringSuggestionPreview` is
+controlled: pass `selectedOperationIds` and `onSelectionChange`. Invalid operations start unchecked and disabled.
+Pass `intent`/`target` to build a
 non-default request, or use `createRequest` for complete control. Operation rows show before/after values and issues
 when supplied by Core. They only render the injected Core contract; Azure OpenAI, OpenAI, and other provider SDKs remain
 application dependencies.
 
-`MuiAuthoringFieldAction` adds rewrite, shorten, and option-generation request buttons for a field without knowing which
-AI provider will handle the request:
+`MuiAuthoringFieldAction` adds rewrite and shorten actions to every field, and adds option generation only to select,
+radio, and multi-select fields by default. An explicit `actions` prop overrides that default without knowing which AI
+provider will handle the request:
 
 ```tsx
 <MuiAuthoringFieldAction field={field} onRequest={assistant.suggest} />

@@ -3,9 +3,11 @@ import {
   type AuthoringOperation,
   type AuthoringSuggestion,
   applyAuthoringSuggestion,
+  buildAuthoringContext,
   computeAuthoringSchemaHash,
   createInitialSchemaByMode,
   type FormField,
+  parseAuthoringSuggestion,
   previewAuthoringSuggestion,
   validateAuthoringSuggestion
 } from "../src";
@@ -151,10 +153,10 @@ describe("authoring suggestions", () => {
       { operationId: "one", type: "updateField", fieldId: "q1", patch: { title: "Updated" } },
       { operationId: "two", type: "updateForm", patch: { title: "Form" } }
     ]);
-    const preview = previewAuthoringSuggestion(base, value, ["one"]);
+    const preview = previewAuthoringSuggestion(base, value, { operationIds: ["one"] });
     expect(preview.valid).toBe(true);
     expect(preview.operations.map((operation) => operation.operationId)).toEqual(["one"]);
-    const operationPreviews = preview.operationPreviews ?? [];
+    const operationPreviews = preview.operationPreviews;
     expect(operationPreviews).toHaveLength(2);
     expect(operationPreviews[0]).toMatchObject({
       operationId: "one",
@@ -168,10 +170,10 @@ describe("authoring suggestions", () => {
       { operationId: "one", type: "addField", field: { type: "text", title: "One" } },
       { operationId: "two", type: "addField", field: { type: "text", title: "Two" } }
     ]);
-    const preview = previewAuthoringSuggestion(base, value, ["one"], { maxFields: 2 });
+    const preview = previewAuthoringSuggestion(base, value, { operationIds: ["one"], policy: { maxFields: 2 } });
     expect(preview.valid).toBe(true);
     expect(preview.schema.fields).toHaveLength(2);
-    expect((preview.operationPreviews ?? []).find((item) => item.operationId === "two")?.valid).toBe(true);
+    expect(preview.operationPreviews.find((item) => item.operationId === "two")?.valid).toBe(true);
   });
 
   it("preserves page membership and rejects runtime-only protected properties", () => {
@@ -209,5 +211,45 @@ describe("authoring suggestions", () => {
       ...suggestion([{ operationId: "remove", type: "removeField" } as unknown as AuthoringOperation])
     } as unknown as AuthoringSuggestion;
     expect(validateAuthoringSuggestion(unsupported, base).valid).toBe(false);
+  });
+
+  it("treats empty selection as a valid no-op and parses provider responses", () => {
+    const value = suggestion([{ operationId: "one", type: "updateForm", patch: { title: "Updated" } }]);
+    const preview = previewAuthoringSuggestion(base, value, { operationIds: [] });
+    expect(preview.valid).toBe(true);
+    expect(preview.schema).toEqual(base);
+    expect(preview.operations).toEqual([]);
+    expect(applyAuthoringSuggestion(base, value, [])).toEqual({
+      success: true,
+      schema: base,
+      appliedOperationIds: []
+    });
+    expect(parseAuthoringSuggestion(value)).toEqual(value);
+    expect(() => parseAuthoringSuggestion({ ...value, operations: [{ type: "removeField" }] })).toThrow(
+      "Invalid authoring suggestion"
+    );
+  });
+
+  it("builds a small authoring context around the target field", () => {
+    const context = buildAuthoringContext({
+      schema: {
+        ...base,
+        fields: [
+          { id: "q1", type: "text", title: "One", required: false },
+          { id: "q2", type: "text", title: "Two", required: false },
+          { id: "q3", type: "text", title: "Three", required: false }
+        ]
+      },
+      request: { intent: "rewrite_field", target: { kind: "field", fieldId: "q2" } },
+      policy: { maxTextLength: 120, allowedFieldTypes: ["text"] }
+    });
+    expect(context.fields).toEqual([
+      expect.objectContaining({ id: "q1" }),
+      expect.objectContaining({ id: "q2" }),
+      expect.objectContaining({ id: "q3" })
+    ]);
+    expect(context.form).toMatchObject({ contentMode: "survey" });
+    expect(context.policy).toMatchObject({ maxTextLength: 120, allowedFieldTypes: ["text"] });
+    expect(context).not.toHaveProperty("answers");
   });
 });

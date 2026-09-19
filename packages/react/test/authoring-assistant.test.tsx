@@ -15,13 +15,19 @@ const schema: FormSchema = {
 
 describe("useAuthoringAssistant", () => {
   it("moves from generating to ready and applies selected operations", async () => {
+    let receivedSchema: FormSchema | undefined;
+    let receivedContext: Readonly<Record<string, unknown>> | undefined;
     const adapter: AuthoringAssistantAdapter = {
-      generate: async (request) => ({
-        id: "s1",
-        summary: "Rename form",
-        baseSchemaHash: computeAuthoringSchemaHash(request.schema as FormSchema),
-        operations: [{ operationId: "form", type: "updateForm", patch: { title: "Updated" } }]
-      })
+      generate: async (request) => {
+        receivedSchema = request.schema;
+        receivedContext = request.context;
+        return {
+          id: "s1",
+          summary: "Rename form",
+          baseSchemaHash: computeAuthoringSchemaHash(schema),
+          operations: [{ operationId: "form", type: "updateForm", patch: { title: "Updated" } }]
+        };
+      }
     };
     const onChange = vi.fn();
     const { result } = renderHook(() => useAuthoringAssistant({ schema, adapter, onChange }));
@@ -33,6 +39,11 @@ describe("useAuthoringAssistant", () => {
       await promise;
     });
     expect(result.current.status).toBe("ready");
+    expect(receivedSchema).toBeUndefined();
+    expect(receivedContext).toMatchObject({
+      schemaHash: computeAuthoringSchemaHash(schema),
+      form: { contentMode: "survey" }
+    });
     act(() => {
       result.current.clearSelection();
     });
@@ -86,10 +97,10 @@ describe("useAuthoringAssistant", () => {
     expect(invalidHook.result.current.error?.code).toBe("invalid_response");
 
     const policyInvalid: AuthoringAssistantAdapter = {
-      generate: async (request) => ({
+      generate: async () => ({
         id: "invalid-policy",
         summary: "Too many fields",
-        baseSchemaHash: computeAuthoringSchemaHash(request.schema as FormSchema),
+        baseSchemaHash: computeAuthoringSchemaHash(schema),
         operations: [{ operationId: "bad-type", type: "addField", field: { type: "rating", title: "Not allowed" } }]
       })
     };
@@ -105,14 +116,15 @@ describe("useAuthoringAssistant", () => {
       await policyHook.result.current.suggest({ intent: "generate_form" });
     });
     expect(policyHook.result.current.error?.code).toBe("validation_failure");
+    expect(policyHook.result.current.selectedOperationIds).toEqual([]);
   });
 
   it("rejects applying a suggestion after the schema changes", async () => {
     const adapter: AuthoringAssistantAdapter = {
-      generate: async (request) => ({
+      generate: async () => ({
         id: "stale",
         summary: "Rename form",
-        baseSchemaHash: computeAuthoringSchemaHash(request.schema as FormSchema),
+        baseSchemaHash: computeAuthoringSchemaHash(schema),
         operations: [{ operationId: "form", type: "updateForm", patch: { title: "Updated" } }]
       })
     };
