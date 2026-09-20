@@ -55,8 +55,9 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.1.0** (2026-09-20). All public packages are currently aligned to version `8.1.0`.
-This release adds privacy-preserving interaction telemetry, deterministic optimization insights, version comparison, and provider-agnostic authoring assistance.
+The latest release is **v8.1.2** (2026-09-20). All public packages are currently aligned to version `8.1.2`.
+This release adds lossless FormSchema conversion, typed field and option metadata codecs, builder field normalization hooks,
+and the provider-neutral AI survey creation client APIs.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -454,8 +455,9 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v8.1.0**（2026-09-20）です。公開パッケージはすべてバージョン `8.1.0` に揃えています。
-本リリースでは、プライバシー保護型インタラクションテレメトリー、決定的な最適化インサイト、version比較、ベンダー非依存のauthoring支援を追加しました。
+最新版は **v8.1.2**（2026-09-20）です。公開パッケージはすべてバージョン `8.1.2` に揃えています。
+本リリースでは、損失のないFormSchema変換、field/option metadata codec、Builderのfield正規化hook、
+ベンダー非依存のAI survey creation client APIを追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

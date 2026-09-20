@@ -3,6 +3,15 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.1.2 — 2026-09-20
+
+- Added lossless generic FormSchema conversion for locale configuration, translation metadata, submission settings, pages,
+  conditions, choice settings, quiz metadata, and unknown JSON metadata.
+- Added typed `TypedFormField<TMetadata>`, `TypedFieldOption<TMetadata>`, and metadata codec APIs for application-owned
+  field, option, and translation metadata.
+- Added `FormBuilder.normalizeField` mutation hooks for survey-specific defaults and field/option normalization.
+- Added the provider-neutral AI survey creation client APIs and `@form-engine-ts/custom-survey-client/ai-creation` entrypoint.
+
 ## v8.1.1 — 2026-09-20
 
 - Added the provider-neutral AI survey creation assistant with a structured `SurveyCreationBrief`, bounded clarification,

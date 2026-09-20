@@ -287,10 +287,38 @@ export type TypedExtensibleNode<
   readonly metadata?: TMetadata;
   readonly translationMetadata?: Readonly<Record<string, Readonly<Record<string, TTranslationMetadata>>>>;
 };
+
+export type TypedFieldOption<
+  TMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>,
+  TTranslationMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>
+> = Omit<FieldOption, "metadata" | "translationMetadata"> & TypedExtensibleNode<TMetadata, TTranslationMetadata>;
+
+type TypedFormFieldVariant<
+  TField extends FormField,
+  TMetadata extends Readonly<Record<string, JsonValue>>,
+  TTranslationMetadata extends Readonly<Record<string, JsonValue>>
+> = Omit<TField, "metadata" | "translationMetadata" | "options"> &
+  TypedExtensibleNode<TMetadata, TTranslationMetadata> &
+  (TField extends { readonly options: readonly FieldOption[] }
+    ? { readonly options: readonly TypedFieldOption<TMetadata, TTranslationMetadata>[] }
+    : object);
+
+export type TypedFormField<
+  TMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>,
+  TTranslationMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>
+> = FormField extends infer TField
+  ? TField extends FormField
+    ? TypedFormFieldVariant<TField, TMetadata, TTranslationMetadata>
+    : never
+  : never;
+
 export type TypedFormSchema<
   TMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>,
   TTranslationMetadata extends Readonly<Record<string, JsonValue>> = Readonly<Record<string, JsonValue>>
-> = Omit<FormSchema, "metadata" | "translationMetadata"> & TypedExtensibleNode<TMetadata, TTranslationMetadata>;
+> = Omit<FormSchema, "metadata" | "translationMetadata" | "fields"> &
+  TypedExtensibleNode<TMetadata, TTranslationMetadata> & {
+    readonly fields: readonly TypedFormField<TMetadata, TTranslationMetadata>[];
+  };
 
 export interface FormSubmissionSettings extends ExtensibleNode {
   readonly showConfirmationBeforeSubmit?: boolean;

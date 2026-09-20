@@ -412,7 +412,9 @@ conversion boundaries. `aggregateForms` adds locale, content-mode, metadata and 
 quiz score groups without changing `aggregateResponses`.
 
 Use `TypedFormSchema<TMetadata, TTranslationMetadata>` when an application owns metadata
-types; the legacy `FormSchema` shape remains available without type arguments.
+types. `TypedFormField<TMetadata, TTranslationMetadata>` and
+`TypedFieldOption<TMetadata, TTranslationMetadata>` provide the same types at field and
+choice boundaries; the legacy `FormSchema` shape remains available without type arguments.
 
 `contentMetadataToJson` copies JSON metadata and rejects undefined, non-finite,
 cyclic and non-JSON data. `readPollMetadata`, `readQuizMetadata` and

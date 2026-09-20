@@ -1,5 +1,6 @@
-import { JsonValue, TranslationAdapter, FormSchema, TranslationReport, TextAnswerItem, FormResponse, FormField, CanonicalTranslationMetadata, FormAnalytics, QuestionAggregate, FormVersionRecord, FormVersionState, QuestionType, FormEngineTranslator, AuthoringRequest, TranslationSlot } from '@form-engine-ts/core';
+import { JsonValue, TranslationAdapter, FormSchema, TranslationReport, TextAnswerItem, FormResponse, FormField, CanonicalTranslationMetadata, FormAnalytics, QuestionAggregate, FormVersionRecord, FormVersionState, QuestionType, FormEngineTranslator, AuthoringRequest, SchemaTranslations, ValidationCode, DisplayCondition, DisplayRule, FormSubmissionSettings, TranslationSlot } from '@form-engine-ts/core';
 export { ResponseSummaryData, ResponseSummaryInput, ResponseSummaryLabels, ResponseSummaryLanguageAggregate, ResponseSummaryQuestion, ResponseSummarySkipReason } from '@form-engine-ts/core';
+export { SurveyAiCreationLabels, SurveyAiCreationPanel, SurveyAiCreationPanelProps, SurveyEditorPreviewDialog, SurveyEditorPreviewDialogProps } from './aiCreation.js';
 import { FormBuilderProps, useFormBuilder } from '@form-engine-ts/react';
 import { SensitiveDataFinding } from '@form-engine-ts/privacy';
 import { ReactNode } from 'react';
@@ -45,6 +46,12 @@ interface SurveyI18n {
 /** Maps an application-owned survey record to the Form Engine schema used by headless UI primitives. */
 interface SurveySchemaDomainAdapter<TDomain> {
     readonly toFormSchema: (domain: TDomain) => FormSchema;
+}
+type SurveyMetadata = Readonly<Record<string, JsonValue>>;
+/** Encodes application-owned node metadata at the Form Engine JSON boundary. */
+interface SurveyMetadataCodec<TMetadata extends SurveyMetadata = SurveyMetadata> {
+    readonly toEngine: (metadata: TMetadata) => SurveyMetadata;
+    readonly fromEngine: (metadata: SurveyMetadata) => TMetadata;
 }
 type SurveyEngineTextMetadata = Partial<CanonicalTranslationMetadata> & {
     readonly isManuallyEdited?: boolean;
@@ -1365,10 +1372,102 @@ interface SurveyControlledValue<TValue> {
 
 type SurveyDefinitionQuestionType = "text" | "textarea" | "date" | "time" | "email" | "tel" | "url" | "number" | "rating" | "radio" | "select" | "single-choice" | "checkbox" | "multi-select";
 type SurveyDefinitionSelectionStyle = "radio" | "select";
-interface SurveyDefinitionOption {
+type SurveyDefinitionNodeMetadata<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata> = {
+    readonly metadata?: TMetadata;
+    readonly translationMetadata?: SurveyDefinitionTranslationMetadata<TTranslationMetadata>;
+};
+type SurveyDefinitionTranslationMetadata<TTranslationMetadata extends SurveyMetadata = SurveyMetadata> = Readonly<Record<string, Readonly<Record<string, TTranslationMetadata>>>>;
+interface TypedSurveyDefinitionOption<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
     readonly id: string;
     readonly label: string;
-    readonly metadata?: Readonly<Record<string, JsonValue>>;
+    readonly textInput?: boolean;
+    readonly pinned?: boolean;
+    readonly translations?: Readonly<Record<string, string>>;
+}
+interface TypedSurveyDefinitionQuestionBase<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
+    readonly id: string;
+    readonly title: string;
+    readonly description?: string;
+    readonly required?: boolean;
+    readonly translationKey?: string;
+    readonly messages?: Partial<Record<ValidationCode, string>>;
+    readonly displayCondition?: DisplayCondition;
+    readonly displayRule?: DisplayRule;
+    readonly translations?: SchemaTranslations;
+}
+interface TypedSurveyDefinitionTextQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "text" | "textarea";
+    readonly placeholderKey?: string;
+    readonly minLength?: number;
+    readonly maxLength?: number;
+    readonly pattern?: string;
+}
+interface TypedSurveyDefinitionTypedStringQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "date" | "time" | "email" | "tel" | "url";
+    readonly placeholderKey?: string;
+    readonly minDate?: string;
+    readonly maxDate?: string;
+    readonly minTime?: string;
+    readonly maxTime?: string;
+}
+interface TypedSurveyDefinitionNumberQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "number";
+    readonly placeholderKey?: string;
+    readonly min?: number;
+    readonly max?: number;
+    readonly step?: number;
+}
+interface TypedSurveyDefinitionRatingQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "rating";
+    readonly min?: number;
+    readonly max?: number;
+}
+interface TypedSurveyDefinitionChoiceQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "radio" | "select";
+    readonly options: readonly TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>[];
+    readonly shuffleOptions?: boolean;
+}
+interface TypedSurveyDefinitionSingleChoiceQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "single-choice";
+    readonly selectionStyle: SurveyDefinitionSelectionStyle;
+    readonly options: readonly TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>[];
+    readonly shuffleOptions?: boolean;
+}
+interface TypedSurveyDefinitionMultiSelectQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "multi-select";
+    readonly options: readonly TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>[];
+    readonly shuffleOptions?: boolean;
+    readonly minSelections?: number;
+    readonly maxSelections?: number;
+}
+interface TypedSurveyDefinitionCheckboxQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+    readonly type: "checkbox";
+}
+type TypedSurveyDefinitionQuestion<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> = TypedSurveyDefinitionTextQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionTypedStringQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionNumberQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionRatingQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionChoiceQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionSingleChoiceQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionMultiSelectQuestion<TMetadata, TTranslationMetadata> | TypedSurveyDefinitionCheckboxQuestion<TMetadata, TTranslationMetadata>;
+interface TypedSurveyDefinitionPage<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
+    readonly id: string;
+    readonly title?: string;
+    readonly description?: string;
+    readonly questionIds: readonly string[];
+    readonly displayCondition?: DisplayCondition;
+    readonly translations?: SchemaTranslations;
+}
+type TypedSurveyDefinitionSubmissionSettings<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> = Omit<FormSubmissionSettings, "metadata" | "translationMetadata"> & SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata>;
+interface TypedSurveyDefinition<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
+    readonly id: string;
+    readonly version: number;
+    readonly locale: string;
+    /** Preserved when the source schema has an explicit non-legacy locale configuration. */
+    readonly defaultLocale?: string;
+    readonly supportedLocales?: readonly string[];
+    readonly title: string;
+    readonly description?: string;
+    readonly completionMessage?: string;
+    readonly submitLabelKey?: string;
+    readonly translations?: SchemaTranslations;
+    readonly fields: readonly TypedSurveyDefinitionQuestion<TMetadata, TTranslationMetadata>[];
+    readonly pages?: readonly TypedSurveyDefinitionPage<TMetadata, TTranslationMetadata>[];
+    readonly submissionSettings?: TypedSurveyDefinitionSubmissionSettings<TMetadata, TTranslationMetadata>;
 }
 interface SurveyDefinitionQuestionBase {
     readonly id: string;
@@ -1376,9 +1475,24 @@ interface SurveyDefinitionQuestionBase {
     readonly description?: string;
     readonly required?: boolean;
     readonly metadata?: Readonly<Record<string, JsonValue>>;
+    readonly translationKey?: string;
+    readonly messages?: Partial<Record<ValidationCode, string>>;
+    readonly displayCondition?: DisplayCondition;
+    readonly displayRule?: DisplayRule;
+    readonly translations?: SchemaTranslations;
+    readonly translationMetadata?: SurveyDefinitionTranslationMetadata;
+}
+interface SurveyDefinitionOption {
+    readonly id: string;
+    readonly label: string;
+    readonly metadata?: Readonly<Record<string, JsonValue>>;
+    readonly textInput?: boolean;
+    readonly pinned?: boolean;
+    readonly translations?: Readonly<Record<string, string>>;
 }
 interface SurveyDefinitionTextQuestion extends SurveyDefinitionQuestionBase {
     readonly type: "text" | "textarea";
+    readonly placeholderKey?: string;
     readonly minLength?: number;
     readonly maxLength?: number;
     readonly pattern?: string;
@@ -1393,6 +1507,7 @@ interface SurveyDefinitionTypedStringQuestion extends SurveyDefinitionQuestionBa
 }
 interface SurveyDefinitionNumberQuestion extends SurveyDefinitionQuestionBase {
     readonly type: "number";
+    readonly placeholderKey?: string;
     readonly min?: number;
     readonly max?: number;
     readonly step?: number;
@@ -1405,15 +1520,18 @@ interface SurveyDefinitionRatingQuestion extends SurveyDefinitionQuestionBase {
 interface SurveyDefinitionChoiceQuestion extends SurveyDefinitionQuestionBase {
     readonly type: "radio" | "select";
     readonly options: readonly SurveyDefinitionOption[];
+    readonly shuffleOptions?: boolean;
 }
 interface SurveyDefinitionSingleChoiceQuestion extends SurveyDefinitionQuestionBase {
     readonly type: "single-choice";
     readonly selectionStyle: SurveyDefinitionSelectionStyle;
     readonly options: readonly SurveyDefinitionOption[];
+    readonly shuffleOptions?: boolean;
 }
 interface SurveyDefinitionMultiSelectQuestion extends SurveyDefinitionQuestionBase {
     readonly type: "multi-select";
     readonly options: readonly SurveyDefinitionOption[];
+    readonly shuffleOptions?: boolean;
     readonly minSelections?: number;
     readonly maxSelections?: number;
 }
@@ -1425,22 +1543,43 @@ interface SurveyDefinition {
     readonly id: string;
     readonly version: number;
     readonly locale: string;
+    readonly defaultLocale?: string;
+    readonly supportedLocales?: readonly string[];
     readonly title: string;
     readonly description?: string;
     readonly completionMessage?: string;
+    readonly submitLabelKey?: string;
+    readonly translations?: SchemaTranslations;
+    readonly translationMetadata?: SurveyDefinitionTranslationMetadata;
     readonly fields: readonly SurveyDefinitionQuestion[];
+    readonly pages?: readonly TypedSurveyDefinitionPage[];
+    readonly submissionSettings?: TypedSurveyDefinitionSubmissionSettings;
     readonly metadata?: Readonly<Record<string, JsonValue>>;
+}
+interface SurveyDefinitionToFormSchemaOptions<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> {
+    readonly metadataCodec?: SurveyMetadataCodec<TMetadata>;
+    readonly translationMetadataCodec?: SurveyMetadataCodec<TTranslationMetadata>;
+}
+interface TypedFormSchemaToSurveyDefinitionOptions<TMetadata extends SurveyMetadata = SurveyMetadata, TTranslationMetadata extends SurveyMetadata = SurveyMetadata> {
+    /** Used only when the schema has neither defaultLocale nor supportedLocales. */
+    readonly locale?: string;
+    readonly metadataCodec?: SurveyMetadataCodec<TMetadata>;
+    readonly translationMetadataCodec?: SurveyMetadataCodec<TTranslationMetadata>;
 }
 interface FormSchemaToSurveyDefinitionOptions {
     /** Used only when the schema has neither defaultLocale nor supportedLocales. */
     readonly locale?: string;
+    readonly metadataCodec?: SurveyMetadataCodec;
+    readonly translationMetadataCodec?: SurveyMetadataCodec;
 }
 declare class SurveyDefinitionConversionError extends TypeError {
     readonly path: string;
     constructor(path: string, message: string);
 }
 declare function surveyDefinitionToFormSchema(definition: SurveyDefinition): FormSchema;
+declare function surveyDefinitionToFormSchema<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(definition: TypedSurveyDefinition<TMetadata, TTranslationMetadata>, options?: SurveyDefinitionToFormSchemaOptions<TMetadata, TTranslationMetadata>): FormSchema;
 declare function formSchemaToSurveyDefinition(schema: FormSchema, options?: FormSchemaToSurveyDefinitionOptions): SurveyDefinition;
+declare function formSchemaToSurveyDefinition<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(schema: FormSchema, options?: TypedFormSchemaToSurveyDefinitionOptions<TMetadata, TTranslationMetadata>): TypedSurveyDefinition<TMetadata, TTranslationMetadata>;
 
 declare function createSurveyTextMetadataCodec(options?: CreateSurveyTextMetadataCodecOptions): SurveyTextMetadataCodec;
 
@@ -1592,4 +1731,4 @@ declare function useSurveyWorkflow<TDomain, TTransitionId = string>({ domain, tr
 /** Generic workflow controls with application-owned transition labels and transport. */
 declare function SurveyWorkflowPanel<TDomain, TTransitionId = string>({ render, slots, title, ...options }: SurveyWorkflowPanelProps<TDomain, TTransitionId>): React.JSX.Element;
 
-export { type ApplyAndRecheckQualityResult, type AsyncTranslationAdapter, type CreateFreeTextTranslationControllerOptions, type CreateSurveyTextMetadataCodecOptions, type CreateSurveyTranslationAdapterOptions, type CreateSurveyTranslationMetadataOptions, type DirectFreeTextTranslationOptions, type DomainSurveyVersionOperationRequest, type DomainSurveyVersionPublishRequest, type DomainSurveyVersionQualityIssueDecisionRequest, type EditorRenderProps, type FormSchemaToSurveyDefinitionOptions, type FreeTextAnswerDomainAdapter, type FreeTextAnswerInput, type FreeTextAnswerItem, type FreeTextAnswerSource, type FreeTextAnswerTranslationSlots, FreeTextAnswerTranslations, type FreeTextAnswerTranslationsProps, type FreeTextItemStatus, type FreeTextTranslationAdapter, type FreeTextTranslationController, type FreeTextTranslationItemState, type FreeTextTranslationOutcome, type FreeTextTranslationOutcomeItem, type FreeTextTranslationOutcomeStatus, type FreeTextTranslationRequest, type FreeTextTranslationResult, type FreeTextTranslationState, type FreeTextTranslationStatus, type QualityCheckResult, type QualityCheckStatus, type QualityIssue, type QualityIssueDecision, type SurveyActionResult, type SurveyAsyncState, type SurveyClientAsyncState, type SurveyControlledValue, type SurveyControllerStatus, type SurveyDefinition, type SurveyDefinitionCheckboxQuestion, type SurveyDefinitionChoiceQuestion, SurveyDefinitionConversionError, type SurveyDefinitionMultiSelectQuestion, type SurveyDefinitionNumberQuestion, type SurveyDefinitionOption, type SurveyDefinitionQuestion, type SurveyDefinitionQuestionType, type SurveyDefinitionRatingQuestion, type SurveyDefinitionSelectionStyle, type SurveyDefinitionSingleChoiceQuestion, type SurveyDefinitionTextQuestion, type SurveyDefinitionTypedStringQuestion, SurveyEditor, type SurveyEditorActionsAdapter, type SurveyEditorAdapter, type SurveyEditorAdapterInput, type SurveyEditorConfigurationSlots, type SurveyEditorDomainActionsAdapter, type SurveyEditorDomainAdapter, type SurveyEditorDomainAdapterOptions, type SurveyEditorDomainSlots, type SurveyEditorOperationState, type SurveyEditorOperationStatus, type SurveyEditorProps, type SurveyEditorQuestionAdapter, type SurveyEditorQuestionRequest, type SurveyEditorRenderProps, type SurveyEditorSlots, type SurveyEditorTranslateRequest, type SurveyEngineText, type SurveyEngineTextMetadata, SurveyFreeTextTable, type SurveyFreeTextTableProps, type SurveyI18n, type SurveyMappingAdapter, type SurveyMappingAddRequest, type SurveyMappingAtomicCrudAdapter, type SurveyMappingAtomicReorderRequest, type SurveyMappingCrudAdapter, type SurveyMappingCrudOperation, type SurveyMappingCrudState, type SurveyMappingEntry, type SurveyMappingListRequest, type SurveyMappingMutationResponse, type SurveyMappingMutationResult, SurveyMappingPanel, type SurveyMappingPanelProps, type SurveyMappingPanelSlots, type SurveyMappingRemoveRequest, type SurveyMappingReorderRequest, type SurveyMappingReorderResult, type SurveyMappingRevisionConflict, SurveyMappingRevisionConflictError, type SurveyMappingSaveRequest, type SurveyMappingSelection, type SurveyMappingState, type SurveyMappingStatus, SurveyProvider, type SurveyProviderProps, type SurveyQualityCheckAdapter, type SurveyQualityEvent, type SurveyQualityIssueRecord, SurveyQualityPanel, type SurveyQualityPanelProps, type SurveyQualityPanelSlots, type SurveyQualityState, SurveyResponseSummary, type SurveyResponseSummaryComponentProps, SurveyResponseSummaryCustomDomain, type SurveyResponseSummaryCustomDomainComponentProps, type SurveyResponseSummaryCustomDomainProps, type SurveyResponseSummaryData, SurveyResponseSummaryDomain, type SurveyResponseSummaryDomainAdapter, type SurveyResponseSummaryDomainComponentProps, type SurveyResponseSummaryDomainInputProps, type SurveyResponseSummaryDomainLabels, type SurveyResponseSummaryDomainProps, type SurveyResponseSummaryDomainSlots, type SurveyResponseSummaryLanguageAggregate, type SurveyResponseSummaryLanguageOption, type SurveyResponseSummaryLanguageTabsProps, type SurveyResponseSummaryLegacyCustomDomainProps, type SurveyResponseSummaryLegacyDomainProps, type SurveyResponseSummaryMapperAdapter, type SurveyResponseSummaryMappingRequest, type SurveyResponseSummaryProps, type SurveyResponseSummaryQuestion, type SurveyResponseSummarySkipReason, type SurveyResponseSummarySlots, type SurveyResponseSummaryTabOption, type SurveyResponseSummaryTabScope, type SurveyResponseSummaryTabSelection, type SurveyResponseSummaryTabsProps, type SurveyResponseSummaryVariant, type SurveySchemaDomainAdapter, type SurveySchemaDomainAdapterOptions, type SurveySchemaDomainAdapterWithTextMetadata, type SurveySchemaTextMetadataCodec, type SurveySlot, type SurveySummaryInput, type SurveySummaryLoader, type SurveyTextMetadata, type SurveyTextMetadataCodec, type SurveyTextMetadataInput, type SurveyTranslationAdapter, type SurveyTranslationInput, type SurveyTranslationMetadataPolicy, type SurveyTranslationMetadataSource, type SurveyTranslationScope, SurveyUiProvider, type SurveyUiProviderProps, type SurveyVersionActionAdapter, type SurveyVersionActionEvent, type SurveyVersionActionResult, type SurveyVersionActionsAdapter, type SurveyVersionAdapter, type SurveyVersionAdapterResponse, type SurveyVersionDomainActionAdapter, type SurveyVersionDomainActionsResult, type SurveyVersionDomainOperationsResult, type SurveyVersionDomainQualityActions, SurveyVersionHistory, type SurveyVersionHistoryProps, type SurveyVersionHistorySlots, type SurveyVersionLifecycleActions, type SurveyVersionOperationName, type SurveyVersionOperationRequest, type SurveyVersionOperationState, type SurveyVersionOperationStatus, SurveyVersionPanel, type SurveyVersionPanelProps, type SurveyVersionPanelRenderProps, type SurveyVersionPanelSlots, type SurveyVersionPublishRequest, type SurveyVersionQualityActions, type SurveyVersionQualityIssueDecisionRequest, type SurveyVersionQualityResult, type SurveyVersionQualityState, type SurveyVersionQualityStatus, type SurveyWorkflowAdapter, SurveyWorkflowControlled, type SurveyWorkflowControlledProps, SurveyWorkflowPanel, type SurveyWorkflowPanelProps, type SurveyWorkflowPanelSlots, type SurveyWorkflowState, type SurveyWorkflowStatus, type SurveyWorkflowTransition, type SurveyWorkflowTransitionRequest, type TranslateFreeTextAnswersOptions, type TranslateSurveySchemaOptions, type TranslateSurveySchemaResult, type UseFreeTextAnswerTranslationOptions, type UseFreeTextAnswerTranslationResult, type UseFreeTextDomainAnswerTranslationOptions, type UseFreeTextDomainAnswerTranslationResult, type UseSurveyEditorDomainOptions, type UseSurveyEditorDomainResult, type UseSurveyEditorOptions, type UseSurveyEditorResult, type UseSurveyMappingCrudOptions, type UseSurveyMappingCrudResult, type UseSurveyMappingOptions, type UseSurveyMappingResult, type UseSurveyQualityControllerOptions, type UseSurveyQualityControllerResult, type UseSurveyResponseSummaryDomainOptions, type UseSurveyResponseSummaryDomainResult, type UseSurveyVersionActionsOptions, type UseSurveyVersionActionsResult, type UseSurveyVersionDomainActionsOptions, type UseSurveyVersionDomainQualityActionsOptions, type UseSurveyVersionOperationsOptions, type UseSurveyVersionOperationsResult, type UseSurveyWorkflowControlledResult, type UseSurveyWorkflowOptions, type UseSurveyWorkflowResult, applyAndRecheckQuality, composeSurveyVersionActions, composeSurveyVersionDomainActions, createAuthoringRequestFromQualityIssue, createFreeTextTranslationController, createSurveySchemaDomainAdapter, createSurveyTextMetadataCodec, createSurveyTranslationAdapter, createSurveyTranslationMetadata, createSurveyTranslator, formSchemaToSurveyDefinition, getFreeTextAnswerFindings, hasPiiCandidate, isSurveyMappingRevisionConflict, isSurveySummaryInput, mapSurveyQualityIssue, mapSurveyQualityIssues, mapSurveyResponseSummary, surveyDefinitionToFormSchema, surveyQualityIssueKey, toFreeTextAnswerItems, toFreeTextAnswerItemsFromDomain, toSurveyQualityIssue, toSurveyResponseSummary, toSurveyResponseSummaryFromDomain, translateFreeTextAnswers, translateSurveySchema, useFreeTextAnswerTranslation, useFreeTextAnswerTranslationController, useFreeTextDomainAnswerTranslation, useSurveyEditor, useSurveyEditorController, useSurveyEditorDomain, useSurveyMapping, useSurveyMappingCrud, useSurveyQualityController, useSurveyResponseSummaryDomain, useSurveyTranslation, useSurveyVersionActions, useSurveyVersionActionsController, useSurveyVersionDomainActions, useSurveyVersionOperations, useSurveyWorkflow, useSurveyWorkflowControlled };
+export { type ApplyAndRecheckQualityResult, type AsyncTranslationAdapter, type CreateFreeTextTranslationControllerOptions, type CreateSurveyTextMetadataCodecOptions, type CreateSurveyTranslationAdapterOptions, type CreateSurveyTranslationMetadataOptions, type DirectFreeTextTranslationOptions, type DomainSurveyVersionOperationRequest, type DomainSurveyVersionPublishRequest, type DomainSurveyVersionQualityIssueDecisionRequest, type EditorRenderProps, type FormSchemaToSurveyDefinitionOptions, type FreeTextAnswerDomainAdapter, type FreeTextAnswerInput, type FreeTextAnswerItem, type FreeTextAnswerSource, type FreeTextAnswerTranslationSlots, FreeTextAnswerTranslations, type FreeTextAnswerTranslationsProps, type FreeTextItemStatus, type FreeTextTranslationAdapter, type FreeTextTranslationController, type FreeTextTranslationItemState, type FreeTextTranslationOutcome, type FreeTextTranslationOutcomeItem, type FreeTextTranslationOutcomeStatus, type FreeTextTranslationRequest, type FreeTextTranslationResult, type FreeTextTranslationState, type FreeTextTranslationStatus, type QualityCheckResult, type QualityCheckStatus, type QualityIssue, type QualityIssueDecision, type SurveyActionResult, type SurveyAsyncState, type SurveyClientAsyncState, type SurveyControlledValue, type SurveyControllerStatus, type SurveyDefinition, type SurveyDefinitionCheckboxQuestion, type SurveyDefinitionChoiceQuestion, SurveyDefinitionConversionError, type SurveyDefinitionMultiSelectQuestion, type SurveyDefinitionNumberQuestion, type SurveyDefinitionOption, type SurveyDefinitionQuestion, type SurveyDefinitionQuestionType, type SurveyDefinitionRatingQuestion, type SurveyDefinitionSelectionStyle, type SurveyDefinitionSingleChoiceQuestion, type SurveyDefinitionTextQuestion, type SurveyDefinitionToFormSchemaOptions, type SurveyDefinitionTranslationMetadata, type SurveyDefinitionTypedStringQuestion, SurveyEditor, type SurveyEditorActionsAdapter, type SurveyEditorAdapter, type SurveyEditorAdapterInput, type SurveyEditorConfigurationSlots, type SurveyEditorDomainActionsAdapter, type SurveyEditorDomainAdapter, type SurveyEditorDomainAdapterOptions, type SurveyEditorDomainSlots, type SurveyEditorOperationState, type SurveyEditorOperationStatus, type SurveyEditorProps, type SurveyEditorQuestionAdapter, type SurveyEditorQuestionRequest, type SurveyEditorRenderProps, type SurveyEditorSlots, type SurveyEditorTranslateRequest, type SurveyEngineText, type SurveyEngineTextMetadata, SurveyFreeTextTable, type SurveyFreeTextTableProps, type SurveyI18n, type SurveyMappingAdapter, type SurveyMappingAddRequest, type SurveyMappingAtomicCrudAdapter, type SurveyMappingAtomicReorderRequest, type SurveyMappingCrudAdapter, type SurveyMappingCrudOperation, type SurveyMappingCrudState, type SurveyMappingEntry, type SurveyMappingListRequest, type SurveyMappingMutationResponse, type SurveyMappingMutationResult, SurveyMappingPanel, type SurveyMappingPanelProps, type SurveyMappingPanelSlots, type SurveyMappingRemoveRequest, type SurveyMappingReorderRequest, type SurveyMappingReorderResult, type SurveyMappingRevisionConflict, SurveyMappingRevisionConflictError, type SurveyMappingSaveRequest, type SurveyMappingSelection, type SurveyMappingState, type SurveyMappingStatus, type SurveyMetadata, type SurveyMetadataCodec, SurveyProvider, type SurveyProviderProps, type SurveyQualityCheckAdapter, type SurveyQualityEvent, type SurveyQualityIssueRecord, SurveyQualityPanel, type SurveyQualityPanelProps, type SurveyQualityPanelSlots, type SurveyQualityState, SurveyResponseSummary, type SurveyResponseSummaryComponentProps, SurveyResponseSummaryCustomDomain, type SurveyResponseSummaryCustomDomainComponentProps, type SurveyResponseSummaryCustomDomainProps, type SurveyResponseSummaryData, SurveyResponseSummaryDomain, type SurveyResponseSummaryDomainAdapter, type SurveyResponseSummaryDomainComponentProps, type SurveyResponseSummaryDomainInputProps, type SurveyResponseSummaryDomainLabels, type SurveyResponseSummaryDomainProps, type SurveyResponseSummaryDomainSlots, type SurveyResponseSummaryLanguageAggregate, type SurveyResponseSummaryLanguageOption, type SurveyResponseSummaryLanguageTabsProps, type SurveyResponseSummaryLegacyCustomDomainProps, type SurveyResponseSummaryLegacyDomainProps, type SurveyResponseSummaryMapperAdapter, type SurveyResponseSummaryMappingRequest, type SurveyResponseSummaryProps, type SurveyResponseSummaryQuestion, type SurveyResponseSummarySkipReason, type SurveyResponseSummarySlots, type SurveyResponseSummaryTabOption, type SurveyResponseSummaryTabScope, type SurveyResponseSummaryTabSelection, type SurveyResponseSummaryTabsProps, type SurveyResponseSummaryVariant, type SurveySchemaDomainAdapter, type SurveySchemaDomainAdapterOptions, type SurveySchemaDomainAdapterWithTextMetadata, type SurveySchemaTextMetadataCodec, type SurveySlot, type SurveySummaryInput, type SurveySummaryLoader, type SurveyTextMetadata, type SurveyTextMetadataCodec, type SurveyTextMetadataInput, type SurveyTranslationAdapter, type SurveyTranslationInput, type SurveyTranslationMetadataPolicy, type SurveyTranslationMetadataSource, type SurveyTranslationScope, SurveyUiProvider, type SurveyUiProviderProps, type SurveyVersionActionAdapter, type SurveyVersionActionEvent, type SurveyVersionActionResult, type SurveyVersionActionsAdapter, type SurveyVersionAdapter, type SurveyVersionAdapterResponse, type SurveyVersionDomainActionAdapter, type SurveyVersionDomainActionsResult, type SurveyVersionDomainOperationsResult, type SurveyVersionDomainQualityActions, SurveyVersionHistory, type SurveyVersionHistoryProps, type SurveyVersionHistorySlots, type SurveyVersionLifecycleActions, type SurveyVersionOperationName, type SurveyVersionOperationRequest, type SurveyVersionOperationState, type SurveyVersionOperationStatus, SurveyVersionPanel, type SurveyVersionPanelProps, type SurveyVersionPanelRenderProps, type SurveyVersionPanelSlots, type SurveyVersionPublishRequest, type SurveyVersionQualityActions, type SurveyVersionQualityIssueDecisionRequest, type SurveyVersionQualityResult, type SurveyVersionQualityState, type SurveyVersionQualityStatus, type SurveyWorkflowAdapter, SurveyWorkflowControlled, type SurveyWorkflowControlledProps, SurveyWorkflowPanel, type SurveyWorkflowPanelProps, type SurveyWorkflowPanelSlots, type SurveyWorkflowState, type SurveyWorkflowStatus, type SurveyWorkflowTransition, type SurveyWorkflowTransitionRequest, type TranslateFreeTextAnswersOptions, type TranslateSurveySchemaOptions, type TranslateSurveySchemaResult, type TypedFormSchemaToSurveyDefinitionOptions, type TypedSurveyDefinition, type TypedSurveyDefinitionCheckboxQuestion, type TypedSurveyDefinitionChoiceQuestion, type TypedSurveyDefinitionMultiSelectQuestion, type TypedSurveyDefinitionNumberQuestion, type TypedSurveyDefinitionOption, type TypedSurveyDefinitionPage, type TypedSurveyDefinitionQuestion, type TypedSurveyDefinitionRatingQuestion, type TypedSurveyDefinitionSingleChoiceQuestion, type TypedSurveyDefinitionSubmissionSettings, type TypedSurveyDefinitionTextQuestion, type TypedSurveyDefinitionTypedStringQuestion, type UseFreeTextAnswerTranslationOptions, type UseFreeTextAnswerTranslationResult, type UseFreeTextDomainAnswerTranslationOptions, type UseFreeTextDomainAnswerTranslationResult, type UseSurveyEditorDomainOptions, type UseSurveyEditorDomainResult, type UseSurveyEditorOptions, type UseSurveyEditorResult, type UseSurveyMappingCrudOptions, type UseSurveyMappingCrudResult, type UseSurveyMappingOptions, type UseSurveyMappingResult, type UseSurveyQualityControllerOptions, type UseSurveyQualityControllerResult, type UseSurveyResponseSummaryDomainOptions, type UseSurveyResponseSummaryDomainResult, type UseSurveyVersionActionsOptions, type UseSurveyVersionActionsResult, type UseSurveyVersionDomainActionsOptions, type UseSurveyVersionDomainQualityActionsOptions, type UseSurveyVersionOperationsOptions, type UseSurveyVersionOperationsResult, type UseSurveyWorkflowControlledResult, type UseSurveyWorkflowOptions, type UseSurveyWorkflowResult, applyAndRecheckQuality, composeSurveyVersionActions, composeSurveyVersionDomainActions, createAuthoringRequestFromQualityIssue, createFreeTextTranslationController, createSurveySchemaDomainAdapter, createSurveyTextMetadataCodec, createSurveyTranslationAdapter, createSurveyTranslationMetadata, createSurveyTranslator, formSchemaToSurveyDefinition, getFreeTextAnswerFindings, hasPiiCandidate, isSurveyMappingRevisionConflict, isSurveySummaryInput, mapSurveyQualityIssue, mapSurveyQualityIssues, mapSurveyResponseSummary, surveyDefinitionToFormSchema, surveyQualityIssueKey, toFreeTextAnswerItems, toFreeTextAnswerItemsFromDomain, toSurveyQualityIssue, toSurveyResponseSummary, toSurveyResponseSummaryFromDomain, translateFreeTextAnswers, translateSurveySchema, useFreeTextAnswerTranslation, useFreeTextAnswerTranslationController, useFreeTextDomainAnswerTranslation, useSurveyEditor, useSurveyEditorController, useSurveyEditorDomain, useSurveyMapping, useSurveyMappingCrud, useSurveyQualityController, useSurveyResponseSummaryDomain, useSurveyTranslation, useSurveyVersionActions, useSurveyVersionActionsController, useSurveyVersionDomainActions, useSurveyVersionOperations, useSurveyWorkflow, useSurveyWorkflowControlled };

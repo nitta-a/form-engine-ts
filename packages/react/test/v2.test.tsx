@@ -15,6 +15,48 @@ function textField(id: string): FormField {
 }
 
 describe("useFormBuilder", () => {
+  it("normalizes field and option mutations through one hook", () => {
+    const initial: FormSchema = {
+      id: "normalize",
+      version: 1,
+      title: "Normalize",
+      fields: [
+        { id: "choice", type: "radio", title: "Choice", required: false, options: [{ id: "one", label: "One" }] }
+      ]
+    };
+    const { result } = renderHook(() => {
+      const [schema, setSchema] = useState(initial);
+      return useFormBuilder({
+        schema,
+        onChange: setSchema,
+        normalizeField: (field, _context) =>
+          field.type === "number"
+            ? { ...field, min: 0, max: 10, step: 1 }
+            : field.type === "radio"
+              ? {
+                  ...field,
+                  options: field.options.map((option) => ({ ...option, textInput: false }))
+                }
+              : field
+      });
+    });
+
+    act(() => expect(result.current.changeFieldType("choice", "number").success).toBe(true));
+    expect(result.current.schema.fields[0]).toMatchObject({ type: "number", min: 0, max: 10, step: 1 });
+    act(() => expect(result.current.changeFieldType("choice", "radio").success).toBe(true));
+    const optionId =
+      result.current.schema.fields[0] !== undefined && "options" in result.current.schema.fields[0]
+        ? result.current.schema.fields[0].options[0]?.id
+        : undefined;
+    expect(optionId).toBeDefined();
+    act(() =>
+      expect(
+        result.current.updateOption("choice", optionId ?? "", (option) => ({ ...option, textInput: true })).success
+      ).toBe(true)
+    );
+    expect(result.current.schema.fields[0]).toMatchObject({ options: [{ textInput: false }] });
+  });
+
   it("returns typed policy failures without changing a schema at the ARGS limits", () => {
     const maxFieldsSchema: FormSchema = {
       id: "policy",

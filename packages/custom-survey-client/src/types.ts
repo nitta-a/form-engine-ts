@@ -83,6 +83,14 @@ export interface SurveySchemaDomainAdapter<TDomain> {
   readonly toFormSchema: (domain: TDomain) => FormSchema;
 }
 
+export type SurveyMetadata = Readonly<Record<string, JsonValue>>;
+
+/** Encodes application-owned node metadata at the Form Engine JSON boundary. */
+export interface SurveyMetadataCodec<TMetadata extends SurveyMetadata = SurveyMetadata> {
+  readonly toEngine: (metadata: TMetadata) => SurveyMetadata;
+  readonly fromEngine: (metadata: SurveyMetadata) => TMetadata;
+}
+
 export type SurveyEngineTextMetadata = Partial<CanonicalTranslationMetadata> & {
   readonly isManuallyEdited?: boolean;
   readonly isManual?: boolean;

@@ -18,6 +18,25 @@ The package has no dependency on Maker authentication, tRPC, Jotai, or URL state
 - `useSurveyVersionActions` manages quality checks, issue Accept/Reject, publish with warning confirmation, draft clone/delete, visibility changes, and async state. `SurveyVersionActionAdapter` is composable: each operation is optional, `composeSurveyVersionActions` combines independently implemented actions, and `useSurveyVersionDomainActions` accepts generic version/state records without schema conversion. The older `SurveyVersionActionsAdapter` and `useSurveyVersionOperations` names remain available.
 - `SurveyResponseSummary` and `toSurveyResponseSummary` accept a `FormSchema` or `FormVersionRecord` directly and resolve question and option labels for `sourceLanguage`. `SurveyResponseSummaryCustomDomain` and `mapSurveyResponseSummary` retain application-owned aggregates, language tabs, skip reasons, definitions, and labels for custom render slots.
 
+## AI survey creation
+
+`SurveyAiCreationPanel` provides an adapter-injected conversation, brief summary, generated-schema review, question removal, respondent preview, retry/error states, and completion callback. It uses `useFormCreationAssistant`; provider credentials and AI responses remain in the host adapters.
+
+```tsx
+import { SurveyAiCreationPanel } from "@form-engine-ts/custom-survey-client/ai-creation";
+
+<SurveyAiCreationPanel
+  initialSchema={schema}
+  sourceLocale="ja"
+  creationAdapter={creationAdapter}
+  authoringAdapter={authoringAdapter}
+  labels={labels}
+  onComplete={setSchema}
+/>
+```
+
+`SurveyAiCreationLabels.error` receives codes such as `provider_unavailable`, `network_error`, `invalid_response`, and `stale_schema`; `fieldType` supplies localized question-type names. `SurveyEditorPreviewDialog` is exported from the same subpath for reuse.
+
 Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt application translation functions without an unsafe cast. `SurveyProvider` is the unified provider for Form Engine and survey translations; it accepts a typed `translation` scope, a structural i18next-compatible `i18n` instance, or a transport-neutral translation adapter. When no local i18n props are passed it composes with the surrounding Form Engine provider instead of replacing it. `@form-engine-ts/custom-survey-client` is publishable with ESM, CommonJS, and declaration outputs; React and Form Engine packages are peer dependencies.
 
 ## v7.7 APIs
@@ -48,6 +67,10 @@ const schema = surveyDefinitionToFormSchema({
 
 const definition = formSchemaToSurveyDefinition(schema);
 ```
+
+Conversion also carries submission settings, pages, conditions, translations and their metadata, quiz/poll metadata,
+choice settings, and field/option metadata. Use `SurveyMetadataCodec<TMetadata>` when application metadata has a typed
+domain shape; the codec is applied at every schema, page, field, option, and submission-settings metadata boundary.
 
 `useSurveyMappingCrud` updates mappings and revision before calling `onConflict`. The callback receives
 `expectedRevision`, `currentRevision`, and `currentMappings`; use `retry()` to replay the last failed mutation or

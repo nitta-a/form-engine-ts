@@ -179,6 +179,9 @@ initial field, option, and page shapes. `<FormBuilder>` delegates its UI mutatio
 options. Its completion-message editors cover both source and locale text. `translationOptions` and
 `onTranslationReport` expose automatic-translation policy and reporting.
 
+Pass `normalizeField(field, context)` to apply application-owned normalization once for field creation, type changes,
+direct edits, and option mutations before policy checks.
+
 `useAuthoringAssistant({ schema, adapter, policy, onChange })` coordinates provider-agnostic AI suggestions. The adapter
 must implement `generate()`; the hook adds a bounded authoring context without sending the full schema and parses provider output before previewing it. It exposes
 `generating`/`ready`/`applying`/`error` state, cancellation, preview data, `selectedOperationIds` with selection helpers,

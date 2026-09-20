@@ -27,6 +27,13 @@ export interface BuilderFactories {
   readonly createPage?: (id: string, questionIds: string[]) => FormPage;
 }
 
+export type FieldMutationReason = "add" | "update" | "changeType" | "option";
+
+export interface FieldMutationContext {
+  readonly reason: FieldMutationReason;
+  readonly previous?: FormField;
+}
+
 export interface BuilderTextTarget {
   readonly kind: "form" | "page" | "field" | "option";
   readonly id?: string;
@@ -38,6 +45,8 @@ export interface FormBuilderOptions {
   readonly policy?: FormPolicy;
   readonly idFactory?: (kind: BuilderIdKind, existingIds: ReadonlySet<string>) => string;
   readonly factories?: BuilderFactories;
+  /** Applies application-owned field normalization before builder constraints are checked. */
+  readonly normalizeField?: (field: FormField, context: FieldMutationContext) => FormField;
   readonly fieldEditorMode?: FieldEditorMode;
   readonly activeFieldId?: string | undefined;
   readonly defaultActiveFieldId?: string;
@@ -313,6 +322,7 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
     policy: hostPolicy,
     idFactory = defaultIdFactory,
     factories = {},
+    normalizeField,
     fieldEditorMode = "all",
     activeFieldId: controlledActiveFieldId,
     defaultActiveFieldId,
@@ -358,7 +368,8 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       const current = schema.fields.find((field) => field.id === fieldId);
       if (current === undefined)
         return { success: false, error: { type: "node_not_found", kind: "field", id: fieldId } };
-      const updated = updater(current);
+      const next = updater(current);
+      const updated = normalizeField?.(next, { reason: "update", previous: current }) ?? next;
       if (updated.id !== fieldId)
         return { success: false, error: { type: "invalid_id", kind: "field", id: updated.id } };
       const constraintError = fieldConstraintError(updated, policy);
@@ -374,7 +385,7 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       onChange({ ...schema, fields: schema.fields.map((field) => (field.id === fieldId ? updated : field)) });
       return { success: true };
     },
-    [onChange, policy, schema, textPolicyError]
+    [normalizeField, onChange, policy, schema, textPolicyError]
   );
 
   const updateOption = useCallback(
@@ -391,20 +402,20 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
         return { success: false, error: { type: "invalid_id", kind: "option", id: updated.id } };
       const error = textPolicyError(updated.label);
       if (error !== undefined) return error;
+      const nextField = {
+        ...field,
+        options: field.options.map((option) => (option.id === optionId ? updated : option))
+      } as FormField;
+      const normalized = normalizeField?.(nextField, { reason: "option", previous: field }) ?? nextField;
+      const normalizedError = fieldConstraintError(normalized, policy);
+      if (normalizedError !== undefined) return { success: false, error: normalizedError };
       onChange({
         ...schema,
-        fields: schema.fields.map((candidate) =>
-          candidate.id === fieldId && "options" in candidate
-            ? ({
-                ...candidate,
-                options: candidate.options.map((option) => (option.id === optionId ? updated : option))
-              } as FormField)
-            : candidate
-        )
+        fields: schema.fields.map((candidate) => (candidate.id === fieldId ? normalized : candidate))
       });
       return { success: true };
     },
-    [onChange, schema, textPolicyError]
+    [normalizeField, onChange, policy, schema, textPolicyError]
   );
 
   const updatePage = useCallback(
@@ -460,6 +471,13 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
         field = { ...field, options: [...field.options, option] } as FormField;
       }
       field = applyFieldConstraintDefaults(field, policy);
+      field = normalizeField?.(field, { reason: "add" }) ?? field;
+      if (field.id !== fieldId.id)
+        return { success: false, error: { type: "invalid_id", kind: "field", id: field.id } };
+      const normalizedConstraintError = fieldConstraintError(field, policy);
+      if (normalizedConstraintError !== undefined) return { success: false, error: normalizedConstraintError };
+      if (policy?.allowedFieldTypes !== undefined && !policy.allowedFieldTypes.includes(field.type))
+        return { success: false, error: { type: "disallowed_field_type", fieldType: field.type } };
       const pages = schema.pages?.map((page, index) => ({
         ...page,
         questionIds:
@@ -471,7 +489,7 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       setActiveFieldId(field.id);
       return { success: true };
     },
-    [createId, factories, onChange, policy, schema, setActiveFieldId]
+    [createId, factories, normalizeField, onChange, policy, schema, setActiveFieldId]
   );
 
   const removeField = useCallback(
@@ -556,17 +574,14 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       const option = (factories.createOption ?? defaultCreateOption)(field, id.id);
       if (option.id !== id.id || ids.has(option.id))
         return { success: false, error: { type: "invalid_id", kind: "option", id: option.id } };
-      onChange({
-        ...schema,
-        fields: schema.fields.map((item) =>
-          item.id === fieldId && "options" in item
-            ? ({ ...item, options: [...item.options, option] } as FormField)
-            : item
-        )
-      });
+      const nextField = { ...field, options: [...field.options, option] } as FormField;
+      const normalized = normalizeField?.(nextField, { reason: "option", previous: field }) ?? nextField;
+      const normalizedError = fieldConstraintError(normalized, policy);
+      if (normalizedError !== undefined) return { success: false, error: normalizedError };
+      onChange({ ...schema, fields: schema.fields.map((item) => (item.id === fieldId ? normalized : item)) });
       return { success: true };
     },
-    [createId, factories.createOption, onChange, policy, policy?.maxOptionsPerField, schema]
+    [createId, factories.createOption, normalizeField, onChange, policy, policy?.maxOptionsPerField, schema]
   );
 
   const removeOption = useCallback(
@@ -591,17 +606,14 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
           success: false,
           error: { type: "field_constraint_violation", property: "options", expected: constraint.minOptions }
         };
-      onChange({
-        ...schema,
-        fields: schema.fields.map((item) =>
-          item.id === fieldId && "options" in item
-            ? ({ ...item, options: item.options.filter((option) => option.id !== optionId) } as FormField)
-            : item
-        )
-      });
+      const nextField = { ...field, options: field.options.filter((option) => option.id !== optionId) } as FormField;
+      const normalized = normalizeField?.(nextField, { reason: "option", previous: field }) ?? nextField;
+      const normalizedError = fieldConstraintError(normalized, policy);
+      if (normalizedError !== undefined) return { success: false, error: normalizedError };
+      onChange({ ...schema, fields: schema.fields.map((item) => (item.id === fieldId ? normalized : item)) });
       return { success: true };
     },
-    [onChange, policy, schema]
+    [normalizeField, onChange, policy, schema]
   );
 
   const moveOption = useCallback(
@@ -617,15 +629,14 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
       );
       if (options === undefined)
         return { success: false, error: { type: "invalid_operation", message: "Invalid option position." } };
-      onChange({
-        ...schema,
-        fields: schema.fields.map((item) =>
-          item.id === fieldId && "options" in item ? ({ ...item, options } as FormField) : item
-        )
-      });
+      const nextField = { ...field, options } as FormField;
+      const normalized = normalizeField?.(nextField, { reason: "option", previous: field }) ?? nextField;
+      const normalizedError = fieldConstraintError(normalized, policy);
+      if (normalizedError !== undefined) return { success: false, error: normalizedError };
+      onChange({ ...schema, fields: schema.fields.map((item) => (item.id === fieldId ? normalized : item)) });
       return { success: true };
     },
-    [onChange, schema]
+    [normalizeField, onChange, policy, schema]
   );
 
   const changeFieldType = useCallback(
@@ -648,10 +659,13 @@ export function useFormBuilder(options: FormBuilderOptions): FormBuilderResult {
           return { success: false, error: { type: "invalid_id", kind: "option", id: option.id } };
         transformed = { ...transformed, options: [option] } as FormField;
       }
+      transformed = normalizeField?.(transformed, { reason: "changeType", previous: field }) ?? transformed;
+      const normalizedError = fieldConstraintError(transformed, policy);
+      if (normalizedError !== undefined) return { success: false, error: normalizedError };
       onChange({ ...schema, fields: schema.fields.map((item) => (item.id === fieldId ? transformed : item)) });
       return { success: true };
     },
-    [createId, factories.createOption, onChange, policy, policy?.allowedFieldTypes, schema]
+    [createId, factories.createOption, normalizeField, onChange, policy, policy?.allowedFieldTypes, schema]
   );
 
   const addPage = useCallback(

@@ -1,14 +1,21 @@
 import type {
+  DisplayCondition,
+  DisplayRule,
   FieldOption,
   FormField,
+  FormPage,
   FormSchema,
+  FormSubmissionSettings,
   JsonValue,
   MultiSelectField,
   NumberField,
   RatingField,
+  SchemaTranslations,
   SelectField,
-  TextField
+  TextField,
+  ValidationCode
 } from "@form-engine-ts/core";
+import type { SurveyMetadata, SurveyMetadataCodec } from "./types";
 
 export type SurveyDefinitionQuestionType =
   | "text"
@@ -28,10 +35,169 @@ export type SurveyDefinitionQuestionType =
 
 export type SurveyDefinitionSelectionStyle = "radio" | "select";
 
-export interface SurveyDefinitionOption {
+type SurveyDefinitionNodeMetadata<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata> = {
+  readonly metadata?: TMetadata;
+  readonly translationMetadata?: SurveyDefinitionTranslationMetadata<TTranslationMetadata>;
+};
+
+export type SurveyDefinitionTranslationMetadata<TTranslationMetadata extends SurveyMetadata = SurveyMetadata> =
+  Readonly<Record<string, Readonly<Record<string, TTranslationMetadata>>>>;
+
+export interface TypedSurveyDefinitionOption<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
   readonly id: string;
   readonly label: string;
-  readonly metadata?: Readonly<Record<string, JsonValue>>;
+  readonly textInput?: boolean;
+  readonly pinned?: boolean;
+  readonly translations?: Readonly<Record<string, string>>;
+}
+
+interface TypedSurveyDefinitionQuestionBase<
+  TMetadata extends SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata
+> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly required?: boolean;
+  readonly translationKey?: string;
+  readonly messages?: Partial<Record<ValidationCode, string>>;
+  readonly displayCondition?: DisplayCondition;
+  readonly displayRule?: DisplayRule;
+  readonly translations?: SchemaTranslations;
+}
+
+export interface TypedSurveyDefinitionTextQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "text" | "textarea";
+  readonly placeholderKey?: string;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly pattern?: string;
+}
+
+export interface TypedSurveyDefinitionTypedStringQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "date" | "time" | "email" | "tel" | "url";
+  readonly placeholderKey?: string;
+  readonly minDate?: string;
+  readonly maxDate?: string;
+  readonly minTime?: string;
+  readonly maxTime?: string;
+}
+
+export interface TypedSurveyDefinitionNumberQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "number";
+  readonly placeholderKey?: string;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+}
+
+export interface TypedSurveyDefinitionRatingQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "rating";
+  readonly min?: number;
+  readonly max?: number;
+}
+
+export interface TypedSurveyDefinitionChoiceQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "radio" | "select";
+  readonly options: readonly TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>[];
+  readonly shuffleOptions?: boolean;
+}
+
+export interface TypedSurveyDefinitionSingleChoiceQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "single-choice";
+  readonly selectionStyle: SurveyDefinitionSelectionStyle;
+  readonly options: readonly TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>[];
+  readonly shuffleOptions?: boolean;
+}
+
+export interface TypedSurveyDefinitionMultiSelectQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "multi-select";
+  readonly options: readonly TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>[];
+  readonly shuffleOptions?: boolean;
+  readonly minSelections?: number;
+  readonly maxSelections?: number;
+}
+
+export interface TypedSurveyDefinitionCheckboxQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends TypedSurveyDefinitionQuestionBase<TMetadata, TTranslationMetadata> {
+  readonly type: "checkbox";
+}
+
+export type TypedSurveyDefinitionQuestion<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> =
+  | TypedSurveyDefinitionTextQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionTypedStringQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionNumberQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionRatingQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionChoiceQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionSingleChoiceQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionMultiSelectQuestion<TMetadata, TTranslationMetadata>
+  | TypedSurveyDefinitionCheckboxQuestion<TMetadata, TTranslationMetadata>;
+
+export interface TypedSurveyDefinitionPage<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
+  readonly id: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly questionIds: readonly string[];
+  readonly displayCondition?: DisplayCondition;
+  readonly translations?: SchemaTranslations;
+}
+
+export type TypedSurveyDefinitionSubmissionSettings<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> = Omit<FormSubmissionSettings, "metadata" | "translationMetadata"> &
+  SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata>;
+
+export interface TypedSurveyDefinition<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> extends SurveyDefinitionNodeMetadata<TMetadata, TTranslationMetadata> {
+  readonly id: string;
+  readonly version: number;
+  readonly locale: string;
+  /** Preserved when the source schema has an explicit non-legacy locale configuration. */
+  readonly defaultLocale?: string;
+  readonly supportedLocales?: readonly string[];
+  readonly title: string;
+  readonly description?: string;
+  readonly completionMessage?: string;
+  readonly submitLabelKey?: string;
+  readonly translations?: SchemaTranslations;
+  readonly fields: readonly TypedSurveyDefinitionQuestion<TMetadata, TTranslationMetadata>[];
+  readonly pages?: readonly TypedSurveyDefinitionPage<TMetadata, TTranslationMetadata>[];
+  readonly submissionSettings?: TypedSurveyDefinitionSubmissionSettings<TMetadata, TTranslationMetadata>;
 }
 
 interface SurveyDefinitionQuestionBase {
@@ -40,10 +206,26 @@ interface SurveyDefinitionQuestionBase {
   readonly description?: string;
   readonly required?: boolean;
   readonly metadata?: Readonly<Record<string, JsonValue>>;
+  readonly translationKey?: string;
+  readonly messages?: Partial<Record<ValidationCode, string>>;
+  readonly displayCondition?: DisplayCondition;
+  readonly displayRule?: DisplayRule;
+  readonly translations?: SchemaTranslations;
+  readonly translationMetadata?: SurveyDefinitionTranslationMetadata;
+}
+
+export interface SurveyDefinitionOption {
+  readonly id: string;
+  readonly label: string;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
+  readonly textInput?: boolean;
+  readonly pinned?: boolean;
+  readonly translations?: Readonly<Record<string, string>>;
 }
 
 export interface SurveyDefinitionTextQuestion extends SurveyDefinitionQuestionBase {
   readonly type: "text" | "textarea";
+  readonly placeholderKey?: string;
   readonly minLength?: number;
   readonly maxLength?: number;
   readonly pattern?: string;
@@ -60,6 +242,7 @@ export interface SurveyDefinitionTypedStringQuestion extends SurveyDefinitionQue
 
 export interface SurveyDefinitionNumberQuestion extends SurveyDefinitionQuestionBase {
   readonly type: "number";
+  readonly placeholderKey?: string;
   readonly min?: number;
   readonly max?: number;
   readonly step?: number;
@@ -74,17 +257,20 @@ export interface SurveyDefinitionRatingQuestion extends SurveyDefinitionQuestion
 export interface SurveyDefinitionChoiceQuestion extends SurveyDefinitionQuestionBase {
   readonly type: "radio" | "select";
   readonly options: readonly SurveyDefinitionOption[];
+  readonly shuffleOptions?: boolean;
 }
 
 export interface SurveyDefinitionSingleChoiceQuestion extends SurveyDefinitionQuestionBase {
   readonly type: "single-choice";
   readonly selectionStyle: SurveyDefinitionSelectionStyle;
   readonly options: readonly SurveyDefinitionOption[];
+  readonly shuffleOptions?: boolean;
 }
 
 export interface SurveyDefinitionMultiSelectQuestion extends SurveyDefinitionQuestionBase {
   readonly type: "multi-select";
   readonly options: readonly SurveyDefinitionOption[];
+  readonly shuffleOptions?: boolean;
   readonly minSelections?: number;
   readonly maxSelections?: number;
 }
@@ -107,16 +293,43 @@ export interface SurveyDefinition {
   readonly id: string;
   readonly version: number;
   readonly locale: string;
+  readonly defaultLocale?: string;
+  readonly supportedLocales?: readonly string[];
   readonly title: string;
   readonly description?: string;
   readonly completionMessage?: string;
+  readonly submitLabelKey?: string;
+  readonly translations?: SchemaTranslations;
+  readonly translationMetadata?: SurveyDefinitionTranslationMetadata;
   readonly fields: readonly SurveyDefinitionQuestion[];
+  readonly pages?: readonly TypedSurveyDefinitionPage[];
+  readonly submissionSettings?: TypedSurveyDefinitionSubmissionSettings;
   readonly metadata?: Readonly<Record<string, JsonValue>>;
+}
+
+export interface SurveyDefinitionToFormSchemaOptions<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> {
+  readonly metadataCodec?: SurveyMetadataCodec<TMetadata>;
+  readonly translationMetadataCodec?: SurveyMetadataCodec<TTranslationMetadata>;
+}
+
+export interface TypedFormSchemaToSurveyDefinitionOptions<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+> {
+  /** Used only when the schema has neither defaultLocale nor supportedLocales. */
+  readonly locale?: string;
+  readonly metadataCodec?: SurveyMetadataCodec<TMetadata>;
+  readonly translationMetadataCodec?: SurveyMetadataCodec<TTranslationMetadata>;
 }
 
 export interface FormSchemaToSurveyDefinitionOptions {
   /** Used only when the schema has neither defaultLocale nor supportedLocales. */
   readonly locale?: string;
+  readonly metadataCodec?: SurveyMetadataCodec;
+  readonly translationMetadataCodec?: SurveyMetadataCodec;
 }
 
 export class SurveyDefinitionConversionError extends TypeError {
@@ -166,6 +379,67 @@ function assertMetadata(value: unknown, path: string): asserts value is Readonly
   if (!isRecord(value) || !isJsonValue(value)) {
     throw new SurveyDefinitionConversionError(path, "Expected JSON-serializable metadata.");
   }
+}
+
+function encodeMetadata<TMetadata extends SurveyMetadata>(
+  metadata: TMetadata | undefined,
+  codec: SurveyMetadataCodec<TMetadata> | undefined,
+  path: string
+): SurveyMetadata | undefined {
+  if (metadata === undefined) return undefined;
+  return encodeRequiredMetadata(metadata, codec, path);
+}
+
+function encodeRequiredMetadata<TMetadata extends SurveyMetadata>(
+  metadata: TMetadata,
+  codec: SurveyMetadataCodec<TMetadata> | undefined,
+  path: string
+): SurveyMetadata {
+  const encoded = codec === undefined ? metadata : codec.toEngine(metadata);
+  assertMetadata(encoded, path);
+  return encoded;
+}
+
+function decodeMetadata<TMetadata extends SurveyMetadata>(
+  metadata: SurveyMetadata | undefined,
+  codec: SurveyMetadataCodec<TMetadata> | undefined
+): TMetadata | undefined {
+  if (metadata === undefined) return undefined;
+  return codec === undefined ? (metadata as TMetadata) : codec.fromEngine(metadata);
+}
+
+function encodeTranslationMetadata<TTranslationMetadata extends SurveyMetadata>(
+  metadata: SurveyDefinitionTranslationMetadata<TTranslationMetadata> | undefined,
+  codec: SurveyMetadataCodec<TTranslationMetadata> | undefined,
+  path: string
+): FormSchema["translationMetadata"] | undefined {
+  if (metadata === undefined) return undefined;
+  return Object.fromEntries(
+    Object.entries(metadata).map(([locale, properties]) => [
+      locale,
+      Object.fromEntries(
+        Object.entries(properties).map(([property, value]) => [
+          property,
+          encodeRequiredMetadata(value, codec, `${path}.${locale}.${property}`)
+        ])
+      )
+    ])
+  );
+}
+
+function decodeTranslationMetadata<TTranslationMetadata extends SurveyMetadata>(
+  metadata: FormSchema["translationMetadata"] | undefined,
+  codec: SurveyMetadataCodec<TTranslationMetadata> | undefined
+): SurveyDefinitionTranslationMetadata<TTranslationMetadata> | undefined {
+  if (metadata === undefined) return undefined;
+  const decoded: Record<string, Record<string, TTranslationMetadata>> = {};
+  for (const [locale, properties] of Object.entries(metadata)) {
+    decoded[locale] = {};
+    for (const [property, value] of Object.entries(properties)) {
+      decoded[locale][property] = codec === undefined ? (value as TTranslationMetadata) : codec.fromEngine(value);
+    }
+  }
+  return decoded;
 }
 
 function assertOption(option: unknown, path: string): asserts option is SurveyDefinitionOption {
@@ -247,26 +521,59 @@ function assertQuestion(question: unknown, path: string): asserts question is Su
   }
 }
 
-function optionToFieldOption(option: SurveyDefinitionOption): FieldOption {
+function optionToFieldOption<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  option: TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata>,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined,
+  path: string
+): FieldOption {
+  const metadata = encodeMetadata(option.metadata, metadataCodec, `${path}.metadata`);
+  const translationMetadata = encodeTranslationMetadata(
+    option.translationMetadata,
+    translationMetadataCodec,
+    `${path}.translationMetadata`
+  );
   return {
     id: option.id,
     label: option.label,
-    ...(option.metadata === undefined ? {} : { metadata: option.metadata })
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(option.textInput === undefined ? {} : { textInput: option.textInput }),
+    ...(option.pinned === undefined ? {} : { pinned: option.pinned }),
+    ...(option.translations === undefined ? {} : { translations: option.translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
   };
 }
 
-function questionToField(question: SurveyDefinitionQuestion): FormField {
+function questionToField<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  question: TypedSurveyDefinitionQuestion<TMetadata, TTranslationMetadata>,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined,
+  path: string
+): FormField {
+  const metadata = encodeMetadata(question.metadata, metadataCodec, `${path}.metadata`);
+  const translationMetadata = encodeTranslationMetadata(
+    question.translationMetadata,
+    translationMetadataCodec,
+    `${path}.translationMetadata`
+  );
   const base = {
     id: question.id,
     title: question.title,
     ...(question.description === undefined ? {} : { description: question.description }),
     required: question.required ?? false,
-    ...(question.metadata === undefined ? {} : { metadata: question.metadata })
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(question.translationKey === undefined ? {} : { translationKey: question.translationKey }),
+    ...(question.messages === undefined ? {} : { messages: question.messages }),
+    ...(question.displayCondition === undefined ? {} : { displayCondition: question.displayCondition }),
+    ...(question.displayRule === undefined ? {} : { displayRule: question.displayRule }),
+    ...(question.translations === undefined ? {} : { translations: question.translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
   };
   if (question.type === "text" || question.type === "textarea") {
     return {
       ...base,
       type: question.type,
+      ...(question.placeholderKey === undefined ? {} : { placeholderKey: question.placeholderKey }),
       ...(question.minLength === undefined ? {} : { minLength: question.minLength }),
       ...(question.maxLength === undefined ? {} : { maxLength: question.maxLength }),
       ...(question.pattern === undefined ? {} : { pattern: question.pattern })
@@ -293,6 +600,7 @@ function questionToField(question: SurveyDefinitionQuestion): FormField {
     return {
       ...base,
       type: question.type,
+      ...(question.placeholderKey === undefined ? {} : { placeholderKey: question.placeholderKey }),
       ...(question.min === undefined ? {} : { min: question.min }),
       ...(question.max === undefined ? {} : { max: question.max }),
       ...(question.step === undefined ? {} : { step: question.step })
@@ -311,7 +619,10 @@ function questionToField(question: SurveyDefinitionQuestion): FormField {
     return {
       ...base,
       type: question.type,
-      options: question.options.map(optionToFieldOption),
+      options: question.options.map((option, index) =>
+        optionToFieldOption(option, metadataCodec, translationMetadataCodec, `${path}.options[${index}]`)
+      ),
+      ...(question.shuffleOptions === undefined ? {} : { shuffleOptions: question.shuffleOptions }),
       ...(question.minSelections === undefined ? {} : { minSelections: question.minSelections }),
       ...(question.maxSelections === undefined ? {} : { maxSelections: question.maxSelections })
     } satisfies MultiSelectField;
@@ -320,17 +631,110 @@ function questionToField(question: SurveyDefinitionQuestion): FormField {
     return {
       ...base,
       type: question.selectionStyle,
-      options: question.options.map(optionToFieldOption)
+      options: question.options.map((option, index) =>
+        optionToFieldOption(option, metadataCodec, translationMetadataCodec, `${path}.options[${index}]`)
+      ),
+      ...(question.shuffleOptions === undefined ? {} : { shuffleOptions: question.shuffleOptions })
     } satisfies SelectField;
   }
   if (question.type === "radio" || question.type === "select") {
     if (!("options" in question)) throw new SurveyDefinitionConversionError("options", "Options are required.");
-    return { ...base, type: question.type, options: question.options.map(optionToFieldOption) } satisfies SelectField;
+    return {
+      ...base,
+      type: question.type,
+      options: question.options.map((option, index) =>
+        optionToFieldOption(option, metadataCodec, translationMetadataCodec, `${path}.options[${index}]`)
+      ),
+      ...(question.shuffleOptions === undefined ? {} : { shuffleOptions: question.shuffleOptions })
+    } satisfies SelectField;
   }
   throw new SurveyDefinitionConversionError("type", "Unsupported question type.");
 }
 
-export function surveyDefinitionToFormSchema(definition: SurveyDefinition): FormSchema {
+function pageToFormPage<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  page: TypedSurveyDefinitionPage<TMetadata, TTranslationMetadata>,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined,
+  path: string
+): FormPage {
+  const { metadata, ...rest } = page;
+  const encoded = encodeMetadata(metadata, metadataCodec, `${path}.metadata`);
+  const translationMetadata = encodeTranslationMetadata(
+    page.translationMetadata,
+    translationMetadataCodec,
+    `${path}.translationMetadata`
+  );
+  return {
+    ...rest,
+    ...(encoded === undefined ? {} : { metadata: encoded }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
+  };
+}
+
+function submissionSettingsToFormSettings<
+  TMetadata extends SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata
+>(
+  settings: TypedSurveyDefinitionSubmissionSettings<TMetadata, TTranslationMetadata>,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined
+): FormSubmissionSettings {
+  const { metadata, ...rest } = settings;
+  const encoded = encodeMetadata(metadata, metadataCodec, "submissionSettings.metadata");
+  const translationMetadata = encodeTranslationMetadata(
+    settings.translationMetadata,
+    translationMetadataCodec,
+    "submissionSettings.translationMetadata"
+  );
+  return {
+    ...rest,
+    ...(encoded === undefined ? {} : { metadata: encoded }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
+  };
+}
+
+function pageToDefinition<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  page: FormPage,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined
+): TypedSurveyDefinitionPage<TMetadata, TTranslationMetadata> {
+  const { metadata, translationMetadata: _translationMetadata, ...rest } = page;
+  const decoded = decodeMetadata(metadata, metadataCodec);
+  const translationMetadata = decodeTranslationMetadata(page.translationMetadata, translationMetadataCodec);
+  return {
+    ...rest,
+    ...(decoded === undefined ? {} : { metadata: decoded }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
+  };
+}
+
+function submissionSettingsToDefinition<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  settings: FormSubmissionSettings,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined
+): TypedSurveyDefinitionSubmissionSettings<TMetadata, TTranslationMetadata> {
+  const { metadata, translationMetadata: _translationMetadata, ...rest } = settings;
+  const decoded = decodeMetadata(metadata, metadataCodec);
+  const translationMetadata = decodeTranslationMetadata(settings.translationMetadata, translationMetadataCodec);
+  return {
+    ...rest,
+    ...(decoded === undefined ? {} : { metadata: decoded }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
+  };
+}
+
+export function surveyDefinitionToFormSchema(definition: SurveyDefinition): FormSchema;
+export function surveyDefinitionToFormSchema<
+  TMetadata extends SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata
+>(
+  definition: TypedSurveyDefinition<TMetadata, TTranslationMetadata>,
+  options?: SurveyDefinitionToFormSchemaOptions<TMetadata, TTranslationMetadata>
+): FormSchema;
+export function surveyDefinitionToFormSchema(
+  definition: SurveyDefinition | TypedSurveyDefinition,
+  options: SurveyDefinitionToFormSchemaOptions = {}
+): FormSchema {
   assertNonEmptyString(definition.id, "id");
   assertFiniteNumber(definition.version, "version");
   if (!Number.isInteger(definition.version) || definition.version < 0) {
@@ -350,39 +754,96 @@ export function surveyDefinitionToFormSchema(definition: SurveyDefinition): Form
     if (fieldIds.has(field.id)) throw new SurveyDefinitionConversionError(`${path}.id`, "Question IDs must be unique.");
     fieldIds.add(field.id);
   });
-  return {
+  const metadata = encodeMetadata(definition.metadata, options.metadataCodec, "metadata");
+  const translationMetadata = encodeTranslationMetadata(
+    definition.translationMetadata,
+    options.translationMetadataCodec,
+    "translationMetadata"
+  );
+  const localeConfig = Object.hasOwn(definition, "defaultLocale") || Object.hasOwn(definition, "supportedLocales");
+  const result = {
     id: definition.id,
     version: definition.version,
     title: definition.title,
     ...(definition.description === undefined ? {} : { description: definition.description }),
     ...(definition.completionMessage === undefined ? {} : { completionMessage: definition.completionMessage }),
-    defaultLocale: definition.locale,
-    supportedLocales: [definition.locale],
-    fields: definition.fields.map(questionToField),
-    ...(definition.metadata === undefined ? {} : { metadata: definition.metadata })
+    ...(definition.submitLabelKey === undefined ? {} : { submitLabelKey: definition.submitLabelKey }),
+    ...(localeConfig
+      ? {
+          ...(definition.defaultLocale === undefined ? {} : { defaultLocale: definition.defaultLocale }),
+          ...(definition.supportedLocales === undefined ? {} : { supportedLocales: definition.supportedLocales })
+        }
+      : { defaultLocale: definition.locale, supportedLocales: [definition.locale] }),
+    ...(definition.translations === undefined ? {} : { translations: definition.translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata }),
+    fields: definition.fields.map((field, index) =>
+      questionToField(field, options.metadataCodec, options.translationMetadataCodec, `fields[${index}]`)
+    ),
+    ...(definition.pages === undefined
+      ? {}
+      : {
+          pages: definition.pages.map((page, index) =>
+            pageToFormPage(page, options.metadataCodec, options.translationMetadataCodec, `pages[${index}]`)
+          )
+        }),
+    ...(definition.submissionSettings === undefined
+      ? {}
+      : {
+          submissionSettings: submissionSettingsToFormSettings(
+            definition.submissionSettings,
+            options.metadataCodec,
+            options.translationMetadataCodec
+          )
+        }),
+    ...(metadata === undefined ? {} : { metadata })
   };
+  return result;
 }
 
-function fieldOptionToDefinition(option: FieldOption): SurveyDefinitionOption {
+function fieldOptionToDefinition<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  option: FieldOption,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined
+): TypedSurveyDefinitionOption<TMetadata, TTranslationMetadata> {
+  const metadata = decodeMetadata(option.metadata, metadataCodec);
+  const translationMetadata = decodeTranslationMetadata(option.translationMetadata, translationMetadataCodec);
   return {
     id: option.id,
     label: option.label,
-    ...(option.metadata === undefined ? {} : { metadata: option.metadata })
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(option.textInput === undefined ? {} : { textInput: option.textInput }),
+    ...(option.pinned === undefined ? {} : { pinned: option.pinned }),
+    ...(option.translations === undefined ? {} : { translations: option.translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
   };
 }
 
-function fieldToQuestion(field: FormField): SurveyDefinitionQuestion {
+function fieldToQuestion<TMetadata extends SurveyMetadata, TTranslationMetadata extends SurveyMetadata>(
+  field: FormField,
+  metadataCodec: SurveyMetadataCodec<TMetadata> | undefined,
+  translationMetadataCodec: SurveyMetadataCodec<TTranslationMetadata> | undefined,
+  path: string
+): TypedSurveyDefinitionQuestion<TMetadata, TTranslationMetadata> {
+  const metadata = decodeMetadata(field.metadata, metadataCodec);
+  const translationMetadata = decodeTranslationMetadata(field.translationMetadata, translationMetadataCodec);
   const base = {
     id: field.id,
     title: field.title,
     ...(field.description === undefined ? {} : { description: field.description }),
     required: field.required,
-    ...(field.metadata === undefined ? {} : { metadata: field.metadata })
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(field.translationKey === undefined ? {} : { translationKey: field.translationKey }),
+    ...(field.messages === undefined ? {} : { messages: field.messages }),
+    ...(field.displayCondition === undefined ? {} : { displayCondition: field.displayCondition }),
+    ...(field.displayRule === undefined ? {} : { displayRule: field.displayRule }),
+    ...(field.translations === undefined ? {} : { translations: field.translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata })
   };
   if (field.type === "text" || field.type === "textarea") {
     return {
       ...base,
       type: field.type,
+      ...(field.placeholderKey === undefined ? {} : { placeholderKey: field.placeholderKey }),
       ...(field.minLength === undefined ? {} : { minLength: field.minLength }),
       ...(field.maxLength === undefined ? {} : { maxLength: field.maxLength }),
       ...(field.pattern === undefined ? {} : { pattern: field.pattern })
@@ -417,6 +878,7 @@ function fieldToQuestion(field: FormField): SurveyDefinitionQuestion {
     return {
       ...base,
       type: field.type,
+      ...(field.placeholderKey === undefined ? {} : { placeholderKey: field.placeholderKey }),
       ...(field.min === undefined ? {} : { min: field.min }),
       ...(field.max === undefined ? {} : { max: field.max }),
       ...(field.step === undefined ? {} : { step: field.step })
@@ -435,26 +897,42 @@ function fieldToQuestion(field: FormField): SurveyDefinitionQuestion {
     return {
       ...base,
       type: field.type,
-      options: field.options.map(fieldOptionToDefinition),
+      options: field.options.map((option) => fieldOptionToDefinition(option, metadataCodec, translationMetadataCodec)),
+      ...(field.shuffleOptions === undefined ? {} : { shuffleOptions: field.shuffleOptions }),
       ...(field.minSelections === undefined ? {} : { minSelections: field.minSelections }),
       ...(field.maxSelections === undefined ? {} : { maxSelections: field.maxSelections })
     };
   }
   if (!("options" in field)) {
-    throw new SurveyDefinitionConversionError("fields.options", "Options are required.");
+    throw new SurveyDefinitionConversionError(`${path}.options`, "Options are required.");
   }
   return {
     ...base,
     type: "single-choice",
     selectionStyle: field.type,
-    options: field.options.map(fieldOptionToDefinition)
+    options: field.options.map((option) => fieldOptionToDefinition(option, metadataCodec, translationMetadataCodec)),
+    ...(field.shuffleOptions === undefined ? {} : { shuffleOptions: field.shuffleOptions })
   };
 }
 
 export function formSchemaToSurveyDefinition(
   schema: FormSchema,
-  options: FormSchemaToSurveyDefinitionOptions = {}
-): SurveyDefinition {
+  options?: FormSchemaToSurveyDefinitionOptions
+): SurveyDefinition;
+export function formSchemaToSurveyDefinition<
+  TMetadata extends SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata
+>(
+  schema: FormSchema,
+  options?: TypedFormSchemaToSurveyDefinitionOptions<TMetadata, TTranslationMetadata>
+): TypedSurveyDefinition<TMetadata, TTranslationMetadata>;
+export function formSchemaToSurveyDefinition<
+  TMetadata extends SurveyMetadata = SurveyMetadata,
+  TTranslationMetadata extends SurveyMetadata = SurveyMetadata
+>(
+  schema: FormSchema,
+  options: TypedFormSchemaToSurveyDefinitionOptions<TMetadata, TTranslationMetadata> = {}
+): TypedSurveyDefinition<TMetadata, TTranslationMetadata> {
   const locale = schema.defaultLocale ?? schema.supportedLocales?.[0] ?? options.locale;
   if (locale === undefined) {
     throw new SurveyDefinitionConversionError(
@@ -463,14 +941,48 @@ export function formSchemaToSurveyDefinition(
     );
   }
   assertNonEmptyString(locale, "locale");
-  return {
+  const metadata = decodeMetadata(schema.metadata, options.metadataCodec);
+  const translationMetadata = decodeTranslationMetadata(schema.translationMetadata, options.translationMetadataCodec);
+  const preserveLocaleConfig =
+    schema.defaultLocale !== locale ||
+    schema.supportedLocales === undefined ||
+    schema.supportedLocales.length !== 1 ||
+    schema.supportedLocales[0] !== locale;
+  const result = {
     id: schema.id,
     version: schema.version,
     locale,
+    ...(preserveLocaleConfig
+      ? {
+          ...(schema.defaultLocale === undefined ? {} : { defaultLocale: schema.defaultLocale }),
+          ...(schema.supportedLocales === undefined ? {} : { supportedLocales: schema.supportedLocales })
+        }
+      : {}),
     title: schema.title,
     ...(schema.description === undefined ? {} : { description: schema.description }),
     ...(schema.completionMessage === undefined ? {} : { completionMessage: schema.completionMessage }),
-    fields: schema.fields.map(fieldToQuestion),
-    ...(schema.metadata === undefined ? {} : { metadata: schema.metadata })
+    ...(schema.submitLabelKey === undefined ? {} : { submitLabelKey: schema.submitLabelKey }),
+    ...(schema.translations === undefined ? {} : { translations: schema.translations }),
+    ...(translationMetadata === undefined ? {} : { translationMetadata }),
+    fields: schema.fields.map((field, index) =>
+      fieldToQuestion(field, options.metadataCodec, options.translationMetadataCodec, `fields[${index}]`)
+    )
+  } as Omit<TypedSurveyDefinition<TMetadata, TTranslationMetadata>, "metadata" | "pages" | "submissionSettings"> & {
+    metadata?: TMetadata;
+    pages?: readonly TypedSurveyDefinitionPage<TMetadata, TTranslationMetadata>[];
+    submissionSettings?: TypedSurveyDefinitionSubmissionSettings<TMetadata, TTranslationMetadata>;
   };
+  if (metadata !== undefined) result.metadata = metadata;
+  if (schema.pages !== undefined)
+    result.pages = schema.pages.map((page) =>
+      pageToDefinition(page, options.metadataCodec, options.translationMetadataCodec)
+    );
+  if (schema.submissionSettings !== undefined) {
+    result.submissionSettings = submissionSettingsToDefinition(
+      schema.submissionSettings,
+      options.metadataCodec,
+      options.translationMetadataCodec
+    );
+  }
+  return result as TypedSurveyDefinition<TMetadata, TTranslationMetadata>;
 }

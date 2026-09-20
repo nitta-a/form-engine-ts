@@ -5,6 +5,7 @@ import {
   type SurveyDefinition,
   SurveyDefinitionConversionError,
   surveyDefinitionToFormSchema,
+  type TypedSurveyDefinition,
   translateSurveySchema
 } from "../src";
 
@@ -125,6 +126,147 @@ describe("survey definition conversion", () => {
         ]
       })
     ).toThrowError(new SurveyDefinitionConversionError("fields[1].id", "Question IDs must be unique."));
+  });
+
+  it("preserves schema settings, conditions, translations, choice settings, and node metadata", () => {
+    const schema: FormSchema = {
+      id: "lossless",
+      version: 4,
+      defaultLocale: "en",
+      supportedLocales: ["en"],
+      title: "Lossless",
+      translations: { ja: { title: "完全" } },
+      translationMetadata: { ja: { title: { provider: "machine" } } },
+      metadata: { mode: "quiz", quiz: { showExplanation: "immediate" }, extra: { source: "maker" } },
+      pages: [
+        {
+          id: "page-1",
+          title: "Page",
+          questionIds: ["choice"],
+          displayCondition: { questionId: "choice", operator: "is_not_empty" },
+          metadata: { layout: "card" },
+          translationMetadata: { ja: { title: { provider: "manual" } } }
+        }
+      ],
+      submissionSettings: {
+        showConfirmationBeforeSubmit: true,
+        confirmationRenderMode: "dialog",
+        metadata: { confirmation: "custom" }
+      },
+      fields: [
+        {
+          id: "choice",
+          type: "radio",
+          title: "Choice",
+          description: "Pick one",
+          required: true,
+          translationKey: "choice.title",
+          messages: { required: "Choose one" },
+          displayCondition: { questionId: "choice", operator: "is_not_empty" },
+          translations: { ja: { title: "選択" } },
+          translationMetadata: { ja: { title: { provider: "manual" } } },
+          metadata: { quiz: { correctOptionId: "yes" } },
+          shuffleOptions: true,
+          options: [
+            {
+              id: "yes",
+              label: "Yes",
+              textInput: true,
+              pinned: true,
+              metadata: { weight: 1 },
+              translations: { ja: "はい" },
+              translationMetadata: { ja: { label: { provider: "manual" } } }
+            }
+          ]
+        }
+      ]
+    };
+
+    expect(surveyDefinitionToFormSchema(formSchemaToSurveyDefinition(schema))).toEqual(schema);
+  });
+
+  it("preserves locale configuration and field placeholders", () => {
+    const schema: FormSchema = {
+      id: "locales",
+      version: 1,
+      defaultLocale: "en",
+      supportedLocales: ["en", "ja", "fr"],
+      title: "Locales",
+      fields: [
+        { id: "text", type: "text", title: "Text", placeholderKey: "text.placeholder", required: false },
+        { id: "number", type: "number", title: "Number", placeholderKey: "number.placeholder", required: false }
+      ]
+    };
+
+    const definition = formSchemaToSurveyDefinition(schema);
+    expect(definition).toEqual(expect.objectContaining({ defaultLocale: "en", supportedLocales: ["en", "ja", "fr"] }));
+    expect(surveyDefinitionToFormSchema(definition)).toEqual(schema);
+  });
+
+  it("uses a separate codec for typed translation metadata", () => {
+    type TranslationMetadata = { readonly provider: string };
+    const codec = {
+      toEngine: (metadata: TranslationMetadata) => ({ provider: metadata.provider.toUpperCase() }),
+      fromEngine: (metadata: Readonly<Record<string, import("@form-engine-ts/core").JsonValue>>) => ({
+        provider: String(metadata.provider).toLowerCase()
+      })
+    };
+    const definition: TypedSurveyDefinition<
+      Record<string, import("@form-engine-ts/core").JsonValue>,
+      TranslationMetadata
+    > = {
+      id: "translation-metadata",
+      version: 1,
+      locale: "en",
+      title: "Translation metadata",
+      translationMetadata: { ja: { title: { provider: "machine" } } },
+      fields: [
+        {
+          id: "question",
+          type: "text",
+          title: "Question",
+          translationMetadata: { ja: { title: { provider: "manual" } } }
+        }
+      ]
+    };
+
+    const schema = surveyDefinitionToFormSchema(definition, { translationMetadataCodec: codec });
+    expect(schema.translationMetadata).toEqual({ ja: { title: { provider: "MACHINE" } } });
+    expect(schema.fields[0]?.translationMetadata).toEqual({ ja: { title: { provider: "MANUAL" } } });
+    expect(formSchemaToSurveyDefinition(schema, { translationMetadataCodec: codec }).translationMetadata).toEqual(
+      definition.translationMetadata
+    );
+  });
+
+  it("uses one typed metadata codec for schema, field, and option metadata", () => {
+    type Metadata = { readonly owner: string };
+    const codec = {
+      toEngine: (metadata: Metadata) => ({ owner: metadata.owner.toUpperCase() }),
+      fromEngine: (metadata: Readonly<Record<string, import("@form-engine-ts/core").JsonValue>>) => ({
+        owner: String(metadata.owner).toLowerCase()
+      })
+    };
+    const definition: TypedSurveyDefinition<Metadata> = {
+      id: "typed",
+      version: 1,
+      locale: "en",
+      title: "Typed",
+      metadata: { owner: "maker" },
+      fields: [
+        {
+          id: "choice",
+          type: "single-choice",
+          selectionStyle: "radio",
+          title: "Choice",
+          metadata: { owner: "field" },
+          options: [{ id: "one", label: "One", metadata: { owner: "option" } }]
+        }
+      ]
+    };
+    const schema = surveyDefinitionToFormSchema(definition, { metadataCodec: codec });
+    expect(schema.metadata).toEqual({ owner: "MAKER" });
+    expect(schema.fields[0]?.metadata).toEqual({ owner: "FIELD" });
+    expect(formSchemaToSurveyDefinition(schema, { metadataCodec: codec }).metadata).toEqual({ owner: "maker" });
   });
 });
 

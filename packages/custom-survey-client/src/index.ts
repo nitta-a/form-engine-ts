@@ -6,6 +6,7 @@ export type {
   ResponseSummaryQuestion,
   ResponseSummarySkipReason
 } from "@form-engine-ts/core";
+export * from "./aiCreation";
 export * from "./domain";
 export * from "./freeText";
 export * from "./freeTextTranslation";

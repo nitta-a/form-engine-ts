@@ -44,6 +44,7 @@ import {
   type BuilderActionResult,
   type BuilderFactories,
   type BuilderTextTarget,
+  type FieldMutationContext,
   useFormBuilder
 } from "./hooks/useFormBuilder";
 import { BUILDER_TRANSLATION_ALIASES, BUILDER_TRANSLATION_KEYS, resolveTranslation } from "./i18n";
@@ -896,6 +897,7 @@ export interface FormBuilderProps {
   readonly policy?: FormPolicy;
   readonly idFactory?: (kind: "field" | "option" | "page", existingIds: ReadonlySet<string>) => string;
   readonly factories?: BuilderFactories;
+  readonly normalizeField?: (field: FormField, context: FieldMutationContext) => FormField;
   readonly className?: string;
   readonly defaultFieldType?: QuestionType;
   readonly onActionError?: (error: BuilderActionError, context: BuilderActionContext) => void;
@@ -934,6 +936,7 @@ export function FormBuilder(props: FormBuilderProps) {
     addFieldDisabledReason,
     idFactory,
     factories,
+    normalizeField,
     className = "",
     defaultFieldType,
     onActionError,
@@ -998,6 +1001,7 @@ export function FormBuilder(props: FormBuilderProps) {
     ...(policy === undefined ? {} : { policy }),
     ...(idFactory === undefined ? {} : { idFactory }),
     ...(factories === undefined ? {} : { factories }),
+    ...(normalizeField === undefined ? {} : { normalizeField }),
     fieldEditorMode,
     ...(hasActiveFieldId ? { activeFieldId } : {}),
     ...(defaultActiveFieldId === undefined ? {} : { defaultActiveFieldId }),
