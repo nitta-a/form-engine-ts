@@ -3,6 +3,7 @@ export * from "./aggregation";
 export * from "./analytics";
 export * from "./authoring";
 export * from "./contentMode";
+export * from "./creation";
 export * from "./crossFormAnalytics";
 export * from "./errors";
 export * from "./events";

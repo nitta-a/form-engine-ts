@@ -1,6 +1,7 @@
 import {
   type AuthoringIntent,
   cloneVersionToDraft,
+  createInitialSchemaByMode,
   createPublishTransitionPlan,
   createResponseAccumulator,
   deleteDraft,
@@ -9,7 +10,12 @@ import {
   type FormVersionState,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { MuiAuthoringFieldAction, MuiAuthoringPrompt, MuiAuthoringSuggestionPreview } from "@form-engine-ts/mui";
+import {
+  MuiAuthoringFieldAction,
+  MuiAuthoringPrompt,
+  MuiAuthoringSuggestionPreview,
+  MuiFormCreationAssistant
+} from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
@@ -24,7 +30,8 @@ import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 import { useBuilderPreview } from "./BuilderPreviewContext";
 import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
-import { previewPolicy } from "./previewPolicy";
+import { mockCreationAssistantAdapter } from "./mockCreationAssistantAdapter";
+import { previewCreationPolicy, previewPolicy } from "./previewPolicy";
 
 function PreviewMuiButton({
   children,
@@ -357,6 +364,29 @@ function AuthoringAssistantDemo({
   );
 }
 
+function CreationAssistantDemo({
+  locale,
+  onComplete
+}: {
+  readonly locale: string;
+  readonly onComplete: (schema: FormSchema) => void;
+}) {
+  const initialSchema = useMemo(
+    () => createInitialSchemaByMode("survey", { id: "ai-created-survey", title: "New survey", locale }),
+    [locale]
+  );
+  return (
+    <MuiFormCreationAssistant
+      key={locale}
+      creationAdapter={mockCreationAssistantAdapter}
+      authoringAdapter={mockAuthoringAssistantAdapter}
+      initialSchema={initialSchema}
+      policy={previewCreationPolicy}
+      onComplete={onComplete}
+    />
+  );
+}
+
 export function BuilderPanel() {
   const { schema, locale, workspaceReady, changeSchema } = usePreviewWorkspace();
   const {
@@ -403,6 +433,7 @@ export function BuilderPanel() {
           {translationReport === null ? null : <output>{translationReport}</output>}
         </fieldset>
         <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
+        <CreationAssistantDemo locale={locale} onComplete={changeSchema} />
         <AuthoringAssistantDemo schema={schema} onChange={changeSchema} />
         <DomainApiDemo schema={schema} />
         <fieldset className="renderer-demo-controls">

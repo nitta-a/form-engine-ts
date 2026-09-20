@@ -74,6 +74,23 @@ describe("preview application builder workspaces", () => {
     );
   });
 
+  it("runs the creation assistant from conversation through draft review and editor handoff", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const assistant = screen.getByRole("region", { name: "AI survey creation assistant" });
+    const input = within(assistant).getByLabelText("Tell us what you want to learn");
+    await user.type(input, "社内の勤怠システムについて知りたい");
+    await user.click(within(assistant).getByRole("button", { name: "Send" }));
+    await user.click(await within(assistant).findByRole("button", { name: "社員" }));
+    await user.type(input, "使いやすさと改善点");
+    await user.click(within(assistant).getByRole("button", { name: "Send" }));
+    await user.click(await within(assistant).findByRole("button", { name: "Create with this information" }));
+    const review = await within(assistant).findByRole("region", { name: "Draft review" });
+    expect(within(review).getByText("Satisfaction survey")).toBeInTheDocument();
+    await user.click(within(review).getByRole("button", { name: "Open in editor" }));
+    await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent("Satisfaction survey"));
+  }, 30000);
+
   it("simulates draft publication and incremental analytics", async () => {
     const user = userEvent.setup();
     render(<App />);

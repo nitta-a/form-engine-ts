@@ -8,3 +8,11 @@ export const previewPolicy: FormPolicy = {
   allowedLocales: ["ja", "en"],
   maxLocales: 2
 };
+
+export const previewCreationPolicy: FormPolicy = {
+  maxFields: 20,
+  maxOptionsPerField: 10,
+  maxTextLength: 500,
+  allowedLocales: ["ja", "en"],
+  maxLocales: 2
+};

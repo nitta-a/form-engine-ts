@@ -1483,6 +1483,229 @@ declare function parseAuthoringSuggestion(value: unknown): AuthoringSuggestion;
 declare function validateAuthoringSuggestion(suggestion: AuthoringSuggestion, schema: FormSchema, policy?: FormPolicy): AuthoringValidationResult;
 declare function previewAuthoringSuggestion(schema: FormSchema, suggestion: AuthoringSuggestion, options?: AuthoringPreviewOptions): AuthoringPreview;
 
+interface SurveyCreationBrief {
+    readonly purpose?: string;
+    readonly audience?: string;
+    readonly goals?: readonly string[];
+    readonly constraints?: {
+        readonly targetQuestionCount?: number;
+        readonly targetDurationMinutes?: number;
+        readonly anonymous?: boolean;
+        readonly tone?: "formal" | "neutral" | "casual";
+    };
+    readonly locale?: string;
+    readonly contentMode?: FormContentMode;
+    readonly notes?: readonly string[];
+}
+type CreationBriefField = "purpose" | "audience" | "goals" | "constraints" | "locale" | "contentMode";
+interface CreationQuickReply {
+    readonly id: string;
+    readonly label: string;
+    readonly value: string;
+}
+interface CreationMessage {
+    readonly role: "user" | "assistant";
+    readonly content: string;
+}
+interface CreationAssistantRequest {
+    readonly latestMessage: string;
+    readonly brief: SurveyCreationBrief;
+    readonly messages?: readonly CreationMessage[];
+    readonly policy?: FormPolicy;
+    readonly locale?: string;
+    readonly contentMode?: FormContentMode;
+    readonly appConstraints?: Readonly<Record<string, JsonValue>>;
+}
+interface CreationClarificationResponse {
+    readonly type: "clarification";
+    readonly message: string;
+    readonly brief: SurveyCreationBrief;
+    readonly missing: readonly CreationBriefField[];
+    readonly suggestions?: readonly CreationQuickReply[];
+}
+interface CreationReadyResponse {
+    readonly type: "ready";
+    readonly message: string;
+    readonly brief: SurveyCreationBrief;
+}
+type CreationAssistantResponse = CreationClarificationResponse | CreationReadyResponse;
+interface CreationAssistantAdapter {
+    respond: (request: CreationAssistantRequest, signal?: AbortSignal) => Promise<unknown>;
+}
+interface CreationBriefReadiness {
+    readonly ready: boolean;
+    readonly missing: readonly CreationBriefField[];
+}
+interface CreationAuthoringRequestOptions {
+    readonly brief: SurveyCreationBrief;
+    readonly prompt?: string;
+    readonly target?: AuthoringRequest["target"];
+}
+type CreationDraftResult = {
+    readonly success: true;
+    readonly suggestion: AuthoringSuggestion;
+} | {
+    readonly success: false;
+    readonly error: unknown;
+};
+
+declare const SurveyCreationBriefSchema: z.ZodObject<{
+    purpose: z.ZodOptional<z.ZodString>;
+    audience: z.ZodOptional<z.ZodString>;
+    goals: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    constraints: z.ZodOptional<z.ZodObject<{
+        targetQuestionCount: z.ZodOptional<z.ZodNumber>;
+        targetDurationMinutes: z.ZodOptional<z.ZodNumber>;
+        anonymous: z.ZodOptional<z.ZodBoolean>;
+        tone: z.ZodOptional<z.ZodEnum<{
+            formal: "formal";
+            neutral: "neutral";
+            casual: "casual";
+        }>>;
+    }, z.core.$strict>>;
+    locale: z.ZodOptional<z.ZodString>;
+    contentMode: z.ZodOptional<z.ZodEnum<{
+        survey: "survey";
+        poll: "poll";
+        quiz: "quiz";
+    }>>;
+    notes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+}, z.core.$strict>;
+declare const CreationAssistantResponseSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
+    type: z.ZodLiteral<"clarification">;
+    message: z.ZodString;
+    brief: z.ZodObject<{
+        purpose: z.ZodOptional<z.ZodString>;
+        audience: z.ZodOptional<z.ZodString>;
+        goals: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        constraints: z.ZodOptional<z.ZodObject<{
+            targetQuestionCount: z.ZodOptional<z.ZodNumber>;
+            targetDurationMinutes: z.ZodOptional<z.ZodNumber>;
+            anonymous: z.ZodOptional<z.ZodBoolean>;
+            tone: z.ZodOptional<z.ZodEnum<{
+                formal: "formal";
+                neutral: "neutral";
+                casual: "casual";
+            }>>;
+        }, z.core.$strict>>;
+        locale: z.ZodOptional<z.ZodString>;
+        contentMode: z.ZodOptional<z.ZodEnum<{
+            survey: "survey";
+            poll: "poll";
+            quiz: "quiz";
+        }>>;
+        notes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    }, z.core.$strict>;
+    missing: z.ZodArray<z.ZodEnum<{
+        locale: "locale";
+        contentMode: "contentMode";
+        purpose: "purpose";
+        audience: "audience";
+        goals: "goals";
+        constraints: "constraints";
+    }>>;
+    suggestions: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        label: z.ZodString;
+        value: z.ZodString;
+    }, z.core.$strict>>>;
+}, z.core.$strict>, z.ZodObject<{
+    type: z.ZodLiteral<"ready">;
+    message: z.ZodString;
+    brief: z.ZodObject<{
+        purpose: z.ZodOptional<z.ZodString>;
+        audience: z.ZodOptional<z.ZodString>;
+        goals: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        constraints: z.ZodOptional<z.ZodObject<{
+            targetQuestionCount: z.ZodOptional<z.ZodNumber>;
+            targetDurationMinutes: z.ZodOptional<z.ZodNumber>;
+            anonymous: z.ZodOptional<z.ZodBoolean>;
+            tone: z.ZodOptional<z.ZodEnum<{
+                formal: "formal";
+                neutral: "neutral";
+                casual: "casual";
+            }>>;
+        }, z.core.$strict>>;
+        locale: z.ZodOptional<z.ZodString>;
+        contentMode: z.ZodOptional<z.ZodEnum<{
+            survey: "survey";
+            poll: "poll";
+            quiz: "quiz";
+        }>>;
+        notes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    }, z.core.$strict>;
+}, z.core.$strict>], "type">;
+declare const CREATION_ASSISTANT_RESPONSE_JSON_SCHEMA: z.core.ZodStandardJSONSchemaPayload<z.ZodDiscriminatedUnion<[z.ZodObject<{
+    type: z.ZodLiteral<"clarification">;
+    message: z.ZodString;
+    brief: z.ZodObject<{
+        purpose: z.ZodOptional<z.ZodString>;
+        audience: z.ZodOptional<z.ZodString>;
+        goals: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        constraints: z.ZodOptional<z.ZodObject<{
+            targetQuestionCount: z.ZodOptional<z.ZodNumber>;
+            targetDurationMinutes: z.ZodOptional<z.ZodNumber>;
+            anonymous: z.ZodOptional<z.ZodBoolean>;
+            tone: z.ZodOptional<z.ZodEnum<{
+                formal: "formal";
+                neutral: "neutral";
+                casual: "casual";
+            }>>;
+        }, z.core.$strict>>;
+        locale: z.ZodOptional<z.ZodString>;
+        contentMode: z.ZodOptional<z.ZodEnum<{
+            survey: "survey";
+            poll: "poll";
+            quiz: "quiz";
+        }>>;
+        notes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    }, z.core.$strict>;
+    missing: z.ZodArray<z.ZodEnum<{
+        locale: "locale";
+        contentMode: "contentMode";
+        purpose: "purpose";
+        audience: "audience";
+        goals: "goals";
+        constraints: "constraints";
+    }>>;
+    suggestions: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodString;
+        label: z.ZodString;
+        value: z.ZodString;
+    }, z.core.$strict>>>;
+}, z.core.$strict>, z.ZodObject<{
+    type: z.ZodLiteral<"ready">;
+    message: z.ZodString;
+    brief: z.ZodObject<{
+        purpose: z.ZodOptional<z.ZodString>;
+        audience: z.ZodOptional<z.ZodString>;
+        goals: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        constraints: z.ZodOptional<z.ZodObject<{
+            targetQuestionCount: z.ZodOptional<z.ZodNumber>;
+            targetDurationMinutes: z.ZodOptional<z.ZodNumber>;
+            anonymous: z.ZodOptional<z.ZodBoolean>;
+            tone: z.ZodOptional<z.ZodEnum<{
+                formal: "formal";
+                neutral: "neutral";
+                casual: "casual";
+            }>>;
+        }, z.core.$strict>>;
+        locale: z.ZodOptional<z.ZodString>;
+        contentMode: z.ZodOptional<z.ZodEnum<{
+            survey: "survey";
+            poll: "poll";
+            quiz: "quiz";
+        }>>;
+        notes: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    }, z.core.$strict>;
+}, z.core.$strict>], "type">>;
+declare function parseSurveyCreationBrief(value: unknown): SurveyCreationBrief;
+declare function parseCreationAssistantResponse(value: unknown): CreationAssistantResponse;
+
+declare function mergeSurveyCreationBrief(current: SurveyCreationBrief, update: SurveyCreationBrief): SurveyCreationBrief;
+declare function evaluateCreationBriefReadiness(brief: SurveyCreationBrief): CreationBriefReadiness;
+declare function canGenerateCreationDraft(brief: SurveyCreationBrief, clarificationTurns: number, maxClarificationTurns?: number): boolean;
+
 type CrossFormSkipReason = "schema_missing" | "invalid_answers" | "not_quiz" | "evaluation_failed";
 interface CrossFormAnalyticsOptions<TSubmission extends FormSubmission = FormSubmission> {
     readonly policy?: FormPolicy;
@@ -2387,4 +2610,4 @@ interface FormProgress {
 }
 declare function calculateProgress(schema: FormSchema, currentAnswers: Readonly<Record<string, unknown>>, currentPageIndex?: number): FormProgress;
 
-export { AUTHORING_SUGGESTION_JSON_SCHEMA, type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AddFieldOperation, type AddOptionOperation, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type AuthoringApplyError, type AuthoringApplyOptions, type AuthoringApplyResult, type AuthoringAssistantAdapter, type AuthoringContext, type AuthoringFieldInput, type AuthoringFieldPatch, type AuthoringIntent, type AuthoringOperation, type AuthoringOperationPreview, type AuthoringOptionInput, type AuthoringPreview, type AuthoringPreviewOptions, type AuthoringPreviewValue, type AuthoringRequest, type AuthoringSuggestion, AuthoringSuggestionSchema, type AuthoringTarget, type AuthoringValidationCode, type AuthoringValidationIssue, type AuthoringValidationResult, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuildAuthoringContextOptions, type BuilderTranslationKey, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type ContentModeConstraintCode, type ContentModeConstraintIssue, type ContentModeDiagnostic, type ContentModeIssue, type ContentModeIssueCode, type ContentModeSettings, type ContentModeValidationResult, type ContentResultTranslationKey, type CountComparison, type CreateSchemaFromTemplateOptions, type CreateSubmissionInput, type CreateSubmissionOptions, type CrossFormAnalytics, type CrossFormAnalyticsOptions, type CrossFormScoreSummary, type CrossFormSkipReason, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, type CustomFormMetadata, DEFAULT_FIELD_TYPE_DEFINITIONS, DEFAULT_OPTIMIZATION_MINIMUM_SAMPLES, DEFAULT_OPTIMIZATION_THRESHOLDS, type DateField, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, type DurationComparison, EN_MESSAGES, type EmailField, type ExtensibleNode, type FieldCompletedEvent, type FieldConstraintRule, type FieldDisplayCondition, type FieldFocusedEvent, type FieldInteractionAnalytics, type FieldInteractionComparison, type FieldOption, type FieldPresentedEvent, type FieldType, type FieldTypeDefinition, type FormAcceptanceResult, type FormAcceptanceStatus, type FormAnalytics, type FormContentMode, type FormDeletionCounts, type FormDeletionInspection, type FormDeletionRequest, type FormDeletionResult, type FormDeletionScope, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormExitedEvent, type FormField, type FormInteractionAnalytics, type FormInteractionEvent, type FormInteractionEventBase, type FormInteractionEventType, type FormInteractionFunnel, type FormLifecycleAdapter, type FormLifecycleBackend, type FormLifecycleOptions, type FormOptimizationInsight, type FormOptimizationInsightType, type FormOptimizationMetric, type FormOptimizationReport, type FormPage, type FormPolicy, type FormProgress, type FormResource, type FormResourceKind, type FormResponse, type FormSchema, type FormStartedEvent, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionValidationSource, type FormSubmissionValidator, type FormSubmissionValidatorResult, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormSubmitAttemptedEvent, type FormSubmitFailedEvent, type FormSubmittedEvent, type FormTelemetryAdapter, type FormTelemetryContextValue, type FormTemplate, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, type FormViewedEvent, type FunnelInteractionComparison, type GetFormTemplatesOptions, type InteractionAnalyticsComparison, type InteractionAnalyticsOptions, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptimizationInsightOptions, type OptimizationInsightThresholds, type OptionAggregate, type PageCompletedEvent, type PageInteractionAnalytics, type PageInteractionComparison, type PageViewedEvent, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PollAccessContext, type PollMetadata, type PollRuntimeAdapter, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type QuizEvaluationResult, type QuizFieldMetadata, type QuizMetadata, type QuizQuestionEvaluation, type QuizQuestionResult, type QuizResult, type RadioTextAnswer, type RateComparison, type RateLimiter, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type ResponseSummaryData, type ResponseSummaryInput, type ResponseSummaryLabels, type ResponseSummaryLanguageAggregate, type ResponseSummaryQuestion, type ResponseSummarySkipReason, type Result, type SanitizeSchemaOptions, type SaveSubmissionOptions, type SchemaDomainCodec, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StorageSubmissionExportOptions, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCodec, type SubmissionCodecFailure, type SubmissionCodecResult, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionGuard, type SubmissionGuardContext, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionPipeline, type SubmissionPipelineOptions, type SubmissionPipelineResult, type SubmissionQueryOptions, type SubmissionSaveResult, type SubmissionSchema, type SubmissionValidationResult, type TelField, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TimeField, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TrpcFormSubmissionErrorData, type TrpcProcedureType, type TrpcSubmissionErrorAdapter, type TrpcSubmissionErrorFormatter, type TrpcSubmissionErrorFormatterOptions, type TrpcSubmissionErrorIntegration, type TrpcSubmissionErrorShape, type TypedExtensibleNode, type TypedFormSchema, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type TypedTextAnswerItem, type TypedTextAnswerPage, type UnifiedSubmissionStorageAdapter, type UpdateFieldOperation, type UpdateFormOperation, type UpdateOptionOperation, type UrlField, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationFailedEvent, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateForms, aggregateInteractionEvents, aggregateResponses, analyzeInteractionAnalytics, applyAuthoringSuggestion, applyTransitionPlan, assertValidFormSchema, assertValidFormSubmission, assertValidFormSubmissionWith, assertVersionMutable, buildAuthoringContext, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, calculateProgress, canShowPollResults, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, compareInteractionAnalytics, computeAuthoringSchemaHash, computeSourceTextHash, contentMetadataToJson, createChallengeGuard, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createFormLifecycleAdapter, createFormSubmissionSchema, createHoneypotGuard, createInitialSchemaByMode, createMemoryRateLimiter, createPublishTransitionPlan, createRateLimitGuard, createResponseAccumulator, createSchemaDomainCodec, createSchemaFromTemplate, createSubmission, createSubmissionId, createSubmissionPayloadHash, createSubmissionPipeline, createTrpcSubmissionErrorAdapter, createTrpcSubmissionErrorFormatter, createTrpcSubmissionErrorIntegration, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, deserializeSubmissionErrorFromTrpc, dispatchWebhook, emptyFormDeletionCounts, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, evaluateQuiz, evaluateQuizLocally, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, getContentModeDiagnostics, getContentModePolicy, getFormAcceptanceStatus, getFormContentMode, getFormTemplates, getTranslationStatus, getTrpcSubmissionErrorData, hashFormSubmissionPayload, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isFormValue, isManualTranslationMetadata, isQuestionVisible, isRadioTextAnswer, isSubmissionUlid, iterateSubmissionPages, jsonValuesEqual, mapField, mapOption, mapPage, mapSchema, mapSchemaNode, matchesSubmissionFilter, matchesSubmissionPageFilters, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, normalizeTranslationMetadata, paginateWithFilter, parseAuthoringSuggestion, pipeResponsesToCsvStream, populateSchemaTranslations, previewAuthoringSuggestion, publishDraft, readPollMetadata, readQuizFieldMetadata, readQuizMetadata, removeLocaleFromSchema, resolveContentModeSettings, resolveFormTranslation, resolveLocalizedSchema, runSubmissionPipeline, sanitizeSchema, selectVisibleAnswers, selectedOptionId, serializeSubmissionError, serializeSubmissionErrorForTrpc, shuffleOptions, toFormSubmissionWire, toResponseSummary, transformFieldType, trpcSubmissionErrorAdapter, validateAnswers, validateAuthoringSuggestion, validateContentMode, validateContentModeConstraints, validateFieldValue, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };
+export { AUTHORING_SUGGESTION_JSON_SCHEMA, type AccumulatorReport, type AccumulatorResponse, type AccumulatorSkipReason, type AddFieldOperation, type AddOptionOperation, type AggregationReport, type AggregationSkipReason, type AnswerValidationResult, type AsyncTranslationAdapter, type AuthoringApplyError, type AuthoringApplyOptions, type AuthoringApplyResult, type AuthoringAssistantAdapter, type AuthoringContext, type AuthoringFieldInput, type AuthoringFieldPatch, type AuthoringIntent, type AuthoringOperation, type AuthoringOperationPreview, type AuthoringOptionInput, type AuthoringPreview, type AuthoringPreviewOptions, type AuthoringPreviewValue, type AuthoringRequest, type AuthoringSuggestion, AuthoringSuggestionSchema, type AuthoringTarget, type AuthoringValidationCode, type AuthoringValidationIssue, type AuthoringValidationResult, type BaseField, type BaseFieldConstraintRule, type BaseSubmissionMetadata, type BuildAuthoringContextOptions, type BuilderTranslationKey, CREATION_ASSISTANT_RESPONSE_JSON_SCHEMA, type CanonicalTranslationMetadata, type CheckboxField, type CheckboxQuestionAggregate, type ChoiceDistributionEntry, type ChoiceFieldConstraintRule, type ChoiceOption, type ChoiceQuestionAggregate, type CloneVersionOptions, type CollectedLocales, type CommitVersionTransitionOptions, type ConditionOperator, type ConditionValue, type ContentModeConstraintCode, type ContentModeConstraintIssue, type ContentModeDiagnostic, type ContentModeIssue, type ContentModeIssueCode, type ContentModeSettings, type ContentModeValidationResult, type ContentResultTranslationKey, type CountComparison, type CreateSchemaFromTemplateOptions, type CreateSubmissionInput, type CreateSubmissionOptions, type CreationAssistantAdapter, type CreationAssistantRequest, type CreationAssistantResponse, CreationAssistantResponseSchema, type CreationAuthoringRequestOptions, type CreationBriefField, type CreationBriefReadiness, type CreationClarificationResponse, type CreationDraftResult, type CreationMessage, type CreationQuickReply, type CreationReadyResponse, type CrossFormAnalytics, type CrossFormAnalyticsOptions, type CrossFormScoreSummary, type CrossFormSkipReason, type CrossTabulationResult, type CsvColumnContext, type CsvColumnDef, type CsvColumnDefinition, type CsvExportOptions, type CursorPagingOptions, type CustomFormMetadata, DEFAULT_FIELD_TYPE_DEFINITIONS, DEFAULT_OPTIMIZATION_MINIMUM_SAMPLES, DEFAULT_OPTIMIZATION_THRESHOLDS, type DateField, type DeleteDraftOptions, type DisplayCondition, type DisplayConditionGroup, type DisplayRule, type DurationComparison, EN_MESSAGES, type EmailField, type ExtensibleNode, type FieldCompletedEvent, type FieldConstraintRule, type FieldDisplayCondition, type FieldFocusedEvent, type FieldInteractionAnalytics, type FieldInteractionComparison, type FieldOption, type FieldPresentedEvent, type FieldType, type FieldTypeDefinition, type FormAcceptanceResult, type FormAcceptanceStatus, type FormAnalytics, type FormContentMode, type FormDeletionCounts, type FormDeletionInspection, type FormDeletionRequest, type FormDeletionResult, type FormDeletionScope, type FormEngineMessages, type FormEngineTranslationKey, type FormEngineTranslator, type FormEngineTranslatorOptions, type FormEvent, type FormEventType, type FormExitedEvent, type FormField, type FormInteractionAnalytics, type FormInteractionEvent, type FormInteractionEventBase, type FormInteractionEventType, type FormInteractionFunnel, type FormLifecycleAdapter, type FormLifecycleBackend, type FormLifecycleOptions, type FormOptimizationInsight, type FormOptimizationInsightType, type FormOptimizationMetric, type FormOptimizationReport, type FormPage, type FormPolicy, type FormProgress, type FormResource, type FormResourceKind, type FormResponse, type FormSchema, type FormStartedEvent, type FormStorageAdapter, type FormSubmission, FormSubmissionError, FormSubmissionMetadataSchema, type FormSubmissionSerializedError, type FormSubmissionSettings, type FormSubmissionValidationSource, type FormSubmissionValidator, type FormSubmissionValidatorResult, type FormSubmissionWire, FormSubmissionWireSchema, type FormSubmissionWireSchemaType, type FormSubmitAttemptedEvent, type FormSubmitFailedEvent, type FormSubmittedEvent, type FormTelemetryAdapter, type FormTelemetryContextValue, type FormTemplate, type FormValue, type FormValues, type FormVersionRecord, type FormVersionState, type FormVersionStatus, type FormVersionTransitionPlan, type FormViewedEvent, type FunnelInteractionComparison, type GetFormTemplatesOptions, type InteractionAnalyticsComparison, type InteractionAnalyticsOptions, JA_COMPARISON_MESSAGES, JA_MESSAGES, type JsonValue, type KnownBuilderTranslationKey, type LegacyTranslationMetadata, type LocaleOption, type LocalizedText, type MetadataCsvExportOptions, type MigrateSchemaTranslationMetadataOptions, type MultiSelectField, type NodeWritableStream, type NumberField, type NumberQuestionAggregate, type NumericSummary, type OptimizationInsightOptions, type OptimizationInsightThresholds, type OptionAggregate, type PageCompletedEvent, type PageInteractionAnalytics, type PageInteractionComparison, type PageViewedEvent, type PagedSubmissionStorageAdapter, type PaginatedResult, type PaginationIteratorOptions, type PollAccessContext, type PollMetadata, type PollRuntimeAdapter, type PopulateTranslationOptions, type PopulateTranslationsOptions, type PrivacyEngine, type PublishDraftOptions, type PublishDraftResult, type Question, type QuestionAggregate, type QuestionType, type QuizEvaluationResult, type QuizFieldMetadata, type QuizMetadata, type QuizQuestionEvaluation, type QuizQuestionResult, type QuizResult, type RadioTextAnswer, type RateComparison, type RateLimiter, type RatingField, type RatingFieldConstraintRule, type RendererTranslationKey, type ResponseAccumulator, type ResponseAccumulatorOptions, type ResponseSummaryData, type ResponseSummaryInput, type ResponseSummaryLabels, type ResponseSummaryLanguageAggregate, type ResponseSummaryQuestion, type ResponseSummarySkipReason, type Result, type SanitizeSchemaOptions, type SaveSubmissionOptions, type SchemaDomainCodec, type SchemaIssue, type SchemaStructureIssue, type SchemaStructureIssueType, type SchemaTranslations, type SchemaValidationResult, type SelectField, type SensitiveDataFinding, type StorageAdapter, type StorageCommitError, type StorageCursor, type StorageFilterCriteria, type StorageSubmissionExportOptions, type StreamCsvOptions, type StrictFormSubmission, type StrictFormSubmissionWire, StrictFormSubmissionWireSchema, type StrictFormSubmissionWireSchemaType, type SubmissionCodec, type SubmissionCodecFailure, type SubmissionCodecResult, type SubmissionCursorPayload, type SubmissionCursorValue, type SubmissionFilter, type SubmissionGuard, type SubmissionGuardContext, type SubmissionGuardResult, type SubmissionIdFormat, type SubmissionPage, type SubmissionPageQueryOptions, type SubmissionPipeline, type SubmissionPipelineOptions, type SubmissionPipelineResult, type SubmissionQueryOptions, type SubmissionSaveResult, type SubmissionSchema, type SubmissionValidationResult, type SurveyCreationBrief, SurveyCreationBriefSchema, type TelField, type TextAnswerCursorPayload, type TextAnswerCursorValue, type TextAnswerItem, type TextAnswerPage, type TextAnswerPageQueryOptions, type TextField, type TextFieldConstraintRule, type TextQuestionAggregate, type TimeField, type ToWireOptions, type TranslationAdapter, type TranslationComparisonTranslationKey, type TranslationFailure, type TranslationMetadataMigrator, type TranslationMigrationContext, type TranslationMissingKeyEvent, type TranslationProgress, type TranslationProviderError, type TranslationReport, type TranslationSlot, type TranslationStatus, type TranslationTargetKind, type TranslationWorkspaceCustomDictionary, type TranslationWorkspaceDetailedKey, type TranslationWorkspaceTranslationKey, type TrpcFormSubmissionErrorData, type TrpcProcedureType, type TrpcSubmissionErrorAdapter, type TrpcSubmissionErrorFormatter, type TrpcSubmissionErrorFormatterOptions, type TrpcSubmissionErrorIntegration, type TrpcSubmissionErrorShape, type TypedExtensibleNode, type TypedFormSchema, type TypedFormStorageAdapter, type TypedPagedSubmissionStorageAdapter, type TypedStorageAdapter, type TypedStreamCsvOptions, type TypedSubmissionPage, type TypedSubmissionPageQueryOptions, type TypedTextAnswerItem, type TypedTextAnswerPage, type UnifiedSubmissionStorageAdapter, type UpdateFieldOperation, type UpdateFormOperation, type UpdateOptionOperation, type UrlField, type ValidateFormSchemaOptions, type ValidationCode, type ValidationError, type ValidationFailedEvent, type ValidationIssue, type VersionTransitionContext, type VersionTransitionError, type VersionTransitionEvent, type VersionTransitionPlan, type VersionedFormStorageAdapter, type WebhookConfig, type WebhookDispatchResult, aggregateForms, aggregateInteractionEvents, aggregateResponses, analyzeInteractionAnalytics, applyAuthoringSuggestion, applyTransitionPlan, assertValidFormSchema, assertValidFormSubmission, assertValidFormSubmissionWith, assertVersionMutable, buildAuthoringContext, calculateChoiceDistribution, calculateCrossTabulation, calculateFieldVisibility, calculateNumericSummary, calculatePageVisibility, calculateProgress, canGenerateCreationDraft, canShowPollResults, cloneVersionToDraft, collectSchemaLocales, collectTranslationSlots, commitVersionTransition, compareInteractionAnalytics, computeAuthoringSchemaHash, computeSourceTextHash, contentMetadataToJson, createChallengeGuard, createCloneTransitionPlan, createDeleteDraftTransitionPlan, createFormEngineTranslator, createFormLifecycleAdapter, createFormSubmissionSchema, createHoneypotGuard, createInitialSchemaByMode, createMemoryRateLimiter, createPublishTransitionPlan, createRateLimitGuard, createResponseAccumulator, createSchemaDomainCodec, createSchemaFromTemplate, createSubmission, createSubmissionId, createSubmissionPayloadHash, createSubmissionPipeline, createTrpcSubmissionErrorAdapter, createTrpcSubmissionErrorFormatter, createTrpcSubmissionErrorIntegration, decodeStorageSubmissionCursor, decodeStorageTextAnswerCursor, decodeSubmissionCursor, decodeTextAnswerCursor, deleteDraft, deserializeSubmissionError, deserializeSubmissionErrorFromTrpc, dispatchWebhook, emptyFormDeletionCounts, encodeStorageSubmissionCursor, encodeStorageTextAnswerCursor, encodeSubmissionCursor, encodeTextAnswerCursor, escapeCsvCell, evaluateCreationBriefReadiness, evaluateQuiz, evaluateQuizLocally, exportResponsesToCsv, exportResponsesToCsvStream, fromFormSubmissionWire, getContentModeDiagnostics, getContentModePolicy, getFormAcceptanceStatus, getFormContentMode, getFormTemplates, getTranslationStatus, getTrpcSubmissionErrorData, hashFormSubmissionPayload, isDisplayConditionGroupSatisfied, isDisplayConditionSatisfied, isFormSubmissionSerializedError, isFormValue, isManualTranslationMetadata, isQuestionVisible, isRadioTextAnswer, isSubmissionUlid, iterateSubmissionPages, jsonValuesEqual, mapField, mapOption, mapPage, mapSchema, mapSchemaNode, matchesSubmissionFilter, matchesSubmissionPageFilters, mergeSurveyCreationBrief, migrateSchemaTranslationMetadata, normalizeLocale, normalizeSubmissionPageSize, normalizeTranslationMetadata, paginateWithFilter, parseAuthoringSuggestion, parseCreationAssistantResponse, parseSurveyCreationBrief, pipeResponsesToCsvStream, populateSchemaTranslations, previewAuthoringSuggestion, publishDraft, readPollMetadata, readQuizFieldMetadata, readQuizMetadata, removeLocaleFromSchema, resolveContentModeSettings, resolveFormTranslation, resolveLocalizedSchema, runSubmissionPipeline, sanitizeSchema, selectVisibleAnswers, selectedOptionId, serializeSubmissionError, serializeSubmissionErrorForTrpc, shuffleOptions, toFormSubmissionWire, toResponseSummary, transformFieldType, trpcSubmissionErrorAdapter, validateAnswers, validateAuthoringSuggestion, validateContentMode, validateContentModeConstraints, validateFieldValue, validateFormSchema, validatePageAnswers, validateSchemaStructure, validateSubmission };

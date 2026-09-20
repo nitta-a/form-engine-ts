@@ -6,6 +6,7 @@ export * from "./contentRenderer";
 export * from "./context";
 export * from "./hooks/useAuthoringAssistant";
 export * from "./hooks/useFormBuilder";
+export * from "./hooks/useFormCreationAssistant";
 export * from "./hooks/usePollResults";
 export * from "./hooks/useShare";
 export * from "./hooks/useTranslationComparison";

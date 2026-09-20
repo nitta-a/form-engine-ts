@@ -3,6 +3,14 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.1.1 — 2026-09-20
+
+- Added the provider-neutral AI survey creation assistant with a structured `SurveyCreationBrief`, bounded clarification,
+  quick replies, cancellation, retry, and fallback to the existing editor.
+- Added the React headless controller and MUI conversation, brief, Draft Review, revision, and customization APIs.
+- Added a deterministic Preview mock and HTTP adapter reference, while preserving the existing authoring parse/preview/apply
+  and `FormPolicy` boundary.
+
 ## v8.1.0 — 2026-09-20
 
 - Added privacy-preserving Core Interaction Telemetry events and `aggregateInteractionEvents()` funnel analytics.

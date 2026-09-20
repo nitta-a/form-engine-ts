@@ -425,6 +425,45 @@ question and option labels without a React or application-domain dependency.
 transport-neutral `QuizEvaluationResult` used by respondent renderers. It scores
 visible questions, includes optional explanations and rewards supplied by a server.
 `evaluateQuiz(schema, answers)` remains a legacy-shaped adapter over the local result.
+
+### AI survey creation
+
+`SurveyCreationBrief` and `CreationAssistantAdapter` provide a provider-neutral conversation layer for
+new survey creation. The adapter returns a parsed clarification or ready response; use
+`evaluateCreationBriefReadiness` and `canGenerateCreationDraft` to keep the conversation bounded.
+Pass the resulting brief through `AuthoringRequest.context` to the existing `generate_form` authoring
+flow. The authoring parser, preview, `FormPolicy`, and `applyAuthoringSuggestion` remain the only path
+to a `FormSchema`; AI responses never supply persistent field or option IDs.
+
+The host application owns provider credentials. A minimal HTTP adapter keeps that boundary explicit:
+
+```ts
+const creationAdapter: CreationAssistantAdapter = {
+  respond: async (request, signal) => {
+    const response = await fetch("/api/form-assistant/conversation", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request),
+      signal
+    });
+    return response.json();
+  }
+};
+```
+
+The HTTP endpoint should parse and validate the provider result before returning it:
+
+```ts
+const response = parseCreationAssistantResponse(await provider.respond(request));
+return Response.json(response);
+```
+
+Creation Assistant only organizes the `SurveyCreationBrief`; the existing authoring adapter remains responsible
+for `generate_form`, and `parseAuthoringSuggestion`/preview/apply plus `FormPolicy` are still the schema boundary.
+Keep submissions, answers, analytics, and provider credentials out of both adapter requests.
+
+既存のauthoring adapterを置き換えず、`SurveyCreationBrief`を会話の構造化状態として使います。
+providerのAPIキーはfrontendやCoreへ置かず、ホストアプリのbackendで管理してください。
 Both reject invalid quizzes, score visible questions,
 uses 1 point by default and 0 for unanswered questions, and returns optional `passed`
 when `passingScore` is configured. Scores and thresholds are finite, non-negative

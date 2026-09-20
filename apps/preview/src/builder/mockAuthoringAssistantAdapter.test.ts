@@ -1,6 +1,14 @@
-import { computeAuthoringSchemaHash, createInitialSchemaByMode, type FormSchema } from "@form-engine-ts/core";
+import {
+  buildAuthoringContext,
+  computeAuthoringSchemaHash,
+  createInitialSchemaByMode,
+  type FormSchema,
+  parseAuthoringSuggestion,
+  previewAuthoringSuggestion
+} from "@form-engine-ts/core";
 import { describe, expect, it } from "vitest";
 import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
+import { previewCreationPolicy } from "./previewPolicy";
 
 const schema: FormSchema = {
   ...createInitialSchemaByMode("survey", { id: "preview-authoring", title: "Survey", locale: "en" }),
@@ -56,5 +64,17 @@ describe("preview authoring mock", () => {
 
     const mixed = await generate({ intent: "add_questions", prompt: "invalid", context });
     expect(mixed.operations.map((operation) => operation.operationId)).toEqual(["valid-title", "invalid-field"]);
+  });
+
+  it("generates a policy-valid draft for the preview schema", async () => {
+    const request = { intent: "generate_form" as const, context: { creationBrief: { purpose: "Learn" } } };
+    const suggestion = parseAuthoringSuggestion(
+      await generate({
+        ...request,
+        context: buildAuthoringContext({ schema, request, policy: previewCreationPolicy })
+      })
+    );
+    const preview = previewAuthoringSuggestion(schema, suggestion, { policy: previewCreationPolicy });
+    expect(preview.valid, preview.issues.map((issue) => issue.message).join(" ")).toBe(true);
   });
 });

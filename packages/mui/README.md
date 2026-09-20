@@ -414,3 +414,27 @@ editor's nested `DisplayRule` AND/OR groups. Drag-and-drop ordering is not inclu
 React's `BuilderPagesSlotProps`. `createMuiBuilderSlots(options, { pages: CustomPages })` and
 `<MuiFormBuilder slots={{ pages: CustomPages }} />` keep custom overrides. For a low-level React builder, use
 `createMuiBuilderProps(options)` to apply the MUI components and slots together.
+
+### AI survey creation
+
+`MuiFormCreationAssistant` provides a ready-to-use conversation, quick replies, structured brief summary,
+and draft review. It accepts the provider-neutral `CreationAssistantAdapter` plus the existing
+`AuthoringAssistantAdapter`; `onComplete` receives the final `FormSchema` so routing remains in the host app.
+
+```tsx
+<MuiFormCreationAssistant
+  creationAdapter={creationAdapter}
+  authoringAdapter={authoringAdapter}
+  initialSchema={initialSchema}
+  policy={policy}
+  onComplete={(nextSchema) => openSurveyEditor(nextSchema)}
+/>
+```
+
+Use `renderBrief`, `renderConversation`, and `renderDraftReview` to replace the structured summary,
+conversation, or draft-review regions while keeping the headless controller and policy pipeline intact.
+
+主要なbrief表示は`renderBrief`で差し替えできます。AIが使えない場合も既存のFormBuilderへ戻せるよう、
+`renderConversation`と`renderDraftReview`で主要領域も差し替えできます。Draft Reviewからは既存authoring
+adapterによる修正依頼、または`onComplete`経由の既存FormBuilderへの引き渡しを行います。AIが使えない場合も
+既存のFormBuilderへ戻せるよう、このコンポーネントはroutingや保存処理を持ちません。

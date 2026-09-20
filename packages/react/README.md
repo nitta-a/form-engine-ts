@@ -428,6 +428,27 @@ rendererです。`classNames`でTailwind utility classを追加でき、既存�
 `QuizEvaluationResult`の合計点を表示し、閾値がある場合は合否も表示します。保存・認可・
 一人一票の原子性はホスト側で強制してください。
 
+### AI survey creation
+
+`useFormCreationAssistant` is a headless, optional controller for a multi-turn creation brief.
+It keeps messages and `SurveyCreationBrief`, bounds clarification turns, supports cancellation, and
+hands draft generation and revisions to the existing `AuthoringAssistantAdapter`. `retry()` repeats the last
+user message after a transient provider failure without discarding the accumulated brief. Call
+`onComplete` after the reviewed suggestion passes the normal authoring preview and apply path.
+
+```tsx
+const assistant = useFormCreationAssistant({
+  creationAdapter,
+  authoringAdapter,
+  initialSchema,
+  policy,
+  onComplete: openEditor
+});
+```
+
+No provider SDK is required by React. AI is optional; existing builders continue to work when these
+adapters are not supplied.
+
 ### Reusing page condition controls in custom builder slots
 
 `BuilderPageConditionEditor` and `BuilderPageConditionEditorProps` expose the default page-condition controls.
