@@ -10,12 +10,8 @@ import {
   type FormVersionState,
   validateFormSchema
 } from "@form-engine-ts/core";
-import {
-  MuiAuthoringFieldAction,
-  MuiAuthoringPrompt,
-  MuiAuthoringSuggestionPreview,
-  MuiFormCreationAssistant
-} from "@form-engine-ts/mui";
+import { type SurveyAiCreationLabels, SurveyAiCreationPanel } from "@form-engine-ts/custom-survey-client";
+import { MuiAuthoringFieldAction, MuiAuthoringPrompt, MuiAuthoringSuggestionPreview } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
   type BuilderTextInputProps,
@@ -32,6 +28,38 @@ import { useBuilderPreview } from "./BuilderPreviewContext";
 import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
 import { mockCreationAssistantAdapter } from "./mockCreationAssistantAdapter";
 import { previewCreationPolicy, previewPolicy } from "./previewPolicy";
+
+const previewSurveyAiLabels: SurveyAiCreationLabels = {
+  title: "AI survey creation assistant",
+  conversation: "Conversation",
+  assistant: "Assistant",
+  user: "You",
+  purposeInput: "Tell us what you want to learn",
+  messageInput: "Tell us more",
+  send: "Send",
+  retry: "Retry",
+  cancel: "Cancel",
+  generate: "Create with this information",
+  generating: "Generating survey…",
+  applying: "Applying survey…",
+  error: (code) => code,
+  brief: "Survey brief",
+  audience: "Audience",
+  questionCount: "Questions",
+  notSet: "Not set",
+  review: "Draft review",
+  questionType: "Type",
+  required: "Required",
+  optional: "Optional",
+  choices: "Choices",
+  removeQuestion: "Remove question",
+  preview: "Preview",
+  previewTitle: "Survey preview",
+  closePreview: "Close preview",
+  createSurvey: "Open in editor",
+  emptyQuestions: "No questions",
+  fieldType: (type) => type
+};
 
 function PreviewMuiButton({
   children,
@@ -376,12 +404,14 @@ function CreationAssistantDemo({
     [locale]
   );
   return (
-    <MuiFormCreationAssistant
+    <SurveyAiCreationPanel
       key={locale}
       creationAdapter={mockCreationAssistantAdapter}
       authoringAdapter={mockAuthoringAssistantAdapter}
       initialSchema={initialSchema}
+      sourceLocale={locale}
       policy={previewCreationPolicy}
+      labels={previewSurveyAiLabels}
       onComplete={onComplete}
     />
   );

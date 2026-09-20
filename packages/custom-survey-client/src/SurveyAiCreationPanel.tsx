@@ -268,6 +268,7 @@ function Review({
   return (
     <section aria-labelledby={headingId}>
       <h3 id={headingId}>{labels.review}</h3>
+      <p>{schema.title}</p>
       {schema.fields.length === 0 ? <p>{labels.emptyQuestions}</p> : null}
       <ol>
         {schema.fields.map((field) => (

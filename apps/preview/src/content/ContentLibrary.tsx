@@ -140,10 +140,17 @@ function ContentLibraryBody({
         <DialogContent>
           <Stack spacing={2}>
             {error ? <Alert severity="error">{error}</Alert> : null}
+            <TextField
+              autoFocus
+              label={ja ? "タイトル" : "Title"}
+              disabled={busy}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
             <fieldset>
               <legend>{ja ? "種別を選択" : "Choose a mode"}</legend>
               {modes.map((value) => (
-                <Card key={value}>
+                <Card key={value} sx={{ border: 2, borderColor: mode === value ? "primary.main" : "transparent" }}>
                   <CardActionArea
                     disabled={busy}
                     aria-pressed={mode === value}
@@ -159,7 +166,7 @@ function ContentLibraryBody({
             </fieldset>
             <fieldset>
               <legend>{ja ? "開始方法を選択" : "Choose how to start"}</legend>
-              <Card>
+              <Card sx={{ border: 2, borderColor: selectedTemplateId === undefined ? "primary.main" : "transparent" }}>
                 <CardActionArea
                   disabled={busy}
                   aria-pressed={selectedTemplateId === undefined}
@@ -172,7 +179,13 @@ function ContentLibraryBody({
                 </CardActionArea>
               </Card>
               {templates.map((template) => (
-                <Card key={template.id}>
+                <Card
+                  key={template.id}
+                  sx={{
+                    border: 2,
+                    borderColor: selectedTemplateId === template.id ? "primary.main" : "transparent"
+                  }}
+                >
                   <CardActionArea
                     disabled={busy}
                     aria-pressed={selectedTemplateId === template.id}
@@ -222,12 +235,6 @@ function ContentLibraryBody({
                 </CardContent>
               </Card>
             )}
-            <TextField
-              label={ja ? "タイトル" : "Title"}
-              disabled={busy}
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
           </Stack>
         </DialogContent>
         <DialogActions>

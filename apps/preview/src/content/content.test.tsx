@@ -94,6 +94,21 @@ describe("content mode demo", () => {
     expect(screen.getByText("A blank form will be created.")).toBeInTheDocument();
   });
 
+  it("shows the required title and selected creation choices", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("button", { name: "Create form" }));
+    const dialog = within(screen.getByRole("dialog"));
+    const create = dialog.getByRole("button", { name: "Create" });
+    expect(dialog.getByLabelText("Title")).toBeVisible();
+    expect(dialog.getByRole("button", { name: "Survey" })).toHaveAttribute("aria-pressed", "true");
+    expect(dialog.getByRole("button", { name: /^Start from a blank form/ })).toHaveAttribute("aria-pressed", "true");
+    expect(create).toBeDisabled();
+    await user.type(dialog.getByLabelText("Title"), "Customer feedback");
+    expect(create).toBeEnabled();
+  });
+
   it("localizes the template picker in Japanese", async () => {
     const user = userEvent.setup();
     render(<App />);
