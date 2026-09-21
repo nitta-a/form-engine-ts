@@ -77,7 +77,9 @@ describe("preview application builder workspaces", () => {
   it("runs the creation assistant from conversation through draft review and editor handoff", async () => {
     const user = userEvent.setup();
     render(<App />);
-    const assistant = screen.getByRole("region", { name: "AI survey creation assistant" });
+    await user.click(screen.getByRole("button", { name: "Create survey with AI" }));
+    const dialog = await screen.findByRole("dialog", { name: "Create survey with AI" });
+    const assistant = within(dialog).getByRole("region", { name: "AI survey creation assistant" });
     const input = within(assistant).getByLabelText("Tell us what you want to learn");
     await user.type(input, "社内の勤怠システムについて知りたい");
     await user.click(within(assistant).getByRole("button", { name: "Send" }));
@@ -89,7 +91,21 @@ describe("preview application builder workspaces", () => {
     expect(within(review).getByText("Satisfaction survey")).toBeInTheDocument();
     await user.click(within(review).getByRole("button", { name: "Open in editor" }));
     await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent("Satisfaction survey"));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Create survey with AI" })).not.toBeInTheDocument()
+    );
   }, 30000);
+
+  it("closes the AI creation dialog when cancelled", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Create survey with AI" }));
+    const dialog = await screen.findByRole("dialog", { name: "Create survey with AI" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Create survey with AI" })).not.toBeInTheDocument()
+    );
+  });
 
   it("simulates draft publication and incremental analytics", async () => {
     const user = userEvent.setup();

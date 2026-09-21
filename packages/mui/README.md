@@ -453,7 +453,7 @@ React's `BuilderPagesSlotProps`. `createMuiBuilderSlots(options, { pages: Custom
 
 `MuiFormCreationAssistant` provides a ready-to-use conversation, quick replies, structured brief summary,
 and draft review. It accepts the provider-neutral `CreationAssistantAdapter` plus the existing
-`AuthoringAssistantAdapter`; `onComplete` receives the final `FormSchema` so routing remains in the host app.
+`AuthoringAssistantAdapter`; `onComplete` receives the final `FormSchema` so routing remains in the host app. `onCancel` is optional and is called after an in-flight request is aborted, allowing a host dialog to close.
 
 ```tsx
 <MuiFormCreationAssistant

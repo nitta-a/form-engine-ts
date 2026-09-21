@@ -49,6 +49,24 @@ const readyResponse = {
 };
 
 describe("SurveyAiCreationPanel", () => {
+  it("aborts and delegates cancellation to its host", () => {
+    const onCancel = vi.fn();
+    render(
+      <SurveyAiCreationPanel
+        initialSchema={schema}
+        sourceLocale="en"
+        creationAdapter={{ respond: vi.fn() }}
+        authoringAdapter={{ generate: vi.fn() }}
+        labels={labels}
+        onComplete={vi.fn()}
+        onCancel={onCancel}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: labels.cancel }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it("supports conversation, quick replies, labeled errors, and retry", async () => {
     const respond = vi
       .fn()
@@ -129,6 +147,7 @@ describe("SurveyAiCreationPanel", () => {
     previewButton.focus();
     fireEvent.click(previewButton);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: labels.closePreview })).toHaveFocus());
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

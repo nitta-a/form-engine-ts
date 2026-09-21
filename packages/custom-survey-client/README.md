@@ -24,6 +24,7 @@ The package has no dependency on Maker authentication, tRPC, Jotai, or URL state
 
 ```tsx
 import { SurveyAiCreationPanel } from "@form-engine-ts/custom-survey-client/ai-creation";
+import "@form-engine-ts/custom-survey-client/ai-creation/styles.css";
 
 <SurveyAiCreationPanel
   initialSchema={schema}
@@ -32,10 +33,11 @@ import { SurveyAiCreationPanel } from "@form-engine-ts/custom-survey-client/ai-c
   authoringAdapter={authoringAdapter}
   labels={labels}
   onComplete={setSchema}
+  onCancel={closeDialog}
 />
 ```
 
-`SurveyAiCreationLabels.error` receives codes such as `provider_unavailable`, `network_error`, `invalid_response`, and `stale_schema`; `fieldType` supplies localized question-type names. `SurveyEditorPreviewDialog` is exported from the same subpath for reuse.
+`SurveyAiCreationLabels.error` receives codes such as `provider_unavailable`, `network_error`, `invalid_response`, and `stale_schema`; `fieldType` supplies localized question-type names. `onCancel` is optional and is called after any in-flight request is aborted. `previewMode="inline"` renders the respondent preview inside a host dialog; the default is its own accessible dialog. `SurveyEditorPreviewDialog` is exported from the same subpath for reuse.
 
 Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt application translation functions without an unsafe cast. `SurveyProvider` is the unified provider for Form Engine and survey translations; it accepts a typed `translation` scope, a structural i18next-compatible `i18n` instance, or a transport-neutral translation adapter. When no local i18n props are passed it composes with the surrounding Form Engine provider instead of replacing it. `@form-engine-ts/custom-survey-client` is publishable with ESM, CommonJS, and declaration outputs; React and Form Engine packages are peer dependencies.
 

@@ -4,11 +4,13 @@ import {
   type UseFormCreationAssistantResult,
   useFormCreationAssistant
 } from "@form-engine-ts/react";
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
+import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -19,6 +21,7 @@ export interface MuiFormCreationAssistantProps
   readonly initialSchema: FormSchema;
   readonly policy?: FormPolicy;
   readonly onComplete?: (schema: FormSchema) => void;
+  readonly onCancel?: () => void;
   readonly renderBrief?: (brief: ReturnType<typeof useFormCreationAssistant>["brief"]) => ReactNode;
   readonly renderConversation?: (assistant: UseFormCreationAssistantResult) => ReactNode;
   readonly renderDraftReview?: (assistant: UseFormCreationAssistantResult) => ReactNode;
@@ -43,14 +46,14 @@ function DraftReview({
           <Typography variant="h6">{schema.title}</Typography>
           {schema.description === undefined ? null : <Typography>{schema.description}</Typography>}
           {schema.fields.map((field) => (
-            <Stack key={field.id} spacing={0.25}>
+            <Paper key={field.id} variant="outlined" sx={{ p: 1.25 }}>
               <Typography>
                 {field.title} ({field.type}) {field.required ? "*" : ""}
               </Typography>
               {"options" in field ? (
                 <Typography variant="body2">{field.options.map((option) => option.label).join(", ")}</Typography>
               ) : null}
-            </Stack>
+            </Paper>
           ))}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
@@ -101,6 +104,7 @@ export function MuiFormCreationAssistant({
   policy,
   maxClarificationTurns,
   onComplete,
+  onCancel,
   renderBrief,
   renderConversation,
   renderDraftReview
@@ -120,19 +124,34 @@ export function MuiFormCreationAssistant({
     void assistant.sendMessage(value);
   };
   const quickReply = (reply: CreationQuickReply) => void assistant.sendMessage(reply.value);
+  const cancel = () => {
+    assistant.cancel();
+    onCancel?.();
+  };
   return (
-    <Card component="section" aria-label="AI survey creation assistant">
+    <Card component="section" aria-label="AI survey creation assistant" variant="outlined">
       <CardContent>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 7 }}>
             {renderConversation === undefined ? (
-              <Stack spacing={1}>
+              <Stack spacing={1.25}>
                 <Typography variant="h5">Create a survey with AI</Typography>
+                <Alert severity="info">Tell us what you want to learn. Do not include personal information.</Alert>
                 <Stack component="section" aria-live="polite" spacing={0.75}>
                   {assistant.messages.map((item) => (
-                    <Typography key={`${item.role}-${item.content}`} data-message-role={item.role}>
+                    <Paper
+                      key={`${item.role}-${item.content}`}
+                      data-message-role={item.role}
+                      sx={{
+                        alignSelf: item.role === "user" ? "flex-end" : "flex-start",
+                        bgcolor: item.role === "user" ? "primary.main" : "grey.100",
+                        color: item.role === "user" ? "primary.contrastText" : "text.primary",
+                        maxWidth: "88%",
+                        p: 1
+                      }}
+                    >
                       <strong>{item.role === "user" ? "You" : "Assistant"}:</strong> {item.content}
-                    </Typography>
+                    </Paper>
                   ))}
                 </Stack>
                 {assistant.quickReplies.length === 0 ? null : (
@@ -187,7 +206,7 @@ export function MuiFormCreationAssistant({
                     Create with this information
                   </Button>
                 ) : null}
-                <Button variant="text" onClick={assistant.cancel}>
+                <Button variant="text" onClick={cancel}>
                   Cancel
                 </Button>
                 <Button variant="text" onClick={() => onComplete?.(assistant.schema)}>

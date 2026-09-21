@@ -55,9 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.1.3** (2026-09-21). All public packages are currently aligned to version `8.1.3`.
-This release adds lossless FormSchema conversion, typed field and option metadata codecs, builder field normalization hooks,
-and the provider-neutral AI survey creation client APIs.
+The latest release is **v8.1.4** (2026-09-21). All public packages are currently aligned to version `8.1.4`.
+This release updates the AI survey creation and respondent preview experience to match the redesigned confirmation and preview flows.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -455,9 +454,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v8.1.3**（2026-09-21）です。公開パッケージはすべてバージョン `8.1.3` に揃えています。
-本リリースでは、損失のないFormSchema変換、field/option metadata codec、Builderのfield正規化hook、
-ベンダー非依存のAI survey creation client APIを追加しました。
+最新版は **v8.1.4**（2026-09-21）です。公開パッケージはすべてバージョン `8.1.4` に揃えています。
+本リリースでは、AIアンケート作成と回答プレビューを、再設計した確認・プレビュー画面に合わせて更新しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験

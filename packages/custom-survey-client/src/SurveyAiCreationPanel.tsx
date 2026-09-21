@@ -41,6 +41,7 @@ export interface SurveyAiCreationLabels {
   readonly removeQuestion: string;
   readonly preview: string;
   readonly previewTitle: string;
+  readonly previewNotice?: string;
   readonly closePreview: string;
   readonly createSurvey: string;
   readonly emptyQuestions: string;
@@ -55,6 +56,8 @@ export interface SurveyAiCreationPanelProps {
   readonly authoringAdapter: AuthoringAssistantAdapter;
   readonly labels: SurveyAiCreationLabels;
   readonly onComplete: (schema: FormSchema) => void;
+  readonly onCancel?: () => void;
+  readonly previewMode?: "dialog" | "inline";
 }
 
 export interface SurveyEditorPreviewDialogProps {
@@ -62,9 +65,10 @@ export interface SurveyEditorPreviewDialogProps {
   readonly schema: FormSchema;
   readonly sourceLocale: string;
   readonly policy?: FormPolicy;
-  readonly labels: Pick<SurveyAiCreationLabels, "previewTitle" | "closePreview" | "createSurvey">;
+  readonly labels: Pick<SurveyAiCreationLabels, "previewTitle" | "previewNotice" | "closePreview" | "createSurvey">;
   readonly onClose: () => void;
   readonly onCreate: () => void;
+  readonly mode?: "dialog" | "inline";
 }
 
 function focusableElements(root: HTMLElement): readonly HTMLElement[] {
@@ -75,7 +79,7 @@ function focusableElements(root: HTMLElement): readonly HTMLElement[] {
   );
 }
 
-function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>, dialog: HTMLDivElement, onClose: () => void) {
+function handleDialogKeyDown(event: KeyboardEvent<HTMLElement>, dialog: HTMLElement, onClose: () => void) {
   if (event.key === "Escape") {
     event.preventDefault();
     onClose();
@@ -114,14 +118,15 @@ export function SurveyEditorPreviewDialog({
   policy,
   labels,
   onClose,
-  onCreate
+  onCreate,
+  mode = "dialog"
 }: SurveyEditorPreviewDialogProps): React.JSX.Element | null {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const titleId = `${useId()}-preview-title`;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || mode === "inline") return;
     previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
     const focusTimer = globalThis.setTimeout(() => {
@@ -132,38 +137,47 @@ export function SurveyEditorPreviewDialog({
       globalThis.clearTimeout(focusTimer);
       previousFocus.current?.focus();
     };
-  }, [open]);
+  }, [mode, open]);
 
   if (!open) return null;
   return (
-    <div
+    <section
       ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
+      className={`fe-ai-creation-preview fe-ai-creation-preview--${mode}`}
+      role={mode === "dialog" ? "dialog" : "region"}
+      {...(mode === "dialog" ? { "aria-modal": true, tabIndex: -1 } : {})}
       aria-labelledby={titleId}
-      tabIndex={-1}
       onKeyDown={(event) => {
-        if (dialogRef.current !== null) handleDialogKeyDown(event, dialogRef.current, onClose);
+        if (mode === "dialog" && dialogRef.current !== null) handleDialogKeyDown(event, dialogRef.current, onClose);
       }}
     >
-      <div>
-        <h2 id={titleId}>{labels.previewTitle}</h2>
+      <div className="fe-ai-creation-preview__surface">
+        <h3 id={titleId}>{labels.previewTitle}</h3>
+        {labels.previewNotice === undefined ? null : (
+          <p className="fe-ai-creation-preview__notice">{labels.previewNotice}</p>
+        )}
         <FormRenderer
           schema={schema}
           locale={sourceLocale}
           {...(policy === undefined ? {} : { policy })}
           onSubmit={() => undefined}
+          slots={{ renderSubmitButton: () => <></> }}
         />
-        <div>
-          <button type="button" data-dialog-close="true" onClick={onClose}>
+        <div className="fe-ai-creation-actions">
+          <button
+            className="fe-ai-creation-button fe-ai-creation-button--secondary"
+            type="button"
+            data-dialog-close="true"
+            onClick={onClose}
+          >
             {labels.closePreview}
           </button>
-          <button type="button" onClick={onCreate}>
+          <button className="fe-ai-creation-button fe-ai-creation-button--primary" type="button" onClick={onCreate}>
             {labels.createSurvey}
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -177,7 +191,7 @@ function BriefSummary({
   readonly headingId: string;
 }) {
   return (
-    <section aria-labelledby={headingId}>
+    <section className="fe-ai-creation-brief" aria-labelledby={headingId}>
       <h3 id={headingId}>{labels.brief}</h3>
       <dl>
         <dt>{labels.audience}</dt>
@@ -211,38 +225,56 @@ function Conversation({
   readonly messageId: string;
 }) {
   return (
-    <section aria-labelledby={headingId}>
+    <section className="fe-ai-creation-conversation" aria-labelledby={headingId}>
       <h3 id={headingId}>{labels.conversation}</h3>
-      <div aria-live="polite">
+      <p className="fe-ai-creation-guidance">{labels.purposeInput}</p>
+      <div className="fe-ai-creation-messages" aria-live="polite">
         {assistant.messages.map((item) => (
-          <p key={`${item.role}-${item.content}`}>
-            <strong>{item.role === "user" ? labels.user : labels.assistant}:</strong> {item.content}
-          </p>
+          <article
+            key={`${item.role}-${item.content}`}
+            className={`fe-ai-creation-message fe-ai-creation-message--${item.role}`}
+          >
+            <strong>{item.role === "user" ? labels.user : labels.assistant}</strong>
+            <p>{item.content}</p>
+          </article>
         ))}
       </div>
       {assistant.quickReplies.length === 0 ? null : (
-        <div>
+        <div className="fe-ai-creation-quick-replies">
           {assistant.quickReplies.map((reply) => (
-            <button key={reply.id} type="button" onClick={() => onQuickReply(reply)} disabled={disabled}>
+            <button
+              className="fe-ai-creation-choice"
+              key={reply.id}
+              type="button"
+              onClick={() => onQuickReply(reply)}
+              disabled={disabled}
+            >
               {reply.label}
             </button>
           ))}
         </div>
       )}
       <form
+        className="fe-ai-creation-composer"
         onSubmit={(event) => {
           event.preventDefault();
           onSend();
         }}
       >
         <label htmlFor={messageId}>{assistant.messages.length === 0 ? labels.purposeInput : labels.messageInput}</label>
-        <textarea
-          id={messageId}
-          value={message}
-          disabled={disabled}
-          onChange={(event) => onMessageChange(event.target.value)}
-        />
-        <button type="submit" disabled={disabled || message.trim().length === 0}>
+        <div>
+          <textarea
+            id={messageId}
+            value={message}
+            disabled={disabled}
+            onChange={(event) => onMessageChange(event.target.value)}
+          />
+        </div>
+        <button
+          className="fe-ai-creation-button fe-ai-creation-button--primary"
+          type="submit"
+          disabled={disabled || message.trim().length === 0}
+        >
           {labels.send}
         </button>
       </form>
@@ -266,20 +298,32 @@ function Review({
   readonly headingId: string;
 }) {
   return (
-    <section aria-labelledby={headingId}>
-      <h3 id={headingId}>{labels.review}</h3>
-      <p>{schema.title}</p>
+    <section className="fe-ai-creation-review" aria-labelledby={headingId}>
+      <h3 className="fe-ai-creation-review__eyebrow" id={headingId}>
+        {labels.review}
+      </h3>
+      <p className="fe-ai-creation-review__title">{schema.title}</p>
       {schema.fields.length === 0 ? <p>{labels.emptyQuestions}</p> : null}
-      <ol>
+      <ol className="fe-ai-creation-question-list">
         {schema.fields.map((field) => (
-          <li key={field.id}>
-            <h4>{field.title}</h4>
-            <p>
-              {labels.questionType}: {labels.fieldType(field.type)};{" "}
-              {field.required ? labels.required : labels.optional}
+          <li className="fe-ai-creation-question-card" key={field.id}>
+            <div className="fe-ai-creation-question-card__header">
+              <h4>{field.title}</h4>
+              <button
+                className="fe-ai-creation-remove"
+                type="button"
+                onClick={() => onRemove(field.id)}
+                disabled={schema.fields.length <= 1}
+              >
+                {labels.removeQuestion}
+              </button>
+            </div>
+            <p className="fe-ai-creation-question-card__meta">
+              {labels.questionType}: {labels.fieldType(field.type)}
+              <span>{field.required ? labels.required : labels.optional}</span>
             </p>
             {"options" in field ? (
-              <div>
+              <div className="fe-ai-creation-options">
                 <span>{labels.choices}</span>
                 <ul>
                   {field.options.map((option) => (
@@ -288,18 +332,17 @@ function Review({
                 </ul>
               </div>
             ) : null}
-            <button type="button" onClick={() => onRemove(field.id)} disabled={schema.fields.length <= 1}>
-              {labels.removeQuestion}
-            </button>
           </li>
         ))}
       </ol>
-      <button type="button" onClick={onPreview}>
-        {labels.preview}
-      </button>
-      <button type="button" onClick={onCreate}>
-        {labels.createSurvey}
-      </button>
+      <div className="fe-ai-creation-actions">
+        <button className="fe-ai-creation-button fe-ai-creation-button--secondary" type="button" onClick={onPreview}>
+          {labels.preview}
+        </button>
+        <button className="fe-ai-creation-button fe-ai-creation-button--primary" type="button" onClick={onCreate}>
+          {labels.createSurvey}
+        </button>
+      </div>
     </section>
   );
 }
@@ -311,7 +354,9 @@ export function SurveyAiCreationPanel({
   creationAdapter,
   authoringAdapter,
   labels,
-  onComplete
+  onComplete,
+  onCancel,
+  previewMode = "dialog"
 }: SurveyAiCreationPanelProps): React.JSX.Element {
   const panelId = useId();
   const assistant = useFormCreationAssistant({
@@ -360,6 +405,11 @@ export function SurveyAiCreationPanel({
     onComplete(finalSchema);
   };
 
+  const cancel = () => {
+    assistant.cancel();
+    onCancel?.();
+  };
+
   const statusMessage =
     assistant.status === "generating"
       ? labels.generating
@@ -368,12 +418,12 @@ export function SurveyAiCreationPanel({
         : undefined;
 
   return (
-    <section aria-labelledby={`${panelId}-title`}>
+    <section className="fe-ai-creation-panel" aria-labelledby={`${panelId}-title`}>
       <h2 id={`${panelId}-title`}>{labels.title}</h2>
-      <div role="status" aria-live="polite">
+      <div className="fe-ai-creation-status" role="status" aria-live="polite">
         {statusMessage}
       </div>
-      <div>
+      <div className="fe-ai-creation-layout">
         <Conversation
           assistant={assistant}
           labels={labels}
@@ -391,15 +441,24 @@ export function SurveyAiCreationPanel({
         <BriefSummary brief={assistant.brief} labels={labels} headingId={`${panelId}-brief`} />
       </div>
       {assistant.status === "error" && assistant.error !== undefined ? (
-        <div role="alert" aria-live="assertive">
+        <div className="fe-ai-creation-error" role="alert" aria-live="assertive">
           {labels.error(assistant.error.code)} ({assistant.error.code})
-          <button type="button" onClick={() => void (draftRequested ? assistant.generateDraft() : assistant.retry())}>
+          <button
+            className="fe-ai-creation-button fe-ai-creation-button--secondary"
+            type="button"
+            onClick={() => void (draftRequested ? assistant.generateDraft() : assistant.retry())}
+          >
             {labels.retry}
           </button>
         </div>
       ) : null}
       {assistant.canGenerate && assistant.status !== "reviewing" ? (
-        <button type="button" onClick={generateDraft} disabled={assistant.status === "generating"}>
+        <button
+          className="fe-ai-creation-button fe-ai-creation-button--primary"
+          type="button"
+          onClick={generateDraft}
+          disabled={assistant.status === "generating"}
+        >
           {labels.generate}
         </button>
       ) : null}
@@ -417,7 +476,7 @@ export function SurveyAiCreationPanel({
         />
       ) : null}
       {assistant.status !== "reviewing" ? (
-        <button type="button" onClick={assistant.cancel} disabled={assistant.status === "idle"}>
+        <button className="fe-ai-creation-cancel" type="button" onClick={cancel}>
           {labels.cancel}
         </button>
       ) : null}
@@ -432,6 +491,7 @@ export function SurveyAiCreationPanel({
           setPreviewOpen(false);
           createSurvey();
         }}
+        mode={previewMode}
       />
     </section>
   );

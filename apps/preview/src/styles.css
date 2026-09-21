@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@form-engine-ts/react/styles.css" layer(form-engine);
+@import "@form-engine-ts/custom-survey-client/ai-creation/styles.css" layer(form-engine);
 
 :root {
   background: #f3f6fb;

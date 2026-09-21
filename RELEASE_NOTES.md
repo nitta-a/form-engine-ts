@@ -3,6 +3,12 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.1.4 — 2026-09-21
+
+- Redesigned the AI survey creation confirmation flow with question cards, removal controls, and preview/create actions.
+- Added a respondent preview dialog with a non-submitting notice and accessible survey controls.
+- Updated the preview app and MUI/custom-survey-client examples to match the new authoring and preview screens.
+
 ## v8.1.3 — 2026-09-21
 
 - Fixed builder validation navigation ordering so the selected page cannot overwrite the target question.

@@ -4,10 +4,25 @@ import {
   createInitialSchemaByMode
 } from "@form-engine-ts/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MuiFormCreationAssistant } from "../src/authoring";
 
 describe("MuiFormCreationAssistant", () => {
+  it("delegates cancellation to its host", () => {
+    const onCancel = vi.fn();
+    render(
+      <MuiFormCreationAssistant
+        creationAdapter={{ respond: vi.fn() }}
+        authoringAdapter={{ generate: vi.fn() }}
+        initialSchema={createInitialSchemaByMode("survey", { title: "Survey", locale: "en" })}
+        onCancel={onCancel}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it("shows conversation, quick replies, and the structured brief", async () => {
     const creationAdapter: CreationAssistantAdapter = {
       respond: async ({ latestMessage }) => ({

@@ -22,6 +22,7 @@ import {
   useFormBuilder
 } from "@form-engine-ts/react";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
+import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 import { useBuilderPreview } from "./BuilderPreviewContext";
@@ -55,6 +56,7 @@ const previewSurveyAiLabels: SurveyAiCreationLabels = {
   removeQuestion: "Remove question",
   preview: "Preview",
   previewTitle: "Survey preview",
+  previewNotice: "You are viewing the current draft. Answers cannot be submitted from this preview.",
   closePreview: "Close preview",
   createSurvey: "Open in editor",
   emptyQuestions: "No questions",
@@ -399,21 +401,36 @@ function CreationAssistantDemo({
   readonly locale: string;
   readonly onComplete: (schema: FormSchema) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const initialSchema = useMemo(
     () => createInitialSchemaByMode("survey", { id: "ai-created-survey", title: "New survey", locale }),
     [locale]
   );
   return (
-    <SurveyAiCreationPanel
-      key={locale}
-      creationAdapter={mockCreationAssistantAdapter}
-      authoringAdapter={mockAuthoringAssistantAdapter}
-      initialSchema={initialSchema}
-      sourceLocale={locale}
-      policy={previewCreationPolicy}
-      labels={previewSurveyAiLabels}
-      onComplete={onComplete}
-    />
+    <>
+      <Button variant="contained" onClick={() => setOpen(true)}>
+        Create survey with AI
+      </Button>
+      <Dialog fullWidth maxWidth="sm" open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>Create survey with AI</DialogTitle>
+        <DialogContent dividers>
+          <SurveyAiCreationPanel
+            key={locale}
+            creationAdapter={mockCreationAssistantAdapter}
+            authoringAdapter={mockAuthoringAssistantAdapter}
+            initialSchema={initialSchema}
+            sourceLocale={locale}
+            policy={previewCreationPolicy}
+            labels={previewSurveyAiLabels}
+            onCancel={() => setOpen(false)}
+            onComplete={(createdSchema) => {
+              onComplete(createdSchema);
+              setOpen(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
