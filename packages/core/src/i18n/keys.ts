@@ -64,6 +64,13 @@ export type KnownBuilderTranslationKey =
   | "builder.formTitle"
   | "builder.formDescription"
   | "builder.completionMessage"
+  | "builder.structure"
+  | "builder.page"
+  | "builder.questions"
+  | "builder.expand"
+  | "builder.collapse"
+  | "builder.validationProblems"
+  | "builder.fixIssue"
   | "builder.addQuestion"
   | "builder.actions.addField"
   | "builder.actions.deleteField"
@@ -221,6 +228,8 @@ export type RendererTranslationKey =
   | "renderer.validationSummaryPlural"
   | "renderer.alreadySubmittedTitle"
   | "renderer.alreadySubmittedMessage"
+  | "renderer.progressLabel"
+  | "renderer.remainingQuestions"
   | "renderer.serverErrorSummary"
   | "renderer.confirmSensitiveDataTitle"
   | "renderer.confirmSensitiveDataMessage"
@@ -280,7 +289,11 @@ export type ContentResultTranslationKey =
   | "content.results.loading"
   | "content.results.retry"
   | "content.results.loadError"
-  | "content.results.invalidQuiz";
+  | "content.results.invalidQuiz"
+  | "content.results.share"
+  | "content.results.shared"
+  | "content.results.copied"
+  | "content.results.shareFailed";
 
 export type TranslationWorkspaceTranslationKey =
   | "workspace.title"

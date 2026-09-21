@@ -4,6 +4,7 @@ import {
   type FormAnalytics,
   type FormSchema
 } from "@form-engine-ts/core";
+import type { RespondentButtonProps } from "@form-engine-ts/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -53,6 +54,19 @@ function pollAnalytics(schema: FormSchema): FormAnalytics {
   };
 }
 
+function pagedSurveySchema(): FormSchema {
+  const schema = createInitialSchemaByMode("survey", { title: "Paged survey", locale: "en" });
+  const first = { id: "question-1", type: "text" as const, title: "Question 1", required: false };
+  return {
+    ...schema,
+    fields: [first, { ...first, id: "question-2", title: "Question 2" }],
+    pages: [
+      { id: "page-1", title: "Page 1", questionIds: [first.id] },
+      { id: "page-2", title: "Page 2", questionIds: ["question-2"] }
+    ]
+  };
+}
+
 describe("MuiContentRenderer", () => {
   it("separates the form title and description in the MUI header", () => {
     render(
@@ -66,11 +80,93 @@ describe("MuiContentRenderer", () => {
     const header = screen.getByRole("heading", { name: "Form title" }).parentElement;
     expect(header).toHaveClass("MuiStack-root");
     expect(header).toContainElement(screen.getByText("Form description"));
+    expect(document.querySelector(".MuiRadio-root")).toBeInTheDocument();
+    expect(document.querySelector(".MuiButton-root")).toBeInTheDocument();
+  });
+
+  it("renders MUI progress and page navigation with the respondent flow", async () => {
+    render(<MuiContentRenderer schema={pagedSurveySchema()} locale="en" onSubmit={async () => undefined} />);
+
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-label", "Progress");
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument();
+  });
+
+  it("routes MUI navigation through the respondent Button primitive", async () => {
+    const kinds: string[] = [];
+    function PrimitiveButton({ kind, type, disabled, children, onClick }: RespondentButtonProps) {
+      if (kind !== undefined) kinds.push(kind);
+      return (
+        <button type={type} disabled={disabled} onClick={onClick}>
+          {children}
+        </button>
+      );
+    }
+
+    render(
+      <MuiContentRenderer
+        schema={pagedSurveySchema()}
+        locale="en"
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={async () => undefined}
+      />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(kinds).toContain("next");
+    expect(kinds).toContain("submit");
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(kinds).toContain("previous");
+  });
+
+  it("uses MUI respondent primitives for standard answer controls", () => {
+    const schema: FormSchema = {
+      id: "mui-respondent-controls",
+      version: 1,
+      title: "Controls",
+      defaultLocale: "en",
+      fields: [
+        { id: "text", type: "text", title: "Text", required: false },
+        { id: "textarea", type: "textarea", title: "Description", required: false },
+        {
+          id: "select",
+          type: "select",
+          title: "Select",
+          required: false,
+          options: [{ id: "one", label: "One" }]
+        },
+        { id: "checkbox", type: "checkbox", title: "Agree", required: false },
+        {
+          id: "radio",
+          type: "radio",
+          title: "Choice",
+          required: false,
+          options: [
+            { id: "one", label: "One" },
+            { id: "two", label: "Two" }
+          ]
+        },
+        { id: "rating", type: "rating", title: "Rating", required: false, min: 1, max: 3 }
+      ]
+    };
+
+    render(<MuiContentRenderer schema={schema} locale="en" onSubmit={async () => undefined} />);
+
+    expect(screen.getByRole("textbox", { name: "Text" }).closest(".MuiTextField-root")).not.toBeNull();
+    expect(screen.getByRole("textbox", { name: "Description" }).tagName).toBe("TEXTAREA");
+    expect(screen.getByRole("textbox", { name: "Description" })).not.toHaveAttribute("field");
+    expect(screen.getByRole("combobox", { name: "Select" })).not.toHaveAttribute("field");
+    expect(screen.getByRole("checkbox", { name: "Agree" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "One" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit" })).toHaveClass("MuiButton-root");
   });
 
   it("shows immediate quiz feedback and a final score", async () => {
     render(<MuiContentRenderer schema={quizSchema()} locale="en" onSubmit={async () => undefined} />);
     await userEvent.click(screen.getByRole("radio", { name: "Option 1" }));
+    expect(document.querySelector('[data-option-id="option-1"]')).toHaveAttribute("data-selected", "true");
     expect(screen.getByText("Because it is correct.")).toBeInTheDocument();
     expect(screen.queryByText(/Total score:/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));

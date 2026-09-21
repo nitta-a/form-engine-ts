@@ -85,6 +85,22 @@ function updateNumberProperty(field: FormField, property: "min" | "max" | "step"
   return remaining;
 }
 
+function updateTextProperty(
+  field: FormField,
+  property: "minLength" | "maxLength" | "pattern",
+  value: string
+): FormField {
+  if (field.type !== "text" && field.type !== "textarea") return field;
+  if (value.trim().length === 0) {
+    const { [property]: _removed, ...remaining } = field;
+    return remaining;
+  }
+  if (property === "pattern") return { ...field, pattern: value };
+  const parsed = numericValue(value);
+  if (parsed === undefined) return field;
+  return { ...field, [property]: Math.max(0, Math.floor(parsed)) };
+}
+
 export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): ComponentType<BuilderFieldEditorSlotProps> {
   const Toolbar = createMuiToolbarSlot(options);
   const OptionEditor = createMuiOptionEditorSlot(options);
@@ -385,13 +401,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                         value={field.minLength === undefined ? "" : String(field.minLength)}
                         disabled={readOnly || controls.textLimits === "readOnly"}
                         onChange={(value) =>
-                          actions.updateField(field.id, (current) => {
-                            if (current.type !== "text" && current.type !== "textarea") return current;
-                            const parsed = numericValue(value);
-                            return parsed === undefined
-                              ? current
-                              : { ...current, minLength: Math.max(0, Math.floor(parsed)) };
-                          })
+                          actions.updateField(field.id, (current) => updateTextProperty(current, "minLength", value))
                         }
                       />
                       <TextInput
@@ -401,13 +411,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                         value={field.maxLength === undefined ? "" : String(field.maxLength)}
                         disabled={readOnly || controls.textLimits === "readOnly"}
                         onChange={(value) =>
-                          actions.updateField(field.id, (current) => {
-                            if (current.type !== "text" && current.type !== "textarea") return current;
-                            const parsed = numericValue(value);
-                            return parsed === undefined
-                              ? current
-                              : { ...current, maxLength: Math.max(0, Math.floor(parsed)) };
-                          })
+                          actions.updateField(field.id, (current) => updateTextProperty(current, "maxLength", value))
                         }
                       />
                       <TextInput
@@ -416,13 +420,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                         value={field.pattern ?? ""}
                         disabled={readOnly || controls.textLimits === "readOnly"}
                         onChange={(value) =>
-                          actions.updateField(field.id, (current) =>
-                            current.type === "text" || current.type === "textarea"
-                              ? value.length === 0
-                                ? current
-                                : { ...current, pattern: value }
-                              : current
-                          )
+                          actions.updateField(field.id, (current) => updateTextProperty(current, "pattern", value))
                         }
                       />
                     </Stack>

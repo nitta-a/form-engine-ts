@@ -1,7 +1,12 @@
 import type { FormSchema } from "@form-engine-ts/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { FieldComponentProps, RespondentRadioProps, RespondentTextInputProps } from "../src";
+import type {
+  FieldComponentProps,
+  RespondentButtonProps,
+  RespondentRadioProps,
+  RespondentTextInputProps
+} from "../src";
 import { FormRenderer } from "../src";
 
 const schema: FormSchema = {
@@ -82,6 +87,31 @@ describe("respondent renderer APIs", () => {
     );
     expect(screen.getByTestId("full-field")).toBeInTheDocument();
     expect(screen.queryByTestId("primitive-text")).not.toBeInTheDocument();
+  });
+
+  it("passes semantic kinds to respondent navigation buttons", async () => {
+    const kinds: string[] = [];
+    function PrimitiveButton({ kind, type, children, disabled, onClick }: RespondentButtonProps) {
+      if (kind !== undefined) kinds.push(kind);
+      return (
+        <button type={type} disabled={disabled} onClick={onClick}>
+          {children}
+        </button>
+      );
+    }
+
+    render(
+      <FormRenderer
+        schema={schema}
+        initialValues={{ first: "Ada" }}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={() => undefined}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(kinds).toContain("next");
+    expect(kinds).toContain("submit");
   });
 
   it("renders whole choice options without removing the controlled input", async () => {
@@ -205,5 +235,21 @@ describe("respondent renderer APIs", () => {
     await waitFor(() => expect(container.querySelector("form")).toHaveAttribute("data-form-id", "respondent-api"));
     expect(screen.getByText("Page one").closest("section")).toHaveAttribute("data-active", "true");
     expect(screen.getByLabelText(/First/).closest("[data-field-id]")).toHaveAttribute("data-invalid", "false");
+  });
+
+  it("uses instant scrolling by default when reduced motion is preferred", async () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    try {
+      render(<FormRenderer schema={schema} onSubmit={() => undefined} pageTransition={{ focus: "none" }} />);
+      fireEvent.change(screen.getByLabelText(/First/), { target: { value: "Ada" } });
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "start" }));
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+      vi.unstubAllGlobals();
+    }
   });
 });

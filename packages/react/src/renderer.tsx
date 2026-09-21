@@ -69,6 +69,7 @@ import type {
   FormTelemetryOptions,
   RadioTextInputSlotProps,
   RenderSubmitButtonProps,
+  RespondentButtonProps,
   RespondentCheckboxProps,
   RespondentRadioProps,
   RespondentRatingProps,
@@ -100,7 +101,7 @@ function resolveScrollBehavior(
   if (options?.scroll === "none") return undefined;
   if (options?.scroll === "instant") return "auto";
   if (
-    options?.respectReducedMotion &&
+    options?.respectReducedMotion !== false &&
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -1578,6 +1579,36 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     button?.focus();
   }, []);
 
+  const renderRespondentButton = ({
+    type,
+    kind,
+    disabled,
+    className,
+    children,
+    onClick,
+    dataConfirm
+  }: RespondentButtonProps & { readonly dataConfirm?: boolean }): ReactNode => {
+    if (primitiveComponents.Button !== undefined) {
+      const button = (
+        <primitiveComponents.Button
+          type={type}
+          {...(kind === undefined ? {} : { kind })}
+          {...(disabled === undefined ? {} : { disabled })}
+          {...(className === undefined ? {} : { className })}
+          {...(onClick === undefined ? {} : { onClick })}
+        >
+          {children}
+        </primitiveComponents.Button>
+      );
+      return dataConfirm === true ? <span data-fe-confirm="true">{button}</span> : button;
+    }
+    return (
+      <button type={type} disabled={disabled} className={className} onClick={onClick} data-fe-confirm={dataConfirm}>
+        {children}
+      </button>
+    );
+  };
+
   const draftResumeEnabled = draftResume !== undefined && autoSaveKey !== undefined;
   const removeDraft = useCallback(() => {
     if (autoSaveKey === undefined || typeof globalThis.localStorage === "undefined") return;
@@ -1642,12 +1673,18 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       <section className="fe-draft-resume" aria-labelledby={`${prefix}-draft-title`}>
         <h2 id={`${prefix}-draft-title`}>{resolveMessage("draftResumeTitle")}</h2>
         <p>{resolveMessage("draftResumeMessage")}</p>
-        <button type="button" onClick={resumeDraft}>
-          {resolveMessage("draftResumeContinue")}
-        </button>{" "}
-        <button type="button" onClick={startDraftOver}>
-          {resolveMessage("draftResumeStartOver")}
-        </button>
+        {renderRespondentButton({
+          type: "button",
+          kind: "draft-resume",
+          onClick: resumeDraft,
+          children: resolveMessage("draftResumeContinue")
+        })}{" "}
+        {renderRespondentButton({
+          type: "button",
+          kind: "draft-start-over",
+          onClick: startDraftOver,
+          children: resolveMessage("draftResumeStartOver")
+        })}
       </section>
     ) : (
       <section className="fe-draft-settings" aria-label={resolveMessage("draftResumeTitle")}>
@@ -2323,23 +2360,13 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {label}
           </>
         );
-        return primitiveComponents.Button === undefined ? (
-          <button
-            className={joinClassNames("fe-submit", classNames?.submitButton)}
-            type="submit"
-            disabled={submitButtonProps.disabled}
-          >
-            {children}
-          </button>
-        ) : (
-          <primitiveComponents.Button
-            className={joinClassNames("fe-submit", classNames?.submitButton)}
-            type="submit"
-            disabled={submitButtonProps.disabled}
-          >
-            {children}
-          </primitiveComponents.Button>
-        );
+        return renderRespondentButton({
+          className: joinClassNames("fe-submit", classNames?.submitButton),
+          type: "submit",
+          kind: "submit",
+          disabled: submitButtonProps.disabled,
+          children
+        });
       })()
     );
   };
@@ -2450,14 +2477,23 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               ))}
             </ul>
           ) : null}
-          <button type="button" data-fe-confirm="true" onClick={confirmSubmission}>
-            {submissionConfirmation?.confirmLabel ??
-              resolveMessage("confirmButton", form.translate("form.confirmSubmission"))}
-          </button>
-          <button type="button" onClick={cancelSubmission}>
-            {submissionConfirmation?.cancelLabel ??
-              resolveMessage("cancelButton", form.translate("form.cancelSubmission"))}
-          </button>
+          {renderRespondentButton({
+            type: "button",
+            kind: "confirm",
+            onClick: confirmSubmission,
+            dataConfirm: true,
+            children:
+              submissionConfirmation?.confirmLabel ??
+              resolveMessage("confirmButton", form.translate("form.confirmSubmission"))
+          })}
+          {renderRespondentButton({
+            type: "button",
+            kind: "cancel",
+            onClick: cancelSubmission,
+            children:
+              submissionConfirmation?.cancelLabel ??
+              resolveMessage("cancelButton", form.translate("form.cancelSubmission"))
+          })}
         </>
       )}
     </div>
@@ -2495,11 +2531,14 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           <div role="status">
             <h2>{resolveMessage("alreadySubmittedTitle")}</h2>
             <p>{resolveMessage("alreadySubmittedMessage", form.translate("form.alreadySubmitted"))}</p>
-            {receiptStore === undefined ? null : (
-              <button type="button" onClick={() => void resetReceipt()}>
-                {resolveMessage("submitButton", form.translate("form.submitAnother"))}
-              </button>
-            )}
+            {receiptStore === undefined
+              ? null
+              : renderRespondentButton({
+                  type: "button",
+                  kind: "reset",
+                  onClick: () => void resetReceipt(),
+                  children: resolveMessage("submitButton", form.translate("form.submitAnother"))
+                })}
           </div>
         )}
       </div>
@@ -2637,6 +2676,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
           </header>
         )}
+        {slots.renderHeader === undefined ? null : slots.renderProgress?.(progress)}
         {activePage === undefined ? null : (
           <section
             ref={pageHeaderRef}
@@ -2753,6 +2793,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               totalPages: 1,
               canPrev: false,
               canNext: false,
+              disabled: interactionLocked,
               progress,
               onPrev: () => undefined,
               onNext: () => undefined
@@ -2766,31 +2807,32 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
               totalPages: visiblePageIndexes.length,
               canPrev,
               canNext,
+              disabled: interactionLocked,
               progress,
               onPrev: handlePrevious,
               onNext: handleNext
             }) ?? (
               <>
-                {canPrev ? (
-                  <button
-                    className={joinClassNames("btn-prev", classNames?.previousButton)}
-                    type="button"
-                    disabled={interactionLocked}
-                    onClick={handlePrevious}
-                  >
-                    {form.translate("form.back")}
-                  </button>
-                ) : null}
-                {canNext ? (
-                  <button
-                    className={joinClassNames("btn-next", classNames?.nextButton)}
-                    type="button"
-                    disabled={interactionLocked}
-                    onClick={handleNext}
-                  >
-                    {form.translate("form.next")}
-                  </button>
-                ) : null}
+                {canPrev
+                  ? renderRespondentButton({
+                      className: joinClassNames("btn-prev", classNames?.previousButton),
+                      type: "button",
+                      kind: "previous",
+                      disabled: interactionLocked,
+                      onClick: handlePrevious,
+                      children: form.translate("form.back")
+                    })
+                  : null}
+                {canNext
+                  ? renderRespondentButton({
+                      className: joinClassNames("btn-next", classNames?.nextButton),
+                      type: "button",
+                      kind: "next",
+                      disabled: interactionLocked,
+                      onClick: handleNext,
+                      children: form.translate("form.next")
+                    })
+                  : null}
               </>
             )}
             {canNext ? null : renderSubmitButton()}
@@ -2802,9 +2844,12 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             : (slots.renderSubmitError?.({ error: acceptanceLoadError, onRetry: reloadAcceptanceCount }) ?? (
                 <div role="alert">
                   {resolveMessage("serverErrorSummary")}
-                  <button type="button" onClick={reloadAcceptanceCount}>
-                    {resolveMessage("retryButton")}
-                  </button>
+                  {renderRespondentButton({
+                    type: "button",
+                    kind: "retry",
+                    onClick: reloadAcceptanceCount,
+                    children: resolveMessage("retryButton")
+                  })}
                 </div>
               ))}
           {form.submitStatus === "success" ? completionRegion : null}
@@ -2816,18 +2861,24 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   {form.submitError.payload.formErrors?.map((message) => (
                     <div key={message}>{message}</div>
                   ))}
-                  <button type="button" onClick={() => void submitValues()}>
-                    {resolveMessage("retryButton")}
-                  </button>
+                  {renderRespondentButton({
+                    type: "button",
+                    kind: "retry",
+                    onClick: () => void submitValues(),
+                    children: resolveMessage("retryButton")
+                  })}
                 </div>
               ) : (
                 <div role="alert">
                   {errorMessageKey === undefined
                     ? resolveMessage("serverErrorSummary")
                     : form.translate(errorMessageKey)}
-                  <button type="button" onClick={() => void submitValues()}>
-                    {resolveMessage("retryButton")}
-                  </button>
+                  {renderRespondentButton({
+                    type: "button",
+                    kind: "retry",
+                    onClick: () => void submitValues(),
+                    children: resolveMessage("retryButton")
+                  })}
                 </div>
               )))
             : null}

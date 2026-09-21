@@ -1,5 +1,7 @@
 import type { FormSchema } from "@form-engine-ts/core";
+import { FormEngineI18nContext, FormEngineI18nProviderScopeContext } from "@form-engine-ts/react";
 import { Alert, AlertTitle, Button, List, ListItem, ListItemText, Stack } from "@mui/material";
+import { useContext } from "react";
 import type { MuiFormBuilderValidationIssue, MuiFormBuilderValidationState } from "./contentModeTypes";
 
 export interface MuiBuilderValidationTarget {
@@ -18,13 +20,17 @@ export interface MuiBuilderValidationSummaryProps {
 }
 
 function issueTarget(schema: FormSchema, path: string): MuiBuilderValidationTarget {
+  const targetForField = (fieldId: string): MuiBuilderValidationTarget => {
+    const pageId = schema.pages?.find((page) => page.questionIds.includes(fieldId))?.id;
+    return pageId === undefined ? { fieldId } : { fieldId, pageId };
+  };
   const fieldIndex = /^fields\[(\d+)]/.exec(path)?.[1];
   if (fieldIndex !== undefined) {
     const field = schema.fields[Number(fieldIndex)];
-    if (field !== undefined) return { fieldId: field.id };
+    if (field !== undefined) return targetForField(field.id);
   }
   const field = schema.fields.find((candidate) => candidate.id === path || path.startsWith(`${candidate.id}.`));
-  if (field !== undefined) return { fieldId: field.id };
+  if (field !== undefined) return targetForField(field.id);
 
   const pageIndex = /^pages\[(\d+)]/.exec(path)?.[1];
   if (pageIndex !== undefined) {
@@ -41,13 +47,22 @@ export function MuiBuilderValidationSummary({
   onFieldSelect,
   onPageSelect,
   onIssueSelect,
-  title = "Problems to fix",
-  actionLabel = "Fix"
+  title,
+  actionLabel
 }: MuiBuilderValidationSummaryProps) {
+  const i18n = useContext(FormEngineI18nContext);
+  const hasI18nProvider = useContext(FormEngineI18nProviderScopeContext);
+  const translated = (key: string, fallback: string) => {
+    if (!hasI18nProvider) return fallback;
+    const value = i18n.translator(key);
+    return value === key ? fallback : value;
+  };
+  const resolvedTitle = title ?? translated("builder.validationProblems", "Problems to fix");
+  const resolvedActionLabel = actionLabel ?? translated("builder.fixIssue", "Fix");
   if (validationState.valid) return null;
   return (
     <Alert severity="warning" role="alert" data-mui-slot="builder-validation-summary">
-      <AlertTitle>{title}</AlertTitle>
+      <AlertTitle>{resolvedTitle}</AlertTitle>
       <List dense>
         {validationState.issues.map((issue) => {
           const target = issueTarget(schema, issue.path);
@@ -73,7 +88,7 @@ export function MuiBuilderValidationSummary({
                       onIssueSelect?.(issue, target);
                     }}
                   >
-                    {actionLabel}
+                    {resolvedActionLabel}
                   </Button>
                 ) : null}
               </Stack>

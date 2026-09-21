@@ -1136,8 +1136,20 @@ export interface RespondentRatingProps extends RespondentPrimitiveProps {
   readonly onChange: (value: number) => void;
 }
 
+export type RespondentButtonKind =
+  | "previous"
+  | "next"
+  | "submit"
+  | "confirm"
+  | "cancel"
+  | "retry"
+  | "draft-resume"
+  | "draft-start-over"
+  | "reset";
+
 export interface RespondentButtonProps {
   readonly type: "submit" | "button";
+  readonly kind?: RespondentButtonKind;
   readonly disabled?: boolean;
   readonly className?: string | undefined;
   readonly children: ReactNode;
@@ -1232,6 +1244,7 @@ export interface FormRendererSlots {
     readonly totalPages: number;
     readonly canPrev: boolean;
     readonly canNext: boolean;
+    readonly disabled?: boolean;
     readonly progress: FormProgressSlotProps;
     readonly onPrev: () => void;
     readonly onNext: () => void;

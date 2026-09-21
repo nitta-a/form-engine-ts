@@ -301,6 +301,12 @@ The shared mode, submission and result logic is provided by React's headless
 slots. Tailwind or other design systems can use `ContentRenderer` directly with typed
 `classNames`.
 
+`MuiContentRenderer` also supplies MUI respondent primitives for text, textarea, select,
+checkbox, radio, rating, and button controls. Use `createMuiRespondentComponents(options)`
+for a standalone `FormRenderer` integration, or pass `primitiveComponents` to override
+individual controls. Renderer navigation buttons carry an additive `kind` such as
+`previous`, `next`, `submit`, or `retry` so an adapter can choose the appropriate variant.
+
 ```tsx
 import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
 
@@ -366,9 +372,9 @@ existing MUI adapters and respect `readOnly`, feature flags, localization, `muiO
 ## Builder workspace composition
 
 `MuiBuilderNavigator`, `MuiBuilderPreview`, and `MuiBuilderValidationSummary` are opt-in building blocks for composing a
-three-pane authoring workspace. They reuse `MuiFormBuilder` and `MuiContentRenderer`; the preview does not receive
-`autoSaveKey`, so it does not persist responses. `selectedPageId` and `onSelectedPageChange` are additive controlled
-props on `MuiFormBuilder`.
+three-pane authoring workspace. They reuse `MuiFormBuilder` and `MuiContentRenderer`; the preview API excludes submit,
+receipt, attempt, draft, controller, metadata, and telemetry side effects, so preview submission is an in-memory
+completion simulation. `selectedPageId` and `onSelectedPageChange` are additive controlled props on `MuiFormBuilder`.
 
 ```tsx
 <MuiBuilderNavigator

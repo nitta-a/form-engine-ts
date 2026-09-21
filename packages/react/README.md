@@ -115,6 +115,9 @@ A Field Type override still wins; otherwise the renderer uses the primitive and 
 Primitive props include the field metadata, semantic state, constraints, and controlled change callback. Keep the
 provided input inside `slots.renderChoiceOption` to retain native input semantics while changing the option surface:
 
+`RespondentButtonProps.kind` is optional and identifies renderer actions such as `previous`, `next`, `submit`, `confirm`,
+`cancel`, `retry`, `draft-resume`, `draft-start-over`, and `reset`. Existing button primitives may ignore it.
+
 ```tsx
   <FormRenderer
   slots={{

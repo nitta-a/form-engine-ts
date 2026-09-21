@@ -1,7 +1,8 @@
 import type { FormSchema } from "@form-engine-ts/core";
+import { FormEngineI18nContext, FormEngineI18nProviderScopeContext } from "@form-engine-ts/react";
 import { ChevronRight } from "@mui/icons-material";
-import { Collapse, List, ListItem, ListItemButton, ListItemText, Paper, Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { Collapse, IconButton, List, ListItem, ListItemButton, ListItemText, Paper, Typography } from "@mui/material";
+import { useContext, useEffect, useState } from "react";
 
 const EMPTY_PAGES: readonly never[] = [];
 
@@ -14,6 +15,8 @@ export interface MuiBuilderNavigatorProps {
   readonly ariaLabel?: string;
   readonly pageLabel?: string;
   readonly questionsLabel?: string;
+  readonly expandLabel?: string;
+  readonly collapseLabel?: string;
   readonly dense?: boolean;
 }
 
@@ -23,11 +26,25 @@ export function MuiBuilderNavigator({
   onActiveFieldChange,
   selectedPageId,
   onSelectedPageChange,
-  ariaLabel = "Form structure",
-  pageLabel = "Page",
-  questionsLabel = "Questions",
+  ariaLabel,
+  pageLabel,
+  questionsLabel,
+  expandLabel,
+  collapseLabel,
   dense = false
 }: MuiBuilderNavigatorProps) {
+  const i18n = useContext(FormEngineI18nContext);
+  const hasI18nProvider = useContext(FormEngineI18nProviderScopeContext);
+  const translate = (key: string, fallback: string) => {
+    if (!hasI18nProvider) return fallback;
+    const translated = i18n.translator(key);
+    return translated === key ? fallback : translated;
+  };
+  const resolvedAriaLabel = ariaLabel ?? translate("builder.structure", "Form structure");
+  const resolvedPageLabel = pageLabel ?? translate("builder.page", "Page");
+  const resolvedQuestionsLabel = questionsLabel ?? translate("builder.questions", "Questions");
+  const resolvedExpandLabel = expandLabel ?? translate("builder.expand", "Expand");
+  const resolvedCollapseLabel = collapseLabel ?? translate("builder.collapse", "Collapse");
   const pages = schema.pages;
   const pageList = pages ?? EMPTY_PAGES;
   const [expandedPages, setExpandedPages] = useState<ReadonlySet<string>>(
@@ -48,11 +65,6 @@ export function MuiBuilderNavigator({
       else next.add(pageId);
       return next;
     });
-    onSelectedPageChange?.(pageId);
-    const firstFieldId = schema.pages
-      ?.find((page) => page.id === pageId)
-      ?.questionIds.find((fieldId) => schema.fields.some((field) => field.id === fieldId));
-    if (firstFieldId !== undefined) onActiveFieldChange?.(firstFieldId);
   };
 
   const renderField = (fieldId: string, index: number) => {
@@ -75,13 +87,13 @@ export function MuiBuilderNavigator({
   return (
     <Paper data-mui-slot="builder-navigator" variant="outlined" sx={{ p: dense ? 0.5 : 1 }}>
       <Typography component="h2" variant={dense ? "subtitle2" : "subtitle1"} sx={{ px: 1, py: 0.5 }}>
-        {ariaLabel}
+        {resolvedAriaLabel}
       </Typography>
-      <List component="nav" aria-label={ariaLabel} disablePadding>
+      <List component="nav" aria-label={resolvedAriaLabel} disablePadding>
         {pageList.length === 0 ? (
           <>
             <ListItem disablePadding>
-              <ListItemText primary={questionsLabel} sx={{ px: 1, py: 0.5 }} />
+              <ListItemText primary={resolvedQuestionsLabel} sx={{ px: 1, py: 0.5 }} />
             </ListItem>
             {schema.fields.map((field, index) => renderField(field.id, index))}
           </>
@@ -89,24 +101,33 @@ export function MuiBuilderNavigator({
           <>
             {pageList.map((page, pageIndex) => {
               const expanded = expandedPages.has(page.id);
+              const pageTitle = page.title ?? `${resolvedPageLabel} ${pageIndex + 1}`;
               return (
                 <ListItem key={page.id} disablePadding sx={{ display: "block" }}>
-                  <ListItemButton
-                    selected={page.id === selectedPageId}
-                    aria-current={page.id === selectedPageId ? "true" : undefined}
-                    aria-expanded={expanded}
-                    onClick={() => togglePage(page.id)}
-                    dense={dense}
-                  >
-                    <ChevronRight
-                      fontSize="small"
-                      aria-hidden="true"
-                      sx={{ mr: 0.5, transform: expanded ? "rotate(90deg)" : undefined }}
-                    />
-                    <ListItemText primary={page.title ?? `${pageLabel} ${pageIndex + 1}`} />
-                  </ListItemButton>
+                  <ListItem component="div" sx={{ p: 0 }}>
+                    <IconButton
+                      size={dense ? "small" : "medium"}
+                      aria-label={`${expanded ? resolvedCollapseLabel : resolvedExpandLabel} ${pageTitle}`}
+                      aria-expanded={expanded}
+                      onClick={() => togglePage(page.id)}
+                    >
+                      <ChevronRight
+                        fontSize="small"
+                        aria-hidden="true"
+                        sx={{ transform: expanded ? "rotate(90deg)" : undefined }}
+                      />
+                    </IconButton>
+                    <ListItemButton
+                      selected={page.id === selectedPageId}
+                      aria-current={page.id === selectedPageId ? "true" : undefined}
+                      onClick={() => onSelectedPageChange?.(page.id)}
+                      dense={dense}
+                    >
+                      <ListItemText primary={pageTitle} />
+                    </ListItemButton>
+                  </ListItem>
                   <Collapse in={expanded} timeout="auto" unmountOnExit>
-                    <List disablePadding aria-label={`${page.title ?? `${pageLabel} ${pageIndex + 1}`} questions`}>
+                    <List disablePadding aria-label={`${pageTitle} ${resolvedQuestionsLabel.toLowerCase()}`}>
                       {page.questionIds.map((fieldId, index) => renderField(fieldId, index))}
                     </List>
                   </Collapse>
@@ -116,7 +137,7 @@ export function MuiBuilderNavigator({
             {schema.fields.some((field) => !pageList.some((page) => page.questionIds.includes(field.id))) ? (
               <>
                 <ListItem disablePadding>
-                  <ListItemText primary={questionsLabel} sx={{ px: 1, py: 0.5 }} />
+                  <ListItemText primary={resolvedQuestionsLabel} sx={{ px: 1, py: 0.5 }} />
                 </ListItem>
                 {schema.fields
                   .filter((field) => !pageList.some((page) => page.questionIds.includes(field.id)))

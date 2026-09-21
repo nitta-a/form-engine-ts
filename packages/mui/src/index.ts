@@ -16,6 +16,7 @@ export * from "./MuiSurveyResponseSummary";
 export * from "./MuiSurveyResponseSummaryDomain";
 export * from "./QuizEditorSlots";
 export * from "./QuizResultView";
+export * from "./respondent";
 export * from "./slots";
 export * from "./types";
 export * from "./workspace/TargetLocaleSelector";

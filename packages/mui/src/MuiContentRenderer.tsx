@@ -6,13 +6,16 @@ import type {
   QuizQuestionResult
 } from "@form-engine-ts/core";
 import {
+  type ChoiceOptionSlotProps,
   ContentRenderer,
   type ContentRendererClassNames,
   type ContentRendererProps,
   type ContentRendererSlots,
   type FormDraftResumeSlotProps,
   FormEngineI18nProvider,
+  type FormProgressSlotProps,
   type FormQuizShareSlotProps,
+  type FormRendererComponents,
   type FormRendererProps,
   type FormSubmissionMetadata,
   type PollResultOptionProps,
@@ -24,12 +27,23 @@ import {
   type TypedFormRendererProps,
   useShare
 } from "@form-engine-ts/react";
-import { Alert, Button, Checkbox, FormControlLabel, LinearProgress, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  LinearProgress,
+  Paper,
+  Stack,
+  TextField,
+  Typography
+} from "@mui/material";
 import type { ReactNode } from "react";
 import { muiContentTranslation } from "./contentTranslation";
 import { MuiFormBuilderContext } from "./context";
 import type { MuiPollResultsSlotProps, MuiPollResultsSlots } from "./MuiPollResults";
 import { QuizResultView, type QuizResultViewProps } from "./QuizResultView";
+import { muiRespondentComponents } from "./respondent";
 import { MuiChoiceGroupSlot } from "./slots";
 import type { MuiAdapterOptions, MuiFormEngineI18nOptions } from "./types";
 
@@ -139,10 +153,6 @@ function MuiQuizSummary({
         ...(share?.url === undefined ? {} : { url: share.url })
       })
   };
-  const shareLabel = locale.toLowerCase().startsWith("ja") ? "結果を共有" : "Share result";
-  const sharedLabel = locale.toLowerCase().startsWith("ja") ? "共有しました" : "Shared";
-  const copiedLabel = locale.toLowerCase().startsWith("ja") ? "コピーしました" : "Copied";
-  const failedLabel = locale.toLowerCase().startsWith("ja") ? "共有できませんでした" : "Share failed";
   const shareContent =
     share === undefined
       ? null
@@ -153,7 +163,11 @@ function MuiQuizSummary({
             disabled={!supported || shareStatus === "shared" || shareStatus === "copied"}
             onClick={shareProps.onShare}
           >
-            {shareStatus === "shared" ? sharedLabel : shareStatus === "copied" ? copiedLabel : shareLabel}
+            {shareStatus === "shared"
+              ? t("content.results.shared")
+              : shareStatus === "copied"
+                ? t("content.results.copied")
+                : t("content.results.share")}
           </Button>
         ));
   return (
@@ -166,7 +180,7 @@ function MuiQuizSummary({
         {...(i18n === undefined ? {} : { i18n })}
       />
       {shareContent}
-      {shareStatus === "error" ? <Alert severity="error">{failedLabel}</Alert> : null}
+      {shareStatus === "error" ? <Alert severity="error">{t("content.results.shareFailed")}</Alert> : null}
     </Stack>
   );
 }
@@ -250,41 +264,117 @@ function MuiInvalidQuiz({
   return <Alert severity="error">{t("content.results.invalidQuiz")}</Alert>;
 }
 
+function formatTranslation(value: string, params: Readonly<Record<string, string | number>>): string {
+  return value.replace(/\{\{(\w+)\}\}/g, (token, key: string) =>
+    Object.hasOwn(params, key) ? String(params[key]) : token
+  );
+}
+
+function MuiProgress({
+  progress,
+  locale,
+  i18n
+}: {
+  readonly progress: FormProgressSlotProps;
+  readonly locale: string;
+  readonly i18n?: MuiFormEngineI18nOptions;
+}) {
+  if (progress.visiblePages <= 1) return null;
+  const { translate: t } = muiContentTranslation(locale, i18n);
+  const step = formatTranslation(t("form.step"), {
+    current: progress.currentPage + 1,
+    total: progress.visiblePages
+  });
+  const remaining = formatTranslation(t("renderer.remainingQuestions"), {
+    count: progress.remainingQuestions
+  });
+  return (
+    <Stack spacing={0.5} sx={{ mt: 1 }}>
+      <LinearProgress
+        variant="determinate"
+        value={progress.percent}
+        aria-label={t("renderer.progressLabel")}
+        aria-valuetext={`${step} (${remaining})`}
+      />
+      <Typography component="span" variant="body2" color="text.secondary">
+        {step}
+      </Typography>
+    </Stack>
+  );
+}
+
+function MuiNavigation({
+  ButtonComponent,
+  totalPages,
+  canPrev,
+  canNext,
+  disabled,
+  onPrev,
+  onNext,
+  locale,
+  i18n
+}: {
+  readonly ButtonComponent: NonNullable<FormRendererComponents["Button"]>;
+  readonly totalPages: number;
+  readonly canPrev: boolean;
+  readonly canNext: boolean;
+  readonly disabled?: boolean;
+  readonly onPrev: () => void;
+  readonly onNext: () => void;
+  readonly locale: string;
+  readonly i18n?: MuiFormEngineI18nOptions;
+}) {
+  if (totalPages <= 1 || (!canPrev && !canNext)) return null;
+  const { translate: t } = muiContentTranslation(locale, i18n);
+  return (
+    <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1} justifyContent="space-between" sx={{ mt: 2 }}>
+      {canPrev ? (
+        <ButtonComponent
+          type="button"
+          kind="previous"
+          {...(disabled === undefined ? {} : { disabled })}
+          onClick={onPrev}
+        >
+          {t("form.back")}
+        </ButtonComponent>
+      ) : (
+        <span />
+      )}
+      {canNext ? (
+        <ButtonComponent type="button" kind="next" {...(disabled === undefined ? {} : { disabled })} onClick={onNext}>
+          {t("form.next")}
+        </ButtonComponent>
+      ) : null}
+    </Stack>
+  );
+}
+
 function MuiDraftResume({
+  ButtonComponent,
   props,
   locale,
   i18n
 }: {
+  readonly ButtonComponent: NonNullable<FormRendererComponents["Button"]>;
   props: FormDraftResumeSlotProps;
   locale: string;
   i18n?: MuiFormEngineI18nOptions;
 }) {
-  const ja = locale.toLowerCase().startsWith("ja");
-  const label = (key: string, fallback: string) => {
-    const translated = i18n?.translator?.(key);
-    return translated === undefined || translated === key ? fallback : translated;
-  };
+  const { translate: t } = muiContentTranslation(locale, i18n);
   if (props.mode === "prompt") {
     return (
       <Alert severity="info">
         <Typography component="h2" variant="h6">
-          {label("renderer.draftResumeTitle", ja ? "回答を続ける" : "Continue your response")}
+          {t("renderer.draftResumeTitle")}
         </Typography>
-        <Typography>
-          {label(
-            "renderer.draftResumeMessage",
-            ja
-              ? "このブラウザーに保存された未送信の回答があります。"
-              : "A saved response from this browser is available. It has not been submitted."
-          )}
-        </Typography>
+        <Typography>{t("renderer.draftResumeMessage")}</Typography>
         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-          <Button type="button" variant="contained" onClick={props.onResume}>
-            {label("renderer.draftResumeContinue", ja ? "続きから回答する" : "Continue where you left off")}
-          </Button>
-          <Button type="button" onClick={props.onStartOver}>
-            {label("renderer.draftResumeStartOver", ja ? "最初から回答する" : "Start over")}
-          </Button>
+          <ButtonComponent type="button" kind="draft-resume" onClick={props.onResume}>
+            {t("renderer.draftResumeContinue")}
+          </ButtonComponent>
+          <ButtonComponent type="button" kind="draft-start-over" onClick={props.onStartOver}>
+            {t("renderer.draftResumeStartOver")}
+          </ButtonComponent>
         </Stack>
       </Alert>
     );
@@ -299,37 +389,41 @@ function MuiDraftResume({
             onChange={(_, checked) => props.onToggleSaving(checked)}
           />
         }
-        label={label(
-          props.savingEnabled ? "renderer.draftResumeEnabled" : "renderer.draftResumeDisabled",
-          props.savingEnabled
-            ? ja
-              ? "この端末に回答を7日間保存する"
-              : "Save my response on this device for 7 days"
-            : ja
-              ? "この端末に回答を保存しない"
-              : "Do not save my response on this device"
-        )}
+        label={t(props.savingEnabled ? "renderer.draftResumeEnabled" : "renderer.draftResumeDisabled")}
       />
-      {props.saveStatus === "saved" ? (
-        <Typography role="status">
-          {label("renderer.draftSaved", ja ? "この端末に一時保存しました" : "Saved on this device")}
-        </Typography>
-      ) : null}
+      {props.saveStatus === "saved" ? <Typography role="status">{t("renderer.draftSaved")}</Typography> : null}
       {props.error === undefined ? null : (
         <Typography role="alert">
-          {label(
-            props.errorKind === "delete" ? "renderer.draftDeleteFailed" : "renderer.draftSaveFailed",
-            props.errorKind === "delete"
-              ? ja
-                ? "保存された回答を削除できませんでした。"
-                : "The saved response could not be removed."
-              : ja
-                ? "この端末に回答を保存できませんでした。"
-                : "This response could not be saved on this device."
-          )}
+          {t(props.errorKind === "delete" ? "renderer.draftDeleteFailed" : "renderer.draftSaveFailed")}
         </Typography>
       )}
     </Stack>
+  );
+}
+
+function MuiChoiceOption({ children, checked, disabled, readOnly, inputId, option }: ChoiceOptionSlotProps) {
+  return (
+    <Paper
+      component="label"
+      variant={checked ? "elevation" : "outlined"}
+      data-option-id={option.id}
+      data-selected={checked ? "true" : "false"}
+      aria-disabled={disabled || readOnly ? "true" : undefined}
+      htmlFor={inputId}
+      sx={{
+        alignItems: "center",
+        cursor: disabled || readOnly ? "default" : "pointer",
+        display: "flex",
+        gap: 1,
+        minHeight: 48,
+        px: 1.5,
+        py: 0.75,
+        borderColor: checked ? "primary.main" : "divider",
+        bgcolor: checked ? "action.selected" : "background.paper"
+      }}
+    >
+      {children}
+    </Paper>
   );
 }
 
@@ -344,8 +438,26 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
   const quizOptions = contentModeOptions?.quiz;
   const pollOptions = contentModeOptions?.poll;
   const contentSlots = slots;
+  const ButtonComponent = rendererProps.primitiveComponents?.Button ?? muiRespondentComponents.Button;
+  if (ButtonComponent === undefined) throw new Error("MUI respondent Button is unavailable.");
   const resolvedSlots: ContentRendererSlots = {
     ...slots,
+    renderNavigation:
+      contentSlots?.renderNavigation ??
+      ((navigation) => (
+        <MuiNavigation
+          ButtonComponent={ButtonComponent}
+          totalPages={navigation.totalPages}
+          canPrev={navigation.canPrev}
+          canNext={navigation.canNext}
+          {...(navigation.disabled === undefined ? {} : { disabled: navigation.disabled })}
+          onPrev={navigation.onPrev}
+          onNext={navigation.onNext}
+          locale={locale}
+          {...(i18n === undefined ? {} : { i18n })}
+        />
+      )),
+    renderChoiceOption: contentSlots?.renderChoiceOption ?? MuiChoiceOption,
     renderHeader:
       contentSlots?.renderHeader ??
       (({ title, description }) => (
@@ -362,8 +474,30 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
       )),
     renderDraftResume:
       contentSlots?.renderDraftResume ??
-      ((draft) => <MuiDraftResume props={draft} locale={locale} {...(i18n === undefined ? {} : { i18n })} />),
+      ((draft) => (
+        <MuiDraftResume
+          ButtonComponent={ButtonComponent}
+          props={draft}
+          locale={locale}
+          {...(i18n === undefined ? {} : { i18n })}
+        />
+      )),
     renderChoiceGroup: slots?.renderChoiceGroup ?? MuiChoiceGroupSlot,
+    renderPageHeader:
+      contentSlots?.renderPageHeader ??
+      (({ page, progress }) => (
+        <Stack spacing={0.5}>
+          {page.title === undefined ? null : <Typography component="h2">{page.title}</Typography>}
+          {page.description === undefined ? null : (
+            <Typography component="p" color="text.secondary">
+              {page.description}
+            </Typography>
+          )}
+          {contentSlots?.renderProgress?.(progress) ?? (
+            <MuiProgress progress={progress} locale={locale} {...(i18n === undefined ? {} : { i18n })} />
+          )}
+        </Stack>
+      )),
     renderRadioTextInput:
       contentSlots?.renderRadioTextInput ??
       ((input: RadioTextInputSlotProps) => (
@@ -458,6 +592,7 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
     <MuiFormBuilderContext.Provider value={{ options: muiOptions ?? {} }}>
       <ContentRenderer
         {...(rendererProps as ContentRendererProps)}
+        primitiveComponents={{ ...muiRespondentComponents, ...rendererProps.primitiveComponents }}
         contentModeOptions={contentMode}
         slots={resolvedSlots}
       />
