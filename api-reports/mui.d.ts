@@ -220,11 +220,12 @@ interface MuiFormCreationAssistantProps extends Omit<UseFormCreationAssistantOpt
     readonly initialSchema: FormSchema;
     readonly policy?: FormPolicy;
     readonly onComplete?: (schema: FormSchema) => void;
+    readonly onCancel?: () => void;
     readonly renderBrief?: (brief: ReturnType<typeof useFormCreationAssistant>["brief"]) => ReactNode;
     readonly renderConversation?: (assistant: UseFormCreationAssistantResult) => ReactNode;
     readonly renderDraftReview?: (assistant: UseFormCreationAssistantResult) => ReactNode;
 }
-declare function MuiFormCreationAssistant({ creationAdapter, authoringAdapter, initialSchema, policy, maxClarificationTurns, onComplete, renderBrief, renderConversation, renderDraftReview }: MuiFormCreationAssistantProps): react.JSX.Element;
+declare function MuiFormCreationAssistant({ creationAdapter, authoringAdapter, initialSchema, policy, maxClarificationTurns, onComplete, onCancel, renderBrief, renderConversation, renderDraftReview }: MuiFormCreationAssistantProps): react.JSX.Element;
 
 interface MuiBuilderOverrides {
     readonly components?: Partial<FormBuilderComponents>;
