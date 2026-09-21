@@ -13,7 +13,7 @@ import {
   useFormBuilder,
   useFormCreationAssistant
 } from "@form-engine-ts/react";
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 export interface SurveyAiCreationLabels {
   readonly title: string;
@@ -63,7 +63,15 @@ export interface SurveyAiCreationPanelProps {
   readonly onComplete: (schema: FormSchema) => void;
   readonly onCancel?: () => void;
   readonly previewMode?: "dialog" | "inline";
+  readonly showBrief?: boolean;
   readonly briefInitiallyVisible?: boolean;
+  readonly renderMessageInput?: (props: {
+    readonly id: string;
+    readonly value: string;
+    readonly disabled: boolean;
+    readonly placeholder: string;
+    readonly onChange: (value: string) => void;
+  }) => ReactNode;
 }
 
 export interface SurveyEditorPreviewDialogProps {
@@ -218,7 +226,8 @@ function Conversation({
   onQuickReply,
   disabled,
   headingId,
-  messageId
+  messageId,
+  renderMessageInput
 }: {
   readonly assistant: UseFormCreationAssistantResult;
   readonly labels: SurveyAiCreationLabels;
@@ -229,6 +238,7 @@ function Conversation({
   readonly disabled: boolean;
   readonly headingId: string;
   readonly messageId: string;
+  readonly renderMessageInput?: SurveyAiCreationPanelProps["renderMessageInput"];
 }) {
   const messages =
     labels.initialPrompt === undefined
@@ -287,13 +297,22 @@ function Conversation({
       >
         <label htmlFor={messageId}>{assistant.messages.length === 0 ? labels.purposeInput : labels.messageInput}</label>
         <div>
-          <textarea
-            id={messageId}
-            value={message}
-            disabled={disabled}
-            placeholder={labels.messageInput}
-            onChange={(event) => onMessageChange(event.target.value)}
-          />
+          {renderMessageInput?.({
+            id: messageId,
+            value: message,
+            disabled,
+            placeholder: labels.messageInput,
+            onChange: onMessageChange
+          }) ?? (
+            <input
+              id={messageId}
+              type="text"
+              value={message}
+              disabled={disabled}
+              placeholder={labels.messageInput}
+              onChange={(event) => onMessageChange(event.target.value)}
+            />
+          )}
         </div>
         <button
           className="fe-ai-creation-button fe-ai-creation-button--primary"
@@ -382,7 +401,9 @@ export function SurveyAiCreationPanel({
   onComplete,
   onCancel,
   previewMode = "dialog",
-  briefInitiallyVisible = true
+  showBrief = true,
+  briefInitiallyVisible = true,
+  renderMessageInput
 }: SurveyAiCreationPanelProps): React.JSX.Element {
   const panelId = useId();
   const assistant = useFormCreationAssistant({
@@ -395,6 +416,7 @@ export function SurveyAiCreationPanel({
   const [draftRequested, setDraftRequested] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [briefVisible, setBriefVisible] = useState(briefInitiallyVisible);
+  const isBriefVisible = showBrief && briefVisible;
   const [reviewSchema, setReviewSchema] = useState(initialSchema);
   const [removedFieldIds, setRemovedFieldIds] = useState<ReadonlySet<string>>(new Set());
   const lastSuggestionId = useRef<string | undefined>(undefined);
@@ -457,6 +479,7 @@ export function SurveyAiCreationPanel({
       disabled={assistant.status === "responding" || assistant.status === "generating"}
       headingId={`${panelId}-conversation`}
       messageId={`${panelId}-message`}
+      renderMessageInput={renderMessageInput}
     />
   );
 
@@ -466,21 +489,35 @@ export function SurveyAiCreationPanel({
       <div className="fe-ai-creation-status" role="status" aria-live="polite">
         {statusMessage}
       </div>
-      {assistant.messages.length === 0 ? (
+      {assistant.status === "reviewing" ? (
+        <Review
+          schema={effectiveReviewSchema}
+          labels={labels}
+          onRemove={(fieldId) => {
+            const result = reviewBuilder.removeField(fieldId);
+            if (result.success) setRemovedFieldIds((current) => new Set(current).add(fieldId));
+          }}
+          onPreview={() => setPreviewOpen(true)}
+          onCreate={createSurvey}
+          headingId={`${panelId}-review`}
+        />
+      ) : assistant.messages.length === 0 ? (
         conversation
       ) : (
         <>
-          <button
-            className="fe-ai-creation-brief-toggle"
-            type="button"
-            aria-expanded={briefVisible}
-            onClick={() => setBriefVisible((visible) => !visible)}
-          >
-            {briefVisible ? (labels.hideBrief ?? "Hide survey brief") : (labels.showBrief ?? "Show survey brief")}
-          </button>
-          <div className="fe-ai-creation-layout">
+          {showBrief ? (
+            <button
+              className="fe-ai-creation-brief-toggle"
+              type="button"
+              aria-expanded={isBriefVisible}
+              onClick={() => setBriefVisible((visible) => !visible)}
+            >
+              {isBriefVisible ? (labels.hideBrief ?? "Hide survey brief") : (labels.showBrief ?? "Show survey brief")}
+            </button>
+          ) : null}
+          <div className={`fe-ai-creation-layout${isBriefVisible ? "" : " fe-ai-creation-layout--full"}`}>
             {conversation}
-            {briefVisible ? (
+            {isBriefVisible ? (
               <BriefSummary brief={assistant.brief} labels={labels} headingId={`${panelId}-brief`} />
             ) : null}
           </div>
@@ -507,19 +544,6 @@ export function SurveyAiCreationPanel({
         >
           {labels.generate}
         </button>
-      ) : null}
-      {assistant.status === "reviewing" ? (
-        <Review
-          schema={effectiveReviewSchema}
-          labels={labels}
-          onRemove={(fieldId) => {
-            const result = reviewBuilder.removeField(fieldId);
-            if (result.success) setRemovedFieldIds((current) => new Set(current).add(fieldId));
-          }}
-          onPreview={() => setPreviewOpen(true)}
-          onCreate={createSurvey}
-          headingId={`${panelId}-review`}
-        />
       ) : null}
       {assistant.status !== "reviewing" ? (
         <button className="fe-ai-creation-cancel" type="button" onClick={cancel}>

@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/translator-i18next",
-  "version": "8.1.5",
+  "version": "8.1.6",
   "publishConfig": {
     "access": "public"
   },

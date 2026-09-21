@@ -162,15 +162,16 @@ describe("SurveyAiCreationPanel", () => {
     fireEvent.change(screen.getByLabelText(labels.purposeInput), { target: { value: "Create it" } });
     fireEvent.click(screen.getByRole("button", { name: labels.send }));
     await waitFor(() => expect(screen.getByRole("button", { name: labels.generate })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: labels.generate }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: labels.review })).toBeInTheDocument());
-    expect(screen.getByText("Satisfaction")).toBeInTheDocument();
     const hideBrief = screen.getByRole("button", { name: "Hide survey brief" });
     expect(screen.getByRole("heading", { name: labels.brief })).toBeInTheDocument();
     fireEvent.click(hideBrief);
     expect(screen.queryByRole("heading", { name: labels.brief })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Show survey brief" }));
     expect(screen.getByRole("heading", { name: labels.brief })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: labels.generate }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: labels.review })).toBeInTheDocument());
+    expect(screen.queryByRole("region", { name: labels.conversation })).not.toBeInTheDocument();
+    expect(screen.getByText("Satisfaction")).toBeInTheDocument();
     expect(screen.getByText(/Type: radio/)).toBeInTheDocument();
     expect(screen.getByText(labels.choices)).toBeInTheDocument();
     expect(screen.getByText("Good")).toBeInTheDocument();
@@ -191,5 +192,28 @@ describe("SurveyAiCreationPanel", () => {
     expect(onComplete).toHaveBeenCalledWith(
       expect.objectContaining({ fields: [expect.objectContaining({ id: "seed" })] })
     );
+  });
+
+  it("can hide the survey brief and expand the conversation", async () => {
+    const respond = vi.fn(async () => readyResponse);
+    const { container } = render(
+      <SurveyAiCreationPanel
+        initialSchema={schema}
+        sourceLocale="en"
+        creationAdapter={{ respond }}
+        authoringAdapter={{ generate: vi.fn() }}
+        labels={labels}
+        showBrief={false}
+        onComplete={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(labels.purposeInput), { target: { value: "Learn satisfaction" } });
+    fireEvent.click(screen.getByRole("button", { name: labels.send }));
+    await waitFor(() => expect(screen.getByRole("region", { name: labels.conversation })).toBeInTheDocument());
+
+    expect(screen.queryByRole("heading", { name: labels.brief })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show survey brief" })).not.toBeInTheDocument();
+    expect(container.querySelector(".fe-ai-creation-layout--full")).toBeInTheDocument();
   });
 });

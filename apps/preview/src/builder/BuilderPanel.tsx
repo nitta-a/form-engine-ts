@@ -22,7 +22,7 @@ import {
   useFormBuilder
 } from "@form-engine-ts/react";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
-import { Button, Dialog, DialogContent, DialogTitle } from "@mui/material";
+import { Button, Dialog, DialogContent, DialogTitle, TextField } from "@mui/material";
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 import { useBuilderPreview } from "./BuilderPreviewContext";
@@ -483,6 +483,18 @@ function CreationAssistantDemo({
             sourceLocale={locale}
             policy={previewCreationPolicy}
             labels={labels}
+            showBrief={false}
+            renderMessageInput={({ id, value, disabled, placeholder, onChange }) => (
+              <TextField
+                id={id}
+                value={value}
+                disabled={disabled}
+                placeholder={placeholder}
+                onChange={(event) => onChange(event.target.value)}
+                fullWidth
+                size="small"
+              />
+            )}
             onCancel={() => setOpen(false)}
             onComplete={(createdSchema) => {
               onComplete(createdSchema);

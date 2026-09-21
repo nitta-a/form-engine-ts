@@ -84,10 +84,13 @@ describe("preview application builder workspaces", () => {
     await user.type(input, "社内の勤怠システムについて知りたい");
     await user.click(within(assistant).getByRole("button", { name: "Send" }));
     await user.click(await within(assistant).findByRole("button", { name: "Employees" }));
+    expect(within(assistant).queryByRole("heading", { name: "Survey brief" })).not.toBeInTheDocument();
+    expect(assistant.querySelector(".fe-ai-creation-layout--full")).toBeInTheDocument();
     await user.type(input, "使いやすさと改善点");
     await user.click(within(assistant).getByRole("button", { name: "Send" }));
     await user.click(await within(assistant).findByRole("button", { name: "Create with this information" }));
-    const review = await within(assistant).findByRole("region", { name: "Draft review" });
+    const review = await within(dialog).findByRole("region", { name: "Draft review" });
+    expect(within(dialog).queryByRole("heading", { name: "Conversation" })).not.toBeInTheDocument();
     expect(within(review).getByText("Satisfaction survey")).toBeInTheDocument();
     await user.click(within(review).getByRole("button", { name: "Open in editor" }));
     await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent("Satisfaction survey"));

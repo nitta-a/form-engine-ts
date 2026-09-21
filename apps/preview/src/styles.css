@@ -551,10 +551,20 @@ textarea {
   white-space: nowrap;
 }
 .preview-ai-creation-dialog .fe-ai-creation-panel {
-  gap: 0.75rem;
+  gap: 1.5rem;
 }
 .preview-ai-creation-dialog .fe-ai-creation-conversation {
-  padding: 0;
+  padding: 1.25rem;
+}
+.preview-ai-creation-dialog .fe-ai-creation-layout--full {
+  display: block;
+  width: 100%;
+}
+.preview-ai-creation-dialog .MuiDialogTitle-root {
+  padding: 1.75rem 2rem 1.25rem;
+}
+.preview-ai-creation-dialog .MuiDialogContent-root {
+  padding: 1.5rem 2rem 2rem;
 }
 @media (max-width: 850px) {
   .builder-grid,
