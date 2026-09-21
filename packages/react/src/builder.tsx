@@ -916,10 +916,12 @@ export interface FormBuilderProps {
   readonly unstyled?: boolean;
   readonly fieldEditorMode?: "all" | "single";
   readonly pageEditorMode?: "all" | "single";
+  readonly selectedPageId?: string | undefined;
   readonly activeFieldId?: string | undefined;
   readonly autoFocusActiveField?: boolean;
   readonly defaultActiveFieldId?: string;
   readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
+  readonly onSelectedPageChange?: (pageId: string | undefined) => void;
   readonly submissionSettingsOptions?: FormBuilderSubmissionSettingsOptions;
 }
 
@@ -953,10 +955,12 @@ export function FormBuilder(props: FormBuilderProps) {
     unstyled = false,
     fieldEditorMode = "all",
     pageEditorMode = "all",
+    selectedPageId: controlledSelectedPageId,
     activeFieldId,
     autoFocusActiveField = false,
     defaultActiveFieldId,
     onActiveFieldChange,
+    onSelectedPageChange,
     submissionSettingsOptions
   } = props;
   const policy = useMemo(
@@ -964,6 +968,7 @@ export function FormBuilder(props: FormBuilderProps) {
     [schema.metadata, hostPolicy]
   );
   const hasActiveFieldId = Object.hasOwn(props, "activeFieldId");
+  const hasSelectedPageId = Object.hasOwn(props, "selectedPageId");
   const i18n = useFormEngineI18n();
   const isProviderValue = useContext(FormEngineI18nProviderScopeContext);
   const locale = explicitLocale ?? (isProviderValue ? i18n.uiLocale : "en");
@@ -1038,7 +1043,15 @@ export function FormBuilder(props: FormBuilderProps) {
   }, [autoFocusActiveField, resolvedActiveFieldId]);
   const isSectionVisible = (name: FormBuilderSectionName): boolean => sectionVisibility?.[name] !== false;
   const [newPageQuestionId, setNewPageQuestionId] = useState("");
-  const [selectedPageId, setSelectedPageId] = useState<string | undefined>(schema.pages?.[0]?.id);
+  const [internalSelectedPageId, setInternalSelectedPageId] = useState<string | undefined>(schema.pages?.[0]?.id);
+  const selectedPageId = hasSelectedPageId ? controlledSelectedPageId : internalSelectedPageId;
+  const setSelectedPageId = useCallback(
+    (pageId: string | undefined) => {
+      if (!hasSelectedPageId) setInternalSelectedPageId(pageId);
+      onSelectedPageChange?.(pageId);
+    },
+    [hasSelectedPageId, onSelectedPageChange]
+  );
   const [selectLastPageAfterAdd, setSelectLastPageAfterAdd] = useState(false);
   const [newLocale, setNewLocale] = useState("");
   const [editingLocale, setEditingLocale] = useState("");
@@ -1120,7 +1133,7 @@ export function FormBuilder(props: FormBuilderProps) {
     if (selectedPageId === undefined || !schema.pages.some((page) => page.id === selectedPageId)) {
       setSelectedPageId(schema.pages[0]?.id);
     }
-  }, [schema.pages, selectLastPageAfterAdd, selectedPageId]);
+  }, [schema.pages, selectLastPageAfterAdd, selectedPageId, setSelectedPageId]);
 
   const addField = () => {
     if (initialFieldType === null) return;

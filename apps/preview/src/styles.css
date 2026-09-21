@@ -101,6 +101,23 @@ textarea {
   gap: 1.25rem;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
 }
+.mui-builder-workspace {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(320px, 1.4fr) minmax(280px, 1fr);
+}
+.mui-builder-workspace__navigation,
+.mui-builder-workspace__preview {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  position: sticky;
+  top: 1rem;
+}
+.mui-builder-workspace__editor {
+  min-width: 0;
+}
 .json-card {
   position: sticky;
   top: 1rem;
@@ -519,8 +536,13 @@ textarea {
 }
 @media (max-width: 850px) {
   .builder-grid,
+  .mui-builder-workspace,
   .analytics-grid {
     grid-template-columns: 1fr;
+  }
+  .mui-builder-workspace__navigation,
+  .mui-builder-workspace__preview {
+    position: static;
   }
   .json-card {
     position: static;

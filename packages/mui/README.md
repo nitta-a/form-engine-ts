@@ -363,6 +363,34 @@ It supports enabling pages, adding/deleting pages, title/description editing, qu
 move-up/down buttons, page display conditions, and manual page translations with metadata. The controls use the
 existing MUI adapters and respect `readOnly`, feature flags, localization, `muiOptions`, and `muiSlotProps.card/stack`.
 
+## Builder workspace composition
+
+`MuiBuilderNavigator`, `MuiBuilderPreview`, and `MuiBuilderValidationSummary` are opt-in building blocks for composing a
+three-pane authoring workspace. They reuse `MuiFormBuilder` and `MuiContentRenderer`; the preview does not receive
+`autoSaveKey`, so it does not persist responses. `selectedPageId` and `onSelectedPageChange` are additive controlled
+props on `MuiFormBuilder`.
+
+```tsx
+<MuiBuilderNavigator
+  schema={schema}
+  activeFieldId={activeFieldId}
+  onActiveFieldChange={setActiveFieldId}
+  selectedPageId={selectedPageId}
+  onSelectedPageChange={setSelectedPageId}
+/>
+<MuiFormBuilder
+  schema={schema}
+  onChange={setSchema}
+  fieldEditorMode="single"
+  selectedPageId={selectedPageId}
+  onSelectedPageChange={setSelectedPageId}
+/>
+<MuiBuilderPreview schema={schema} />
+```
+
+Use `MuiBuilderValidationSummary` with `contentModeOptions.onValidationChange` to connect validation issues to the
+same field/page selection callbacks. All three components are optional and do not replace the existing builder slots.
+
 ```tsx
 import type { FormSchema } from "@form-engine-ts/core";
 import { MuiFormBuilder } from "@form-engine-ts/mui/builder";

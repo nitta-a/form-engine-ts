@@ -636,7 +636,8 @@ describe("MuiFormBuilder", () => {
     expect(screen.getByRole("textbox", { name: "Translated description" })).toHaveAttribute("readonly");
   });
 
-  it("applies field editor controls and per-type overrides without CSS selectors", () => {
+  it("applies field editor controls and per-type overrides without CSS selectors", async () => {
+    const user = userEvent.setup();
     render(
       <MuiFormBuilder
         schema={{
@@ -668,6 +669,7 @@ describe("MuiFormBuilder", () => {
     expect(screen.queryByRole("textbox", { name: "Question title" })).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Type" })).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Required" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByRole("spinbutton", { name: "Minimum" })).toBeDisabled();
     expect(screen.getByRole("spinbutton", { name: "Maximum" })).toBeDisabled();
   });

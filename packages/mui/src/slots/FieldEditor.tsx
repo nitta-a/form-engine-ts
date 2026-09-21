@@ -6,8 +6,9 @@ import type {
   QuestionType
 } from "@form-engine-ts/react";
 import { resolveFieldEditorControls, resolveFieldTypeSelectOptions } from "@form-engine-ts/react";
-import { Card, Stack, Typography } from "@mui/material";
-import type { ComponentType } from "react";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { Accordion, AccordionDetails, AccordionSummary, Card, Stack, Typography } from "@mui/material";
+import { type ComponentType, useState } from "react";
 import { useResolvedMuiAdapterOptions } from "../context";
 import type { MuiAdapterOptions } from "../types";
 import { ConditionEditor } from "./ConditionEditor";
@@ -153,6 +154,16 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     const changeFieldType = (nextType: QuestionType) => {
       if (allowedTypes.includes(nextType)) actions.changeFieldType(field.id, nextType);
     };
+    const [advancedOpen, setAdvancedOpen] = useState(false);
+    const hasAdvancedSettings =
+      (features?.pages !== false && schema.pages !== undefined) ||
+      (field.type === "number" && controls.numberLimits !== "hidden") ||
+      (field.type === "rating" && controls.ratingBounds !== "hidden") ||
+      field.type === "date" ||
+      field.type === "time" ||
+      ((field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden") ||
+      ("options" in field && controls.options !== "hidden") ||
+      (features?.conditions !== false && conditionSources.length > 0 && controls.displayConditions !== "hidden");
     return (
       <Card
         {...resolved.muiSlotProps?.card}
@@ -251,202 +262,245 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               onChange={(checked) => actions.updateField(field.id, (current) => ({ ...current, required: checked }))}
             />
           )}
-          {features?.pages === false || schema.pages === undefined ? null : (
-            <Select
-              id={`mui-field-${field.id}-page`}
-              label={translate("builder.questionPage")}
-              value={pageId}
-              options={[
-                { value: "", label: translate("builder.unassigned") },
-                ...schema.pages.map((page) => ({ value: page.id, label: page.title ?? page.id }))
-              ]}
-              disabled={readOnly}
-              onChange={(value) => actions.assignFieldToPage(field.id, value.length === 0 ? null : value)}
-            />
-          )}
-          {field.type === "number" || field.type === "rating" ? (
-            (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "hidden" ? null : (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
-                <TextInput
-                  id={`mui-field-${field.id}-minimum`}
-                  label={translate("builder.minimum")}
-                  type="number"
-                  value={field.min === undefined ? "" : String(field.min)}
-                  disabled={
-                    readOnly || (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "readOnly"
-                  }
-                  onChange={(value) => actions.updateField(field.id, (current) => updateBound(current, "min", value))}
-                />
-                <TextInput
-                  id={`mui-field-${field.id}-maximum`}
-                  label={translate("builder.maximum")}
-                  type="number"
-                  value={field.max === undefined ? "" : String(field.max)}
-                  disabled={
-                    readOnly || (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "readOnly"
-                  }
-                  onChange={(value) => actions.updateField(field.id, (current) => updateBound(current, "max", value))}
-                />
-              </Stack>
-            )
-          ) : null}
-          {field.type === "number" && controls.numberLimits !== "hidden" ? (
-            <TextInput
-              id={`mui-field-${field.id}-step`}
-              label={translate("builder.step")}
-              type="number"
-              value={field.step === undefined ? "" : String(field.step)}
-              disabled={readOnly || controls.numberLimits === "readOnly"}
-              onChange={(value) =>
-                actions.updateField(field.id, (current) => updateNumberProperty(current, "step", value))
-              }
-            />
-          ) : null}
-          {field.type === "date" || field.type === "time" ? (
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
-              <TextInput
-                id={`mui-field-${field.id}-minimum-${field.type}`}
-                label={translate("builder.minimum")}
-                type="text"
-                value={field.type === "date" ? (field.minDate ?? "") : (field.minTime ?? "")}
-                disabled={readOnly}
-                onChange={(value) =>
-                  actions.updateField(field.id, (current) =>
-                    updateStringBound(current, field.type === "date" ? "minDate" : "minTime", value)
-                  )
-                }
-              />
-              <TextInput
-                id={`mui-field-${field.id}-maximum-${field.type}`}
-                label={translate("builder.maximum")}
-                type="text"
-                value={field.type === "date" ? (field.maxDate ?? "") : (field.maxTime ?? "")}
-                disabled={readOnly}
-                onChange={(value) =>
-                  actions.updateField(field.id, (current) =>
-                    updateStringBound(current, field.type === "date" ? "maxDate" : "maxTime", value)
-                  )
-                }
-              />
-            </Stack>
-          ) : null}
-          {(field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden" ? (
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
-              <TextInput
-                id={`mui-field-${field.id}-min-length`}
-                label={translate("builder.minimumLength")}
-                type="number"
-                value={field.minLength === undefined ? "" : String(field.minLength)}
-                disabled={readOnly || controls.textLimits === "readOnly"}
-                onChange={(value) =>
-                  actions.updateField(field.id, (current) => {
-                    if (current.type !== "text" && current.type !== "textarea") return current;
-                    const parsed = numericValue(value);
-                    return parsed === undefined ? current : { ...current, minLength: Math.max(0, Math.floor(parsed)) };
-                  })
-                }
-              />
-              <TextInput
-                id={`mui-field-${field.id}-max-length`}
-                label={translate("builder.maximumLength")}
-                type="number"
-                value={field.maxLength === undefined ? "" : String(field.maxLength)}
-                disabled={readOnly || controls.textLimits === "readOnly"}
-                onChange={(value) =>
-                  actions.updateField(field.id, (current) => {
-                    if (current.type !== "text" && current.type !== "textarea") return current;
-                    const parsed = numericValue(value);
-                    return parsed === undefined ? current : { ...current, maxLength: Math.max(0, Math.floor(parsed)) };
-                  })
-                }
-              />
-              <TextInput
-                id={`mui-field-${field.id}-pattern`}
-                label={translate("builder.pattern")}
-                value={field.pattern ?? ""}
-                disabled={readOnly || controls.textLimits === "readOnly"}
-                onChange={(value) =>
-                  actions.updateField(field.id, (current) =>
-                    current.type === "text" || current.type === "textarea"
-                      ? value.length === 0
-                        ? current
-                        : { ...current, pattern: value }
-                      : current
-                  )
-                }
-              />
-            </Stack>
-          ) : null}
-          {features?.conditions === false ||
-          conditionSources.length === 0 ||
-          controls.displayConditions === "hidden" ? null : field.displayRule !== undefined ? (
-            <ConditionEditor
-              schema={schema}
-              fieldId={field.id}
-              value={field.displayRule}
-              readOnly={readOnly || controls.displayConditions === "readOnly"}
-              onChange={(displayRule) =>
-                actions.updateField(field.id, (current) => {
-                  const { displayCondition: _displayCondition, ...withoutLegacyCondition } = current;
-                  if (displayRule === undefined) {
-                    const { displayRule: _displayRule, ...withoutRules } = withoutLegacyCondition;
-                    return withoutRules as FormField;
-                  }
-                  return { ...withoutLegacyCondition, displayRule } as FormField;
-                })
-              }
-            />
-          ) : (
-            <Stack direction={{ xs: "column", md: "row" }} spacing={resolved.dense ? 1 : 2}>
-              <Select
-                id={`mui-field-${field.id}-condition-source`}
-                label={translate("builder.displayCondition")}
-                value={condition?.questionId ?? ""}
-                options={[
-                  { value: "", label: translate("builder.alwaysVisible") },
-                  ...conditionSources.map((source) => ({ value: source.id, label: source.title }))
-                ]}
-                disabled={readOnly || controls.displayConditions === "readOnly"}
-                onChange={(value) =>
-                  actions.setDisplayCondition(
-                    field.id,
-                    value.length === 0 ? undefined : { questionId: value, operator: "equals", value: "" }
-                  )
-                }
-              />
-              {condition === undefined ? null : (
-                <>
-                  <Select
-                    id={`mui-field-${field.id}-condition-operator`}
-                    label={translate("builder.conditionOperator")}
-                    value={condition.operator}
-                    options={(conditionSource === undefined ? [] : conditionOperators(conditionSource)).map(
-                      (operator) => ({ value: operator, label: translate(`builder.operator.${operator}`) })
-                    )}
-                    disabled={readOnly || controls.displayConditions === "readOnly"}
-                    onChange={(value) => {
-                      if (!isConditionOperator(value)) return;
-                      actions.setDisplayCondition(
-                        field.id,
-                        value === "not_empty"
-                          ? { questionId: condition.questionId, operator: value }
-                          : { ...condition, operator: value, value: condition.value ?? "" }
-                      );
-                    }}
-                  />
-                  {condition.operator === "not_empty" ? null : (
-                    <TextInput
-                      id={`mui-field-${field.id}-condition-value`}
-                      label={translate("builder.conditionValue")}
-                      value={condition.value === undefined ? "" : String(condition.value)}
-                      disabled={readOnly || controls.displayConditions === "readOnly"}
-                      onChange={(value) => actions.setDisplayCondition(field.id, { ...condition, value })}
+          {hasAdvancedSettings ? (
+            <Accordion
+              {...resolved.muiSlotProps?.accordion}
+              data-mui-slot="field-editor-advanced"
+              expanded={advancedOpen}
+              onChange={(_, expanded) => setAdvancedOpen(expanded)}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>{translate("builder.fieldCategory.advanced")}</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Stack spacing={resolved.dense ? 1 : 2}>
+                  {features?.pages === false || schema.pages === undefined ? null : (
+                    <Select
+                      id={`mui-field-${field.id}-page`}
+                      label={translate("builder.questionPage")}
+                      value={pageId}
+                      options={[
+                        { value: "", label: translate("builder.unassigned") },
+                        ...schema.pages.map((page) => ({ value: page.id, label: page.title ?? page.id }))
+                      ]}
+                      disabled={readOnly}
+                      onChange={(value) => actions.assignFieldToPage(field.id, value.length === 0 ? null : value)}
                     />
                   )}
-                </>
-              )}
-            </Stack>
-          )}
+                  {"options" in field && controls.options !== "hidden" ? (
+                    <Checkbox
+                      id={`mui-field-${field.id}-shuffle-options`}
+                      name={`fields.${field.id}.shuffleOptions`}
+                      label={translate("builder.shuffleOptions")}
+                      checked={field.shuffleOptions === true}
+                      disabled={readOnly || controls.options === "readOnly"}
+                      onChange={(checked) =>
+                        actions.updateField(field.id, (current) => {
+                          if (!("options" in current)) return current;
+                          if (checked) return { ...current, shuffleOptions: true };
+                          const { shuffleOptions: _removed, ...remaining } = current;
+                          return remaining;
+                        })
+                      }
+                    />
+                  ) : null}
+                  {field.type === "number" || field.type === "rating" ? (
+                    (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "hidden" ? null : (
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+                        <TextInput
+                          id={`mui-field-${field.id}-minimum`}
+                          label={translate("builder.minimum")}
+                          type="number"
+                          value={field.min === undefined ? "" : String(field.min)}
+                          disabled={
+                            readOnly ||
+                            (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "readOnly"
+                          }
+                          onChange={(value) =>
+                            actions.updateField(field.id, (current) => updateBound(current, "min", value))
+                          }
+                        />
+                        <TextInput
+                          id={`mui-field-${field.id}-maximum`}
+                          label={translate("builder.maximum")}
+                          type="number"
+                          value={field.max === undefined ? "" : String(field.max)}
+                          disabled={
+                            readOnly ||
+                            (field.type === "number" ? controls.numberLimits : controls.ratingBounds) === "readOnly"
+                          }
+                          onChange={(value) =>
+                            actions.updateField(field.id, (current) => updateBound(current, "max", value))
+                          }
+                        />
+                      </Stack>
+                    )
+                  ) : null}
+                  {field.type === "number" && controls.numberLimits !== "hidden" ? (
+                    <TextInput
+                      id={`mui-field-${field.id}-step`}
+                      label={translate("builder.step")}
+                      type="number"
+                      value={field.step === undefined ? "" : String(field.step)}
+                      disabled={readOnly || controls.numberLimits === "readOnly"}
+                      onChange={(value) =>
+                        actions.updateField(field.id, (current) => updateNumberProperty(current, "step", value))
+                      }
+                    />
+                  ) : null}
+                  {field.type === "date" || field.type === "time" ? (
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+                      <TextInput
+                        id={`mui-field-${field.id}-minimum-${field.type}`}
+                        label={translate("builder.minimum")}
+                        type="text"
+                        value={field.type === "date" ? (field.minDate ?? "") : (field.minTime ?? "")}
+                        disabled={readOnly}
+                        onChange={(value) =>
+                          actions.updateField(field.id, (current) =>
+                            updateStringBound(current, field.type === "date" ? "minDate" : "minTime", value)
+                          )
+                        }
+                      />
+                      <TextInput
+                        id={`mui-field-${field.id}-maximum-${field.type}`}
+                        label={translate("builder.maximum")}
+                        type="text"
+                        value={field.type === "date" ? (field.maxDate ?? "") : (field.maxTime ?? "")}
+                        disabled={readOnly}
+                        onChange={(value) =>
+                          actions.updateField(field.id, (current) =>
+                            updateStringBound(current, field.type === "date" ? "maxDate" : "maxTime", value)
+                          )
+                        }
+                      />
+                    </Stack>
+                  ) : null}
+                  {(field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden" ? (
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+                      <TextInput
+                        id={`mui-field-${field.id}-min-length`}
+                        label={translate("builder.minimumLength")}
+                        type="number"
+                        value={field.minLength === undefined ? "" : String(field.minLength)}
+                        disabled={readOnly || controls.textLimits === "readOnly"}
+                        onChange={(value) =>
+                          actions.updateField(field.id, (current) => {
+                            if (current.type !== "text" && current.type !== "textarea") return current;
+                            const parsed = numericValue(value);
+                            return parsed === undefined
+                              ? current
+                              : { ...current, minLength: Math.max(0, Math.floor(parsed)) };
+                          })
+                        }
+                      />
+                      <TextInput
+                        id={`mui-field-${field.id}-max-length`}
+                        label={translate("builder.maximumLength")}
+                        type="number"
+                        value={field.maxLength === undefined ? "" : String(field.maxLength)}
+                        disabled={readOnly || controls.textLimits === "readOnly"}
+                        onChange={(value) =>
+                          actions.updateField(field.id, (current) => {
+                            if (current.type !== "text" && current.type !== "textarea") return current;
+                            const parsed = numericValue(value);
+                            return parsed === undefined
+                              ? current
+                              : { ...current, maxLength: Math.max(0, Math.floor(parsed)) };
+                          })
+                        }
+                      />
+                      <TextInput
+                        id={`mui-field-${field.id}-pattern`}
+                        label={translate("builder.pattern")}
+                        value={field.pattern ?? ""}
+                        disabled={readOnly || controls.textLimits === "readOnly"}
+                        onChange={(value) =>
+                          actions.updateField(field.id, (current) =>
+                            current.type === "text" || current.type === "textarea"
+                              ? value.length === 0
+                                ? current
+                                : { ...current, pattern: value }
+                              : current
+                          )
+                        }
+                      />
+                    </Stack>
+                  ) : null}
+                  {features?.conditions === false ||
+                  conditionSources.length === 0 ||
+                  controls.displayConditions === "hidden" ? null : field.displayRule !== undefined ? (
+                    <ConditionEditor
+                      schema={schema}
+                      fieldId={field.id}
+                      value={field.displayRule}
+                      readOnly={readOnly || controls.displayConditions === "readOnly"}
+                      onChange={(displayRule) =>
+                        actions.updateField(field.id, (current) => {
+                          const { displayCondition: _displayCondition, ...withoutLegacyCondition } = current;
+                          if (displayRule === undefined) {
+                            const { displayRule: _displayRule, ...withoutRules } = withoutLegacyCondition;
+                            return withoutRules as FormField;
+                          }
+                          return { ...withoutLegacyCondition, displayRule } as FormField;
+                        })
+                      }
+                    />
+                  ) : (
+                    <Stack direction={{ xs: "column", md: "row" }} spacing={resolved.dense ? 1 : 2}>
+                      <Select
+                        id={`mui-field-${field.id}-condition-source`}
+                        label={translate("builder.displayCondition")}
+                        value={condition?.questionId ?? ""}
+                        options={[
+                          { value: "", label: translate("builder.alwaysVisible") },
+                          ...conditionSources.map((source) => ({ value: source.id, label: source.title }))
+                        ]}
+                        disabled={readOnly || controls.displayConditions === "readOnly"}
+                        onChange={(value) =>
+                          actions.setDisplayCondition(
+                            field.id,
+                            value.length === 0 ? undefined : { questionId: value, operator: "equals", value: "" }
+                          )
+                        }
+                      />
+                      {condition === undefined ? null : (
+                        <>
+                          <Select
+                            id={`mui-field-${field.id}-condition-operator`}
+                            label={translate("builder.conditionOperator")}
+                            value={condition.operator}
+                            options={(conditionSource === undefined ? [] : conditionOperators(conditionSource)).map(
+                              (operator) => ({ value: operator, label: translate(`builder.operator.${operator}`) })
+                            )}
+                            disabled={readOnly || controls.displayConditions === "readOnly"}
+                            onChange={(value) => {
+                              if (!isConditionOperator(value)) return;
+                              actions.setDisplayCondition(
+                                field.id,
+                                value === "not_empty"
+                                  ? { questionId: condition.questionId, operator: value }
+                                  : { ...condition, operator: value, value: condition.value ?? "" }
+                              );
+                            }}
+                          />
+                          {condition.operator === "not_empty" ? null : (
+                            <TextInput
+                              id={`mui-field-${field.id}-condition-value`}
+                              label={translate("builder.conditionValue")}
+                              value={condition.value === undefined ? "" : String(condition.value)}
+                              disabled={readOnly || controls.displayConditions === "readOnly"}
+                              onChange={(value) => actions.setDisplayCondition(field.id, { ...condition, value })}
+                            />
+                          )}
+                        </>
+                      )}
+                    </Stack>
+                  )}
+                </Stack>
+              </AccordionDetails>
+            </Accordion>
+          ) : null}
           {currentLocale.length === 0 ? null : (
             <Stack spacing={resolved.dense ? 1 : 2}>
               <Typography variant="subtitle2">

@@ -49,11 +49,13 @@ import type {
   BeforeSubmit,
   ChoiceFieldTypeLayoutMap,
   ChoiceGroupSlotProps,
+  FieldComponentProps,
   FieldError,
   FormAcceptanceProps,
   FormDraftResumeSlotProps,
   FormRendererAppearance,
   FormRendererClassNames,
+  FormRendererComponents,
   FormRendererFieldConfig,
   FormRendererMessages,
   FormRendererSlotProps,
@@ -67,6 +69,12 @@ import type {
   FormTelemetryOptions,
   RadioTextInputSlotProps,
   RenderSubmitButtonProps,
+  RespondentCheckboxProps,
+  RespondentRadioProps,
+  RespondentRatingProps,
+  RespondentSelectProps,
+  RespondentTextAreaProps,
+  RespondentTextInputProps,
   SubmissionConfirmationOptions,
   SubmissionConfirmationRenderMode,
   SubmissionGuard,
@@ -76,12 +84,29 @@ import type {
   TypedFormSubmitHandler
 } from "./types";
 
+export type { FieldComponentProps, FormRendererComponents } from "./types";
+
 const isChoiceFieldType = (type: FieldType): boolean =>
   type === "radio" || type === "checkbox" || type === "multi-select" || type === "select";
 
 function joinClassNames(...names: readonly (string | undefined)[]): string | undefined {
   const value = names.filter((name): name is string => name !== undefined && name.length > 0).join(" ");
   return value.length === 0 ? undefined : value;
+}
+
+function resolveScrollBehavior(
+  options: import("./types").FormPageTransitionOptions | undefined
+): "smooth" | "auto" | undefined {
+  if (options?.scroll === "none") return undefined;
+  if (options?.scroll === "instant") return "auto";
+  if (
+    options?.respectReducedMotion &&
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+    return "auto";
+  return "smooth";
 }
 
 export function resolveChoiceFieldLayout(
@@ -94,21 +119,6 @@ export function resolveChoiceFieldLayout(
   if (config === undefined) return "default";
   if (typeof config === "string") return config;
   return config[type as keyof ChoiceFieldTypeLayoutMap] ?? "default";
-}
-
-export interface FieldComponentProps {
-  readonly field: FormField;
-  readonly value: FormValue;
-  readonly error: ValidationIssue | undefined;
-  readonly setValue: (value: FormValue) => void;
-  readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
-  readonly inputId: string;
-  readonly errorId: string;
-  readonly helpId: string;
-  readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
-  readonly a11y?: FormRendererFieldConfig["a11y"];
-  readonly classNames?: FormRendererClassNames;
-  readonly optionOrderSeed?: string;
 }
 
 export type FieldComponents = Partial<Record<FieldType, ComponentType<FieldComponentProps>>>;
@@ -156,6 +166,153 @@ function defaultRadioTextInput({
   );
 }
 
+function defaultTextInput({
+  type = "text",
+  value,
+  onChange,
+  onBlur,
+  onFocus,
+  field: _field,
+  label: _label,
+  description: _description,
+  error: _error,
+  helperText: _helperText,
+  errorText: _errorText,
+  ...props
+}: RespondentTextInputProps): ReactNode {
+  return (
+    <input
+      {...props}
+      type={type}
+      value={value ?? ""}
+      onBlur={() => onBlur?.()}
+      onFocus={() => onFocus?.()}
+      onChange={(event) =>
+        onChange(
+          type === "number"
+            ? event.currentTarget.value === ""
+              ? undefined
+              : event.currentTarget.valueAsNumber
+            : event.currentTarget.value
+        )
+      }
+    />
+  );
+}
+
+function defaultTextArea({
+  value,
+  onChange,
+  onBlur,
+  onFocus,
+  field: _field,
+  label: _label,
+  description: _description,
+  error: _error,
+  helperText: _helperText,
+  errorText: _errorText,
+  ...props
+}: RespondentTextAreaProps): ReactNode {
+  return (
+    <textarea
+      {...props}
+      value={value ?? ""}
+      onBlur={() => onBlur?.()}
+      onFocus={() => onFocus?.()}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    />
+  );
+}
+
+function defaultSelect({
+  value,
+  options,
+  onChange,
+  field: _field,
+  label: _label,
+  description: _description,
+  error: _error,
+  helperText: _helperText,
+  errorText: _errorText,
+  ...props
+}: RespondentSelectProps): ReactNode {
+  return (
+    <select {...props} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value || undefined)}>
+      <option value="">—</option>
+      {options.map((option) => (
+        <option value={option.id} key={option.id}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function defaultCheckbox({
+  checked,
+  onChange,
+  field: _field,
+  label: _label,
+  description: _description,
+  error: _error,
+  helperText: _helperText,
+  errorText: _errorText,
+  ...props
+}: RespondentCheckboxProps): ReactNode {
+  return (
+    <input {...props} type="checkbox" checked={checked} onChange={(event) => onChange(event.currentTarget.checked)} />
+  );
+}
+
+function defaultRadio({
+  checked,
+  onChange,
+  onKeyDown,
+  field: _field,
+  label: _label,
+  description: _description,
+  error: _error,
+  helperText: _helperText,
+  errorText: _errorText,
+  ...props
+}: RespondentRadioProps): ReactNode {
+  return (
+    <input
+      {...props}
+      type="radio"
+      checked={checked}
+      onKeyDown={(event) => onKeyDown?.(event)}
+      onChange={(event) => onChange(event.currentTarget.checked)}
+    />
+  );
+}
+
+function defaultRating({
+  value,
+  checked,
+  min,
+  max: _max,
+  onChange,
+  field: _field,
+  label: _label,
+  description: _description,
+  error: _error,
+  helperText: _helperText,
+  errorText: _errorText,
+  ...props
+}: RespondentRatingProps): ReactNode {
+  return (
+    <input
+      {...props}
+      type="radio"
+      value={value ?? ""}
+      checked={checked}
+      min={min}
+      onChange={() => onChange(value ?? min)}
+    />
+  );
+}
+
 function RequiredMark({
   required,
   className = "fe-required"
@@ -192,6 +349,16 @@ function requiredIndicator(required: boolean, a11y: FieldComponentProps["a11y"])
   if (a11y?.requiredIndicator === false) return null;
   if (typeof a11y?.requiredIndicator === "string") return <span className="fe-required">{a11y.requiredIndicator}</span>;
   return <RequiredMark required={required} />;
+}
+
+function fieldDataAttributes(field: FormField, error: ValidationIssue | undefined, disabled?: boolean) {
+  return {
+    "data-field-id": field.id,
+    "data-field-type": field.type,
+    "data-required": field.required === true ? "true" : "false",
+    "data-invalid": error === undefined ? "false" : "true",
+    "data-disabled": disabled === true ? "true" : "false"
+  } as const;
 }
 
 function GroupedChoiceDescription({ props }: { readonly props: FieldComponentProps }) {
@@ -252,8 +419,7 @@ function ChoiceGroupFrame({
   return (
     <fieldset
       className={className}
-      data-field-id={field.id}
-      data-field-type={field.type}
+      {...fieldDataAttributes(field, error, disabled)}
       disabled={disabled}
       aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
       style={slotProps?.style}
@@ -281,7 +447,9 @@ function DefaultField({
   submitStatus,
   submittedValue,
   renderChoiceOptionAfter,
+  renderChoiceOption,
   renderRadioTextInput,
+  primitiveComponents = {},
   radioTextInputEnabled,
   ...props
 }: FieldComponentProps & {
@@ -294,7 +462,9 @@ function DefaultField({
   readonly submitStatus?: FormSubmitStatus | undefined;
   readonly submittedValue?: unknown;
   readonly renderChoiceOptionAfter?: FormRendererSlots["renderChoiceOptionAfter"];
+  readonly renderChoiceOption?: FormRendererSlots["renderChoiceOption"];
   readonly renderRadioTextInput?: FormRendererSlots["renderRadioTextInput"];
+  readonly primitiveComponents?: FormRendererComponents;
   readonly radioTextInputEnabled: boolean;
   readonly optionOrderSeed?: string;
 }) {
@@ -325,6 +495,26 @@ function DefaultField({
     "aria-invalid": error === undefined ? undefined : true,
     "aria-required": field.required === true ? true : undefined
   } as const;
+  const primitiveBase = {
+    field,
+    name: field.id,
+    label: field.title,
+    ...(field.description === undefined ? {} : { description: field.description }),
+    required: field.required,
+    disabled,
+    readOnly,
+    error: error !== undefined,
+    helperText: field.description,
+    ...(error === undefined ? {} : { errorText: translate(error.messageKey, error.params) }),
+    className: props.classNames?.fieldInput,
+    ...ariaProps
+  };
+  const Checkbox = primitiveComponents.Checkbox ?? defaultCheckbox;
+  const Radio = primitiveComponents.Radio ?? defaultRadio;
+  const Rating = primitiveComponents.Rating ?? defaultRating;
+  const Select = primitiveComponents.Select ?? defaultSelect;
+  const TextArea = primitiveComponents.TextArea ?? defaultTextArea;
+  const TextInput = primitiveComponents.TextInput ?? defaultTextInput;
 
   if (field.type === "checkbox") {
     if (isGroupedChoiceField) {
@@ -341,20 +531,12 @@ function DefaultField({
         >
           <div className={joinClassNames("fe-choice-options", props.classNames?.choiceOptions)}>
             <label className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)} htmlFor={inputId}>
-              <input
+              <Checkbox
+                {...primitiveBase}
                 id={inputId}
-                className={props.classNames?.fieldInput}
-                name={field.id}
-                type="checkbox"
                 checked={value === true}
                 aria-label={props.a11y?.ariaLabel ?? field.title}
-                aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
-                aria-invalid={error === undefined ? undefined : true}
-                aria-required={field.required === true ? true : undefined}
-                required={field.required}
-                disabled={disabled}
-                readOnly={readOnly}
-                onChange={(event) => setValue(event.currentTarget.checked)}
+                onChange={(checked) => setValue(checked)}
               />
               <span>{field.title}</span>
             </label>
@@ -365,18 +547,14 @@ function DefaultField({
     return (
       <div
         className={joinClassNames("fe-field fe-field--checkbox", props.classNames?.field)}
-        data-field-id={field.id}
-        data-field-type={field.type}
+        {...fieldDataAttributes(field, error, disabled)}
       >
         <label className={joinClassNames("fe-check-label", props.classNames?.choiceOption)} htmlFor={inputId}>
-          <input
-            {...ariaProps}
+          <Checkbox
+            {...primitiveBase}
             id={inputId}
-            className={props.classNames?.fieldInput}
-            name={field.id}
-            type="checkbox"
             checked={value === true}
-            onChange={(event) => setValue(event.currentTarget.checked)}
+            onChange={(checked) => setValue(checked)}
           />
           <span>
             {field.title}
@@ -421,68 +599,82 @@ function DefaultField({
                       onChange: (text) => setValue({ optionId: option.id, text })
                     })
                   : null;
+              const Option = isRadio ? Radio : Checkbox;
+              const optionChange = (checked: boolean) => {
+                if (isRadio) {
+                  if (!checked) return;
+                  setValue(
+                    radioTextInputEnabled && option.textInput === true ? { optionId: option.id, text: "" } : option.id
+                  );
+                  return;
+                }
+                setValue(checked ? [...selected, option.id] : selected.filter((item) => item !== option.id));
+              };
+              const optionContent = (
+                <>
+                  <Option
+                    {...primitiveBase}
+                    id={optionId}
+                    value={option.id}
+                    checked={checked}
+                    aria-label={optionAccessibleName(option, props.a11y)}
+                    aria-required={isRadio && field.required ? true : undefined}
+                    required={isRadio && field.required}
+                    onKeyDown={
+                      isRadio
+                        ? (event) => {
+                            if (
+                              event.key !== "ArrowDown" &&
+                              event.key !== "ArrowRight" &&
+                              event.key !== "ArrowUp" &&
+                              event.key !== "ArrowLeft"
+                            )
+                              return;
+                            event.preventDefault();
+                            const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+                            const nextIndex = (index + offset + orderedOptions.length) % orderedOptions.length;
+                            const nextOption = orderedOptions[nextIndex];
+                            if (nextOption === undefined) return;
+                            setValue(
+                              radioTextInputEnabled && nextOption.textInput === true
+                                ? { optionId: nextOption.id, text: "" }
+                                : nextOption.id
+                            );
+                            document.getElementById(`${inputId}-${nextIndex}`)?.focus();
+                          }
+                        : undefined
+                    }
+                    onChange={optionChange}
+                  />
+                  <span>{option.label}</span>
+                  {renderChoiceOptionAfter?.({ field, option, checked })}
+                </>
+              );
+              const optionElement = renderChoiceOption?.({
+                field,
+                option,
+                inputId: optionId,
+                inputType: isRadio ? "radio" : "checkbox",
+                checked,
+                ...(disabled === undefined ? {} : { disabled }),
+                ...(readOnly === undefined ? {} : { readOnly }),
+                onChange: optionChange,
+                ...(submittedValue === undefined ? {} : { submittedValue }),
+                ...(submitStatus === undefined ? {} : { submitStatus }),
+                children: optionContent
+              }) ?? (
+                <label
+                  className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)}
+                  htmlFor={optionId}
+                  data-option-id={option.id}
+                  data-selected={checked ? "true" : "false"}
+                >
+                  {optionContent}
+                </label>
+              );
               return (
                 <Fragment key={option.id}>
-                  <label
-                    className={joinClassNames("fe-choice-option", props.classNames?.choiceOption)}
-                    htmlFor={optionId}
-                  >
-                    <input
-                      id={optionId}
-                      className={props.classNames?.fieldInput}
-                      name={field.id}
-                      type={isRadio ? "radio" : "checkbox"}
-                      value={option.id}
-                      checked={checked}
-                      aria-label={optionAccessibleName(option, props.a11y)}
-                      aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
-                      aria-invalid={error === undefined ? undefined : true}
-                      aria-required={isRadio && field.required ? true : undefined}
-                      required={isRadio && field.required}
-                      disabled={disabled}
-                      readOnly={readOnly}
-                      onKeyDown={
-                        isRadio
-                          ? (event) => {
-                              if (
-                                event.key !== "ArrowDown" &&
-                                event.key !== "ArrowRight" &&
-                                event.key !== "ArrowUp" &&
-                                event.key !== "ArrowLeft"
-                              )
-                                return;
-                              event.preventDefault();
-                              const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
-                              const nextIndex = (index + offset + orderedOptions.length) % orderedOptions.length;
-                              const nextOption = orderedOptions[nextIndex];
-                              if (nextOption === undefined) return;
-                              setValue(
-                                radioTextInputEnabled && nextOption.textInput === true
-                                  ? { optionId: nextOption.id, text: "" }
-                                  : nextOption.id
-                              );
-                              document.getElementById(`${inputId}-${nextIndex}`)?.focus();
-                            }
-                          : undefined
-                      }
-                      onChange={(event) => {
-                        if (isRadio)
-                          setValue(
-                            radioTextInputEnabled && option.textInput === true
-                              ? { optionId: option.id, text: "" }
-                              : option.id
-                          );
-                        else
-                          setValue(
-                            event.currentTarget.checked
-                              ? [...selected, option.id]
-                              : selected.filter((item) => item !== option.id)
-                          );
-                      }}
-                    />
-                    <span>{option.label}</span>
-                    {renderChoiceOptionAfter?.({ field, option, checked })}
-                  </label>
+                  {optionElement}
                   {textInput}
                 </Fragment>
               );
@@ -496,8 +688,7 @@ function DefaultField({
       return (
         <fieldset
           className={joinClassNames("fe-field fe-field--radio", props.classNames?.field)}
-          data-field-id={field.id}
-          data-field-type={field.type}
+          {...fieldDataAttributes(field, error, disabled)}
           aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
         >
           <legend id={labelId} className={joinClassNames("fe-label", props.classNames?.fieldLabel)}>
@@ -520,30 +711,72 @@ function DefaultField({
                     onChange: (text) => setValue({ optionId: option.id, text })
                   })
                 : null;
+            const optionChange = (checked: boolean) => {
+              if (!checked) return;
+              setValue(
+                radioTextInputEnabled && option.textInput === true ? { optionId: option.id, text: "" } : option.id
+              );
+            };
+            const optionContent = (
+              <>
+                <Radio
+                  {...primitiveBase}
+                  id={optionId}
+                  value={option.id}
+                  checked={checked}
+                  aria-label={optionAccessibleName(option, props.a11y)}
+                  required={field.required}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key !== "ArrowDown" &&
+                      event.key !== "ArrowRight" &&
+                      event.key !== "ArrowUp" &&
+                      event.key !== "ArrowLeft"
+                    )
+                      return;
+                    event.preventDefault();
+                    const offset = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+                    const nextIndex = (index + offset + orderedOptions.length) % orderedOptions.length;
+                    const nextOption = orderedOptions[nextIndex];
+                    if (nextOption === undefined) return;
+                    setValue(
+                      radioTextInputEnabled && nextOption.textInput === true
+                        ? { optionId: nextOption.id, text: "" }
+                        : nextOption.id
+                    );
+                    document.getElementById(`${inputId}-${nextIndex}`)?.focus();
+                  }}
+                  onChange={optionChange}
+                />
+                <span>{option.label}</span>
+                {renderChoiceOptionAfter?.({ field, option, checked })}
+              </>
+            );
+            const optionElement = renderChoiceOption?.({
+              field,
+              option,
+              inputId: optionId,
+              inputType: "radio",
+              checked,
+              ...(disabled === undefined ? {} : { disabled }),
+              ...(readOnly === undefined ? {} : { readOnly }),
+              onChange: optionChange,
+              ...(submittedValue === undefined ? {} : { submittedValue }),
+              ...(submitStatus === undefined ? {} : { submitStatus }),
+              children: optionContent
+            }) ?? (
+              <label
+                className={joinClassNames("fe-check-label", props.classNames?.choiceOption)}
+                htmlFor={optionId}
+                data-option-id={option.id}
+                data-selected={checked ? "true" : "false"}
+              >
+                {optionContent}
+              </label>
+            );
             return (
               <Fragment key={option.id}>
-                <label className={joinClassNames("fe-check-label", props.classNames?.choiceOption)} htmlFor={optionId}>
-                  <input
-                    {...ariaProps}
-                    id={optionId}
-                    className={props.classNames?.fieldInput}
-                    name={field.id}
-                    type="radio"
-                    value={option.id}
-                    checked={checked}
-                    aria-label={optionAccessibleName(option, props.a11y)}
-                    required={field.required}
-                    onChange={() =>
-                      setValue(
-                        radioTextInputEnabled && option.textInput === true
-                          ? { optionId: option.id, text: "" }
-                          : option.id
-                      )
-                    }
-                  />
-                  <span>{option.label}</span>
-                  {renderChoiceOptionAfter?.({ field, option, checked })}
-                </label>
+                {optionElement}
                 {textInput}
               </Fragment>
             );
@@ -555,8 +788,7 @@ function DefaultField({
     return (
       <fieldset
         className={joinClassNames(`fe-field fe-field--${field.type}`, props.classNames?.field)}
-        data-field-id={field.id}
-        data-field-type={field.type}
+        {...fieldDataAttributes(field, error, disabled)}
         aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
       >
         <legend className={joinClassNames("fe-label", props.classNames?.fieldLabel)}>
@@ -566,37 +798,45 @@ function DefaultField({
         {orderedOptions.map((option, index) => {
           const optionId = `${inputId}-${index}`;
           const checked = field.type === "radio" ? value === option.id : selected.includes(option.id);
-          return (
-            <label
-              className={joinClassNames("fe-check-label", props.classNames?.choiceOption)}
-              htmlFor={optionId}
-              key={option.id}
-            >
-              <input
+          const optionChange = (nextChecked: boolean) =>
+            setValue(nextChecked ? [...selected, option.id] : selected.filter((item) => item !== option.id));
+          const optionContent = (
+            <>
+              <Checkbox
+                {...primitiveBase}
                 id={optionId}
-                className={props.classNames?.fieldInput}
-                name={field.id}
-                type={field.type === "radio" ? "radio" : "checkbox"}
                 value={option.id}
                 checked={checked}
                 aria-label={optionAccessibleName(option, props.a11y)}
-                aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
-                aria-invalid={error === undefined ? undefined : true}
-                required={field.type === "radio" && field.required}
-                onChange={(event) => {
-                  if (field.type === "radio") setValue(option.id);
-                  else
-                    setValue(
-                      event.currentTarget.checked
-                        ? [...selected, option.id]
-                        : selected.filter((item) => item !== option.id)
-                    );
-                }}
+                onChange={optionChange}
               />
               <span>{option.label}</span>
               {renderChoiceOptionAfter?.({ field, option, checked })}
+            </>
+          );
+          const optionElement = renderChoiceOption?.({
+            field,
+            option,
+            inputId: optionId,
+            inputType: "checkbox",
+            checked,
+            ...(disabled === undefined ? {} : { disabled }),
+            ...(readOnly === undefined ? {} : { readOnly }),
+            onChange: optionChange,
+            ...(submittedValue === undefined ? {} : { submittedValue }),
+            ...(submitStatus === undefined ? {} : { submitStatus }),
+            children: optionContent
+          }) ?? (
+            <label
+              className={joinClassNames("fe-check-label", props.classNames?.choiceOption)}
+              htmlFor={optionId}
+              data-option-id={option.id}
+              data-selected={checked ? "true" : "false"}
+            >
+              {optionContent}
             </label>
           );
+          return <Fragment key={option.id}>{optionElement}</Fragment>;
         })}
         <FieldMessage props={props} />
       </fieldset>
@@ -609,8 +849,7 @@ function DefaultField({
     return (
       <fieldset
         className={joinClassNames("fe-field fe-field--rating", props.classNames?.field)}
-        data-field-id={field.id}
-        data-field-type={field.type}
+        {...fieldDataAttributes(field, error, disabled)}
         aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
       >
         <legend className={joinClassNames("fe-label", props.classNames?.fieldLabel)}>
@@ -625,17 +864,17 @@ function DefaultField({
                 className={joinClassNames("fe-rating-label", props.classNames?.choiceOption)}
                 htmlFor={optionId}
                 key={rating}
+                data-option-id={rating}
+                data-selected={value === rating ? "true" : "false"}
               >
-                <input
+                <Rating
+                  {...primitiveBase}
                   id={optionId}
-                  className={props.classNames?.fieldInput}
                   name={field.id}
-                  type="radio"
                   value={rating}
                   checked={value === rating}
-                  aria-describedby={describedBy(field, error, props.helpId, props.errorId)}
-                  aria-invalid={error === undefined ? undefined : true}
-                  required={field.required}
+                  min={min}
+                  max={max}
                   onChange={() => setValue(rating)}
                 />
                 <span>{rating}</span>
@@ -655,44 +894,31 @@ function DefaultField({
     </label>
   );
   let control: ReactNode;
-  const textConstraints =
-    field.type === "text" || field.type === "textarea"
-      ? {
-          minLength: field.minLength,
-          maxLength: field.maxLength,
-          ...(field.pattern === undefined ? {} : { pattern: field.pattern })
-        }
-      : {};
   if (field.type === "textarea") {
     control = (
-      <textarea
-        {...ariaProps}
-        {...textConstraints}
+      <TextArea
+        {...primitiveBase}
         id={inputId}
-        className={props.classNames?.fieldInput}
-        name={field.id}
-        required={field.required}
-        placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
         value={typeof value === "string" ? value : ""}
-        onChange={(event) => setValue(event.currentTarget.value)}
+        minLength={field.minLength}
+        maxLength={field.maxLength}
+        {...(field.pattern === undefined ? {} : { pattern: field.pattern })}
+        placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
+        onChange={(nextValue) => setValue(nextValue)}
       />
     );
   } else if (field.type === "number") {
     control = (
-      <input
-        {...ariaProps}
-        {...textConstraints}
+      <TextInput
+        {...primitiveBase}
         id={inputId}
-        className={props.classNames?.fieldInput}
-        name={field.id}
         type="number"
-        required={field.required}
         min={field.min}
         max={field.max}
         step={field.step}
         placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
-        value={typeof value === "number" ? value : ""}
-        onChange={(event) => setValue(event.currentTarget.value === "" ? undefined : event.currentTarget.valueAsNumber)}
+        value={typeof value === "number" ? value : undefined}
+        onChange={(nextValue) => setValue(typeof nextValue === "number" ? nextValue : undefined)}
       />
     );
   } else if (
@@ -705,55 +931,46 @@ function DefaultField({
     const autoComplete =
       field.type === "email" ? "email" : field.type === "tel" ? "tel" : field.type === "url" ? "url" : undefined;
     control = (
-      <input
-        {...ariaProps}
+      <TextInput
+        {...primitiveBase}
         id={inputId}
-        className={props.classNames?.fieldInput}
-        name={field.id}
         type={field.type}
         autoComplete={autoComplete}
-        required={field.required}
         min={field.type === "date" ? field.minDate : field.type === "time" ? field.minTime : undefined}
         max={field.type === "date" ? field.maxDate : field.type === "time" ? field.maxTime : undefined}
         placeholder={field.placeholderKey === undefined ? undefined : translate(field.placeholderKey)}
         value={typeof value === "string" ? value : ""}
-        onChange={(event) => setValue(event.currentTarget.value)}
+        onChange={(nextValue) => setValue(typeof nextValue === "string" ? nextValue : undefined)}
       />
     );
   } else if (field.type === "select") {
     control = (
-      <select
-        {...ariaProps}
+      <Select
+        {...primitiveBase}
         id={inputId}
-        className={props.classNames?.fieldInput}
-        name={field.id}
         aria-label={isGroupedChoiceField ? (props.a11y?.ariaLabel ?? field.title) : props.a11y?.ariaLabel}
-        required={field.required}
-        disabled={disabled}
         value={typeof value === "string" ? value : ""}
-        onChange={(event) => setValue(event.currentTarget.value || undefined)}
-      >
-        <option value="">—</option>
-        {orderedOptions.map((option) => (
-          <option value={option.id} key={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        options={orderedOptions}
+        onChange={(nextValue) => setValue(nextValue)}
+      />
     );
   } else {
     const placeholderKey = "placeholderKey" in field ? field.placeholderKey : undefined;
     control = (
-      <input
-        {...ariaProps}
+      <TextInput
+        {...primitiveBase}
         id={inputId}
-        className={props.classNames?.fieldInput}
-        name={field.id}
         type="text"
-        required={field.required}
         placeholder={placeholderKey === undefined ? undefined : translate(placeholderKey)}
         value={typeof value === "string" ? value : ""}
-        onChange={(event) => setValue(event.currentTarget.value)}
+        {...("minLength" in field && field.minLength === undefined
+          ? {}
+          : { minLength: "minLength" in field ? field.minLength : undefined })}
+        {...("maxLength" in field && field.maxLength === undefined
+          ? {}
+          : { maxLength: "maxLength" in field ? field.maxLength : undefined })}
+        {...("pattern" in field && field.pattern !== undefined ? { pattern: field.pattern } : {})}
+        onChange={(nextValue) => setValue(typeof nextValue === "string" ? nextValue : undefined)}
       />
     );
   }
@@ -776,8 +993,7 @@ function DefaultField({
   return (
     <div
       className={joinClassNames(`fe-field fe-field--${field.type}`, props.classNames?.field)}
-      data-field-id={field.id}
-      data-field-type={field.type}
+      {...fieldDataAttributes(field, error, disabled)}
     >
       {label}
       {control}
@@ -799,8 +1015,10 @@ function DefaultField({
 
 export interface FormRendererPresentationProps extends SubmissionProtectionProps {
   readonly components?: FieldComponents;
+  readonly primitiveComponents?: FormRendererComponents;
   readonly className?: string;
   readonly appearance?: FormRendererAppearance;
+  readonly pageTransition?: import("./types").FormPageTransitionOptions;
   readonly slotProps?: FormRendererSlotProps;
   /** @deprecated Use appearance.choiceField="grouped" instead. */
   readonly groupedChoiceFields?: boolean;
@@ -1104,7 +1322,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   fieldConfig,
   successRenderMode = "append",
   appearance,
+  pageTransition,
   slotProps,
+  primitiveComponents = {},
   groupedChoiceFields = false,
   submissionConfirmation,
   submissionConfirmationRenderMode,
@@ -1497,22 +1717,39 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     );
     const control = fieldContainer?.querySelector<HTMLElement>("input, select, textarea");
     if (control !== undefined && control !== null) {
-      control.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      const behavior = resolveScrollBehavior(pageTransition);
+      if (behavior !== undefined) control.scrollIntoView?.({ behavior, block: "center" });
       control.focus();
       setFocusFieldId(null);
     }
-  }, [focusFieldId]);
+  }, [focusFieldId, pageTransition]);
 
   useEffect(() => {
     if (!pageNavigationPending.current) return;
+    if (focusFieldId !== null) {
+      pageNavigationPending.current = false;
+      return;
+    }
     if (activePage === undefined) {
       pageNavigationPending.current = false;
       return;
     }
     pageNavigationPending.current = false;
-    pageHeaderRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-    pageHeaderRef.current?.focus();
-  }, [activePage]);
+    const behavior = resolveScrollBehavior(pageTransition);
+    const focus = pageTransition?.focus ?? "page-header";
+    const firstField =
+      focus === "first-field"
+        ? formRef.current?.querySelector<HTMLElement>(
+            "[data-field-id] input, [data-field-id] select, [data-field-id] textarea"
+          )
+        : undefined;
+    const target = focus === "first-field" ? firstField : pageHeaderRef.current;
+    if (target !== undefined && target !== null) {
+      if (behavior !== undefined)
+        target.scrollIntoView?.({ behavior, block: focus === "first-field" ? "center" : "start" });
+      if (focus !== "none") target.focus();
+    }
+  }, [activePage, focusFieldId, pageTransition]);
 
   useEffect(() => {
     if (!isReplaceMode || form.submitStatus !== "success") return;
@@ -1716,9 +1953,21 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     setResumePageId(null);
   }, [pages, resumePageId, visiblePageIndexes]);
 
-  const focusFirstIssue = (fieldId: string | undefined) => {
-    if (fieldId !== undefined) setFocusFieldId(fieldId);
+  const focusField = (fieldId: string | undefined) => {
+    if (fieldId === undefined || form.visibility[fieldId] !== true) return;
+    if (!form.schema.fields.some((field) => field.id === fieldId)) return;
+    const pageIndex = pages?.findIndex((page) => page.questionIds.includes(fieldId)) ?? -1;
+    if (pageIndex >= 0) {
+      if (!visiblePageIndexes.includes(pageIndex)) return;
+      if (pageIndex !== currentPageIndex) {
+        pageNavigationPending.current = true;
+        setCurrentPageIndex(pageIndex);
+      }
+    }
+    setFocusFieldId(fieldId);
   };
+
+  const handleIssueSelect = (issue: { readonly fieldId?: string }) => focusField(issue.fieldId);
 
   const goToPage = (pageIndex: number) => {
     pageNavigationPending.current = true;
@@ -1737,7 +1986,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     const result = form.validatePage(currentPageIndex);
     if (!result.valid) {
       telemetryRuntime.validationFailed("page", result.issues, activePage?.id);
-      focusFirstIssue(result.issues[0]?.fieldId);
+      focusField(result.issues[0]?.fieldId);
       return;
     }
     const nextPageIndex = visiblePageIndexes[activeVisibleIndex + 1];
@@ -1926,11 +2175,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       }
       if (result.status === "invalid") {
         if (validation.valid) telemetryRuntime.validationFailed("form", result.issues);
-        const invalidPageIndex = pages?.findIndex((page) =>
-          firstInvalidFieldId === undefined ? false : page.questionIds.includes(firstInvalidFieldId)
-        );
-        if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
-        focusFirstIssue(firstInvalidFieldId);
+        focusField(firstInvalidFieldId);
         return result;
       }
       if (result.status === "error") {
@@ -1946,9 +2191,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           const firstServerFieldId =
             form.schema.fields.find((field) => Object.hasOwn(fieldErrors, field.id))?.id ?? Object.keys(fieldErrors)[0];
           if (firstServerFieldId !== undefined) {
-            const invalidPageIndex = pages?.findIndex((page) => page.questionIds.includes(firstServerFieldId));
-            if (invalidPageIndex !== undefined && invalidPageIndex >= 0) setCurrentPageIndex(invalidPageIndex);
-            focusFirstIssue(firstServerFieldId);
+            focusField(firstServerFieldId);
           }
           if (payload.piiFindings !== undefined && payload.piiFindings.length > 0) {
             setConfirmation({ findings: payload.piiFindings, generic: false });
@@ -2068,18 +2311,36 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
       }
     };
     return (
-      slots.renderSubmitButton?.(submitButtonProps) ?? (
-        <button
-          className={joinClassNames("fe-submit", classNames?.submitButton)}
-          type="submit"
-          disabled={submitButtonProps.disabled}
-        >
-          {submitState === "submitting" ? <span className="fe-spinner" aria-hidden="true" /> : null}
-          {submitState === "submitting"
+      slots.renderSubmitButton?.(submitButtonProps) ??
+      (() => {
+        const label =
+          submitState === "submitting"
             ? resolveMessage("submittingButton")
-            : resolveMessage("submitButton", form.translate(form.schema.submitLabelKey ?? "form.submit"))}
-        </button>
-      )
+            : resolveMessage("submitButton", form.translate(form.schema.submitLabelKey ?? "form.submit"));
+        const children = (
+          <>
+            {submitState === "submitting" ? <span className="fe-spinner" aria-hidden="true" /> : null}
+            {label}
+          </>
+        );
+        return primitiveComponents.Button === undefined ? (
+          <button
+            className={joinClassNames("fe-submit", classNames?.submitButton)}
+            type="submit"
+            disabled={submitButtonProps.disabled}
+          >
+            {children}
+          </button>
+        ) : (
+          <primitiveComponents.Button
+            className={joinClassNames("fe-submit", classNames?.submitButton)}
+            type="submit"
+            disabled={submitButtonProps.disabled}
+          >
+            {children}
+          </primitiveComponents.Button>
+        );
+      })()
     );
   };
 
@@ -2206,7 +2467,13 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   if (draftResumeEnabled && draftResumeState === "checking") return null;
   if (draftResumeEnabled && draftResumeState === "choice") {
     return (
-      <div className={`fe-form ${className}`.trim()} data-mode={getFormContentMode(form.schema.metadata)}>
+      <div
+        className={`fe-form ${className}`.trim()}
+        data-form-id={form.schema.id}
+        data-form-version={form.schema.version}
+        data-content-mode={getFormContentMode(form.schema.metadata)}
+        data-mode={getFormContentMode(form.schema.metadata)}
+      >
         {draftResumeContent}
       </div>
     );
@@ -2215,6 +2482,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     return (
       <div
         className={`fe-form fe-already-submitted ${className}`.trim()}
+        data-form-id={form.schema.id}
+        data-form-version={form.schema.version}
+        data-content-mode={getFormContentMode(form.schema.metadata)}
         data-mode={getFormContentMode(form.schema.metadata)}
         data-submit-status={submitState}
       >
@@ -2240,6 +2510,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     return (
       <div
         className={`fe-form ${className}`.trim()}
+        data-form-id={form.schema.id}
+        data-form-version={form.schema.version}
+        data-content-mode={getFormContentMode(form.schema.metadata)}
         data-mode={getFormContentMode(form.schema.metadata)}
         data-submit-status={submitState}
       >
@@ -2270,6 +2543,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     return (
       <div
         className={`fe-form fe-form-closed ${className}`.trim()}
+        data-form-id={form.schema.id}
+        data-form-version={form.schema.version}
+        data-content-mode={getFormContentMode(form.schema.metadata)}
         data-mode={getFormContentMode(form.schema.metadata)}
         data-acceptance-status={acceptanceStatus.status}
       >
@@ -2288,6 +2564,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     return (
       <div
         className={`fe-form ${className}`.trim()}
+        data-form-id={form.schema.id}
+        data-form-version={form.schema.version}
+        data-content-mode={getFormContentMode(form.schema.metadata)}
         data-mode={getFormContentMode(form.schema.metadata)}
         data-submit-status={submitState}
       >
@@ -2302,6 +2581,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         ref={formRef}
         className={joinClassNames("fe-form", className, classNames?.form)}
         noValidate
+        data-form-id={form.schema.id}
+        data-form-version={form.schema.version}
+        data-content-mode={getFormContentMode(form.schema.metadata)}
         data-mode={getFormContentMode(form.schema.metadata)}
         data-submit-status={submitState}
         onSubmit={handleSubmit}
@@ -2359,6 +2641,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
           <section
             ref={pageHeaderRef}
             className={joinClassNames("fe-page-header", classNames?.pageHeader)}
+            data-page-id={activePage.id}
+            data-page-index={activeVisibleIndex}
+            data-active="true"
             tabIndex={-1}
             aria-label={
               activePage.title ??
@@ -2431,7 +2716,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   choiceGroupSlotProps={slotProps?.choiceGroup}
                   renderChoiceGroup={slots.renderChoiceGroup}
                   renderChoiceOptionAfter={slots.renderChoiceOptionAfter}
+                  renderChoiceOption={slots.renderChoiceOption}
                   renderRadioTextInput={slots.renderRadioTextInput}
+                  primitiveComponents={primitiveComponents}
                   radioTextInputEnabled={getFormContentMode(form.schema.metadata) === "survey"}
                   disabled={interactionLocked}
                   submitStatus={submitState}
@@ -2454,7 +2741,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         {confirmation !== null && confirmationRenderMode === "inline" ? confirmationContent : null}
         {validationIssues.length === 0
           ? null
-          : (slots.renderValidationSummary?.({ issues: validationIssues }) ?? (
+          : (slots.renderValidationSummary?.({ issues: validationIssues, onIssueSelect: handleIssueSelect }) ?? (
               <div className="fe-validation-summary" role="alert">
                 {resolveMessage(validationSummaryKey, undefined, { count: validationIssues.length })}
               </div>

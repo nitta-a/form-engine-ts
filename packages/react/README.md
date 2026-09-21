@@ -98,6 +98,61 @@ Customize that input with `slots.renderRadioTextInput`; changing to another opti
 
 `groupedChoiceFields={true}` remains available as a deprecated compatibility alias.
 
+## Respondent primitives and choice options
+
+`components` keeps the existing Field Type override API. Additive `primitiveComponents` accepts respondent primitives.
+A Field Type override still wins; otherwise the renderer uses the primitive and its native default:
+
+```tsx
+<FormRenderer
+  primitiveComponents={{
+    TextInput: (props) => <MyTextInput {...props} />,
+    Radio: (props) => <MyRadio {...props} />
+  }}
+/>
+```
+
+Primitive props include the field metadata, semantic state, constraints, and controlled change callback. Keep the
+provided input inside `slots.renderChoiceOption` to retain native input semantics while changing the option surface:
+
+```tsx
+  <FormRenderer
+  slots={{
+    renderChoiceOption: ({ option, inputId, children }) => (
+      <label htmlFor={inputId} data-option-id={option.id} className="choice-card">
+        {children}
+      </label>
+    )
+  }}
+/>
+```
+
+`renderChoiceOptionAfter` continues to render alongside the option label, including poll and quiz content. A custom
+validation summary receives `onIssueSelect(issue)`, which changes to the visible page and focuses the matching field;
+unknown or hidden fields are ignored safely:
+
+```tsx
+<FormRenderer
+  slots={{
+    renderValidationSummary: ({ issues, onIssueSelect }) => (
+      <ul>
+        {issues.map((issue) => (
+          <li key={`${issue.fieldId}-${issue.messageKey}`}>
+            <button type="button" onClick={() => onIssueSelect(issue)}>{issue.fieldId}</button>
+          </li>
+        ))}
+      </ul>
+    )
+  }}
+  pageTransition={{ scroll: "instant", focus: "first-field", respectReducedMotion: true }}
+/>
+```
+
+`pageTransition` defaults to the existing smooth scroll and page-header focus behavior. `scroll: "none"` and
+`focus: "none"` let a host own those effects. Forms, pages, fields, and default choice options expose stable
+`data-*` state attributes for CSS-only theming. The base stylesheet exposes `--fe-color-*`, `--fe-border-color`,
+`--fe-focus-ring-color`, spacing, radius, and control-size variables with fallbacks.
+
 Define `schema.pages` to enable Back/Next navigation, page validation, conditional page skipping, and an accessible
 progress indicator. Pass `autoSaveKey` to persist a versioned draft in `localStorage` after a 500ms debounce and restore it
 on the next mount:

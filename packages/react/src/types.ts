@@ -12,6 +12,7 @@ import type {
   FormSchema,
   FormTelemetryAdapter,
   FormTelemetryContextValue,
+  FormValue,
   FormValues,
   JsonValue,
   LocaleOption,
@@ -57,6 +58,21 @@ import type { SubmissionAttemptStore } from "./attempt";
 import type { BuilderActionResult, FormBuilderResult } from "./hooks/useFormBuilder";
 import type { UseTranslationWorkspaceOptions, UseTranslationWorkspaceResult } from "./hooks/useTranslationWorkspace";
 import type { SubmissionReceipt, SubmissionReceiptQuery, SubmissionReceiptStore } from "./receipt";
+
+export interface FieldComponentProps {
+  readonly field: FormField;
+  readonly value: FormValue;
+  readonly error: ValidationIssue | undefined;
+  readonly setValue: (value: FormValue) => void;
+  readonly translate: (key: string, params?: Readonly<Record<string, string | number>>) => string;
+  readonly inputId: string;
+  readonly errorId: string;
+  readonly helpId: string;
+  readonly renderCharacterCount?: FormRendererSlots["renderCharacterCount"];
+  readonly a11y?: FormRendererFieldConfig["a11y"];
+  readonly classNames?: FormRendererClassNames;
+  readonly optionOrderSeed?: string;
+}
 
 export interface ComponentBaseProps {
   readonly id?: string;
@@ -1046,6 +1062,123 @@ export interface ChoiceOptionAfterSlotProps {
   readonly checked: boolean;
 }
 
+export interface RespondentPrimitiveProps {
+  readonly field: FormField;
+  readonly id: string;
+  readonly name: string;
+  readonly label?: ReactNode | undefined;
+  readonly description?: string | undefined;
+  readonly required?: boolean | undefined;
+  readonly disabled?: boolean | undefined;
+  readonly readOnly?: boolean | undefined;
+  readonly error?: boolean | undefined;
+  readonly helperText?: ReactNode | undefined;
+  readonly errorText?: ReactNode | undefined;
+  readonly className?: string | undefined;
+  readonly "aria-label"?: string | undefined;
+  readonly "aria-describedby"?: string | undefined;
+  readonly "aria-labelledby"?: string | undefined;
+  readonly "aria-invalid"?: boolean | undefined;
+  readonly "aria-required"?: boolean | undefined;
+}
+
+export interface RespondentTextInputProps extends RespondentPrimitiveProps {
+  readonly type?: "text" | "number" | "date" | "time" | "email" | "tel" | "url" | undefined;
+  readonly value?: string | number | undefined;
+  readonly min?: string | number | undefined;
+  readonly max?: string | number | undefined;
+  readonly step?: string | number | undefined;
+  readonly minLength?: number | undefined;
+  readonly maxLength?: number | undefined;
+  readonly pattern?: string | undefined;
+  readonly placeholder?: string | undefined;
+  readonly autoComplete?: string | undefined;
+  readonly onChange: (value: string | number | undefined) => void;
+  readonly onBlur?: (() => void) | undefined;
+  readonly onFocus?: (() => void) | undefined;
+}
+
+export interface RespondentTextAreaProps extends RespondentPrimitiveProps {
+  readonly value?: string | undefined;
+  readonly minLength?: number | undefined;
+  readonly maxLength?: number | undefined;
+  readonly pattern?: string | undefined;
+  readonly placeholder?: string | undefined;
+  readonly onChange: (value: string) => void;
+  readonly onBlur?: () => void;
+  readonly onFocus?: () => void;
+}
+
+export interface RespondentSelectProps extends RespondentPrimitiveProps {
+  readonly value?: string | undefined;
+  readonly options: readonly FieldOption[];
+  readonly onChange: (value: string | undefined) => void;
+}
+
+export interface RespondentCheckboxProps extends RespondentPrimitiveProps {
+  readonly checked: boolean;
+  readonly value?: string | undefined;
+  readonly onChange: (checked: boolean) => void;
+}
+
+export interface RespondentRadioProps extends RespondentPrimitiveProps {
+  readonly checked: boolean;
+  readonly value?: string;
+  readonly onChange: (checked: boolean) => void;
+  readonly onKeyDown?: ((event: ReactKeyboardEvent<HTMLElement>) => void) | undefined;
+}
+
+export interface RespondentRatingProps extends RespondentPrimitiveProps {
+  readonly checked: boolean;
+  readonly value?: number | undefined;
+  readonly min: number;
+  readonly max: number;
+  readonly onChange: (value: number) => void;
+}
+
+export interface RespondentButtonProps {
+  readonly type: "submit" | "button";
+  readonly disabled?: boolean;
+  readonly className?: string | undefined;
+  readonly children: ReactNode;
+  readonly onClick?: () => void;
+}
+
+export type FormRendererComponents = {
+  readonly TextInput?: ComponentType<RespondentTextInputProps>;
+  readonly TextArea?: ComponentType<RespondentTextAreaProps>;
+  readonly Select?: ComponentType<RespondentSelectProps>;
+  readonly Checkbox?: ComponentType<RespondentCheckboxProps>;
+  readonly Radio?: ComponentType<RespondentRadioProps>;
+  readonly Rating?: ComponentType<RespondentRatingProps>;
+  readonly Button?: ComponentType<RespondentButtonProps>;
+};
+
+export interface ChoiceOptionSlotProps {
+  readonly field: Question;
+  readonly option: FieldOption;
+  readonly inputId: string;
+  readonly inputType: "radio" | "checkbox";
+  readonly checked: boolean;
+  readonly disabled?: boolean;
+  readonly readOnly?: boolean;
+  readonly onChange: (checked: boolean) => void;
+  readonly submittedValue?: unknown;
+  readonly submitStatus?: FormSubmitStatus;
+  readonly children: ReactNode;
+}
+
+export interface ValidationSummarySlotProps {
+  readonly issues: readonly ValidationError[];
+  readonly onIssueSelect: (issue: ValidationError) => void;
+}
+
+export interface FormPageTransitionOptions {
+  readonly scroll?: "smooth" | "instant" | "none";
+  readonly focus?: "page-header" | "first-field" | "none";
+  readonly respectReducedMotion?: boolean;
+}
+
 export interface RadioTextInputSlotProps {
   readonly field: FormField;
   readonly option: FieldOption;
@@ -1104,7 +1237,7 @@ export interface FormRendererSlots {
     readonly onNext: () => void;
   }) => ReactNode;
   readonly renderSubmitButton?: (props: RenderSubmitButtonProps) => ReactNode;
-  readonly renderValidationSummary?: (props: { readonly issues: readonly ValidationError[] }) => ReactNode;
+  readonly renderValidationSummary?: (props: ValidationSummarySlotProps) => ReactNode;
   readonly renderCompletion?: (props: FormCompletionSlotProps & { readonly message: string }) => ReactNode;
   readonly renderAfterForm?: (props: FormAfterFormSlotProps) => ReactNode;
   readonly renderSubmittedValues?: (props: {
@@ -1128,6 +1261,7 @@ export interface FormRendererSlots {
     readonly max: number;
   }) => ReactNode;
   readonly renderChoiceOptionAfter?: (props: ChoiceOptionAfterSlotProps) => ReactNode;
+  readonly renderChoiceOption?: (props: ChoiceOptionSlotProps) => ReactNode;
   readonly renderRadioTextInput?: (props: RadioTextInputSlotProps) => ReactNode;
   readonly renderChoiceGroup?: (props: ChoiceGroupSlotProps) => ReactNode;
 }
