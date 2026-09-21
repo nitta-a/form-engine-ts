@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/translator-cache",
-  "version": "8.1.4",
+  "version": "8.1.5",
   "publishConfig": {
     "access": "public"
   },

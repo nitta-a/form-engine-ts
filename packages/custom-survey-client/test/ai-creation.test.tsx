@@ -49,6 +49,35 @@ const readyResponse = {
 };
 
 describe("SurveyAiCreationPanel", () => {
+  it("shows an initial notice, prompt, and quick replies when configured", async () => {
+    const respond = vi.fn(async () => readyResponse);
+    render(
+      <SurveyAiCreationPanel
+        initialSchema={schema}
+        sourceLocale="en"
+        creationAdapter={{ respond }}
+        authoringAdapter={{ generate: vi.fn() }}
+        labels={{
+          ...labels,
+          initialNotice: "This assistant helps you create a survey.",
+          initialPrompt: "What would you like to know?",
+          initialQuickReplies: [{ id: "satisfaction", label: "Satisfaction", value: "Satisfaction" }]
+        }}
+        onComplete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("This assistant helps you create a survey.")).toBeInTheDocument();
+    expect(screen.getByText("What would you like to know?")).toBeInTheDocument();
+    await screen.getByRole("button", { name: "Satisfaction" }).click();
+    await waitFor(() =>
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ latestMessage: "Satisfaction" }),
+        expect.anything()
+      )
+    );
+  });
+
   it("aborts and delegates cancellation to its host", () => {
     const onCancel = vi.fn();
     render(
@@ -136,6 +165,12 @@ describe("SurveyAiCreationPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: labels.generate }));
     await waitFor(() => expect(screen.getByRole("heading", { name: labels.review })).toBeInTheDocument());
     expect(screen.getByText("Satisfaction")).toBeInTheDocument();
+    const hideBrief = screen.getByRole("button", { name: "Hide survey brief" });
+    expect(screen.getByRole("heading", { name: labels.brief })).toBeInTheDocument();
+    fireEvent.click(hideBrief);
+    expect(screen.queryByRole("heading", { name: labels.brief })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show survey brief" }));
+    expect(screen.getByRole("heading", { name: labels.brief })).toBeInTheDocument();
     expect(screen.getByText(/Type: radio/)).toBeInTheDocument();
     expect(screen.getByText(labels.choices)).toBeInTheDocument();
     expect(screen.getByText("Good")).toBeInTheDocument();

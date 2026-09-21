@@ -1,9 +1,19 @@
 import type { AuthoringAssistantAdapter, AuthoringSuggestion } from "@form-engine-ts/core";
 
+function isJsonObject(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJapanese(request: Parameters<AuthoringAssistantAdapter["generate"]>[0]): boolean {
+  const form = request.context?.form;
+  return isJsonObject(form) && form.defaultLocale === "ja";
+}
+
 /** Deterministic provider used by the preview app; real AI stays in the host app. */
 export const mockAuthoringAssistantAdapter: AuthoringAssistantAdapter = {
   async generate(request, signal): Promise<AuthoringSuggestion> {
     if (signal?.aborted) throw new DOMException("The request was cancelled.", "AbortError");
+    const japanese = isJapanese(request);
     const schemaHash = typeof request.context?.schemaHash === "string" ? request.context.schemaHash : undefined;
     if (schemaHash === undefined) throw new Error("Mock authoring requires an authoring context.");
     const prompt = request.prompt?.toLowerCase() ?? "";
@@ -18,18 +28,38 @@ export const mockAuthoringAssistantAdapter: AuthoringAssistantAdapter = {
     if (request.intent === "generate_form")
       return {
         id: "mock-generate-form",
-        summary: "Generate a satisfaction survey",
-        rationale: "The mock provider returns a multi-operation form draft.",
+        summary: japanese ? "満足度アンケートを作成" : "Generate a satisfaction survey",
+        rationale: japanese
+          ? "プレビュー用の固定アダプターが質問を作成します。"
+          : "The mock provider returns a multi-operation form draft.",
         baseSchemaHash: schemaHash,
         operations: [
-          { operationId: "form-title", type: "updateForm", patch: { title: "Satisfaction survey" } },
-          { operationId: "rating", type: "addField", field: { type: "rating", title: "Overall satisfaction" } },
+          {
+            operationId: "form-title",
+            type: "updateForm",
+            patch: { title: japanese ? "観光地の満足度調査" : "Satisfaction survey" }
+          },
+          {
+            operationId: "rating",
+            type: "addField",
+            field: { type: "rating", title: japanese ? "総合満足度" : "Overall satisfaction" }
+          },
           {
             operationId: "reason",
             type: "addField",
-            field: { type: "radio", title: "What stood out?", options: [{ label: "Service" }, { label: "Value" }] }
+            field: {
+              type: "radio",
+              title: japanese ? "改善してほしい点" : "What stood out?",
+              options: japanese
+                ? [{ label: "交通の利便性" }, { label: "施設設備" }]
+                : [{ label: "Service" }, { label: "Value" }]
+            }
           },
-          { operationId: "feedback", type: "addField", field: { type: "textarea", title: "Additional feedback" } }
+          {
+            operationId: "feedback",
+            type: "addField",
+            field: { type: "textarea", title: japanese ? "その他のご意見" : "Additional feedback" }
+          }
         ]
       };
     if (request.intent === "rewrite_field") {

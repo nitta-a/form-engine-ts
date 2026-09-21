@@ -17,6 +17,16 @@
   grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.35fr);
 }
 
+.fe-ai-creation-brief-toggle {
+  background: #fff;
+  border: 1px solid #b9d8f6;
+  border-radius: 0.25rem;
+  color: #287bc2;
+  cursor: pointer;
+  justify-self: start;
+  padding: 0.4rem 0.65rem;
+}
+
 .fe-ai-creation-conversation,
 .fe-ai-creation-brief,
 .fe-ai-creation-review {
@@ -123,7 +133,7 @@
 .fe-ai-creation-composer textarea {
   border: 1px solid #d0d5dd;
   border-radius: 0.25rem;
-  min-height: 4.5rem;
+  min-height: 2.75rem;
   padding: 0.5rem;
   resize: vertical;
   width: 100%;

@@ -3,6 +3,12 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.1.5 — 2026-09-21
+
+- Added the redesigned AI survey creation initial dialog state with localized notices, prompts, quick replies, and input guidance.
+- Added Japanese/English switching for the Preview AI creation flow and mock responses.
+- Added a show/hide toggle for the survey brief with an initial visibility option.
+
 ## v8.1.4 — 2026-09-21
 
 - Redesigned the AI survey creation confirmation flow with question cards, removal controls, and preview/create actions.

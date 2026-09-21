@@ -39,6 +39,8 @@ import "@form-engine-ts/custom-survey-client/ai-creation/styles.css";
 
 `SurveyAiCreationLabels.error` receives codes such as `provider_unavailable`, `network_error`, `invalid_response`, and `stale_schema`; `fieldType` supplies localized question-type names. `onCancel` is optional and is called after any in-flight request is aborted. `previewMode="inline"` renders the respondent preview inside a host dialog; the default is its own accessible dialog. `SurveyEditorPreviewDialog` is exported from the same subpath for reuse.
 
+Set `initialNotice`, `initialPrompt`, and `initialQuickReplies` to customize the empty conversation state. The generated survey brief is visible by default; pass `briefInitiallyVisible={false}` to hide it initially, and localize its toggle with `showBrief` and `hideBrief`.
+
 Use `createSurveyTranslationAdapter` and `createSurveyTranslator` to adapt application translation functions without an unsafe cast. `SurveyProvider` is the unified provider for Form Engine and survey translations; it accepts a typed `translation` scope, a structural i18next-compatible `i18n` instance, or a transport-neutral translation adapter. When no local i18n props are passed it composes with the surrounding Form Engine provider instead of replacing it. `@form-engine-ts/custom-survey-client` is publishable with ESM, CommonJS, and declaration outputs; React and Form Engine packages are peer dependencies.
 
 ## v7.7 APIs

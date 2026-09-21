@@ -30,9 +30,16 @@ import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
 import { mockCreationAssistantAdapter } from "./mockCreationAssistantAdapter";
 import { previewCreationPolicy, previewPolicy } from "./previewPolicy";
 
-const previewSurveyAiLabels: SurveyAiCreationLabels = {
+const previewEnglishSurveyAiLabels: SurveyAiCreationLabels = {
   title: "AI survey creation assistant",
   conversation: "Conversation",
+  initialNotice:
+    "This AI assistant helps you create a survey. Tell us what you would like to learn, or choose a suggestion below.",
+  initialPrompt: "What would you like to know with this survey?",
+  initialQuickReplies: [
+    { id: "satisfaction", label: "I want to know satisfaction", value: "I want to know satisfaction" },
+    { id: "improvement", label: "I want to know improvement needs", value: "I want to know improvement needs" }
+  ],
   assistant: "Assistant",
   user: "You",
   purposeInput: "Tell us what you want to learn",
@@ -45,6 +52,8 @@ const previewSurveyAiLabels: SurveyAiCreationLabels = {
   applying: "Applying survey…",
   error: (code) => code,
   brief: "Survey brief",
+  showBrief: "Show survey brief",
+  hideBrief: "Hide survey brief",
   audience: "Audience",
   questionCount: "Questions",
   notSet: "Not set",
@@ -62,6 +71,51 @@ const previewSurveyAiLabels: SurveyAiCreationLabels = {
   emptyQuestions: "No questions",
   fieldType: (type) => type
 };
+
+function previewSurveyAiLabels(locale: string): SurveyAiCreationLabels {
+  if (!locale.startsWith("ja")) return previewEnglishSurveyAiLabels;
+  return {
+    ...previewEnglishSurveyAiLabels,
+    title: "AIでアンケートを作成",
+    conversation: "AIとのやり取り",
+    initialNotice:
+      "AIアシスタントにアンケートの作成を依頼できます。知りたいことを入力するか、候補から選択してください。",
+    initialPrompt: "このアンケートで何を知りたいですか？",
+    initialQuickReplies: [
+      { id: "satisfaction", label: "満足度を知りたい", value: "満足度を知りたい" },
+      { id: "improvement", label: "改善点を知りたい", value: "改善点を知りたい" }
+    ],
+    assistant: "AI",
+    user: "あなた",
+    purposeInput: "このアンケートで知りたいことを入力してください。",
+    messageInput: "候補にない回答を入力",
+    send: "送信",
+    retry: "再試行",
+    cancel: "キャンセル",
+    generate: "この情報で作成",
+    generating: "アンケートを作成中…",
+    applying: "アンケートを反映中…",
+    error: (code) => `エラー: ${code}`,
+    brief: "アンケート概要",
+    showBrief: "アンケート概要を表示",
+    hideBrief: "アンケート概要を非表示",
+    audience: "対象者",
+    questionCount: "質問数",
+    notSet: "未設定",
+    review: "作成内容の確認",
+    questionType: "種類",
+    required: "必須",
+    optional: "任意",
+    choices: "選択肢",
+    removeQuestion: "質問を削除",
+    preview: "回答画面をプレビュー",
+    previewTitle: "回答画面プレビュー",
+    previewNotice: "現在編集中の内容を表示しています。プレビューから回答は送信されません。",
+    closePreview: "プレビューを閉じる",
+    createSurvey: "アンケートを作成",
+    emptyQuestions: "質問がありません"
+  };
+}
 
 function PreviewMuiButton({
   children,
@@ -402,18 +456,25 @@ function CreationAssistantDemo({
   readonly onComplete: (schema: FormSchema) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const labels = previewSurveyAiLabels(locale);
+  const isJapanese = locale.startsWith("ja");
+  const surveyTheme = isJapanese ? "観光地の感想" : "Travel destination impressions";
+  const dialogTitle = isJapanese ? labels.title : "Create survey with AI";
   const initialSchema = useMemo(
-    () => createInitialSchemaByMode("survey", { id: "ai-created-survey", title: "New survey", locale }),
-    [locale]
+    () => createInitialSchemaByMode("survey", { id: "ai-created-survey", title: surveyTheme, locale }),
+    [locale, surveyTheme]
   );
   return (
     <>
       <Button variant="contained" onClick={() => setOpen(true)}>
-        Create survey with AI
+        {isJapanese ? "AIでアンケートを作成" : "Create survey with AI"}
       </Button>
-      <Dialog fullWidth maxWidth="sm" open={open} onClose={() => setOpen(false)}>
-        <DialogTitle>Create survey with AI</DialogTitle>
+      <Dialog className="preview-ai-creation-dialog" fullWidth maxWidth="sm" open={open} onClose={() => setOpen(false)}>
+        <DialogTitle>{dialogTitle}</DialogTitle>
         <DialogContent dividers>
+          <p className="preview-ai-creation-theme">
+            {isJapanese ? "アンケートのテーマ: 🏞️ 観光地の感想" : "Survey theme: 🏞️ Travel destination impressions"}
+          </p>
           <SurveyAiCreationPanel
             key={locale}
             creationAdapter={mockCreationAssistantAdapter}
@@ -421,7 +482,7 @@ function CreationAssistantDemo({
             initialSchema={initialSchema}
             sourceLocale={locale}
             policy={previewCreationPolicy}
-            labels={previewSurveyAiLabels}
+            labels={labels}
             onCancel={() => setOpen(false)}
             onComplete={(createdSchema) => {
               onComplete(createdSchema);

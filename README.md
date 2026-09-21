@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.1.4** (2026-09-21). All public packages are currently aligned to version `8.1.4`.
-This release updates the AI survey creation and respondent preview experience to match the redesigned confirmation and preview flows.
+The latest release is **v8.1.5** (2026-09-21). All public packages are currently aligned to version `8.1.5`.
+This release updates the AI survey creation dialog with localized initial guidance, preview locale switching, and a togglable survey brief.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience

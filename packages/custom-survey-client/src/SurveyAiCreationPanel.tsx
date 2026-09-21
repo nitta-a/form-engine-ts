@@ -18,6 +18,9 @@ import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 export interface SurveyAiCreationLabels {
   readonly title: string;
   readonly conversation: string;
+  readonly initialNotice?: string;
+  readonly initialPrompt?: string;
+  readonly initialQuickReplies?: readonly CreationQuickReply[];
   readonly assistant: string;
   readonly user: string;
   readonly purposeInput: string;
@@ -30,6 +33,8 @@ export interface SurveyAiCreationLabels {
   readonly applying: string;
   readonly error: (code: CreationAssistantErrorCode) => string;
   readonly brief: string;
+  readonly showBrief?: string;
+  readonly hideBrief?: string;
   readonly audience: string;
   readonly questionCount: string;
   readonly notSet: string;
@@ -58,6 +63,7 @@ export interface SurveyAiCreationPanelProps {
   readonly onComplete: (schema: FormSchema) => void;
   readonly onCancel?: () => void;
   readonly previewMode?: "dialog" | "inline";
+  readonly briefInitiallyVisible?: boolean;
 }
 
 export interface SurveyEditorPreviewDialogProps {
@@ -224,24 +230,42 @@ function Conversation({
   readonly headingId: string;
   readonly messageId: string;
 }) {
+  const messages =
+    labels.initialPrompt === undefined
+      ? assistant.messages
+      : [{ role: "assistant" as const, content: labels.initialPrompt }, ...assistant.messages];
+  const quickReplies =
+    assistant.quickReplies.length > 0
+      ? assistant.quickReplies
+      : assistant.messages.length === 0
+        ? (labels.initialQuickReplies ?? [])
+        : [];
+  const messageKeyCounts = new Map<string, number>();
+  const messageKey = (item: (typeof messages)[number]) => {
+    const base = `${item.role}-${item.content}`;
+    const occurrence = messageKeyCounts.get(base) ?? 0;
+    messageKeyCounts.set(base, occurrence + 1);
+    return occurrence === 0 ? base : `${base}-${occurrence}`;
+  };
   return (
     <section className="fe-ai-creation-conversation" aria-labelledby={headingId}>
       <h3 id={headingId}>{labels.conversation}</h3>
-      <p className="fe-ai-creation-guidance">{labels.purposeInput}</p>
+      <p className="fe-ai-creation-guidance">
+        {assistant.messages.length === 0 && labels.initialNotice !== undefined
+          ? labels.initialNotice
+          : labels.purposeInput}
+      </p>
       <div className="fe-ai-creation-messages" aria-live="polite">
-        {assistant.messages.map((item) => (
-          <article
-            key={`${item.role}-${item.content}`}
-            className={`fe-ai-creation-message fe-ai-creation-message--${item.role}`}
-          >
+        {messages.map((item) => (
+          <article key={messageKey(item)} className={`fe-ai-creation-message fe-ai-creation-message--${item.role}`}>
             <strong>{item.role === "user" ? labels.user : labels.assistant}</strong>
             <p>{item.content}</p>
           </article>
         ))}
       </div>
-      {assistant.quickReplies.length === 0 ? null : (
+      {quickReplies.length === 0 ? null : (
         <div className="fe-ai-creation-quick-replies">
-          {assistant.quickReplies.map((reply) => (
+          {quickReplies.map((reply) => (
             <button
               className="fe-ai-creation-choice"
               key={reply.id}
@@ -267,6 +291,7 @@ function Conversation({
             id={messageId}
             value={message}
             disabled={disabled}
+            placeholder={labels.messageInput}
             onChange={(event) => onMessageChange(event.target.value)}
           />
         </div>
@@ -356,7 +381,8 @@ export function SurveyAiCreationPanel({
   labels,
   onComplete,
   onCancel,
-  previewMode = "dialog"
+  previewMode = "dialog",
+  briefInitiallyVisible = true
 }: SurveyAiCreationPanelProps): React.JSX.Element {
   const panelId = useId();
   const assistant = useFormCreationAssistant({
@@ -368,6 +394,7 @@ export function SurveyAiCreationPanel({
   const [message, setMessage] = useState("");
   const [draftRequested, setDraftRequested] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [briefVisible, setBriefVisible] = useState(briefInitiallyVisible);
   const [reviewSchema, setReviewSchema] = useState(initialSchema);
   const [removedFieldIds, setRemovedFieldIds] = useState<ReadonlySet<string>>(new Set());
   const lastSuggestionId = useRef<string | undefined>(undefined);
@@ -416,6 +443,22 @@ export function SurveyAiCreationPanel({
       : assistant.status === "applying"
         ? labels.applying
         : undefined;
+  const conversation = (
+    <Conversation
+      assistant={assistant}
+      labels={labels}
+      message={message}
+      onMessageChange={setMessage}
+      onSend={sendMessage}
+      onQuickReply={(reply) => {
+        setDraftRequested(false);
+        void assistant.sendMessage(reply.value);
+      }}
+      disabled={assistant.status === "responding" || assistant.status === "generating"}
+      headingId={`${panelId}-conversation`}
+      messageId={`${panelId}-message`}
+    />
+  );
 
   return (
     <section className="fe-ai-creation-panel" aria-labelledby={`${panelId}-title`}>
@@ -423,23 +466,26 @@ export function SurveyAiCreationPanel({
       <div className="fe-ai-creation-status" role="status" aria-live="polite">
         {statusMessage}
       </div>
-      <div className="fe-ai-creation-layout">
-        <Conversation
-          assistant={assistant}
-          labels={labels}
-          message={message}
-          onMessageChange={setMessage}
-          onSend={sendMessage}
-          onQuickReply={(reply) => {
-            setDraftRequested(false);
-            void assistant.sendMessage(reply.value);
-          }}
-          disabled={assistant.status === "responding" || assistant.status === "generating"}
-          headingId={`${panelId}-conversation`}
-          messageId={`${panelId}-message`}
-        />
-        <BriefSummary brief={assistant.brief} labels={labels} headingId={`${panelId}-brief`} />
-      </div>
+      {assistant.messages.length === 0 ? (
+        conversation
+      ) : (
+        <>
+          <button
+            className="fe-ai-creation-brief-toggle"
+            type="button"
+            aria-expanded={briefVisible}
+            onClick={() => setBriefVisible((visible) => !visible)}
+          >
+            {briefVisible ? (labels.hideBrief ?? "Hide survey brief") : (labels.showBrief ?? "Show survey brief")}
+          </button>
+          <div className="fe-ai-creation-layout">
+            {conversation}
+            {briefVisible ? (
+              <BriefSummary brief={assistant.brief} labels={labels} headingId={`${panelId}-brief`} />
+            ) : null}
+          </div>
+        </>
+      )}
       {assistant.status === "error" && assistant.error !== undefined ? (
         <div className="fe-ai-creation-error" role="alert" aria-live="assertive">
           {labels.error(assistant.error.code)} ({assistant.error.code})

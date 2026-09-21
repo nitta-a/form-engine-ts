@@ -535,6 +535,27 @@ textarea {
   color: #b42318;
   padding: 0.75rem;
 }
+.preview-ai-creation-theme {
+  color: #667085;
+  font-size: 0.8rem;
+  margin: 0 0 0.75rem;
+}
+.preview-ai-creation-dialog .fe-ai-creation-panel > h2,
+.preview-ai-creation-dialog .fe-ai-creation-conversation > h3 {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.preview-ai-creation-dialog .fe-ai-creation-panel {
+  gap: 0.75rem;
+}
+.preview-ai-creation-dialog .fe-ai-creation-conversation {
+  padding: 0;
+}
 @media (max-width: 850px) {
   .builder-grid,
   .mui-builder-workspace,

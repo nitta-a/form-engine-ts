@@ -83,7 +83,7 @@ describe("preview application builder workspaces", () => {
     const input = within(assistant).getByLabelText("Tell us what you want to learn");
     await user.type(input, "社内の勤怠システムについて知りたい");
     await user.click(within(assistant).getByRole("button", { name: "Send" }));
-    await user.click(await within(assistant).findByRole("button", { name: "社員" }));
+    await user.click(await within(assistant).findByRole("button", { name: "Employees" }));
     await user.type(input, "使いやすさと改善点");
     await user.click(within(assistant).getByRole("button", { name: "Send" }));
     await user.click(await within(assistant).findByRole("button", { name: "Create with this information" }));
@@ -105,6 +105,18 @@ describe("preview application builder workspaces", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Create survey with AI" })).not.toBeInTheDocument()
     );
+  });
+
+  it("switches AI creation dialog copy with the preview locale", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "日本語" }));
+    await user.click(screen.getByRole("button", { name: "AIでアンケートを作成" }));
+    const dialog = await screen.findByRole("dialog", { name: "AIでアンケートを作成" });
+    expect(within(dialog).getByText("アンケートのテーマ: 🏞️ 観光地の感想")).toBeInTheDocument();
+    expect(within(dialog).getByText("このアンケートで何を知りたいですか？")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "満足度を知りたい" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "改善点を知りたい" })).toBeInTheDocument();
   });
 
   it("simulates draft publication and incremental analytics", async () => {

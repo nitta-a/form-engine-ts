@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/storage-sqlite",
-  "version": "8.1.4",
+  "version": "8.1.5",
   "publishConfig": {
     "access": "public"
   },
