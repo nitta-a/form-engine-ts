@@ -69,7 +69,7 @@ describe("SurveyAiCreationPanel", () => {
 
     expect(screen.getByText("This assistant helps you create a survey.")).toBeInTheDocument();
     expect(screen.getByText("What would you like to know?")).toBeInTheDocument();
-    await screen.getByRole("button", { name: "Satisfaction" }).click();
+    fireEvent.click(screen.getByRole("button", { name: "Satisfaction" }));
     await waitFor(() =>
       expect(respond).toHaveBeenCalledWith(
         expect.objectContaining({ latestMessage: "Satisfaction" }),

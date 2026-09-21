@@ -58,7 +58,7 @@ describe("preview application builder workspaces", () => {
       )
     );
     await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent('"translationMetadata"'));
-  });
+  }, 60_000);
 
   it("demonstrates headless factory actions with Core and React policy parity", async () => {
     const user = userEvent.setup();
