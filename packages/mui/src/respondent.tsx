@@ -9,13 +9,9 @@ import type {
   RespondentTextInputProps
 } from "@form-engine-ts/react";
 import { Button, Checkbox, MenuItem, Radio, TextField } from "@mui/material";
-import { type ComponentType, createElement, type ReactNode } from "react";
+import { type ComponentType, createElement } from "react";
 import { MuiFormBuilderContext, useResolvedMuiAdapterOptions } from "./context";
 import type { MuiAdapterOptions } from "./types";
-
-function helperText(errorText: ReactNode, helper: ReactNode): ReactNode {
-  return errorText ?? helper;
-}
 
 function MuiRespondentTextInput({
   field,
@@ -26,8 +22,8 @@ function MuiRespondentTextInput({
   disabled,
   readOnly,
   error,
-  helperText: help,
-  errorText,
+  helperText: _helperText,
+  errorText: _errorText,
   value,
   type = "text",
   min,
@@ -55,7 +51,6 @@ function MuiRespondentTextInput({
       required={required}
       disabled={disabled}
       error={error}
-      helperText={helperText(errorText, help)}
       value={value ?? ""}
       type={type}
       placeholder={placeholder}
@@ -104,8 +99,8 @@ function MuiRespondentTextArea({
   disabled,
   readOnly,
   error,
-  helperText: help,
-  errorText,
+  helperText: _helperText,
+  errorText: _errorText,
   value,
   minLength,
   maxLength,
@@ -127,7 +122,6 @@ function MuiRespondentTextArea({
       required={required}
       disabled={disabled}
       error={error}
-      helperText={helperText(errorText, help)}
       value={value ?? ""}
       placeholder={placeholder}
       multiline
@@ -155,8 +149,8 @@ function MuiRespondentSelect({
   disabled,
   readOnly,
   error,
-  helperText: help,
-  errorText,
+  helperText: _helperText,
+  errorText: _errorText,
   value,
   options,
   className,
@@ -165,17 +159,17 @@ function MuiRespondentSelect({
 }: RespondentSelectProps) {
   const resolved = useResolvedMuiAdapterOptions();
   const slotProps = resolved.muiSlotProps?.textField;
+  const selectDisplayProps =
+    typeof slotProps?.slotProps?.select === "function" ? undefined : slotProps?.slotProps?.select?.SelectDisplayProps;
   return (
     <TextField
       {...slotProps}
       className={className}
       id={id}
       name={name}
-      label={label}
       required={required}
       disabled={disabled || readOnly}
       error={error}
-      helperText={helperText(errorText, help)}
       value={value ?? ""}
       select
       fullWidth={resolved.inputFullWidth ?? resolved.fullWidth}
@@ -183,7 +177,15 @@ function MuiRespondentSelect({
       variant={slotProps?.variant ?? resolved.variant}
       slotProps={{
         ...slotProps?.slotProps,
-        select: { ...slotProps?.slotProps?.select, readOnly, ...aria }
+        select: {
+          ...slotProps?.slotProps?.select,
+          readOnly,
+          SelectDisplayProps: {
+            ...selectDisplayProps,
+            ...aria,
+            "aria-label": aria["aria-label"] ?? (typeof label === "string" ? label : undefined)
+          }
+        }
       }}
       onChange={(event) => onChange(event.target.value || undefined)}
     >

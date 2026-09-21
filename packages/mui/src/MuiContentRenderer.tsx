@@ -327,7 +327,7 @@ function MuiNavigation({
   if (totalPages <= 1 || (!canPrev && !canNext)) return null;
   const { translate: t } = muiContentTranslation(locale, i18n);
   return (
-    <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1} justifyContent="space-between" sx={{ mt: 2 }}>
+    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" sx={{ mt: 2 }}>
       {canPrev ? (
         <ButtonComponent
           type="button"
@@ -485,7 +485,7 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
     renderChoiceGroup: slots?.renderChoiceGroup ?? MuiChoiceGroupSlot,
     renderPageHeader:
       contentSlots?.renderPageHeader ??
-      (({ page, progress }) => (
+      (({ page }) => (
         <Stack spacing={0.5}>
           {page.title === undefined ? null : <Typography component="h2">{page.title}</Typography>}
           {page.description === undefined ? null : (
@@ -493,11 +493,11 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
               {page.description}
             </Typography>
           )}
-          {contentSlots?.renderProgress?.(progress) ?? (
-            <MuiProgress progress={progress} locale={locale} {...(i18n === undefined ? {} : { i18n })} />
-          )}
         </Stack>
       )),
+    renderProgress:
+      contentSlots?.renderProgress ??
+      ((progress) => <MuiProgress progress={progress} locale={locale} {...(i18n === undefined ? {} : { i18n })} />),
     renderRadioTextInput:
       contentSlots?.renderRadioTextInput ??
       ((input: RadioTextInputSlotProps) => (

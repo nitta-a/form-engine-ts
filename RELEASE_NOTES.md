@@ -3,6 +3,13 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.1.3 — 2026-09-21
+
+- Fixed builder validation navigation ordering so the selected page cannot overwrite the target question.
+- Removed duplicate MUI respondent labels, descriptions, and validation messages while preserving control error and ARIA state.
+- Fixed confirmation focus for custom buttons, duplicate progress slots, mobile navigation order, and empty-question navigator labels.
+- Added regression coverage for MUI respondent controls, choice cards, ratings, confirmation focus, and every respondent button kind.
+
 ## v8.1.2 — 2026-09-20
 
 - Added lossless generic FormSchema conversion for locale configuration, translation metadata, submission settings, pages,

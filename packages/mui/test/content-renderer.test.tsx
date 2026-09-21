@@ -89,8 +89,12 @@ describe("MuiContentRenderer", () => {
 
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-label", "Progress");
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Submit" })).toBeInTheDocument();
+    const back = screen.getByRole("button", { name: "Back" });
+    const submit = screen.getByRole("button", { name: "Submit" });
+    expect(back).toBeInTheDocument();
+    expect(submit).toBeInTheDocument();
+    expect(back.parentElement?.firstElementChild).toBe(back);
+    expect(back.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("routes MUI navigation through the respondent Button primitive", async () => {
@@ -161,6 +165,157 @@ describe("MuiContentRenderer", () => {
     expect(screen.getByRole("radio", { name: "One" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit" })).toHaveClass("MuiButton-root");
+  });
+
+  it("keeps respondent labels, messages, and accessibility relations in the React field frame", async () => {
+    const schema: FormSchema = {
+      id: "mui-field-frame",
+      version: 1,
+      title: "Fields",
+      defaultLocale: "en",
+      fields: [
+        { id: "name", type: "text", title: "Name", description: "Your full name", required: true },
+        { id: "bio", type: "textarea", title: "Bio", description: "Tell us about you", required: true },
+        {
+          id: "country",
+          type: "select",
+          title: "Country",
+          description: "Choose one",
+          required: true,
+          options: [{ id: "jp", label: "Japan" }]
+        }
+      ]
+    };
+
+    render(<MuiContentRenderer schema={schema} locale="en" onSubmit={async () => undefined} />);
+
+    expect(screen.getAllByText("Name", { exact: true })).toHaveLength(1);
+    expect(screen.getAllByText("Your full name", { exact: true })).toHaveLength(1);
+    expect(screen.getAllByText("Bio", { exact: true })).toHaveLength(1);
+    expect(screen.getAllByText("Tell us about you", { exact: true })).toHaveLength(1);
+    expect(screen.getAllByText("Country", { exact: true })).toHaveLength(1);
+    expect(screen.getAllByText("Choose one", { exact: true })).toHaveLength(1);
+    expect(screen.getByRole("combobox", { name: "Country" })).toBeRequired();
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveAttribute(
+      "aria-describedby",
+      expect.stringContaining("name-help")
+    );
+    expect(screen.getByRole("textbox", { name: "Name" })).toBeRequired();
+
+    await userEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(await screen.findAllByText("This field is required.", { exact: true })).toHaveLength(3);
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveAttribute(
+      "aria-describedby",
+      expect.stringContaining("name-error")
+    );
+    expect(screen.getByRole("textbox", { name: "Name" })).toHaveAttribute("aria-invalid", "true");
+    const nameInput = screen.getByRole("textbox", { name: "Name" });
+    const bioInput = screen.getByRole("textbox", { name: "Bio" });
+    const countryInput = screen.getByRole("combobox", { name: "Country" });
+    expect(nameInput.closest(".MuiInputBase-root")).toHaveClass("Mui-error");
+    expect(bioInput.closest(".MuiInputBase-root")).toHaveClass("Mui-error");
+    expect(countryInput).toHaveAttribute("aria-invalid", "true");
+    expect(countryInput).toHaveAttribute("aria-describedby", expect.stringContaining("country-help"));
+    expect(countryInput).toHaveAttribute("aria-describedby", expect.stringContaining("country-error"));
+    expect(countryInput.closest(".MuiInputBase-root")).toHaveClass("Mui-error");
+  });
+
+  it("keeps MUI choice cards and ratings accessible and interactive", async () => {
+    const user = userEvent.setup();
+    const schema: FormSchema = {
+      id: "mui-choice-cards",
+      version: 1,
+      title: "Choices",
+      defaultLocale: "en",
+      fields: [
+        {
+          id: "contact",
+          type: "radio",
+          title: "Contact",
+          required: false,
+          options: [
+            { id: "email", label: "Email" },
+            { id: "phone", label: "Phone" }
+          ]
+        },
+        {
+          id: "channels",
+          type: "multi-select",
+          title: "Channels",
+          required: false,
+          options: [{ id: "sms", label: "SMS" }]
+        },
+        { id: "rating", type: "rating", title: "Rating", required: false, min: 2, max: 4 }
+      ]
+    };
+
+    render(<MuiContentRenderer schema={schema} locale="en" onSubmit={async () => undefined} />);
+
+    const email = screen.getByRole("radio", { name: "Email" });
+    await user.click(screen.getByText("Email", { exact: true }));
+    expect(email).toBeChecked();
+    expect(document.querySelector('[data-option-id="email"]')).toHaveAttribute("data-selected", "true");
+    email.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("radio", { name: "Phone" })).toBeChecked();
+
+    const sms = screen.getByRole("checkbox", { name: "SMS" });
+    await user.click(screen.getByText("SMS", { exact: true }));
+    expect(sms).toBeChecked();
+    expect(document.querySelector('[data-option-id="sms"]')).toHaveAttribute("data-selected", "true");
+
+    expect(screen.queryByRole("radio", { name: "1" })).not.toBeInTheDocument();
+    const four = screen.getByRole("radio", { name: "4" });
+    await user.click(four);
+    expect(four).toBeChecked();
+    expect(document.querySelector('[data-option-id="4"]')).toHaveAttribute("data-selected", "true");
+  });
+
+  it("disables MUI choice cards while submission is pending", async () => {
+    const user = userEvent.setup();
+    let release: (() => void) | undefined;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const schema: FormSchema = {
+      id: "mui-locked-controls",
+      version: 1,
+      title: "Locked controls",
+      defaultLocale: "en",
+      fields: [
+        {
+          id: "choice",
+          type: "radio",
+          title: "Choice",
+          required: false,
+          options: [{ id: "one", label: "One" }]
+        }
+      ]
+    };
+
+    render(<MuiContentRenderer schema={schema} locale="en" onSubmit={() => pending} />);
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(screen.getByRole("radio", { name: "One" })).toBeDisabled();
+    expect(document.querySelector('[data-option-id="one"]')).toHaveAttribute("aria-disabled", "true");
+    release?.();
+  });
+
+  it("renders progress once for paged forms and not for unpaged forms", () => {
+    const custom = render(
+      <MuiContentRenderer
+        schema={pagedSurveySchema()}
+        locale="en"
+        onSubmit={async () => undefined}
+        slots={{ renderProgress: ({ percent }) => <output data-testid="custom-progress">{percent}</output> }}
+      />
+    );
+    expect(screen.getAllByTestId("custom-progress")).toHaveLength(1);
+    custom.unmount();
+
+    render(<MuiContentRenderer schema={quizSchema()} locale="en" onSubmit={async () => undefined} />);
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
   it("shows immediate quiz feedback and a final score", async () => {

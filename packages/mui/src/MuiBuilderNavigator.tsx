@@ -78,7 +78,7 @@ export function MuiBuilderNavigator({
           onClick={() => onActiveFieldChange?.(field.id)}
           dense={dense}
         >
-          <ListItemText primary={field.title || `${questionsLabel} ${index + 1}`} />
+          <ListItemText primary={field.title || `${resolvedQuestionsLabel} ${index + 1}`} />
         </ListItemButton>
       </ListItem>
     );

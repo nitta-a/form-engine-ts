@@ -7,7 +7,7 @@ import type {
   RespondentRadioProps,
   RespondentTextInputProps
 } from "../src";
-import { FormRenderer } from "../src";
+import { FormRenderer, type SubmissionReceiptStore } from "../src";
 
 const schema: FormSchema = {
   id: "respondent-api",
@@ -112,6 +112,142 @@ describe("respondent renderer APIs", () => {
     await userEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(kinds).toContain("next");
     expect(kinds).toContain("submit");
+  });
+
+  it("covers every built-in button kind through a custom primitive", async () => {
+    const user = userEvent.setup();
+    const records = new Map<
+      string,
+      { readonly type: string | undefined; readonly disabled: boolean | undefined; readonly hasOnClick: boolean }
+    >();
+    function PrimitiveButton({ kind, type, children, disabled, onClick }: RespondentButtonProps) {
+      if (kind !== undefined) records.set(kind, { type, disabled, hasOnClick: onClick !== undefined });
+      return (
+        <button type={type} disabled={disabled} onClick={onClick}>
+          {children}
+        </button>
+      );
+    }
+    const paged = render(
+      <FormRenderer
+        schema={schema}
+        initialValues={{ first: "Ada" }}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        submissionConfirmation={{ enabled: true, renderMode: "replace" }}
+        onSubmit={async () => undefined}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(screen.getByRole("radio", { name: "One" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(screen.getByRole("button", { name: "Proceed" }));
+    paged.unmount();
+
+    const retrySubmit = vi.fn().mockRejectedValue(new Error("failed"));
+    const retry = render(
+      <FormRenderer
+        schema={unpagedSchema}
+        initialValues={{ first: "Ada", choice: "one" }}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={retrySubmit}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    await user.click(await screen.findByRole("button", { name: "Retry" }));
+    retry.unmount();
+
+    const draftKey = "respondent-button-kinds-draft";
+    const draftStorage = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => draftStorage.get(key) ?? null,
+      setItem: (key: string, value: string) => draftStorage.set(key, value),
+      removeItem: (key: string) => draftStorage.delete(key)
+    });
+    draftStorage.set(
+      draftKey,
+      JSON.stringify({
+        formId: unpagedSchema.id,
+        formVersion: unpagedSchema.version,
+        values: { first: "Ada", choice: "one" },
+        savedAt: new Date().toISOString()
+      })
+    );
+    const startOver = render(
+      <FormRenderer
+        schema={unpagedSchema}
+        autoSaveKey={draftKey}
+        draftResume={{}}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={async () => undefined}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Start over" }));
+    startOver.unmount();
+    draftStorage.set(
+      draftKey,
+      JSON.stringify({
+        formId: unpagedSchema.id,
+        formVersion: unpagedSchema.version,
+        values: { first: "Ada", choice: "one" },
+        savedAt: new Date().toISOString()
+      })
+    );
+    const resume = render(
+      <FormRenderer
+        schema={unpagedSchema}
+        autoSaveKey={draftKey}
+        draftResume={{}}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={async () => undefined}
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Continue where you left off" }));
+    resume.unmount();
+    vi.unstubAllGlobals();
+
+    const receiptStore: SubmissionReceiptStore = {
+      get: async () => ({
+        formId: unpagedSchema.id,
+        formVersion: unpagedSchema.version,
+        submissionId: "existing",
+        submittedAt: new Date().toISOString()
+      }),
+      save: async () => undefined,
+      remove: async () => undefined
+    };
+    render(
+      <FormRenderer
+        schema={unpagedSchema}
+        receiptStore={receiptStore}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={async () => undefined}
+      />
+    );
+    await user.click(await screen.findByRole("button", { name: "Submit another response" }));
+
+    expect([...records.keys()]).toEqual(
+      expect.arrayContaining([
+        "previous",
+        "next",
+        "submit",
+        "confirm",
+        "cancel",
+        "retry",
+        "draft-resume",
+        "draft-start-over",
+        "reset"
+      ])
+    );
+    for (const [kind, record] of records) {
+      expect(record.type, kind).toBe(kind === "submit" ? "submit" : "button");
+      expect(record.hasOnClick, kind).toBe(kind !== "submit");
+      if (record.disabled !== undefined) expect(record.disabled, kind).toBe(false);
+    }
   });
 
   it("renders whole choice options without removing the controlled input", async () => {

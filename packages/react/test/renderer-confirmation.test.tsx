@@ -1,7 +1,7 @@
 import type { FormSchema } from "@form-engine-ts/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { FormRenderer, type SubmissionReceipt, type SubmissionReceiptStore } from "../src";
+import { FormRenderer, type RespondentButtonProps, type SubmissionReceipt, type SubmissionReceiptStore } from "../src";
 
 const schema: FormSchema = {
   id: "renderer-confirmation",
@@ -137,5 +137,49 @@ describe("FormRenderer generic submission confirmation", () => {
     expect(screen.queryByText("ada@example.com")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "送信" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "戻る" })).toBeInTheDocument();
+  });
+
+  it("focuses native and primitive confirm buttons and restores focus after Escape", async () => {
+    const user = userEvent.setup();
+    const native = render(
+      <FormRenderer
+        schema={schema}
+        onSubmit={async () => undefined}
+        submissionConfirmation={{ enabled: true, renderMode: "dialog" }}
+      />
+    );
+    await user.type(screen.getByLabelText(/Name/), "Ada");
+    await user.selectOptions(screen.getByLabelText(/Team/), "engineering");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    const nativeConfirm = await screen.findByRole("button", { name: "Proceed" });
+    expect(nativeConfirm).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await user.tab();
+    expect(nativeConfirm).toHaveFocus();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Submit" })).toHaveFocus());
+    native.unmount();
+
+    function PrimitiveButton({ type, children, disabled, onClick }: RespondentButtonProps) {
+      return (
+        <button type={type} disabled={disabled} onClick={onClick}>
+          {children}
+        </button>
+      );
+    }
+
+    render(
+      <FormRenderer
+        schema={schema}
+        primitiveComponents={{ Button: PrimitiveButton }}
+        onSubmit={async () => undefined}
+        submissionConfirmation={{ enabled: true, renderMode: "dialog" }}
+      />
+    );
+    await user.type(screen.getByLabelText(/Name/), "Ada");
+    await user.selectOptions(screen.getByLabelText(/Team/), "engineering");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(await screen.findByRole("button", { name: "Proceed" })).toHaveFocus();
   });
 });

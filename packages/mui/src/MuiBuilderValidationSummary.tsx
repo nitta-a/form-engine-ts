@@ -83,8 +83,8 @@ export function MuiBuilderValidationSummary({
                   <Button
                     size="small"
                     onClick={() => {
-                      if (target.fieldId !== undefined) onFieldSelect?.(target.fieldId);
                       if (target.pageId !== undefined) onPageSelect?.(target.pageId);
+                      if (target.fieldId !== undefined) onFieldSelect?.(target.fieldId);
                       onIssueSelect?.(issue, target);
                     }}
                   >

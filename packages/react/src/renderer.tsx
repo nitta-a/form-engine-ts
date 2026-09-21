@@ -1795,7 +1795,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
 
   useEffect(() => {
     if (confirmation === null) return;
-    const confirmButton = confirmationRef.current?.querySelector<HTMLElement>("[data-fe-confirm], button");
+    const confirmButton = confirmationRef.current?.querySelector<HTMLElement>(
+      "[data-fe-confirm] button, button[data-fe-confirm], button"
+    );
     confirmButton?.focus();
     if (confirmationRenderMode !== "dialog") return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2651,32 +2653,36 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
             {form.schema.description === undefined ? null : (
               <p className={classNames?.headerDescription}>{form.schema.description}</p>
             )}
-            {slots.renderProgress?.(progress) ??
-              (pages === undefined ? null : (
-                <div className={joinClassNames("fe-progress", classNames?.progress)}>
-                  <div
-                    className="form-progress-bar"
-                    role="progressbar"
-                    aria-valuemin={1}
-                    aria-valuemax={visiblePageIndexes.length}
-                    aria-valuenow={activeVisibleIndex + 1}
-                    aria-label={resolveMessage("progressLabel")}
-                    aria-valuetext={`${form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })} (${resolveMessage("remainingQuestions", undefined, { count: progress.remainingQuestions })})`}
-                  >
+            {pages === undefined
+              ? null
+              : (slots.renderProgress?.(progress) ?? (
+                  <div className={joinClassNames("fe-progress", classNames?.progress)}>
                     <div
-                      className="form-progress-fill"
-                      style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
-                    />
+                      className="form-progress-bar"
+                      role="progressbar"
+                      aria-valuemin={1}
+                      aria-valuemax={visiblePageIndexes.length}
+                      aria-valuenow={activeVisibleIndex + 1}
+                      aria-label={resolveMessage("progressLabel")}
+                      aria-valuetext={`${form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })} (${resolveMessage("remainingQuestions", undefined, { count: progress.remainingQuestions })})`}
+                    >
+                      <div
+                        className="form-progress-fill"
+                        style={{ width: `${((activeVisibleIndex + 1) / visiblePageIndexes.length) * 100}%` }}
+                      />
+                    </div>
+                    <span>
+                      {form.translate("form.step", {
+                        current: activeVisibleIndex + 1,
+                        total: visiblePageIndexes.length
+                      })}
+                    </span>
                   </div>
-                  <span>
-                    {form.translate("form.step", { current: activeVisibleIndex + 1, total: visiblePageIndexes.length })}
-                  </span>
-                </div>
-              ))}
+                ))}
             {draftRestored ? <span className="form-draft-badge">{form.translate("form.draftRestored")}</span> : null}
           </header>
         )}
-        {slots.renderHeader === undefined ? null : slots.renderProgress?.(progress)}
+        {slots.renderHeader === undefined || pages === undefined ? null : slots.renderProgress?.(progress)}
         {activePage === undefined ? null : (
           <section
             ref={pageHeaderRef}

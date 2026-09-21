@@ -190,6 +190,32 @@ describe("MUI builder UX", () => {
     expect(screen.getByText("設問")).toBeInTheDocument();
   });
 
+  it("falls back to translated and custom question labels for empty titles", () => {
+    const { pages: _pages, ...schemaWithoutPages } = schema;
+    const emptyTitleSchema: FormSchema = {
+      ...schemaWithoutPages,
+      fields: [{ id: "empty", type: "text", title: "", required: false }]
+    };
+    const first = render(<MuiBuilderNavigator schema={emptyTitleSchema} />);
+    expect(screen.getByRole("button", { name: "Questions 1" })).toBeInTheDocument();
+    first.unmount();
+
+    const japanese = render(
+      <FormEngineI18nProvider locale="ja" messages={{ "builder.questions": "質問" }}>
+        <MuiBuilderNavigator schema={emptyTitleSchema} />
+      </FormEngineI18nProvider>
+    );
+    expect(screen.getByRole("button", { name: "質問 1" })).toBeInTheDocument();
+    japanese.unmount();
+
+    render(
+      <FormEngineI18nProvider locale="ja" messages={{ "builder.questions": "質問" }}>
+        <MuiBuilderNavigator schema={emptyTitleSchema} questionsLabel="設問" />
+      </FormEngineI18nProvider>
+    );
+    expect(screen.getByRole("button", { name: "設問 1" })).toBeInTheDocument();
+  });
+
   it("renders the real renderer in a non-persisting preview wrapper", async () => {
     const { pages: _pages, ...schemaWithoutPages } = schema;
     const setItem = vi.spyOn(Storage.prototype, "setItem");
@@ -240,5 +266,47 @@ describe("MUI builder UX", () => {
     });
     await user.click(pageFixButton);
     expect(onPageSelect).toHaveBeenCalledWith("about");
+  });
+
+  it("selects the page before the invalid field so the field remains active", async () => {
+    const user = userEvent.setup();
+    const events: string[] = [];
+    const twoQuestionSchema: FormSchema = {
+      ...schema,
+      fields: [
+        { id: "first", type: "text", title: "First", required: false },
+        { id: "second", type: "text", title: "Second", required: false }
+      ],
+      pages: [{ id: "page", title: "Page", questionIds: ["first", "second"] }]
+    };
+    function Harness() {
+      const [activeFieldId, setActiveFieldId] = useState("first");
+      return (
+        <>
+          <output data-testid="active-field">{activeFieldId}</output>
+          <MuiBuilderValidationSummary
+            schema={twoQuestionSchema}
+            validationState={{
+              mode: "survey",
+              valid: false,
+              issues: [{ source: "schema", path: "fields[1].title", code: "required", message: "Fix second." }]
+            }}
+            onPageSelect={(pageId) => {
+              events.push(`page:${pageId}`);
+              setActiveFieldId("first");
+            }}
+            onFieldSelect={(fieldId) => {
+              events.push(`field:${fieldId}`);
+              setActiveFieldId(fieldId);
+            }}
+          />
+        </>
+      );
+    }
+
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Fix" }));
+    expect(events).toEqual(["page:page", "field:second"]);
+    expect(screen.getByTestId("active-field")).toHaveTextContent("second");
   });
 });
