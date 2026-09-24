@@ -179,6 +179,7 @@ describe("SurveyAiCreationPanel", () => {
     const generatedQuestionRemoveButton = removeButtons[1];
     if (generatedQuestionRemoveButton === undefined) throw new Error("Expected generated question remove button.");
     fireEvent.click(generatedQuestionRemoveButton);
+    await waitFor(() => expect(screen.queryByText("Satisfaction")).not.toBeInTheDocument());
     const previewButton = screen.getByRole("button", { name: labels.preview });
     previewButton.focus();
     fireEvent.click(previewButton);
