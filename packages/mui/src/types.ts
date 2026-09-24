@@ -118,9 +118,18 @@ export interface MuiFieldEditorOptions {
   readonly textLimits?: FieldPropertyControlMode;
   readonly ratingBounds?: FieldPropertyControlMode;
   readonly numberLimits?: FieldPropertyControlMode;
+  readonly advancedSettings?: "visible" | "hidden";
+  readonly numberLimitsPlacement?: "advanced" | "afterRequired";
+  readonly shuffleOptionsPlacement?: "advanced" | "belowQuestion";
+  readonly showQuestionNumber?: boolean;
   /** Per-question-type overrides take precedence over the base controls. */
   readonly byType?: Partial<Record<QuestionType, Partial<FieldEditorControlsConfig>>>;
   readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
+}
+
+export interface MuiRespondentTypeSlotProps {
+  readonly textField?: MuiComponentSlotProps<TextFieldProps>;
+  readonly choiceGroup?: Partial<PaperProps>;
 }
 
 export interface MuiSlotProps {
@@ -136,6 +145,7 @@ export interface MuiSlotProps {
   readonly radio?: MuiComponentSlotProps<RadioProps>;
   readonly button?: MuiComponentSlotProps<ButtonProps>;
   readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
+  readonly byType?: Partial<Record<QuestionType, MuiRespondentTypeSlotProps>>;
 }
 
 export interface MuiBuilderSlotProps {
@@ -151,6 +161,7 @@ export interface MuiBuilderSlotProps {
   readonly radio?: MuiComponentSlotProps<RadioProps>;
   readonly button?: MuiComponentSlotProps<ButtonProps>;
   readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
+  readonly byType?: Partial<Record<QuestionType, MuiRespondentTypeSlotProps>>;
 }
 
 export interface MuiAdapterOptions {
@@ -172,6 +183,8 @@ export interface MuiAdapterOptions {
   readonly fieldEditorOptions?: MuiFieldEditorOptions;
   readonly localizationOptions?: MuiLocalizationOptions;
   readonly localization?: MuiLocalizationSlotOptions;
+  readonly ratingDisplay?: "number" | "stars";
+  readonly ratingStarSize?: number;
   readonly muiSlotProps?: MuiBuilderSlotProps;
 }
 
@@ -195,6 +208,8 @@ export interface ResolvedMuiAdapterOptions {
   readonly localizationOptions?: MuiLocalizationOptions;
   readonly localization?: MuiLocalizationSlotOptions;
   readonly muiSlotProps?: MuiBuilderSlotProps;
+  readonly ratingDisplay?: "number" | "stars";
+  readonly ratingStarSize?: number;
 }
 
 export const DEFAULT_MUI_SECTION_ORDER: readonly BuilderSectionName[] = [
@@ -229,6 +244,8 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
     inputFullWidth: options.inputFullWidth ?? options.fullWidth ?? true,
     buttonFullWidth: options.buttonFullWidth ?? options.fullWidth ?? false,
     dense: options.dense ?? false,
+    ...(options.ratingDisplay === undefined ? {} : { ratingDisplay: options.ratingDisplay }),
+    ...(options.ratingStarSize === undefined ? {} : { ratingStarSize: options.ratingStarSize }),
     getLocaleLabel: options.getLocaleLabel ?? ((locale) => locale),
     ...(options.getActionLabel === undefined ? {} : { getActionLabel: options.getActionLabel }),
     layoutOptions: options.layoutOptions ?? {},
@@ -242,6 +259,10 @@ export function resolveMuiAdapterOptions(options: MuiAdapterOptions = {}): Resol
       textLimits: options.fieldEditorOptions?.textLimits ?? "editable",
       ratingBounds: options.fieldEditorOptions?.ratingBounds ?? "editable",
       numberLimits: options.fieldEditorOptions?.numberLimits ?? "editable",
+      advancedSettings: options.fieldEditorOptions?.advancedSettings ?? "visible",
+      numberLimitsPlacement: options.fieldEditorOptions?.numberLimitsPlacement ?? "advanced",
+      shuffleOptionsPlacement: options.fieldEditorOptions?.shuffleOptionsPlacement ?? "advanced",
+      showQuestionNumber: options.fieldEditorOptions?.showQuestionNumber ?? true,
       ...(options.fieldEditorOptions?.byType === undefined ? {} : { byType: options.fieldEditorOptions.byType }),
       ...(options.fieldEditorOptions?.fieldTypeOptions === undefined
         ? {}

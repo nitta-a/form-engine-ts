@@ -72,6 +72,8 @@ export interface FieldComponentProps {
   readonly a11y?: FormRendererFieldConfig["a11y"];
   readonly classNames?: FormRendererClassNames;
   readonly optionOrderSeed?: string;
+  readonly ratingDisplay?: "number" | "stars";
+  readonly ratingStarSize?: number;
 }
 
 export interface ComponentBaseProps {
@@ -309,6 +311,11 @@ export interface BuilderFieldEditorPreviewSlotProps extends BuilderSlotBaseProps
   readonly onSelect: () => void;
 }
 
+export interface BuilderFieldEditorBelowRequiredSlotProps extends BuilderSlotBaseProps {
+  readonly field: FormField;
+  readonly index: number;
+}
+
 export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
   readonly field: FormField;
   readonly index: number;
@@ -323,6 +330,7 @@ export interface BuilderFieldEditorSlotProps extends BuilderSlotBaseProps {
   readonly fieldEditorControls?: FieldEditorControlsConfig;
   readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
   readonly slots?: Pick<FormBuilderSlots, "fieldTypeSelect" | "fieldEditorHeader">;
+  readonly fieldEditorBelowRequired?: FormBuilderSlots["fieldEditorBelowRequired"];
   readonly fieldEditorAfter?: FormBuilderSlots["fieldEditorAfter"];
   readonly optionEditorAfter?: FormBuilderSlots["optionEditorAfter"];
 }
@@ -627,6 +635,7 @@ export interface FormBuilderSlots {
   readonly basicSettingsAfter?: ComponentType<BuilderBasicSettingsSlotProps>;
   readonly fieldEditorPreview?: ComponentType<BuilderFieldEditorPreviewSlotProps>;
   readonly fieldEditorAfter?: ComponentType<BuilderFieldEditorSlotProps>;
+  readonly fieldEditorBelowRequired?: ComponentType<BuilderFieldEditorBelowRequiredSlotProps>;
   readonly optionEditorAfter?: ComponentType<BuilderOptionEditorSlotProps>;
   readonly toolbar?: ComponentType<BuilderToolbarSlotProps>;
   readonly fieldEditor?: ComponentType<BuilderFieldEditorSlotProps>;

@@ -592,6 +592,12 @@ function MuiContentRendererImplementation<TMeta extends BaseSubmissionMetadata =
     <MuiFormBuilderContext.Provider value={{ options: muiOptions ?? {} }}>
       <ContentRenderer
         {...(rendererProps as ContentRendererProps)}
+        {...(rendererProps.ratingDisplay === undefined && muiOptions?.ratingDisplay !== undefined
+          ? { ratingDisplay: muiOptions.ratingDisplay }
+          : {})}
+        {...(rendererProps.ratingStarSize === undefined && muiOptions?.ratingStarSize !== undefined
+          ? { ratingStarSize: muiOptions.ratingStarSize }
+          : {})}
         primitiveComponents={{ ...muiRespondentComponents, ...rendererProps.primitiveComponents }}
         contentModeOptions={contentMode}
         slots={resolvedSlots}

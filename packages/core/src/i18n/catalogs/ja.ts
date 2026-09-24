@@ -163,6 +163,7 @@ export const JA_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "builder.required": "必須項目にする",
   "builder.options": "選択肢一覧",
   "builder.shuffleOptions": "回答者ごとに選択肢を並べ替える",
+  "builder.optionDisplayOrder": "選択肢の表示順",
   "builder.pinOption": "この選択肢を固定する",
   "builder.optionTextInput": "補足テキストを許可する",
   "builder.openAt": "受付開始日時 (ISO形式)",

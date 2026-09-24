@@ -272,6 +272,89 @@ describe("MuiContentRenderer", () => {
     expect(document.querySelector('[data-option-id="4"]')).toHaveAttribute("data-selected", "true");
   });
 
+  it("renders ratings as accessible stars when requested", async () => {
+    const user = userEvent.setup();
+    const schema: FormSchema = {
+      id: "star-rating",
+      version: 1,
+      title: "Rating",
+      defaultLocale: "en",
+      fields: [{ id: "rating", type: "rating", title: "Rating", required: false, min: 1, max: 5 }]
+    };
+
+    render(
+      <MuiContentRenderer
+        schema={schema}
+        locale="en"
+        onSubmit={async () => undefined}
+        muiOptions={{ ratingDisplay: "stars", ratingStarSize: 36 }}
+      />
+    );
+
+    const three = screen.getByRole("radio", { name: "3" });
+    await user.click(three);
+    const ratingOptions = document.querySelector(".fe-rating-options");
+    expect(ratingOptions).toHaveAttribute("data-rating-display", "stars");
+    const stars = ratingOptions?.querySelectorAll(".fe-rating-label") ?? [];
+    expect(stars).toHaveLength(5);
+    expect(stars[0]).toHaveAttribute("data-filled", "true");
+    expect(stars[2]).toHaveAttribute("data-selected", "true");
+    expect(stars[3]).toHaveAttribute("data-filled", "false");
+    expect(stars[0]?.lastElementChild).toHaveTextContent("★");
+    expect(stars[0]?.lastElementChild).toHaveStyle({ fontSize: "36px" });
+  });
+
+  it("applies respondent MUI slots by question type", () => {
+    const schema: FormSchema = {
+      id: "type-slots",
+      version: 1,
+      title: "Type slots",
+      defaultLocale: "en",
+      fields: [
+        {
+          id: "choice",
+          type: "radio",
+          title: "Choice",
+          required: false,
+          options: [{ id: "one", label: "One" }]
+        },
+        { id: "text", type: "text", title: "Text", required: false },
+        { id: "notes", type: "textarea", title: "Notes", required: false }
+      ]
+    };
+
+    render(
+      <MuiContentRenderer
+        schema={schema}
+        locale="en"
+        appearance={{ choiceField: "grouped" }}
+        onSubmit={async () => undefined}
+        muiOptions={{
+          muiSlotProps: {
+            byType: {
+              radio: { choiceGroup: { className: "radio-frame-custom", sx: { p: 0, border: 0 } } },
+              text: { textField: { variant: "filled" } },
+              textarea: { textField: { variant: "standard" } }
+            }
+          }
+        }}
+      />
+    );
+
+    const radioFrame = document.querySelector<HTMLElement>(".radio-frame-custom");
+    expect(radioFrame).not.toBeNull();
+    if (radioFrame === null) throw new Error("Expected the radio choice group wrapper.");
+    expect(radioFrame).toHaveAttribute("data-field-type", "radio");
+    expect(getComputedStyle(radioFrame).padding).toBe("0px");
+    expect(screen.getByRole("textbox", { name: "Text" }).closest(".MuiFormControl-root")).toHaveClass(
+      "MuiTextField-root"
+    );
+    expect(screen.getByRole("textbox", { name: "Text" }).closest(".MuiInputBase-root")).toHaveClass(
+      "MuiFilledInput-root"
+    );
+    expect(screen.getByRole("textbox", { name: "Notes" }).closest(".MuiInputBase-root")).toHaveClass("MuiInput-root");
+  });
+
   it("disables MUI choice cards while submission is pending", async () => {
     const user = userEvent.setup();
     let release: (() => void) | undefined;

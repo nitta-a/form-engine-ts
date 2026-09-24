@@ -41,7 +41,10 @@ function MuiRespondentTextInput({
   ...aria
 }: RespondentTextInputProps) {
   const resolved = useResolvedMuiAdapterOptions();
-  const slotProps = resolved.muiSlotProps?.textField;
+  const slotProps: NonNullable<MuiAdapterOptions["muiSlotProps"]>["textField"] = {
+    ...resolved.muiSlotProps?.textField,
+    ...resolved.muiSlotProps?.byType?.[field.type]?.textField
+  };
   return (
     <TextField
       {...slotProps}
@@ -91,7 +94,7 @@ function MuiRespondentTextInput({
 }
 
 function MuiRespondentTextArea({
-  field: _field,
+  field,
   id,
   name,
   label: _label,
@@ -112,7 +115,10 @@ function MuiRespondentTextArea({
   ...aria
 }: RespondentTextAreaProps) {
   const resolved = useResolvedMuiAdapterOptions();
-  const slotProps = resolved.muiSlotProps?.textField;
+  const slotProps: NonNullable<MuiAdapterOptions["muiSlotProps"]>["textField"] = {
+    ...resolved.muiSlotProps?.textField,
+    ...resolved.muiSlotProps?.byType?.[field.type]?.textField
+  };
   return (
     <TextField
       {...slotProps}
@@ -141,7 +147,7 @@ function MuiRespondentTextArea({
 }
 
 function MuiRespondentSelect({
-  field: _field,
+  field,
   id,
   name,
   label,
@@ -158,7 +164,10 @@ function MuiRespondentSelect({
   ...aria
 }: RespondentSelectProps) {
   const resolved = useResolvedMuiAdapterOptions();
-  const slotProps = resolved.muiSlotProps?.textField;
+  const slotProps: NonNullable<MuiAdapterOptions["muiSlotProps"]>["textField"] = {
+    ...resolved.muiSlotProps?.textField,
+    ...resolved.muiSlotProps?.byType?.[field.type]?.textField
+  };
   const selectDisplayProps =
     typeof slotProps?.slotProps?.select === "function" ? undefined : slotProps?.slotProps?.select?.SelectDisplayProps;
   return (

@@ -112,6 +112,10 @@ A Field Type override still wins; otherwise the renderer uses the primitive and 
 />
 ```
 
+`ContentRenderer` renders rating choices as accessible left-to-right stars by default. Selected values fill every star up
+to the chosen value; the radio controls keep numeric accessible names. Set `ratingDisplay="number"` for the numeric scale
+or use `ratingStarSize` to set the star size.
+
 Primitive props include the field metadata, semantic state, constraints, and controlled change callback. Keep the
 provided input inside `slots.renderChoiceOption` to retain native input semantics while changing the option surface:
 
@@ -488,6 +492,8 @@ rendererです。`classNames`でTailwind utility classを追加でき、既存�
 クイズの正誤は回答欄内に文字・アイコン・`aria-live`付きで表示します。完了領域には
 `QuizEvaluationResult`の合計点を表示し、閾値がある場合は合否も表示します。保存・認可・
 一人一票の原子性はホスト側で強制してください。
+評価選択肢は既定で左から星表示になり、選択値まで塗りつぶします。ラジオ選択肢の名前は数字のまま
+アクセシブルに保たれます。`ratingDisplay="number"`で数字表示に切り替え、`ratingStarSize`で星のサイズを指定できます。
 
 ### AI survey creation
 

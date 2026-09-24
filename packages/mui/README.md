@@ -181,6 +181,10 @@ width options. `fieldEditorOptions` controls title, description, required, type 
 text limits, rating bounds, and number limits. Each control can be `editable`, `readOnly`, or `hidden`, and `byType`
 can override controls for individual question types. `localizationOptions.defaultLocaleControl` independently controls
 the default locale input. Set `dense` to reduce section, editor, option, and toolbar spacing.
+`advancedSettings: "hidden"` removes the advanced accordion; `numberLimitsPlacement: "afterRequired"` moves number
+min/max/step controls below Required; `shuffleOptionsPlacement: "belowQuestion"` moves option ordering to the bottom of
+the question card. Set `showQuestionNumber: false` to remove the number left of each collapsed question title.
+Use React's `slots.fieldEditorBelowRequired` for app-specific controls in that same position.
 `buttonVariants` can override the MUI variant for `primary`, `secondary`, and `danger` actions independently.
 `localizationOptions.availableLocales` supplies display-ready locale candidates independently from the policy; when
 both are present, only candidates allowed by `allowedLocales` are shown. `placement` supports `top`,
@@ -203,6 +207,28 @@ for focused customization. `muiSlotProps` also supports `textField`, `select`, `
 `fieldEditorMode="single"`, the default `fieldEditorPreview` renders a numbered, clickable MUI preview with border,
 spacing, hover, and focus-visible styling. Override its appearance with `muiSlotProps.questionPreview` or replace it
 with `slots.fieldEditorPreview`.
+
+For respondent rendering, `muiSlotProps.byType` accepts `textField` props for text and textarea inputs and `choiceGroup`
+Paper props for grouped radio and checkbox wrappers. Choice option cards keep their own styling. Rating scales use stars
+by default, filled through the selected value; set `ratingDisplay: "number"` for numeric options and `ratingStarSize` to
+set the star size. The radio options keep numeric accessible names.
+
+```tsx
+<MuiContentRenderer
+  schema={schema}
+  muiOptions={{
+    ratingDisplay: "stars",
+    ratingStarSize: 32,
+    muiSlotProps: {
+      byType: {
+        radio: { choiceGroup: { sx: { p: 1 } } },
+        text: { textField: { variant: "filled" } },
+        textarea: { textField: { slotProps: { htmlInput: { style: { padding: 12 } } } } }
+      }
+    }
+  }}
+/>
+```
 
 ```tsx
 <MuiFormBuilder
@@ -361,6 +387,15 @@ field・feedback・summary・poll result slotだけを提供します。投票�
 集計済みサマリーは`/survey-summary`、survey client連携は`/survey-domain`から個別にimportできます。
 v7では必須の`custom-survey-client` peerとrootのdomain exportを維持し、optional peer化と
 domain adapterの`/survey-domain`限定は次のmajorで行う移行方針です。
+
+MUIの質問編集では`fieldEditorOptions.advancedSettings: "hidden"`で「その他」を隠し、
+`numberLimitsPlacement: "afterRequired"`で数値の最小値・最大値・刻み幅を必須の直後へ移動できます。
+`shuffleOptionsPlacement: "belowQuestion"`は選択肢の表示順設定を質問カード下部へ置き、
+`showQuestionNumber: false`は折りたたみ時の質問タイトル左側の番号を隠します。
+同じ位置に独自の項目を置く場合はReactの`slots.fieldEditorBelowRequired`を使えます。
+回答画面では`muiSlotProps.byType`から質問タイプごとにradio/checkboxの質問枠とtext/textareaの入力欄を設定できます。
+評価は既定で星表示になり、選択値まで塗りつぶします。`ratingDisplay: "number"`で数字表示に切り替え、
+`ratingStarSize`で星のサイズを指定できます。
 
 ## Multi-page editing
 

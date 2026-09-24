@@ -468,6 +468,8 @@ function DefaultField({
   readonly primitiveComponents?: FormRendererComponents;
   readonly radioTextInputEnabled: boolean;
   readonly optionOrderSeed?: string;
+  readonly ratingDisplay?: "number" | "stars";
+  readonly ratingStarSize?: number;
 }) {
   const { field, value, setValue, inputId, error, translate } = props;
   const selectedOption = selectedOptionId(value);
@@ -857,7 +859,7 @@ function DefaultField({
           {field.title}
           {requiredIndicator(field.required, props.a11y)}
         </legend>
-        <div className="fe-rating-options">
+        <div className="fe-rating-options" data-rating-display={props.ratingDisplay ?? "number"}>
           {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((rating) => {
             const optionId = `${inputId}-${rating}`;
             return (
@@ -867,6 +869,7 @@ function DefaultField({
                 key={rating}
                 data-option-id={rating}
                 data-selected={value === rating ? "true" : "false"}
+                data-filled={typeof value === "number" && rating <= value ? "true" : "false"}
               >
                 <Rating
                   {...primitiveBase}
@@ -876,9 +879,15 @@ function DefaultField({
                   checked={value === rating}
                   min={min}
                   max={max}
+                  {...(props.ratingDisplay === "stars" ? { "aria-label": String(rating) } : {})}
                   onChange={() => setValue(rating)}
                 />
-                <span>{rating}</span>
+                <span
+                  aria-hidden={props.ratingDisplay === "stars" ? true : undefined}
+                  style={props.ratingStarSize === undefined ? undefined : { fontSize: props.ratingStarSize }}
+                >
+                  {props.ratingDisplay === "stars" ? "★" : rating}
+                </span>
               </label>
             );
           })}
@@ -1044,6 +1053,8 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly clientKey?: string;
   /** Seed used to keep shuffled choice options stable for a respondent. */
   readonly optionOrderSeed?: string;
+  readonly ratingDisplay?: "number" | "stars";
+  readonly ratingStarSize?: number;
   readonly estimateSecondsPerQuestion?: number;
   /** Metadata copied into the submission context for typed application integrations. */
   readonly submissionMetadata?: BaseSubmissionMetadata;
@@ -1311,6 +1322,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   challengeToken,
   clientKey,
   optionOrderSeed: providedOptionOrderSeed,
+  ratingDisplay = "stars",
+  ratingStarSize,
   estimateSecondsPerQuestion,
   idFormat: providedIdFormat = "uuid",
   submissionMetadata,
@@ -2733,7 +2746,9 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
                   : { renderCharacterCount: slots.renderCharacterCount }),
                 ...(fieldConfig?.[field.id]?.a11y === undefined ? {} : { a11y: fieldConfig[field.id]?.a11y }),
                 ...(classNames === undefined ? {} : { classNames }),
-                ...(optionOrderSeed === undefined ? {} : { optionOrderSeed })
+                ...(optionOrderSeed === undefined ? {} : { optionOrderSeed }),
+                ratingDisplay,
+                ...(ratingStarSize === undefined ? {} : { ratingStarSize })
               };
               if (slots.renderField !== undefined) {
                 return (

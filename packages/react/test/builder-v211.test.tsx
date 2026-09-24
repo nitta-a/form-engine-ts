@@ -27,6 +27,18 @@ function BuilderHarness({
 }
 
 describe("FormBuilder v2.1.1", () => {
+  it("renders the below-required field editor slot", () => {
+    render(
+      <BuilderHarness
+        slots={{
+          fieldEditorBelowRequired: ({ field }) => <div data-testid="below-required">Extra for {field.title}</div>
+        }}
+      />
+    );
+
+    expect(screen.getByTestId("below-required")).toHaveTextContent("Extra for Seed");
+  });
+
   it("uses the first allowed type when text is disallowed", async () => {
     const user = userEvent.setup();
     render(

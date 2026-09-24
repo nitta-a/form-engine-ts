@@ -245,6 +245,29 @@ describe("MuiFormBuilder", () => {
     expect(screen.getByTestId("question-preview")).toHaveAttribute("data-field-id", "first");
   });
 
+  it("hides the left question number when configured", () => {
+    const singleSchema: FormSchema = {
+      ...schema,
+      fields: [
+        { id: "first", type: "text", title: "First", required: false },
+        { id: "second", type: "text", title: "Second", required: false }
+      ]
+    };
+    render(
+      <MuiFormBuilder
+        schema={singleSchema}
+        onChange={() => undefined}
+        fieldEditorMode="single"
+        activeFieldId="first"
+        features={{ pages: false, localization: false, conditions: false }}
+        muiOptions={{ fieldEditorOptions: { showQuestionNumber: false } }}
+      />
+    );
+
+    expect(screen.getByText("Second")).toBeInTheDocument();
+    expect(screen.queryByText("2.")).not.toBeInTheDocument();
+  });
+
   it("lets applications replace the standard MUI question preview", () => {
     render(
       <MuiFormBuilder
@@ -672,6 +695,58 @@ describe("MuiFormBuilder", () => {
     await user.click(screen.getByRole("button", { name: "Advanced" }));
     expect(screen.getByRole("spinbutton", { name: "Minimum" })).toBeDisabled();
     expect(screen.getByRole("spinbutton", { name: "Maximum" })).toBeDisabled();
+  });
+
+  it("places number limits below required and hides advanced settings on request", () => {
+    const numberSchema: FormSchema = {
+      ...schema,
+      fields: [{ id: "amount", type: "number", title: "Amount", required: true, min: 1, max: 10, step: 1 }]
+    };
+    render(
+      <MuiFormBuilder
+        schema={numberSchema}
+        onChange={() => undefined}
+        features={{ pages: false, localization: false, conditions: false }}
+        muiOptions={{
+          fieldEditorOptions: {
+            advancedSettings: "hidden",
+            numberLimitsPlacement: "afterRequired",
+            showQuestionNumber: false
+          }
+        }}
+      />
+    );
+
+    expect(screen.queryByText("Advanced")).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Minimum" })).toHaveValue(1);
+    expect(screen.getByRole("spinbutton", { name: "Maximum" })).toHaveValue(10);
+    expect(screen.getByRole("spinbutton", { name: "Step" })).toHaveValue(1);
+  });
+
+  it("places option display order below the question editor", () => {
+    const choiceSchema: FormSchema = {
+      ...schema,
+      fields: [
+        {
+          id: "choice",
+          type: "radio",
+          title: "Choice",
+          required: false,
+          options: [{ id: "one", label: "One" }]
+        }
+      ]
+    };
+    render(
+      <MuiFormBuilder
+        schema={choiceSchema}
+        onChange={() => undefined}
+        features={{ pages: false, localization: false, conditions: false }}
+        muiOptions={{ fieldEditorOptions: { advancedSettings: "hidden", shuffleOptionsPlacement: "belowQuestion" } }}
+      />
+    );
+
+    expect(screen.getByRole("checkbox", { name: "Option display order" })).toBeInTheDocument();
+    expect(screen.queryByText("Advanced")).not.toBeInTheDocument();
   });
 
   it("keeps localization actions and tabs on one line and updates the summary and empty state", async () => {

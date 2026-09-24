@@ -996,6 +996,7 @@ export function FormBuilder(props: FormBuilderProps) {
   const OptionEditorSlot = slots?.optionEditor;
   const OptionEditorAfter = slots?.optionEditorAfter;
   const FieldEditorAfter = slots?.fieldEditorAfter;
+  const FieldEditorBelowRequiredSlot = slots?.fieldEditorBelowRequired;
   const PagesSlot = slots?.pages;
   const LocalizationSlot = slots?.localization;
   const TranslationActionsSlot = slots?.translationActions;
@@ -2086,6 +2087,9 @@ export function FormBuilder(props: FormBuilderProps) {
                         currentLocale={editingLocale}
                         translate={translate}
                         {...(slots === undefined ? {} : { slots })}
+                        {...(FieldEditorBelowRequiredSlot === undefined
+                          ? {}
+                          : { fieldEditorBelowRequired: FieldEditorBelowRequiredSlot })}
                         {...(FieldEditorAfter === undefined ? {} : { fieldEditorAfter: FieldEditorAfter })}
                         {...(OptionEditorAfter === undefined ? {} : { optionEditorAfter: OptionEditorAfter })}
                         {...(policy === undefined ? {} : { policy })}
@@ -2201,6 +2205,19 @@ export function FormBuilder(props: FormBuilderProps) {
                               updateField(field.id, (current) => ({ ...current, required: checked }))
                             }
                             label={translate("builder.required")}
+                          />
+                        )}
+                        {FieldEditorBelowRequiredSlot === undefined ? null : (
+                          <FieldEditorBelowRequiredSlot
+                            schema={schema}
+                            field={field}
+                            index={index}
+                            translate={translate}
+                            readOnly={readOnly}
+                            actions={actions}
+                            components={components}
+                            {...(policy === undefined ? {} : { policy })}
+                            {...(onChange === undefined ? {} : { onChange })}
                           />
                         )}
                       </div>
@@ -2467,7 +2484,7 @@ export function FormBuilder(props: FormBuilderProps) {
                                   return remaining;
                                 })
                               }
-                              label={translate("builder.shuffleOptions")}
+                              label={translate("builder.optionDisplayOrder")}
                             />
                           )}
                           {field.options.map((option, optionIndex) =>

@@ -72,9 +72,17 @@ interface MuiFieldEditorOptions {
     readonly textLimits?: FieldPropertyControlMode;
     readonly ratingBounds?: FieldPropertyControlMode;
     readonly numberLimits?: FieldPropertyControlMode;
+    readonly advancedSettings?: "visible" | "hidden";
+    readonly numberLimitsPlacement?: "advanced" | "afterRequired";
+    readonly shuffleOptionsPlacement?: "advanced" | "belowQuestion";
+    readonly showQuestionNumber?: boolean;
     /** Per-question-type overrides take precedence over the base controls. */
     readonly byType?: Partial<Record<QuestionType, Partial<FieldEditorControlsConfig>>>;
     readonly fieldTypeOptions?: FieldTypeSelectOptionsConfig;
+}
+interface MuiRespondentTypeSlotProps {
+    readonly textField?: MuiComponentSlotProps<TextFieldProps>;
+    readonly choiceGroup?: Partial<PaperProps>;
 }
 interface MuiSlotProps {
     readonly questionPreview?: MuiComponentSlotProps<CardActionAreaProps>;
@@ -89,6 +97,7 @@ interface MuiSlotProps {
     readonly radio?: MuiComponentSlotProps<RadioProps>;
     readonly button?: MuiComponentSlotProps<ButtonProps>;
     readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
+    readonly byType?: Partial<Record<QuestionType, MuiRespondentTypeSlotProps>>;
 }
 interface MuiBuilderSlotProps {
     readonly questionPreview?: MuiComponentSlotProps<CardActionAreaProps>;
@@ -103,6 +112,7 @@ interface MuiBuilderSlotProps {
     readonly radio?: MuiComponentSlotProps<RadioProps>;
     readonly button?: MuiComponentSlotProps<ButtonProps>;
     readonly iconButton?: MuiComponentSlotProps<IconButtonProps>;
+    readonly byType?: Partial<Record<QuestionType, MuiRespondentTypeSlotProps>>;
 }
 interface MuiAdapterOptions {
     readonly size?: "small" | "medium";
@@ -123,6 +133,8 @@ interface MuiAdapterOptions {
     readonly fieldEditorOptions?: MuiFieldEditorOptions;
     readonly localizationOptions?: MuiLocalizationOptions;
     readonly localization?: MuiLocalizationSlotOptions;
+    readonly ratingDisplay?: "number" | "stars";
+    readonly ratingStarSize?: number;
     readonly muiSlotProps?: MuiBuilderSlotProps;
 }
 interface ResolvedMuiAdapterOptions {
@@ -145,6 +157,8 @@ interface ResolvedMuiAdapterOptions {
     readonly localizationOptions?: MuiLocalizationOptions;
     readonly localization?: MuiLocalizationSlotOptions;
     readonly muiSlotProps?: MuiBuilderSlotProps;
+    readonly ratingDisplay?: "number" | "stars";
+    readonly ratingStarSize?: number;
 }
 declare const DEFAULT_MUI_SECTION_ORDER: readonly BuilderSectionName[];
 declare const MUI_LOCALIZATION_SECTION_ORDERS: Readonly<Record<LocalizationSectionPlacement, readonly BuilderSectionName[]>>;
@@ -738,4 +752,4 @@ interface TranslationWorkspaceProps {
 }
 declare function TranslationWorkspace(props: TranslationWorkspaceProps): react.JSX.Element;
 
-export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, ContentModeSettings, type ContentModeSettingsProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, MuiAuthoringFieldAction, type MuiAuthoringFieldActionName, type MuiAuthoringFieldActionProps, MuiAuthoringPrompt, type MuiAuthoringPromptProps, MuiAuthoringSuggestionPreview, type MuiAuthoringSuggestionPreviewProps, MuiBuilderNavigator, type MuiBuilderNavigatorProps, type MuiBuilderOverrides, MuiBuilderPreview, type MuiBuilderPreviewProps, type MuiBuilderSlotProps, MuiBuilderValidationSummary, type MuiBuilderValidationSummaryProps, type MuiBuilderValidationTarget, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, type MuiComponentSlotProps, type MuiContentModeControls, type MuiContentModeOptions, MuiContentModeSettingsSlot, MuiContentRenderer, type MuiContentRendererOptions, type MuiContentRendererProps, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorPreviewSlot, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormBuilderValidationIssue, type MuiFormBuilderValidationState, MuiFormCreationAssistant, type MuiFormCreationAssistantProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiPagesEditor, type MuiPagesEditorProps, MuiPagesEditorSlot, type MuiPollRendererOptions, type MuiPollResultItem, MuiPollResultView, type MuiPollResultViewProps, type MuiPollResultViewSlotProps, type MuiPollResultViewSlots, MuiPollResults, MuiPollResultsEmbed, type MuiPollResultsEmbedProps, type MuiPollResultsProps, type MuiPollResultsSlotProps, type MuiPollResultsSlots, type MuiQuizRendererOptions, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, QuizFieldEditor, QuizOptionEditor, QuizResultView, type QuizResultViewLabels, type QuizResultViewProps, type QuizResultViewSlotProps, type QuizResultViewSlots, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, type TranslationComparisonColumnHeaderProps, type TranslationComparisonEmptyStateOptions, type TranslationComparisonEmptyStateProps, type TranslationComparisonLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, type TypedMuiContentRendererProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiContentModeSettingsSlot, createMuiErrorMessageAdapter, createMuiFieldEditorPreviewSlot, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiPagesEditorSlot, createMuiRespondentComponents, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, muiRespondentComponents, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };
+export { AddLocaleDropdown, type AddLocaleDropdownProps, type BuilderSectionName, ConditionEditor, type ConditionEditorProps, ContentModeSettings, type ContentModeSettingsProps, DEFAULT_MUI_SECTION_ORDER, type LocaleOptionItem, type LocalizationSectionPlacement, MUI_LOCALIZATION_SECTION_ORDERS, type MuiAdapterOptions, MuiAuthoringFieldAction, type MuiAuthoringFieldActionName, type MuiAuthoringFieldActionProps, MuiAuthoringPrompt, type MuiAuthoringPromptProps, MuiAuthoringSuggestionPreview, type MuiAuthoringSuggestionPreviewProps, MuiBuilderNavigator, type MuiBuilderNavigatorProps, type MuiBuilderOverrides, MuiBuilderPreview, type MuiBuilderPreviewProps, type MuiBuilderSlotProps, MuiBuilderValidationSummary, type MuiBuilderValidationSummaryProps, type MuiBuilderValidationTarget, MuiButtonAdapter, type MuiButtonVariant, MuiCheckboxAdapter, MuiChoiceGroupSlot, type MuiComponentSlotProps, type MuiContentModeControls, type MuiContentModeOptions, MuiContentModeSettingsSlot, MuiContentRenderer, type MuiContentRendererOptions, type MuiContentRendererProps, MuiErrorMessageAdapter, type MuiFieldEditorOptions, MuiFieldEditorPreviewSlot, MuiFieldEditorSlot, MuiFieldsetAdapter, MuiFormBuilder, MuiFormBuilderContext, type MuiFormBuilderContextValue, type MuiFormBuilderProps, type MuiFormBuilderValidationIssue, type MuiFormBuilderValidationState, MuiFormCreationAssistant, type MuiFormCreationAssistantProps, type MuiFormEngineI18nOptions, MuiIconButtonAdapter, type MuiLayoutOptions, type MuiLocaleOption, type MuiLocalizationOptions, MuiLocalizationSlot, type MuiLocalizationSlotOptions, MuiOptionEditorSlot, MuiPagesEditor, type MuiPagesEditorProps, MuiPagesEditorSlot, type MuiPollRendererOptions, type MuiPollResultItem, MuiPollResultView, type MuiPollResultViewProps, type MuiPollResultViewSlotProps, type MuiPollResultViewSlots, MuiPollResults, MuiPollResultsEmbed, type MuiPollResultsEmbedProps, type MuiPollResultsProps, type MuiPollResultsSlotProps, type MuiPollResultsSlots, type MuiQuizRendererOptions, type MuiRespondentTypeSlotProps, MuiSectionAdapter, MuiSelectAdapter, type MuiSlotProps, type MuiSubmissionSettingsOptions, MuiSurveyResponseSummary, type MuiSurveyResponseSummaryDataProps, MuiSurveyResponseSummaryDomain, type MuiSurveyResponseSummaryDomainProps, type MuiSurveyResponseSummarySlotProps, type MuiSurveyResponseSummarySlots, MuiTextAreaAdapter, MuiTextInputAdapter, MuiToolbarSlot, QuizFieldEditor, QuizOptionEditor, QuizResultView, type QuizResultViewLabels, type QuizResultViewProps, type QuizResultViewSlotProps, type QuizResultViewSlots, type ResolvedMuiAdapterOptions, TargetLocaleHeaderToolbar, type TargetLocaleOption, TargetLocaleSelector, type TargetLocaleToolbarProps, type TranslationComparisonColumnHeaderProps, type TranslationComparisonEmptyStateOptions, type TranslationComparisonEmptyStateProps, type TranslationComparisonLocaleToolbarProps, TranslationComparisonWorkspace, type TranslationComparisonWorkspaceProps, type TranslationLocaleActionProps, type TranslationLocaleActionsProps, TranslationWorkspace, type TranslationWorkspaceProps, type TypedMuiContentRendererProps, createMuiBuilderComponents, createMuiBuilderProps, createMuiBuilderSlots, createMuiButtonAdapter, createMuiCheckboxAdapter, createMuiContentModeSettingsSlot, createMuiErrorMessageAdapter, createMuiFieldEditorPreviewSlot, createMuiFieldEditorSlot, createMuiFieldsetAdapter, createMuiIconButtonAdapter, createMuiLocalizationSlot, createMuiOptionEditorSlot, createMuiPagesEditorSlot, createMuiRespondentComponents, createMuiSectionAdapter, createMuiSelectAdapter, createMuiTextAreaAdapter, createMuiTextInputAdapter, createMuiToolbarSlot, mergeMuiAdapterOptions, muiBuilderComponents, muiBuilderSlots, muiDefaultFieldTypeIcon, muiDefaultIconResolver, muiRespondentComponents, resolveMuiAdapterOptions, useResolvedMuiAdapterOptions };

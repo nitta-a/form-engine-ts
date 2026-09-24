@@ -119,6 +119,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     translate,
     slots,
     fieldEditorAfter: FieldEditorAfter,
+    fieldEditorBelowRequired: FieldEditorBelowRequired,
     optionEditorAfter: OptionEditorAfter,
     fieldEditorControls,
     fieldTypeOptions: fieldTypeOptionsConfig
@@ -139,6 +140,8 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     const titleErrorId = field.title.trim().length === 0 ? `mui-field-${field.id}-title-error` : undefined;
     const FieldTypeSelect = slots?.fieldTypeSelect;
     const FieldEditorHeader = slots?.fieldEditorHeader;
+    const numberLimitsBelowRequired = fieldEditorOptions.numberLimitsPlacement === "afterRequired";
+    const shuffleOptionsBelowQuestion = fieldEditorOptions.shuffleOptionsPlacement === "belowQuestion";
     const fieldTypeSelectId = `mui-field-${field.id}-type`;
     const fieldTypeSelectLabel = translate("builder.type");
     const generatedFieldTypeOptions: readonly BuilderSelectOption<QuestionType>[] = FIELD_TYPES.filter((type) =>
@@ -173,12 +176,12 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const hasAdvancedSettings =
       (features?.pages !== false && schema.pages !== undefined) ||
-      (field.type === "number" && controls.numberLimits !== "hidden") ||
+      (field.type === "number" && controls.numberLimits !== "hidden" && !numberLimitsBelowRequired) ||
       (field.type === "rating" && controls.ratingBounds !== "hidden") ||
       field.type === "date" ||
       field.type === "time" ||
       ((field.type === "text" || field.type === "textarea") && controls.textLimits !== "hidden") ||
-      ("options" in field && controls.options !== "hidden") ||
+      ("options" in field && controls.options !== "hidden" && !shuffleOptionsBelowQuestion) ||
       (features?.conditions !== false && conditionSources.length > 0 && controls.displayConditions !== "hidden");
     return (
       <Card
@@ -278,7 +281,39 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
               onChange={(checked) => actions.updateField(field.id, (current) => ({ ...current, required: checked }))}
             />
           )}
-          {hasAdvancedSettings ? (
+          {FieldEditorBelowRequired === undefined ? null : (
+            <FieldEditorBelowRequired
+              schema={schema}
+              field={field}
+              index={index}
+              translate={translate}
+              readOnly={readOnly}
+              actions={actions}
+              components={components}
+              {...(policy === undefined ? {} : { policy })}
+              {...(onChange === undefined ? {} : { onChange })}
+            />
+          )}
+          {field.type === "number" && numberLimitsBelowRequired && controls.numberLimits !== "hidden" ? (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={resolved.dense ? 1 : 2}>
+              {(["min", "max", "step"] as const).map((property) => (
+                <TextInput
+                  key={property}
+                  id={`mui-field-${field.id}-${property}`}
+                  label={translate(
+                    property === "step" ? "builder.step" : property === "min" ? "builder.minimum" : "builder.maximum"
+                  )}
+                  type="number"
+                  value={field[property] === undefined ? "" : String(field[property])}
+                  disabled={readOnly || controls.numberLimits === "readOnly"}
+                  onChange={(value) =>
+                    actions.updateField(field.id, (current) => updateNumberProperty(current, property, value))
+                  }
+                />
+              ))}
+            </Stack>
+          ) : null}
+          {fieldEditorOptions.advancedSettings !== "hidden" && hasAdvancedSettings ? (
             <Accordion
               {...resolved.muiSlotProps?.accordion}
               data-mui-slot="field-editor-advanced"
@@ -303,7 +338,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                       onChange={(value) => actions.assignFieldToPage(field.id, value.length === 0 ? null : value)}
                     />
                   )}
-                  {"options" in field && controls.options !== "hidden" ? (
+                  {"options" in field && controls.options !== "hidden" && !shuffleOptionsBelowQuestion ? (
                     <Checkbox
                       id={`mui-field-${field.id}-shuffle-options`}
                       name={`fields.${field.id}.shuffleOptions`}
@@ -352,7 +387,7 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                       </Stack>
                     )
                   ) : null}
-                  {field.type === "number" && controls.numberLimits !== "hidden" ? (
+                  {field.type === "number" && controls.numberLimits !== "hidden" && !numberLimitsBelowRequired ? (
                     <TextInput
                       id={`mui-field-${field.id}-step`}
                       label={translate("builder.step")}
@@ -498,6 +533,26 @@ export function createMuiFieldEditorSlot(options?: MuiAdapterOptions): Component
                 </Stack>
               </AccordionDetails>
             </Accordion>
+          ) : null}
+          {"options" in field &&
+          controls.options !== "hidden" &&
+          shuffleOptionsBelowQuestion &&
+          (field.type === "select" || field.type === "radio" || field.type === "multi-select") ? (
+            <Checkbox
+              id={`mui-field-${field.id}-shuffle-options`}
+              name={`fields.${field.id}.shuffleOptions`}
+              label={translate("builder.optionDisplayOrder")}
+              checked={field.shuffleOptions === true}
+              disabled={readOnly || controls.options === "readOnly"}
+              onChange={(checked) =>
+                actions.updateField(field.id, (current) => {
+                  if (!("options" in current)) return current;
+                  if (checked) return { ...current, shuffleOptions: true };
+                  const { shuffleOptions: _removed, ...remaining } = current;
+                  return remaining;
+                })
+              }
+            />
           ) : null}
           {currentLocale.length === 0 ? null : (
             <Stack spacing={resolved.dense ? 1 : 2}>

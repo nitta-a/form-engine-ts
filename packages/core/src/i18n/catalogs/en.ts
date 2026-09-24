@@ -148,6 +148,7 @@ export const EN_MESSAGES: Readonly<Record<FormEngineTranslationKey, string>> = O
   "builder.required": "Required",
   "builder.options": "Options",
   "builder.shuffleOptions": "Shuffle options for respondents",
+  "builder.optionDisplayOrder": "Option display order",
   "builder.pinOption": "Keep this option in place",
   "builder.optionTextInput": "Allow additional text",
   "builder.openAt": "Open at (ISO timestamp)",

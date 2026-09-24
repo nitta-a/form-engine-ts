@@ -130,6 +130,7 @@ export type KnownBuilderTranslationKey =
   | "builder.required"
   | "builder.options"
   | "builder.shuffleOptions"
+  | "builder.optionDisplayOrder"
   | "builder.pinOption"
   | "builder.optionTextInput"
   | "builder.openAt"

@@ -35,9 +35,11 @@ export function createMuiFieldEditorPreviewSlot(
         }
       >
         <Stack direction="row" spacing={1} alignItems="center">
-          <Typography component="span" variant="body2" color="text.secondary" aria-hidden="true">
-            {index + 1}.
-          </Typography>
+          {resolved.fieldEditorOptions?.showQuestionNumber === false ? null : (
+            <Typography component="span" variant="body2" color="text.secondary" aria-hidden="true">
+              {index + 1}.
+            </Typography>
+          )}
           <Typography component="span" variant="body1">
             {field.title}
           </Typography>
