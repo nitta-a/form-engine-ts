@@ -3,6 +3,13 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.2.0 — 2026-09-27
+
+- Added form-wide runtime settings for response windows, response caps, and candidate icon/color tokens without changing the schema version.
+- Added runtime settings storage and lifecycle support across the built-in adapters, with response caps enforced across all schema versions.
+- Added builder and renderer support for editing and displaying current settings, plus migration from the published schema's legacy response window and cap.
+- Added atomic cross-version response limit checks, cap reduction behavior, and Web Locks coordination for LocalStorage where supported.
+
 ## v8.1.5 — 2026-09-21
 
 - Added the redesigned AI survey creation initial dialog state with localized notices, prompts, quick replies, and input guidance.

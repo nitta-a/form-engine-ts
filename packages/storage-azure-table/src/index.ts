@@ -2,6 +2,7 @@ import type { TransactionAction } from "@azure/data-tables";
 import type {
   BaseSubmissionMetadata,
   FormAnalytics,
+  FormRuntimeSettings,
   FormSchema,
   FormSubmission,
   FormSubmissionValidationSource,
@@ -24,6 +25,7 @@ import type {
 } from "@form-engine-ts/core";
 import {
   aggregateResponses,
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   assertValidFormSubmission,
   assertValidFormSubmissionWith,
@@ -126,6 +128,8 @@ export interface AzureTableStorageOptions<T = FormSubmission> {
 
 export interface AzureTableStorageAdapter<TMeta extends BaseSubmissionMetadata = BaseSubmissionMetadata>
   extends PagedSubmissionStorageAdapter {
+  getRuntimeSettings?(formId: string): Promise<FormRuntimeSettings | null>;
+  saveRuntimeSettings?(settings: FormRuntimeSettings): Promise<void>;
   readonly listTextAnswerPage: (
     formId: string,
     fieldIdOrOptions?: string | TextAnswerPageQueryOptions,
@@ -815,18 +819,31 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
   };
 
   const lifecycleBackend: FormLifecycleBackend = {
-    resources: ["schema", "submission"],
+    resources: ["schema", "submission", "runtimeSettings"],
     async list(formId) {
       const records: FormResource[] = [];
-      for (const kind of ["schema", "submission"] as const) {
-        const client = kind === "schema" ? await schemaClient(formId) : await submissionClient(formId);
-        const filter =
-          kind === "schema" ? `PartitionKey eq '${escapeOData(formId)}' and kind eq 'schema'` : queryFilter(formId, {});
+      for (const kind of ["schema", "submission", "runtimeSettings"] as const) {
+        const isSchema = kind === "schema" || kind === "runtimeSettings";
+        const client = isSchema ? await schemaClient(formId) : await submissionClient(formId);
+        const filter = isSchema
+          ? `PartitionKey eq '${escapeOData(formId)}' and kind eq '${kind === "schema" ? "schema" : "runtimeSettings"}'`
+          : queryFilter(formId, {});
         for await (const raw of client.listEntities({ queryOptions: { filter } })) {
-          if (kind === "schema" && raw.kind !== "schema") continue;
+          if (isSchema && raw.kind !== kind) continue;
           const value =
-            kind === "schema" ? parseSchemaEntity(raw, options.schemaValidation) : deserializeIfMatching(raw);
-          if (value === undefined || ("formId" in value ? value.formId : value.id) !== formId) continue;
+            kind === "schema"
+              ? parseSchemaEntity(raw, options.schemaValidation)
+              : kind === "runtimeSettings"
+                ? parseJson(raw.payload, "runtime settings")
+                : deserializeIfMatching(raw);
+          const resourceFormId = isRecord(value)
+            ? typeof value.formId === "string"
+              ? value.formId
+              : typeof value.id === "string"
+                ? value.id
+                : undefined
+            : undefined;
+          if (resourceFormId !== formId) continue;
           if (typeof raw.partitionKey !== "string" || typeof raw.rowKey !== "string")
             throw new TypeError("Missing entity keys.");
           records.push({ kind, id: JSON.stringify([raw.partitionKey, raw.rowKey]), value: { raw, value, formId } });
@@ -841,7 +858,10 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
       const { raw, formId } = resource.value;
       if (typeof raw.partitionKey !== "string" || typeof raw.rowKey !== "string" || typeof raw.etag !== "string")
         throw new TypeError("Conditional deletion requires entity keys and an ETag.");
-      const client = resource.kind === "schema" ? await schemaClient(formId) : await submissionClient(formId);
+      const client =
+        resource.kind === "schema" || resource.kind === "runtimeSettings"
+          ? await schemaClient(formId)
+          : await submissionClient(formId);
       try {
         await client.deleteEntity(raw.partitionKey, raw.rowKey, { etag: raw.etag });
         return 1;
@@ -899,6 +919,31 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
         if (isNotFound(error)) return null;
         throw error;
       }
+    },
+    async getRuntimeSettings(formId) {
+      try {
+        const entity = await (await schemaClient(formId)).getEntity(formId, "runtime-settings");
+        const settings = parseJson(entity.payload, "runtime settings") as FormRuntimeSettings;
+        assertValidFormRuntimeSettings(settings);
+        if (settings.formId !== formId) throw new Error("Azure Table runtime settings have inconsistent metadata.");
+        return cloneJson(settings);
+      } catch (error) {
+        if (isNotFound(error)) return null;
+        throw error;
+      }
+    },
+    async saveRuntimeSettings(settings) {
+      ensureWritable();
+      assertValidFormRuntimeSettings(settings);
+      await (await schemaClient(settings.formId)).upsertEntity(
+        {
+          partitionKey: settings.formId,
+          rowKey: "runtime-settings",
+          kind: "runtimeSettings",
+          payload: JSON.stringify(settings)
+        },
+        "Replace"
+      );
     },
     async listSchemas() {
       const found: FormSchema[] = [];
@@ -1001,7 +1046,13 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
           code: "transaction_unsupported"
         });
       const partitionKey = codec.createPartitionKey(stored);
-      if (codec.createPartitionKeyFromQuery(stored.formId, { version: stored.formVersion }) !== partitionKey)
+      const formScope = saveOptions.responseLimitScope === "form";
+      const capacityVersion = formScope ? undefined : stored.formVersion;
+      if (
+        codec.createPartitionKeyFromQuery(stored.formId, {
+          ...(capacityVersion === undefined ? {} : { version: capacityVersion })
+        }) !== partitionKey
+      )
         throw new Error("Atomic response limits require one Azure Table partition per form.");
       const rowKey = codec.createRowKey(stored);
       const payloadHash = await hashFormSubmissionPayload(stored);
@@ -1030,14 +1081,14 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
       } catch (error) {
         if (!isNotFound(error)) throw error;
       }
-      const capacityRowKey = `capacity_${stored.formVersion}`;
+      const capacityRowKey = formScope ? "capacity_form" : `capacity_${stored.formVersion}`;
       for (let attempt = 0; attempt < 5; attempt += 1) {
         let capacity: Record<string, unknown>;
         try {
           capacity = await client.getEntity(partitionKey, capacityRowKey);
         } catch (error) {
           if (!isNotFound(error)) throw error;
-          const count = await adapter.countSubmissions(stored.formId, stored.formVersion);
+          const count = await adapter.countSubmissions(stored.formId, capacityVersion);
           try {
             await client.createEntity({ partitionKey, rowKey: capacityRowKey, kind: "capacity", count });
           } catch (createError) {
@@ -1045,7 +1096,7 @@ export function createAzureTableStorage<TMeta extends BaseSubmissionMetadata | u
           }
           continue;
         }
-        const count = await adapter.countSubmissions(stored.formId, stored.formVersion);
+        const count = await adapter.countSubmissions(stored.formId, capacityVersion);
         if (count >= maxResponses) return { status: "limit_reached" };
         if (typeof capacity.etag !== "string") throw new Error("Azure Table capacity entity is missing an ETag.");
         const actions: TransactionAction[] = [

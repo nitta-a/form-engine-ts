@@ -28,9 +28,13 @@ operations use the same core contracts regardless of the backing database.
 from `SubmissionQueryOptions`; submission pipelines no longer fall back to scanning every page.
 
 Built-in adapters also expose `saveSubmissionWithinLimit(submission, maxResponses, options?)`. This operation checks
-capacity and saves atomically for one form version, preserves idempotent duplicate/conflict results, and returns
+capacity and saves atomically for one form version by default, or all versions when
+`options.responseLimitScope` is `"form"`. It preserves idempotent duplicate/conflict results and returns
 `{ status: "limit_reached" }` without writing when full. Database adapters require their documented transaction or
 conditional-write capability; they throw `transaction_unsupported` rather than performing a racy check-then-save.
+
+Form storage adapters also expose `getRuntimeSettings(formId)` and `saveRuntimeSettings(settings)` for mutable
+form-wide settings. Settings are included in form lifecycle deletion and full adapter clears.
 
 The `./testing` subpath exports framework-independent JSON fixtures and contract runners for pagination,
 idempotency, revision conflicts, translation metadata, CSV, and form deletion. Adapters expose

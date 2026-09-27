@@ -1,4 +1,5 @@
 import type {
+  FormRuntimeSettings,
   FormSchema,
   FormStorageAdapter,
   FormSubmission,
@@ -6,6 +7,7 @@ import type {
   SubmissionSaveResult
 } from "@form-engine-ts/core";
 import {
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   createFormLifecycleAdapter,
   type FormLifecycleBackend,
@@ -39,6 +41,7 @@ export interface D1StorageOptions {
   readonly db: D1DatabaseLike;
   readonly schemasTable?: string;
   readonly responsesTable?: string;
+  readonly runtimeSettingsTable?: string;
   readonly autoMigrate?: boolean;
 }
 
@@ -145,6 +148,11 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
   }
   const schemasTable = identifier(options.schemasTable, "form_schemas", "schemasTable");
   const responsesTableName = options.responsesTable ?? "form_responses";
+  const runtimeSettingsTable = identifier(
+    options.runtimeSettingsTable,
+    "form_runtime_settings",
+    "runtimeSettingsTable"
+  );
   const responsesTable = identifier(responsesTableName, "form_responses", "responsesTable");
   const responsesIndex = identifier(`${responsesTableName}_lookup_idx`, "form_responses_lookup_idx", "responsesTable");
   let migration: Promise<void> | undefined;
@@ -188,10 +196,17 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
         ),
         boundStatement(
           options.db,
+          `CREATE TABLE IF NOT EXISTS ${runtimeSettingsTable} (
+          form_id TEXT PRIMARY KEY,
+          settings_json TEXT NOT NULL
+        )`
+        ),
+        boundStatement(
+          options.db,
           `CREATE INDEX IF NOT EXISTS ${responsesIndex} ON ${responsesTable} (form_id, submitted_at, response_id)`
         )
       ]);
-      if (results.length !== 3) throw new Error(`D1 migration returned ${results.length} results for 3 statements.`);
+      if (results.length !== 4) throw new Error(`D1 migration returned ${results.length} results for 4 statements.`);
       for (const result of results) assertSuccessful(result, "migration");
     })();
     await migration;
@@ -206,18 +221,25 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
     };
     const marker = (_index: number) => "?";
     return {
-      resources: ["schema", "submission"],
+      resources: ["schema", "submission", "runtimeSettings"],
       async list(formId) {
         await ensureReady();
         const records: FormResource[] = [];
-        for (const kind of ["schema", "submission"] as const) {
-          const table = kind === "schema" ? schemasTable : responsesTable;
+        for (const kind of ["schema", "submission", "runtimeSettings"] as const) {
+          const table =
+            kind === "schema" ? schemasTable : kind === "submission" ? responsesTable : runtimeSettingsTable;
           const rows = await query(`SELECT * FROM ${table} WHERE form_id = ${marker(1)}`, [formId]);
           for (const row of rows) {
             if (!isRecord(row)) throw new TypeError("Invalid lifecycle row.");
-            const payload = row[kind === "schema" ? "schema_json" : "submission_json"];
+            const payload =
+              row[kind === "schema" ? "schema_json" : kind === "submission" ? "submission_json" : "settings_json"];
             const value = parseJson(payload, "lifecycle");
-            const id = kind === "schema" ? JSON.stringify([row.form_id, row.form_version]) : String(row.response_id);
+            const id =
+              kind === "schema"
+                ? JSON.stringify([row.form_id, row.form_version])
+                : kind === "submission"
+                  ? String(row.response_id)
+                  : formId;
             records.push({ kind, id, value: { row, value } });
           }
         }
@@ -228,16 +250,23 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
           throw new TypeError("Invalid lifecycle resource.");
         const row = resource.value.row;
         const schema = resource.kind === "schema";
-        const table = schema ? schemasTable : responsesTable;
-        const payloadColumn = schema ? "schema_json" : "submission_json";
+        const settings = resource.kind === "runtimeSettings";
+        const table = schema ? schemasTable : settings ? runtimeSettingsTable : responsesTable;
+        const payloadColumn = schema ? "schema_json" : settings ? "settings_json" : "submission_json";
         const payload = row[payloadColumn];
-        const params: unknown[] = schema ? [row.form_id, row.form_version] : [row.response_id, row.form_id];
+        const params: unknown[] = schema
+          ? [row.form_id, row.form_version]
+          : settings
+            ? [row.form_id]
+            : [row.response_id, row.form_id];
         const identity = schema
           ? `form_id = ${marker(1)} AND form_version = ${marker(2)}`
-          : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
+          : settings
+            ? `form_id = ${marker(1)}`
+            : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
         params.push(typeof payload === "string" ? payload : JSON.stringify(payload));
         const deleted = await query(
-          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(3)} RETURNING ${schema ? "form_id" : "response_id"}`,
+          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(params.length)} RETURNING ${schema ? "form_id" : "form_id"}`,
           params
         );
         if (deleted.length === 0) throw new Error("Deletion revision conflict or record disappeared.");
@@ -282,6 +311,27 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
         [formId, formVersion]
       ).first<SchemaRow>();
       return row === null ? null : parseSchemaRow(row, 0, options.schemaValidation);
+    },
+    async getRuntimeSettings(formId) {
+      await ensureReady();
+      const row = await boundStatement(
+        options.db,
+        `SELECT settings_json FROM ${runtimeSettingsTable} WHERE form_id = ?`,
+        [formId]
+      ).first<{ readonly settings_json: unknown }>();
+      if (row === null) return null;
+      const settings = parseJson(row.settings_json, "runtime settings") as FormRuntimeSettings;
+      assertValidFormRuntimeSettings(settings);
+      return cloneJson(settings);
+    },
+    async saveRuntimeSettings(settings) {
+      await ensureReady();
+      assertValidFormRuntimeSettings(settings);
+      await run(
+        `INSERT INTO ${runtimeSettingsTable} (form_id, settings_json) VALUES (?, ?)
+         ON CONFLICT (form_id) DO UPDATE SET settings_json = excluded.settings_json`,
+        [settings.formId, JSON.stringify(settings)]
+      );
     },
     async listSchemas() {
       await ensureReady();
@@ -333,7 +383,7 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
         `INSERT INTO ${responsesTable}
           (response_id, form_id, form_version, locale, submitted_at, submission_json)
          SELECT ?, ?, ?, ?, ?, ?
-         WHERE (SELECT COUNT(*) FROM ${responsesTable} WHERE form_id = ? AND form_version = ?) < ?
+         WHERE (SELECT COUNT(*) FROM ${responsesTable} WHERE form_id = ?${saveOptions.responseLimitScope === "form" ? "" : " AND form_version = ?"}) < ?
          RETURNING response_id`,
         [
           stored.id,
@@ -343,7 +393,7 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
           stored.submittedAt,
           JSON.stringify(stored),
           stored.formId,
-          stored.formVersion,
+          ...(saveOptions.responseLimitScope === "form" ? [] : [stored.formVersion]),
           maxResponses
         ]
       ).first<{ readonly response_id: string }>();
@@ -420,9 +470,10 @@ export function createD1Storage(options: D1StorageOptions): FormStorageAdapter {
       await ensureReady();
       const results = await options.db.batch([
         boundStatement(options.db, `DELETE FROM ${responsesTable}`),
-        boundStatement(options.db, `DELETE FROM ${schemasTable}`)
+        boundStatement(options.db, `DELETE FROM ${schemasTable}`),
+        boundStatement(options.db, `DELETE FROM ${runtimeSettingsTable}`)
       ]);
-      if (results.length !== 2) throw new Error(`D1 clear returned ${results.length} results for 2 statements.`);
+      if (results.length !== 3) throw new Error(`D1 clear returned ${results.length} results for 3 statements.`);
       for (const result of results) assertSuccessful(result, "clear");
     }
   };

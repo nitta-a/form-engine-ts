@@ -6,6 +6,7 @@ import {
   type FieldType,
   type FormField,
   type FormPolicy,
+  type FormRuntimeSettings,
   type FormSchema,
   FormSubmissionError,
   type FormValue,
@@ -1049,6 +1050,8 @@ export interface FormRendererPresentationProps extends SubmissionProtectionProps
   readonly errorMessageKey?: string;
   readonly attemptIdFactory?: () => string;
   readonly acceptance?: FormAcceptanceProps;
+  /** Current form-wide settings. Submission handlers should re-read these on the server. */
+  readonly runtimeSettings?: FormRuntimeSettings | null;
   readonly challengeToken?: string | (() => string | Promise<string>);
   readonly clientKey?: string;
   /** Seed used to keep shuffled choice options stable for a respondent. */
@@ -1319,6 +1322,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
   errorMessageKey,
   attemptIdFactory,
   acceptance,
+  runtimeSettings,
   challengeToken,
   clientKey,
   optionOrderSeed: providedOptionOrderSeed,
@@ -1517,6 +1521,7 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
     };
   }, [acceptance?.submissionCount, acceptanceReloadRevision]);
   const acceptanceStatus = getFormAcceptanceStatus(form.schema, {
+    ...(runtimeSettings === undefined ? {} : { runtimeSettings }),
     now: acceptance?.now?.() ?? new Date(),
     ...(resolvedSubmissionCount === undefined ? {} : { submissionCount: resolvedSubmissionCount })
   });
@@ -2524,6 +2529,8 @@ function ContextFormRenderer<TMeta extends BaseSubmissionMetadata = FormSubmissi
         data-form-version={form.schema.version}
         data-content-mode={getFormContentMode(form.schema.metadata)}
         data-mode={getFormContentMode(form.schema.metadata)}
+        data-icon-key={runtimeSettings?.iconKey}
+        data-color-token={runtimeSettings?.colorToken}
       >
         {draftResumeContent}
       </div>

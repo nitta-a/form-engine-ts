@@ -168,7 +168,7 @@ describe("createPostgresStorage", () => {
     expect(
       query.mock.calls.some(([sql, params]) => String(sql).includes("WHERE form_id = $1") && params?.[0] === "form")
     ).toBe(true);
-    expect(query.mock.calls.filter(([sql]) => String(sql).startsWith("DELETE FROM"))).toHaveLength(3);
+    expect(query.mock.calls.filter(([sql]) => String(sql).startsWith("DELETE FROM"))).toHaveLength(4);
   });
 
   it("rejects unsafe identifiers and corrupt stored payloads", async () => {

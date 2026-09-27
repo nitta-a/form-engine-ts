@@ -34,4 +34,5 @@ Schemas use a `(form_id, form_version)` primary key and JSONB payload. Responses
 `metadataFilters` and custom `filter` predicates are applied before page sizing.
 
 `saveSubmissionWithinLimit(submission, maxResponses, options?)` requires the injected client's `transaction` method.
-It uses a transaction-scoped advisory lock per form version before checking capacity and inserting the response.
+It uses a transaction-scoped advisory lock per form version by default; `responseLimitScope: "form"` locks and counts
+all versions together before inserting the response.

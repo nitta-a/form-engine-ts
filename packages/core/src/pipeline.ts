@@ -5,6 +5,7 @@ import { assertValidFormSchema } from "./schema";
 import { type CreateSubmissionOptions, createSubmission, hashFormSubmissionPayload } from "./submission";
 import type {
   BaseSubmissionMetadata,
+  FormRuntimeSettings,
   FormSchema,
   FormSubmission,
   FormValue,
@@ -60,6 +61,11 @@ export interface SubmissionPipelineOptions<
   readonly challengeToken?: string;
   readonly clientKey?: string;
   readonly honeypotValue?: string;
+  /** Fresh form-wide settings, or a provider that re-reads them for each submission. */
+  readonly runtimeSettings?:
+    | FormRuntimeSettings
+    | null
+    | (() => FormRuntimeSettings | null | undefined | Promise<FormRuntimeSettings | null | undefined>);
 }
 
 export type SubmissionPipelineResult<TMeta extends BaseSubmissionMetadata | undefined = undefined> =
@@ -235,7 +241,16 @@ async function executeSubmissionPipelineUnlocked<
     throw validationError("Submission could not be created.", cause);
   }
 
+  let runtimeSettings: FormRuntimeSettings | null | undefined;
+  try {
+    runtimeSettings =
+      typeof options.runtimeSettings === "function" ? await options.runtimeSettings() : options.runtimeSettings;
+  } catch (cause) {
+    throw storageError(cause);
+  }
+  const hasRuntimeSettings = runtimeSettings !== undefined;
   const acceptance = getFormAcceptanceStatus(options.schema, {
+    ...(runtimeSettings === undefined ? {} : { runtimeSettings }),
     now: options.now?.() ?? new Date()
   });
   if (!acceptance.accepted) {
@@ -252,8 +267,13 @@ async function executeSubmissionPipelineUnlocked<
     });
   }
 
-  const saveOptions: SaveSubmissionOptions = { idempotent: options.idempotent ?? true };
-  const maxResponses = options.schema.submissionSettings?.maxResponses;
+  const saveOptions: SaveSubmissionOptions = {
+    idempotent: options.idempotent ?? true,
+    ...(hasRuntimeSettings ? { responseLimitScope: "form" } : {})
+  };
+  const maxResponses = !hasRuntimeSettings
+    ? options.schema.submissionSettings?.maxResponses
+    : runtimeSettings?.maxResponses;
   let saved: undefined | SubmissionSaveResult<TMeta> | { readonly status: "limit_reached" };
   try {
     saved =

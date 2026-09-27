@@ -6,6 +6,7 @@ import {
   exportResponsesToCsv,
   type FormLifecycleAdapter,
   type FormResource,
+  type FormRuntimeSettings,
   type FormSchema,
   type FormStorageAdapter,
   type FormSubmission,
@@ -97,6 +98,29 @@ export async function runStorageContract(adapter: FormStorageAdapter): Promise<S
     "count must filter by submission time"
   );
   passed.push("count");
+  if (adapter.getRuntimeSettings === undefined || adapter.saveRuntimeSettings === undefined)
+    throw new Error("Adapter does not expose runtime settings storage.");
+  const runtimeSettings: FormRuntimeSettings = {
+    formId: schema.id,
+    openAt: "2026-01-01T00:00:00.000Z",
+    closeAt: "2026-12-31T00:00:00.000Z",
+    maxResponses: 10,
+    iconKey: "feedback",
+    colorToken: "blue",
+    metadata: { tenantId: "tenant-a", ownerId: "owner-a" },
+    updatedAt: "2026-01-01T00:00:00.000Z"
+  };
+  await adapter.saveRuntimeSettings(runtimeSettings);
+  check(
+    JSON.stringify(await adapter.getRuntimeSettings(schema.id)) === JSON.stringify(runtimeSettings),
+    "runtime settings round trip"
+  );
+  await adapter.saveSchema({ ...schema, version: schema.version + 1, title: "Next version" });
+  check(
+    JSON.stringify(await adapter.getRuntimeSettings(schema.id)) === JSON.stringify(runtimeSettings),
+    "runtime settings must persist across schema versions"
+  );
+  passed.push("runtime_settings");
   if ("listSubmissionPage" in adapter && typeof adapter.listSubmissionPage === "function") {
     const paged = adapter as PagedSubmissionStorageAdapter;
     const ids: string[] = [];
@@ -180,6 +204,47 @@ export async function runResponseLimitContract(adapter: FormStorageAdapter): Pro
     JSON.stringify(capacityStatuses) === JSON.stringify(["created", "limit_reached"]),
     "concurrent submissions must not exceed the response limit"
   );
+  const formWide = { ...submission, formId: "contract-form-wide", formVersion: 1 };
+  const formWideResults = await Promise.all([
+    saveWithinLimit({ ...formWide, id: "contract-form-wide-v1" }, 1, { idempotent: true, responseLimitScope: "form" }),
+    saveWithinLimit({ ...formWide, id: "contract-form-wide-v2", formVersion: 2 }, 1, {
+      idempotent: true,
+      responseLimitScope: "form"
+    })
+  ]);
+  check(
+    JSON.stringify(formWideResults.map((result) => result?.status).sort()) ===
+      JSON.stringify(["created", "limit_reached"]),
+    "form-scoped concurrent submissions across versions must share one atomic limit"
+  );
+  const loweredCapForm = { ...submission, formId: "contract-lowered-cap", formVersion: 1 };
+  const existingVersions = await Promise.all([
+    saveWithinLimit({ ...loweredCapForm, id: "contract-lowered-cap-v1" }, 5, {
+      idempotent: true,
+      responseLimitScope: "form"
+    }),
+    saveWithinLimit({ ...loweredCapForm, id: "contract-lowered-cap-v2", formVersion: 2 }, 5, {
+      idempotent: true,
+      responseLimitScope: "form"
+    })
+  ]);
+  check(
+    existingVersions.every((result) => result?.status === "created"),
+    "existing submissions across versions must be accepted before lowering the cap"
+  );
+  check(
+    (
+      await saveWithinLimit({ ...loweredCapForm, id: "contract-lowered-cap-v3", formVersion: 3 }, 1, {
+        idempotent: true,
+        responseLimitScope: "form"
+      })
+    )?.status === "limit_reached",
+    "lowering the cap below the existing response count must reject new submissions"
+  );
+  check(
+    (await adapter.countSubmissions(loweredCapForm.formId)) === 2,
+    "lowering the cap must preserve existing submissions"
+  );
 }
 
 export async function runRevisionConflictContract(adapter: VersionedFormStorageAdapter): Promise<void> {
@@ -209,12 +274,22 @@ export async function runLifecycleContract(adapter: FormStorageAdapter): Promise
   if (submission === undefined) throw new Error("Missing fixture");
   await adapter.saveSchema(schema);
   await adapter.saveSubmission(submission);
+  if (adapter.saveRuntimeSettings === undefined || adapter.getRuntimeSettings === undefined)
+    throw new Error("Adapter does not expose runtime settings storage.");
+  await adapter.saveRuntimeSettings({
+    formId: schema.id,
+    metadata: { tenantId: "tenant-a", ownerId: "owner-a" },
+    updatedAt: "2026-01-01T00:00:00.000Z"
+  });
   await adapter.saveSchema({ ...schema, id: "contract-other" });
   await adapter.saveSchema({ ...schema, version: 2, metadata: { tenantId: "tenant-b", ownerId: "owner-a" } });
   await adapter.saveSchema({ ...schema, version: 3, metadata: { tenantId: "tenant-a", ownerId: "owner-b" } });
   const request = { formId: schema.id, tenantId: "tenant-a", ownerId: "owner-a" };
   const inspection = await lifecycle.inspectFormDeletion({ ...request, pageSize: 1 });
-  check(inspection.counts.schema === 1 && inspection.counts.submission === 1, "scope inspection counts");
+  check(
+    inspection.counts.schema === 1 && inspection.counts.submission === 1 && inspection.counts.runtimeSettings === 1,
+    "scope inspection counts"
+  );
   check(inspection.targets.length === 1 && inspection.nextCursor !== undefined, "inspection pagination");
   const next = await lifecycle.inspectFormDeletion({ ...request, pageSize: 1, cursor: inspection.nextCursor });
   check(next.targets.length === 1 && next.targets[0]?.id !== inspection.targets[0]?.id, "inspection next page");
@@ -229,7 +304,10 @@ export async function runLifecycleContract(adapter: FormStorageAdapter): Promise
   }
   const result = await lifecycle.deleteForm({ ...request, allowNonAtomic: true });
   check(
-    result.status === "deleted" && result.counts.schema === 1 && result.counts.submission === 1,
+    result.status === "deleted" &&
+      result.counts.schema === 1 &&
+      result.counts.submission === 1 &&
+      result.counts.runtimeSettings === 1,
     "actual deletion counts"
   );
   check((await adapter.getSchema("contract-other", 1)) !== null, "other form survives");

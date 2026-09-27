@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.1.5** (2026-09-21). All public packages are currently aligned to version `8.1.5`.
-This release updates the AI survey creation dialog with localized initial guidance, preview locale switching, and a togglable survey brief.
+The latest release is **v8.2.0** (2026-09-27). All public packages are currently aligned to version `8.2.0`.
+This release adds mutable form-wide runtime settings for response windows, limits, and appearance without creating a new schema version.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -74,6 +74,31 @@ Core also supports typed `date`, `time`, `email`, `tel`, and `url` fields, deter
 windows and limits, vendor-neutral submission guards, and optimized response counting across storage adapters.
 Quiz authors can enable or disable the passing-score threshold; when it is disabled, respondent results omit total score
 and pass/fail status.
+
+### Versioned form data and current settings
+
+Each schema version stores its title, description, completion message, translations, and questions. One separate current
+settings record per `formId` stores the mutable acceptance window, response cap, and appearance. Responses retain their
+own `formVersion`:
+
+```json
+{
+  "schema": { "id": "contact", "version": 3, "title": "Contact", "description": "Reach us", "completionMessage": "Thanks", "translations": { "ja": { "title": "お問い合わせ" } } },
+  "runtimeSettings": { "formId": "contact", "openAt": "2026-10-01T00:00:00.000Z", "closeAt": "2026-12-31T23:59:59.000Z", "maxResponses": 200, "iconKey": "mail", "colorToken": "blue", "updatedAt": "2026-09-27T03:00:00.000Z" },
+  "submission": { "id": "response-123", "formId": "contact", "formVersion": 3, "values": { "email": "ada@example.com" }, "submittedAt": "2026-10-02T01:23:00.000Z" }
+}
+```
+
+The runtime record is keyed by `formId` and follows the form when its published version changes. A missing date or
+response cap means there is no restriction. The response cap counts submissions across all versions and database
+adapters enforce it atomically. The LocalStorage adapter uses the browser Web Locks API to coordinate limited saves
+across tabs when available; without it, the count and write are synchronous only within one JavaScript context.
+Changing the cap does not rewrite past responses;
+reducing it below the current count blocks new responses. The form can still be viewed outside its acceptance window,
+while the respondent UI shows the current status. Give the submission pipeline a settings provider to re-fetch current
+settings on the server during submission. Use `migrateFormRuntimeSettings` with the
+currently published schema to copy its legacy dates and cap once. Titles, descriptions, completion messages, and their
+translations continue to change only through a new schema version.
 
 AI Authoring is provider-neutral: an injected server-backed adapter returns an `AuthoringSuggestion`, Core parses and
 validates it, and the UI shows a controlled Before/After preview before applying selected operations. Providers never
@@ -454,8 +479,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v8.1.4**（2026-09-21）です。公開パッケージはすべてバージョン `8.1.4` に揃えています。
-本リリースでは、AIアンケート作成と回答プレビューを、再設計した確認・プレビュー画面に合わせて更新しました。
+最新版は **v8.2.0**（2026-09-27）です。公開パッケージはすべてバージョン `8.2.0` に揃えています。
+本リリースでは、版番号を変えずに受付期間・回答上限・表示を管理するフォーム全体の現在設定を追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -474,6 +499,29 @@ Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と�
 `date`・`time`・`email`・`tel`・`url`の型付き質問、選択肢シャッフル、受付期間・回答上限、
 ベンダー非依存のsubmission guard、storage adapterの回答数取得にも対応します。
 クイズでは合格ラインの設定有無を切り替えられ、未設定の場合は回答結果に合計点と合否を表示しません。
+
+### 版付きフォームデータと現在設定
+
+各スキーマ版にはタイトル、説明、回答完了メッセージ、翻訳、質問を保存します。受付期間・回答数上限・表示用の
+アイコンと色は、`formId`ごとに1件の現在設定として別に保存します。回答データには回答時の`formVersion`を残します。
+
+```json
+{
+  "schema": { "id": "contact", "version": 3, "title": "お問い合わせ", "description": "ご連絡ください", "completionMessage": "回答ありがとうございます", "translations": { "en": { "title": "Contact" } } },
+  "runtimeSettings": { "formId": "contact", "openAt": "2026-10-01T00:00:00.000Z", "closeAt": "2026-12-31T23:59:59.000Z", "maxResponses": 200, "iconKey": "mail", "colorToken": "blue", "updatedAt": "2026-09-27T03:00:00.000Z" },
+  "submission": { "id": "response-123", "formId": "contact", "formVersion": 3, "values": { "email": "ada@example.com" }, "submittedAt": "2026-10-02T01:23:00.000Z" }
+}
+```
+
+現在設定は`formId`をキーにするため、公開版を切り替えても引き継がれます。日付や回答数上限を省略すると制限しません。
+回答数上限は全版の回答合計に対して適用し、データベースアダプターでは上限判定と回答保存を原子的に行います。
+LocalStorageアダプターはWeb Locks API対応ブラウザーで複数タブ間の送信を直列化します。未対応環境では同じ
+JavaScriptコンテキスト内に限り件数確認と保存を同期実行します。上限を既存回答数より低くしても過去の回答は残り、
+新しい回答が拒否されます。受付期間外もフォームは
+閲覧でき、画面には現在の受付状態を表示します。送信パイプラインに設定Providerを渡すと、サーバー側で送信時に
+現在設定を再取得して判定できます。`migrateFormRuntimeSettings`に
+現在公開中のスキーマを渡すと、従来の受付期間と上限を一度だけ現在設定へコピーできます。タイトル・説明・回答完了
+メッセージと翻訳は、引き続き新しいスキーマ版で変更します。
 
 AI AuthoringはProviderに依存しません。サーバー側のAdapterが`AuthoringSuggestion`を返し、Coreが構造とPolicyを
 検証した後、UIがcontrolledな変更前/変更後Previewを表示し、利用者が選んだ操作だけを適用します。Providerが

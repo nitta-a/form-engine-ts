@@ -1,4 +1,5 @@
 import type {
+  FormRuntimeSettings,
   FormSchema,
   FormSubmission,
   FormValue,
@@ -6,6 +7,7 @@ import type {
   PagedSubmissionStorageAdapter
 } from "@form-engine-ts/core";
 import {
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   createFormLifecycleAdapter,
   decodeSubmissionCursor,
@@ -61,10 +63,11 @@ export function createMemoryStorageAdapter(
 ): PagedSubmissionStorageAdapter {
   const submissions = new Map<string, FormSubmission>();
   const schemas = new Map<string, FormSchema>();
+  const runtimeSettings = new Map<string, FormRuntimeSettings>();
   const schemaValidation = options.schemaValidation ?? options.validation;
 
   const backend: FormLifecycleBackend = {
-    resources: ["schema", "submission"],
+    resources: ["schema", "submission", "runtimeSettings"],
     async list(formId) {
       return [
         ...[...schemas]
@@ -72,11 +75,14 @@ export function createMemoryStorageAdapter(
           .map(([id, value]): FormResource => ({ kind: "schema", id, value: cloneJson(value) })),
         ...[...submissions]
           .filter(([, value]) => value.formId === formId)
-          .map(([id, value]): FormResource => ({ kind: "submission", id, value: cloneJson(value) }))
+          .map(([id, value]): FormResource => ({ kind: "submission", id, value: cloneJson(value) })),
+        ...(runtimeSettings.has(formId)
+          ? [{ kind: "runtimeSettings" as const, id: formId, value: cloneJson(runtimeSettings.get(formId)) }]
+          : [])
       ];
     },
     async remove(resource) {
-      const map = resource.kind === "schema" ? schemas : submissions;
+      const map = resource.kind === "schema" ? schemas : resource.kind === "submission" ? submissions : runtimeSettings;
       if (JSON.stringify(map.get(resource.id)) !== JSON.stringify(resource.value))
         throw new Error("Deletion revision conflict.");
       return map.delete(resource.id) ? 1 : 0;
@@ -84,6 +90,7 @@ export function createMemoryStorageAdapter(
     async transaction(operation) {
       const originalSchemas = new Map(schemas);
       const originalSubmissions = new Map(submissions);
+      const originalRuntimeSettings = new Map(runtimeSettings);
       const pending: FormResource[] = [];
       const result = await operation({
         ...backend,
@@ -96,17 +103,23 @@ export function createMemoryStorageAdapter(
       if (
         schemas.size !== originalSchemas.size ||
         submissions.size !== originalSubmissions.size ||
+        runtimeSettings.size !== originalRuntimeSettings.size ||
         [...originalSchemas].some(([key, value]) => schemas.get(key) !== value) ||
-        [...originalSubmissions].some(([key, value]) => submissions.get(key) !== value)
+        [...originalSubmissions].some(([key, value]) => submissions.get(key) !== value) ||
+        [...originalRuntimeSettings].some(([key, value]) => runtimeSettings.get(key) !== value)
       )
         throw new Error("Deletion revision conflict.");
       // Validate and commit without yielding, so ordinary writes cannot interleave.
       for (const resource of pending) {
-        const map = resource.kind === "schema" ? schemas : submissions;
+        const map =
+          resource.kind === "schema" ? schemas : resource.kind === "submission" ? submissions : runtimeSettings;
         if (JSON.stringify(map.get(resource.id)) !== JSON.stringify(resource.value))
           throw new Error("Deletion revision conflict.");
       }
-      for (const resource of pending) (resource.kind === "schema" ? schemas : submissions).delete(resource.id);
+      for (const resource of pending)
+        (resource.kind === "schema" ? schemas : resource.kind === "submission" ? submissions : runtimeSettings).delete(
+          resource.id
+        );
       return result;
     }
   };
@@ -119,6 +132,14 @@ export function createMemoryStorageAdapter(
     async getSchema(formId, formVersion) {
       const schema = schemas.get(schemaKey(formId, formVersion));
       return schema === undefined ? null : cloneSchema(schema);
+    },
+    async getRuntimeSettings(formId) {
+      const settings = runtimeSettings.get(formId);
+      return settings === undefined ? null : cloneJson(settings);
+    },
+    async saveRuntimeSettings(settings) {
+      assertValidFormRuntimeSettings(settings);
+      runtimeSettings.set(settings.formId, cloneJson(settings));
     },
     async listSchemas() {
       return [...schemas.values()]
@@ -146,7 +167,9 @@ export function createMemoryStorageAdapter(
         return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
       }
       const count = [...submissions.values()].filter(
-        (candidate) => candidate.formId === submission.formId && candidate.formVersion === submission.formVersion
+        (candidate) =>
+          candidate.formId === submission.formId &&
+          (saveOptions.responseLimitScope === "form" || candidate.formVersion === submission.formVersion)
       ).length;
       if (count >= maxResponses) return { status: "limit_reached" };
       submissions.set(stored.id, stored);
@@ -213,6 +236,7 @@ export function createMemoryStorageAdapter(
     async clear() {
       schemas.clear();
       submissions.clear();
+      runtimeSettings.clear();
     }
   };
 }

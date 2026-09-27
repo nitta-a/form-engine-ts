@@ -12,6 +12,7 @@ interface PostgresStorageOptions {
     readonly client: PostgresClientLike;
     readonly schemasTable?: string;
     readonly responsesTable?: string;
+    readonly runtimeSettingsTable?: string;
     readonly autoMigrate?: boolean;
 }
 declare function createPostgresStorage(options: PostgresStorageOptions): PagedSubmissionStorageAdapter;

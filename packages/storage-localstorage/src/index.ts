@@ -1,5 +1,6 @@
-import type { FormSchema, FormStorageAdapter, FormSubmission } from "@form-engine-ts/core";
+import type { FormRuntimeSettings, FormSchema, FormStorageAdapter, FormSubmission } from "@form-engine-ts/core";
 import {
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   createFormLifecycleAdapter,
   type FormLifecycleBackend,
@@ -65,6 +66,11 @@ function encoded(value: string): string {
   return encodeURIComponent(value);
 }
 
+function withBrowserLock<T>(name: string, operation: () => Promise<T>): Promise<T> {
+  if (typeof navigator === "undefined" || navigator.locks === undefined) return operation();
+  return navigator.locks.request(name, operation);
+}
+
 export function createLocalStorageAdapter(
   storagePrefix = "pf_",
   injectedStorage?: StorageLike,
@@ -84,8 +90,10 @@ export function createLocalStorageAdapter(
   }
   const schemaPrefix = `${storagePrefix}schema:`;
   const submissionPrefix = `${storagePrefix}submission:`;
+  const runtimeSettingsPrefix = `${storagePrefix}runtime-settings:`;
   const schemaKey = (formId: string, formVersion: number) => `${schemaPrefix}${encoded(formId)}:${formVersion}`;
   const submissionKey = (id: string) => `${submissionPrefix}${encoded(id)}`;
+  const runtimeSettingsKey = (formId: string) => `${runtimeSettingsPrefix}${encoded(formId)}`;
 
   const prefixedKeys = (prefix: string): string[] => {
     const keys: string[] = [];
@@ -97,7 +105,7 @@ export function createLocalStorageAdapter(
   };
 
   const backend: FormLifecycleBackend = {
-    resources: ["schema", "submission"],
+    resources: ["schema", "submission", "runtimeSettings"],
     async list(formId) {
       const result: FormResource[] = [];
       for (const kind of ["schema", "submission"] as const) {
@@ -108,6 +116,10 @@ export function createLocalStorageAdapter(
           if (("formId" in value ? value.formId : value.id) === formId) result.push({ kind, id: key, value });
         }
       }
+      const settingsKey = runtimeSettingsKey(formId);
+      const settingsValue = storage.getItem(settingsKey);
+      if (settingsValue !== null)
+        result.push({ kind: "runtimeSettings", id: settingsKey, value: parseJson(settingsValue, settingsKey) });
       return result;
     },
     async remove(resource) {
@@ -129,6 +141,18 @@ export function createLocalStorageAdapter(
       const key = schemaKey(formId, formVersion);
       const value = storage.getItem(key);
       return value === null ? null : cloneJson(parseSchema(value, key, schemaValidation));
+    },
+    async getRuntimeSettings(formId) {
+      const key = runtimeSettingsKey(formId);
+      const value = storage.getItem(key);
+      if (value === null) return null;
+      const settings = parseJson(value, key) as FormRuntimeSettings;
+      assertValidFormRuntimeSettings(settings);
+      return cloneJson(settings);
+    },
+    async saveRuntimeSettings(settings) {
+      assertValidFormRuntimeSettings(settings);
+      storage.setItem(runtimeSettingsKey(settings.formId), JSON.stringify(settings));
     },
     async listSchemas() {
       return prefixedKeys(schemaPrefix)
@@ -153,26 +177,34 @@ export function createLocalStorageAdapter(
         throw new RangeError("maxResponses must be a positive integer.");
       const key = submissionKey(submission.id);
       const payloadHash = await hashFormSubmissionPayload(submission);
-      const existingValue = storage.getItem(key);
-      if (existingValue !== null) {
-        if (saveOptions.idempotent !== true) throw new Error(`A submission with ID "${submission.id}" already exists.`);
-        const existing = parseSubmission(existingValue, key);
-        const existingPayloadHash = await hashFormSubmissionPayload(existing);
-        if (existingPayloadHash === payloadHash)
-          return { status: "duplicate", submission: cloneJson(existing), payloadHash };
-        return { status: "conflict", submissionId: submission.id, payloadHash, existingPayloadHash };
-      }
-      const count = prefixedKeys(submissionPrefix).reduce((total, key) => {
-        const value = storage.getItem(key);
-        if (value === null) return total;
-        const candidate = parseSubmission(value, key);
-        return (
-          total + (candidate.formId === submission.formId && candidate.formVersion === submission.formVersion ? 1 : 0)
-        );
-      }, 0);
-      if (count >= maxResponses) return { status: "limit_reached" };
-      storage.setItem(key, JSON.stringify(submission));
-      if (saveOptions.idempotent === true) return { status: "created", submission: cloneJson(submission), payloadHash };
+      return withBrowserLock(`${storagePrefix}response-limit:${encoded(submission.formId)}`, async () => {
+        const existingValue = storage.getItem(key);
+        if (existingValue !== null) {
+          if (saveOptions.idempotent !== true)
+            throw new Error(`A submission with ID "${submission.id}" already exists.`);
+          const existing = parseSubmission(existingValue, key);
+          const existingPayloadHash = await hashFormSubmissionPayload(existing);
+          if (existingPayloadHash === payloadHash)
+            return { status: "duplicate", submission: cloneJson(existing), payloadHash };
+          return { status: "conflict", submissionId: submission.id, payloadHash, existingPayloadHash };
+        }
+        const count = prefixedKeys(submissionPrefix).reduce((total, key) => {
+          const value = storage.getItem(key);
+          if (value === null) return total;
+          const candidate = parseSubmission(value, key);
+          return (
+            total +
+            (candidate.formId === submission.formId &&
+            (saveOptions.responseLimitScope === "form" || candidate.formVersion === submission.formVersion)
+              ? 1
+              : 0)
+          );
+        }, 0);
+        if (count >= maxResponses) return { status: "limit_reached" };
+        storage.setItem(key, JSON.stringify(submission));
+        if (saveOptions.idempotent === true)
+          return { status: "created", submission: cloneJson(submission), payloadHash };
+      });
     },
     async listSubmissions(formId, formVersion, options) {
       return prefixedKeys(submissionPrefix)

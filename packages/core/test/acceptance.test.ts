@@ -43,6 +43,35 @@ describe("form acceptance", () => {
     ).toEqual({ status: "open", accepted: true });
   });
 
+  it("uses form-wide settings over legacy versioned limits", () => {
+    expect(
+      getFormAcceptanceStatus(
+        { ...baseSchema, submissionSettings: { closeAt: "2026-09-17T00:00:00.000Z", maxResponses: 1 } },
+        {
+          now: new Date("2026-09-18T00:00:00.000Z"),
+          submissionCount: 4,
+          runtimeSettings: { formId: baseSchema.id, updatedAt: "2026-09-17T00:00:00.000Z", maxResponses: 5 }
+        }
+      )
+    ).toEqual({ status: "open", accepted: true });
+  });
+
+  it.each([
+    ["openAt boundary", { openAt: "2026-09-17T00:00:00.000Z" }, "open"],
+    ["closeAt boundary", { closeAt: "2026-09-17T00:00:00.000Z" }, "closed"]
+  ] as const)("checks the current settings %s", (_label, settings, status) => {
+    expect(
+      getFormAcceptanceStatus(baseSchema, {
+        now: new Date("2026-09-17T00:00:00.000Z"),
+        runtimeSettings: {
+          formId: baseSchema.id,
+          updatedAt: "2026-09-01T00:00:00.000Z",
+          ...settings
+        }
+      })
+    ).toEqual({ status, accepted: status === "open" });
+  });
+
   it("rejects non-ISO response window timestamps", async () => {
     const { validateFormSchema } = await import("../src");
     expect(
@@ -80,6 +109,42 @@ describe("form acceptance", () => {
     ).rejects.toMatchObject({ payload: { code: "FORM_CLOSED" } });
     expect(countSubmissions).not.toHaveBeenCalled();
     expect(saveSubmissionWithinLimit).toHaveBeenCalledWith(expect.any(Object), 1, { idempotent: true });
+  });
+
+  it("loads current settings per request and asks storage for a form-wide atomic limit", async () => {
+    const loadSettings = vi.fn(async () => ({
+      formId: baseSchema.id,
+      maxResponses: 3,
+      updatedAt: "2026-09-17T00:00:00.000Z"
+    }));
+    const saveSubmissionWithinLimit = vi.fn(async () => undefined);
+    const storage = {
+      countSubmissions: vi.fn(async () => 0),
+      saveSubmission: vi.fn(async () => undefined),
+      saveSubmissionWithinLimit,
+      listSubmissionPage: vi.fn(async () => ({ items: [], hasMore: false })),
+      listTextAnswerPage: vi.fn(),
+      aggregateResponses: vi.fn(),
+      exportResponsesToCsv: vi.fn(),
+      validateSubmission: vi.fn()
+    } as unknown as UnifiedSubmissionStorageAdapter;
+    await runSubmissionPipeline(
+      {
+        schema: { ...baseSchema, submissionSettings: { maxResponses: 1 } },
+        storage,
+        runtimeSettings: loadSettings,
+        id: "runtime-settings-submit",
+        locale: "en",
+        now: () => new Date("2026-09-17T00:00:00.000Z")
+      },
+      { answer: "value" }
+    );
+    expect(loadSettings).toHaveBeenCalledOnce();
+    expect(saveSubmissionWithinLimit).toHaveBeenCalledWith(expect.any(Object), 3, {
+      idempotent: true,
+      responseLimitScope: "form"
+    });
+    expect(storage.saveSubmission).not.toHaveBeenCalled();
   });
 
   it("delegates concurrent capacity checks to atomic storage", async () => {

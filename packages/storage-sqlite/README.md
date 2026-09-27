@@ -30,4 +30,5 @@ const storage = createSqliteStorage({ db: executor, autoMigrate: true });
 `autoMigrate` defaults to `false`; when enabled, idempotent table/index DDL runs lazily once. Schemas use a `(form_id, form_version)` primary key. Complete schemas and submissions are stored as JSON text alongside searchable response metadata. `listSubmissions` accepts inclusive `since`/`until` ISO 8601 boundaries and orders by timestamp then ID. Schema deletion does not cascade; form-scoped and full clears retain the configured tables.
 
 `saveSubmissionWithinLimit(submission, maxResponses, options?)` requires `SqliteExecutor.transaction` so the capacity
-check and insert commit atomically. Without it, the method throws an error with `code: "transaction_unsupported"`.
+check and insert commit atomically. `responseLimitScope: "form"` checks the total across versions. Without a transaction,
+the method throws an error with `code: "transaction_unsupported"`.

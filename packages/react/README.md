@@ -194,6 +194,9 @@ single-slot or batch translation with stale/manual status handling. The MUI pack
 `TranslationWorkspace` surface. For large forms, set `fieldEditorMode="single"` and use `activeFieldId` or the hook's
 `setActiveFieldId` to keep one field editor open at a time. Set `submissionSettingsOptions={{ enabled: true }}` to expose
 schema-driven pre-submit confirmation controls in the builder.
+Pass `runtimeSettings`, `onRuntimeSettingsChange`, and `runtimeSettingsOptions` to edit form-wide dates, response caps,
+and candidate icon/color tokens without changing the schema version. `FormRenderer` accepts the same settings for
+acceptance-state display and exposes the icon/color tokens as `data-icon-key` and `data-color-token` attributes.
 Use `sectionVisibility` to hide individual builder sections, such as `basicSettings` and `completionMessage`, while
 keeping `questions` visible. Set `autoFocusActiveField` to focus the selected question's title input whenever
 `activeFieldId` changes; it does not focus an input during the initial mount.

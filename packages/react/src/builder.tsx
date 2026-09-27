@@ -8,6 +8,7 @@ import {
   type FieldType,
   type FormField,
   type FormPolicy,
+  type FormRuntimeSettings,
   type FormSchema,
   getContentModePolicy,
   getFormContentMode,
@@ -68,6 +69,7 @@ import type {
   FieldTypeSelectOptionsConfig,
   FieldTypeSelectOptionsContext,
   FormBuilderComponents,
+  FormBuilderRuntimeSettingsOptions,
   FormBuilderSectionName,
   FormBuilderSectionVisibility,
   FormBuilderSlots,
@@ -889,6 +891,8 @@ export interface FormBuilderProps {
   readonly addFieldDisabledReason?: string;
   readonly schema: FormSchema;
   readonly onChange: (newSchema: FormSchema) => void;
+  readonly runtimeSettings?: FormRuntimeSettings;
+  readonly onRuntimeSettingsChange?: (settings: FormRuntimeSettings) => void;
   readonly locale?: string;
   readonly translator?: TranslationAdapter;
   readonly translationAdapter?: AsyncTranslationAdapter;
@@ -923,6 +927,7 @@ export interface FormBuilderProps {
   readonly onActiveFieldChange?: (fieldId: string | undefined) => void;
   readonly onSelectedPageChange?: (pageId: string | undefined) => void;
   readonly submissionSettingsOptions?: FormBuilderSubmissionSettingsOptions;
+  readonly runtimeSettingsOptions?: FormBuilderRuntimeSettingsOptions;
 }
 
 export function FormBuilder(props: FormBuilderProps) {
@@ -961,7 +966,10 @@ export function FormBuilder(props: FormBuilderProps) {
     defaultActiveFieldId,
     onActiveFieldChange,
     onSelectedPageChange,
-    submissionSettingsOptions
+    submissionSettingsOptions,
+    runtimeSettings,
+    onRuntimeSettingsChange,
+    runtimeSettingsOptions
   } = props;
   const policy = useMemo(
     () => getContentModePolicy(getFormContentMode(schema.metadata), hostPolicy),
@@ -989,6 +997,30 @@ export function FormBuilder(props: FormBuilderProps) {
   const defaultStylesDisabled = disableDefaultStyles || unstyled;
   const builderClass = (value: string): string | undefined => (defaultStylesDisabled ? undefined : value);
   const { Button, Checkbox, ErrorMessage, Fieldset, IconButton, Section, Select, TextArea, TextInput } = components;
+  const updateRuntimeSetting = (
+    key: "openAt" | "closeAt" | "maxResponses" | "iconKey" | "colorToken",
+    value: string | number | undefined
+  ) => {
+    const next: {
+      formId: string;
+      updatedAt: string;
+      openAt?: string;
+      closeAt?: string;
+      maxResponses?: number;
+      iconKey?: string;
+      colorToken?: string;
+    } = {
+      ...(runtimeSettings ?? { formId: schema.id, updatedAt: new Date().toISOString() }),
+      formId: schema.id,
+      updatedAt: new Date().toISOString()
+    };
+    if (key === "openAt" || key === "closeAt" || key === "iconKey" || key === "colorToken") {
+      if (typeof value === "string" && value.length > 0) next[key] = value;
+      else delete next[key];
+    } else if (typeof value === "number") next.maxResponses = value;
+    else delete next.maxResponses;
+    onRuntimeSettingsChange?.(next);
+  };
   const ToolbarSlot = slots?.toolbar;
   const BasicSettingsAfter = slots?.basicSettingsAfter;
   const FieldEditorPreviewSlot = slots?.fieldEditorPreview;
@@ -1535,6 +1567,78 @@ export function FormBuilder(props: FormBuilderProps) {
                 )}
               </Section>
             </BuilderSectionGroup>
+            <BuilderSectionGroup name="runtimeSettings" visible={isSectionVisible("runtimeSettings")}>
+              {runtimeSettingsOptions?.enabled ? (
+                <Section
+                  className={builderClass("form-engine-builder__runtime-settings")}
+                  headingId="builder-runtime-settings-heading"
+                  title={translate("builder.runtimeSettings.title")}
+                >
+                  <TextInput
+                    id="builder-runtime-open-at"
+                    type="datetime-local"
+                    label={translate("builder.openAt")}
+                    value={toDateTimeLocalValue(runtimeSettings?.openAt)}
+                    disabled={readOnly || onRuntimeSettingsChange === undefined}
+                    onChange={(value) =>
+                      updateRuntimeSetting(
+                        "openAt",
+                        value.trim().length === 0 ? undefined : new Date(value).toISOString()
+                      )
+                    }
+                  />
+                  <TextInput
+                    id="builder-runtime-close-at"
+                    type="datetime-local"
+                    label={translate("builder.closeAt")}
+                    value={toDateTimeLocalValue(runtimeSettings?.closeAt)}
+                    disabled={readOnly || onRuntimeSettingsChange === undefined}
+                    onChange={(value) =>
+                      updateRuntimeSetting(
+                        "closeAt",
+                        value.trim().length === 0 ? undefined : new Date(value).toISOString()
+                      )
+                    }
+                  />
+                  <TextInput
+                    id="builder-runtime-max-responses"
+                    type="number"
+                    min={1}
+                    step={1}
+                    label={translate("builder.maxResponses")}
+                    value={runtimeSettings?.maxResponses?.toString() ?? ""}
+                    disabled={readOnly || onRuntimeSettingsChange === undefined}
+                    onChange={(value) => {
+                      if (value.trim().length === 0) updateRuntimeSetting("maxResponses", undefined);
+                      else if (Number.isSafeInteger(Number(value)) && Number(value) > 0)
+                        updateRuntimeSetting("maxResponses", Number(value));
+                    }}
+                  />
+                  <Select
+                    id="builder-runtime-icon"
+                    label={translate("builder.runtimeSettings.icon")}
+                    value={runtimeSettings?.iconKey ?? ""}
+                    options={[
+                      { value: "", label: translate("builder.runtimeSettings.default") },
+                      ...runtimeSettingsOptions.iconOptions
+                    ]}
+                    disabled={readOnly || onRuntimeSettingsChange === undefined}
+                    onChange={(value) => updateRuntimeSetting("iconKey", value || undefined)}
+                  />
+                  <Select
+                    id="builder-runtime-color"
+                    label={translate("builder.runtimeSettings.color")}
+                    value={runtimeSettings?.colorToken ?? ""}
+                    options={[
+                      { value: "", label: translate("builder.runtimeSettings.default") },
+                      ...runtimeSettingsOptions.colorOptions
+                    ]}
+                    disabled={readOnly || onRuntimeSettingsChange === undefined}
+                    onChange={(value) => updateRuntimeSetting("colorToken", value || undefined)}
+                  />
+                </Section>
+              ) : null}
+            </BuilderSectionGroup>
             <BuilderSectionGroup name="submissionSettings" visible={isSectionVisible("submissionSettings")}>
               {submissionSettingsOptions?.enabled ? (
                 <Section
@@ -1569,46 +1673,52 @@ export function FormBuilder(props: FormBuilderProps) {
                       });
                     }}
                   />
-                  <TextInput
-                    id="builder-open-at"
-                    type="datetime-local"
-                    label={translate("builder.openAt")}
-                    value={toDateTimeLocalValue(schema.submissionSettings?.openAt)}
-                    onChange={(value) => {
-                      const settings = { ...schema.submissionSettings };
-                      if (value.trim().length === 0) delete settings.openAt;
-                      else settings.openAt = new Date(value).toISOString();
-                      onChange({ ...schema, submissionSettings: settings });
-                    }}
-                  />
-                  <TextInput
-                    id="builder-close-at"
-                    type="datetime-local"
-                    label={translate("builder.closeAt")}
-                    value={toDateTimeLocalValue(schema.submissionSettings?.closeAt)}
-                    onChange={(value) => {
-                      const settings = { ...schema.submissionSettings };
-                      if (value.trim().length === 0) delete settings.closeAt;
-                      else settings.closeAt = new Date(value).toISOString();
-                      onChange({ ...schema, submissionSettings: settings });
-                    }}
-                  />
-                  <TextInput
-                    id="builder-max-responses"
-                    type="number"
-                    min={1}
-                    step={1}
-                    label={translate("builder.maxResponses")}
-                    value={schema.submissionSettings?.maxResponses?.toString() ?? ""}
-                    onChange={(value) => {
-                      const settings = { ...schema.submissionSettings };
-                      const parsed = Number(value);
-                      if (value.trim().length === 0) delete settings.maxResponses;
-                      else if (Number.isInteger(parsed) && parsed > 0) settings.maxResponses = parsed;
-                      else return;
-                      onChange({ ...schema, submissionSettings: settings });
-                    }}
-                  />
+                  {runtimeSettingsOptions?.enabled ? null : (
+                    <TextInput
+                      id="builder-open-at"
+                      type="datetime-local"
+                      label={translate("builder.openAt")}
+                      value={toDateTimeLocalValue(schema.submissionSettings?.openAt)}
+                      onChange={(value) => {
+                        const settings = { ...schema.submissionSettings };
+                        if (value.trim().length === 0) delete settings.openAt;
+                        else settings.openAt = new Date(value).toISOString();
+                        onChange({ ...schema, submissionSettings: settings });
+                      }}
+                    />
+                  )}
+                  {runtimeSettingsOptions?.enabled ? null : (
+                    <TextInput
+                      id="builder-close-at"
+                      type="datetime-local"
+                      label={translate("builder.closeAt")}
+                      value={toDateTimeLocalValue(schema.submissionSettings?.closeAt)}
+                      onChange={(value) => {
+                        const settings = { ...schema.submissionSettings };
+                        if (value.trim().length === 0) delete settings.closeAt;
+                        else settings.closeAt = new Date(value).toISOString();
+                        onChange({ ...schema, submissionSettings: settings });
+                      }}
+                    />
+                  )}
+                  {runtimeSettingsOptions?.enabled ? null : (
+                    <TextInput
+                      id="builder-max-responses"
+                      type="number"
+                      min={1}
+                      step={1}
+                      label={translate("builder.maxResponses")}
+                      value={schema.submissionSettings?.maxResponses?.toString() ?? ""}
+                      onChange={(value) => {
+                        const settings = { ...schema.submissionSettings };
+                        const parsed = Number(value);
+                        if (value.trim().length === 0) delete settings.maxResponses;
+                        else if (Number.isInteger(parsed) && parsed > 0) settings.maxResponses = parsed;
+                        else return;
+                        onChange({ ...schema, submissionSettings: settings });
+                      }}
+                    />
+                  )}
                   <TextInput
                     id="builder-closed-message"
                     label={translate("builder.closedMessage")}

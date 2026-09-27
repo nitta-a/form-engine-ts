@@ -12,6 +12,7 @@ interface SqliteStorageOptions {
     readonly db: SqliteExecutor;
     readonly schemasTable?: string;
     readonly responsesTable?: string;
+    readonly runtimeSettingsTable?: string;
     readonly autoMigrate?: boolean;
 }
 declare function createSqliteStorage(options: SqliteStorageOptions): FormStorageAdapter;

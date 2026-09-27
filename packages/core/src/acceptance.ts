@@ -1,4 +1,4 @@
-import type { FormSchema } from "./types";
+import type { FormRuntimeSettings, FormSchema } from "./types";
 
 export type FormAcceptanceStatus = "open" | "not_yet_open" | "closed" | "limit_reached";
 
@@ -8,9 +8,13 @@ export type FormAcceptanceResult =
 
 export function getFormAcceptanceStatus(
   schema: FormSchema,
-  options: { readonly now?: Date; readonly submissionCount?: number } = {}
+  options: {
+    readonly now?: Date;
+    readonly submissionCount?: number;
+    readonly runtimeSettings?: FormRuntimeSettings | null;
+  } = {}
 ): FormAcceptanceResult {
-  const settings = schema.submissionSettings;
+  const settings = options.runtimeSettings === undefined ? schema.submissionSettings : options.runtimeSettings;
   const now = options.now ?? new Date();
   if (settings?.openAt !== undefined && now < new Date(settings.openAt)) {
     return { status: "not_yet_open", accepted: false };

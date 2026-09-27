@@ -618,6 +618,7 @@ export interface BuilderTranslationActionsSlotProps extends BuilderSlotBaseProps
 
 export type FormBuilderSectionName =
   | "basicSettings"
+  | "runtimeSettings"
   | "completionMessage"
   | "questions"
   | "addQuestion"
@@ -629,6 +630,12 @@ export type FormBuilderSectionVisibility = Partial<Record<FormBuilderSectionName
 export interface FormBuilderSubmissionSettingsOptions {
   readonly enabled: boolean;
   readonly placement?: "beforeQuestions" | "afterQuestions" | "bottom";
+}
+
+export interface FormBuilderRuntimeSettingsOptions {
+  readonly enabled: boolean;
+  readonly iconOptions: readonly BuilderSelectOption<string>[];
+  readonly colorOptions: readonly BuilderSelectOption<string>[];
 }
 
 export interface FormBuilderSlots {

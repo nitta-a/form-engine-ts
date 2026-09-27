@@ -88,7 +88,7 @@ describe("createSqliteStorage", () => {
     const storage = createSqliteStorage({ db, autoMigrate: true });
     await storage.getSchema("form", 1);
     await storage.getSchema("form", 2);
-    expect(calls.filter(({ sql }) => sql.includes("CREATE TABLE IF NOT EXISTS"))).toHaveLength(2);
+    expect(calls.filter(({ sql }) => sql.includes("CREATE TABLE IF NOT EXISTS"))).toHaveLength(3);
     expect(calls.filter(({ sql }) => sql.includes("CREATE INDEX IF NOT EXISTS"))).toHaveLength(1);
   });
 
@@ -106,7 +106,7 @@ describe("createSqliteStorage", () => {
     await expect(storage.saveSubmission(submission)).rejects.toThrow(/constraint failed/);
     await storage.clearResponses?.("form");
     await storage.clear();
-    expect(calls.filter((sql) => sql.startsWith("DELETE FROM"))).toHaveLength(3);
+    expect(calls.filter((sql) => sql.startsWith("DELETE FROM"))).toHaveLength(4);
     expect(calls.some((sql) => sql.includes("WHERE form_id = ?"))).toBe(true);
   });
 

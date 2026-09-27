@@ -1,5 +1,5 @@
 import * as _form_engine_ts_core from '@form-engine-ts/core';
-import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, FormSchema, SubmissionPageQueryOptions, FormAnalytics, StorageSubmissionExportOptions, FormSubmission, FormSubmissionValidationSource, ValidateFormSchemaOptions, FormLifecycleOptions, FormSubmissionValidator, BaseSubmissionMetadata, TypedSubmissionPageQueryOptions, TypedSubmissionPage, SaveSubmissionOptions, SubmissionSaveResult, TextAnswerPageQueryOptions, TypedTextAnswerPage, JsonValue, SubmissionFilter } from '@form-engine-ts/core';
+import { PagedSubmissionStorageAdapter, VersionedFormStorageAdapter, FormRuntimeSettings, FormSchema, SubmissionPageQueryOptions, FormAnalytics, StorageSubmissionExportOptions, FormSubmission, FormSubmissionValidationSource, ValidateFormSchemaOptions, FormLifecycleOptions, FormSubmissionValidator, BaseSubmissionMetadata, TypedSubmissionPageQueryOptions, TypedSubmissionPage, SaveSubmissionOptions, SubmissionSaveResult, TextAnswerPageQueryOptions, TypedTextAnswerPage, JsonValue, SubmissionFilter } from '@form-engine-ts/core';
 import { IndexSpecification, CreateIndexesOptions, Db, Document } from 'mongodb';
 
 interface MongoCustomIndexDefinition {
@@ -14,10 +14,12 @@ interface MongoDbStorageOptions {
     readonly responsesCollectionName?: string;
     readonly versionsCollectionName?: string;
     readonly versionStatesCollectionName?: string;
+    readonly runtimeSettingsCollectionName?: string;
     readonly collectionNames?: {
         readonly forms?: string;
         readonly formVersions?: string;
         readonly formVersionStates?: string;
+        readonly formRuntimeSettings?: string;
         readonly formResponses?: string;
     };
     readonly customIndexes?: {
@@ -40,6 +42,8 @@ interface MongoDbStorageOptions {
     readonly schema?: FormSubmissionValidationSource;
 }
 interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
+    getRuntimeSettings?(formId: string): Promise<FormRuntimeSettings | null>;
+    saveRuntimeSettings?(settings: FormRuntimeSettings): Promise<void>;
     createIndexes(): Promise<void>;
     aggregateResponses(schema: FormSchema, options?: SubmissionPageQueryOptions): Promise<FormAnalytics>;
     exportResponsesToCsv(schema: FormSchema, options?: StorageSubmissionExportOptions): Promise<string>;

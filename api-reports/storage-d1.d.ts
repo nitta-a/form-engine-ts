@@ -20,6 +20,7 @@ interface D1StorageOptions {
     readonly db: D1DatabaseLike;
     readonly schemasTable?: string;
     readonly responsesTable?: string;
+    readonly runtimeSettingsTable?: string;
     readonly autoMigrate?: boolean;
 }
 declare function createD1Storage(options: D1StorageOptions): FormStorageAdapter;

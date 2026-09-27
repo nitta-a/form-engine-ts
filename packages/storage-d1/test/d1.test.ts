@@ -105,13 +105,13 @@ describe("createD1Storage", () => {
     expect(list?.params).toEqual(["form", 2, "2025-01-01T00:00:00.000Z", "2025-01-03T00:00:00.000Z"]);
   });
 
-  it("runs migration once and clears both tables in transactional batches", async () => {
+  it("runs migration once and clears form data in transactional batches", async () => {
     const { db, calls } = createD1Mock({ first: [null, null] });
     const storage = createD1Storage({ db, autoMigrate: true });
     await storage.getSchema("form", 1);
     await storage.getSchema("form", 2);
     await storage.clear();
-    expect(calls.filter(({ kind }) => kind === "batch").map(({ size }) => size)).toEqual([3, 2]);
+    expect(calls.filter(({ kind }) => kind === "batch").map(({ size }) => size)).toEqual([4, 3]);
   });
 
   it("rejects unsuccessful and malformed D1 results", async () => {

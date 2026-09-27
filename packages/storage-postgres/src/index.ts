@@ -1,4 +1,5 @@
 import type {
+  FormRuntimeSettings,
   FormSchema,
   FormSubmission,
   PagedSubmissionStorageAdapter,
@@ -6,6 +7,7 @@ import type {
   SubmissionSaveResult
 } from "@form-engine-ts/core";
 import {
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   createFormLifecycleAdapter,
   decodeSubmissionCursor,
@@ -31,6 +33,7 @@ export interface PostgresStorageOptions {
   readonly client: PostgresClientLike;
   readonly schemasTable?: string;
   readonly responsesTable?: string;
+  readonly runtimeSettingsTable?: string;
   readonly autoMigrate?: boolean;
 }
 
@@ -130,6 +133,11 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
   }
   const schemasTable = identifier(options.schemasTable, "form_schemas", "schemasTable");
   const responsesTable = identifier(options.responsesTable, "form_responses", "responsesTable");
+  const runtimeSettingsTable = identifier(
+    options.runtimeSettingsTable,
+    "form_runtime_settings",
+    "runtimeSettingsTable"
+  );
   const responsesIndex = identifier(
     `${options.responsesTable ?? "form_responses"}_lookup_idx`,
     "form_responses_lookup_idx",
@@ -156,6 +164,10 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
           submitted_at TIMESTAMPTZ NOT NULL,
           submission_json JSONB NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS ${runtimeSettingsTable} (
+          form_id TEXT PRIMARY KEY,
+          settings_json JSONB NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS ${responsesIndex}
           ON ${responsesTable} (form_id, submitted_at, response_id);
       `)
@@ -169,18 +181,25 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
     };
     const marker = (index: number) => `$${index}`;
     return {
-      resources: ["schema", "submission"],
+      resources: ["schema", "submission", "runtimeSettings"],
       async list(formId) {
         await ensureReady();
         const records: FormResource[] = [];
-        for (const kind of ["schema", "submission"] as const) {
-          const table = kind === "schema" ? schemasTable : responsesTable;
+        for (const kind of ["schema", "submission", "runtimeSettings"] as const) {
+          const table =
+            kind === "schema" ? schemasTable : kind === "submission" ? responsesTable : runtimeSettingsTable;
           const rows = await query(`SELECT * FROM ${table} WHERE form_id = ${marker(1)}`, [formId]);
           for (const row of rows) {
             if (!isRecord(row)) throw new TypeError("Invalid lifecycle row.");
-            const payload = row[kind === "schema" ? "schema_json" : "submission_json"];
+            const payload =
+              row[kind === "schema" ? "schema_json" : kind === "submission" ? "submission_json" : "settings_json"];
             const value = parseJson(payload, "lifecycle");
-            const id = kind === "schema" ? JSON.stringify([row.form_id, row.form_version]) : String(row.response_id);
+            const id =
+              kind === "schema"
+                ? JSON.stringify([row.form_id, row.form_version])
+                : kind === "submission"
+                  ? String(row.response_id)
+                  : formId;
             records.push({ kind, id, value: { row, value } });
           }
         }
@@ -191,16 +210,23 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
           throw new TypeError("Invalid lifecycle resource.");
         const row = resource.value.row;
         const schema = resource.kind === "schema";
-        const table = schema ? schemasTable : responsesTable;
-        const payloadColumn = schema ? "schema_json" : "submission_json";
+        const settings = resource.kind === "runtimeSettings";
+        const table = schema ? schemasTable : settings ? runtimeSettingsTable : responsesTable;
+        const payloadColumn = schema ? "schema_json" : settings ? "settings_json" : "submission_json";
         const payload = row[payloadColumn];
-        const params: unknown[] = schema ? [row.form_id, row.form_version] : [row.response_id, row.form_id];
+        const params: unknown[] = schema
+          ? [row.form_id, row.form_version]
+          : settings
+            ? [row.form_id]
+            : [row.response_id, row.form_id];
         const identity = schema
           ? `form_id = ${marker(1)} AND form_version = ${marker(2)}`
-          : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
+          : settings
+            ? `form_id = ${marker(1)}`
+            : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
         params.push(typeof payload === "string" ? payload : JSON.stringify(payload));
         const deleted = await query(
-          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(3)}::jsonb RETURNING ${schema ? "form_id" : "response_id"}`,
+          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(params.length)}::jsonb RETURNING form_id`,
           params
         );
         if (deleted.length === 0) throw new Error("Deletion revision conflict or record disappeared.");
@@ -254,6 +280,27 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
       const row = result.rows[0];
       return row === undefined ? null : parseSchemaRow(row, 0, options.schemaValidation);
     },
+    async getRuntimeSettings(formId) {
+      await ensureReady();
+      const result = await options.client.query(
+        `SELECT settings_json FROM ${runtimeSettingsTable} WHERE form_id = $1`,
+        [formId]
+      );
+      const row = result.rows[0];
+      if (row === undefined || !isRecord(row)) return null;
+      const settings = parseJson(row.settings_json, "runtime settings") as FormRuntimeSettings;
+      assertValidFormRuntimeSettings(settings);
+      return cloneJson(settings);
+    },
+    async saveRuntimeSettings(settings) {
+      await ensureReady();
+      assertValidFormRuntimeSettings(settings);
+      await options.client.query(
+        `INSERT INTO ${runtimeSettingsTable} (form_id, settings_json) VALUES ($1, $2::jsonb)
+         ON CONFLICT (form_id) DO UPDATE SET settings_json = EXCLUDED.settings_json`,
+        [settings.formId, JSON.stringify(settings)]
+      );
+    },
     async listSchemas() {
       await ensureReady();
       const result = await options.client.query(
@@ -293,7 +340,10 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
       const stored = parseSubmission(submission, `input "${String(submission?.id)}"`);
       const payloadHash = await hashFormSubmissionPayload(stored);
       return options.client.transaction(async (client) => {
-        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`${stored.formId}@${stored.formVersion}`]);
+        const limitScope = saveOptions.responseLimitScope ?? "version";
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+          limitScope === "form" ? stored.formId : `${stored.formId}@${stored.formVersion}`
+        ]);
         const existingResult = await client.query(
           `SELECT response_id, form_id, form_version, locale, submitted_at, submission_json
            FROM ${responsesTable} WHERE response_id = $1`,
@@ -308,8 +358,8 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
           return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
         }
         const countResult = await client.query(
-          `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE form_id = $1 AND form_version = $2`,
-          [stored.formId, stored.formVersion]
+          `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE form_id = $1${limitScope === "form" ? "" : " AND form_version = $2"}`,
+          limitScope === "form" ? [stored.formId] : [stored.formId, stored.formVersion]
         );
         const countRow = countResult.rows[0];
         const count = isRecord(countRow) ? Number(countRow.count ?? 0) : 0;
@@ -434,6 +484,7 @@ export function createPostgresStorage(options: PostgresStorageOptions): PagedSub
       await ensureReady();
       await options.client.query(`DELETE FROM ${responsesTable}`);
       await options.client.query(`DELETE FROM ${schemasTable}`);
+      await options.client.query(`DELETE FROM ${runtimeSettingsTable}`);
     }
   };
 }

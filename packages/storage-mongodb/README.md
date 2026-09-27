@@ -31,8 +31,8 @@ typed `created`, `duplicate`, and `conflict` results based on the submission ID 
 `validateSubmissions: true` (or pass `validateAgainstSchema` to `saveSubmission`) to re-validate against the stored
 `FormSchema`.
 
-`saveSubmissionWithinLimit(submission, maxResponses, options?)` serializes capacity checks per form version in a
-MongoDB transaction. Replica-set or mongos transaction support is required; unsupported deployments fail with
+`saveSubmissionWithinLimit(submission, maxResponses, options?)` serializes capacity checks per form version by default;
+set `responseLimitScope: "form"` to share the cap across all versions. MongoDB transactions are required; unsupported deployments fail with
 `code: "transaction_unsupported"` instead of using a non-atomic fallback.
 
 For save-time validation independent of the stored schema, provide `submissionSchema` or `submissionValidator` (or

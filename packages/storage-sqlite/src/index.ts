@@ -1,4 +1,5 @@
 import type {
+  FormRuntimeSettings,
   FormSchema,
   FormStorageAdapter,
   FormSubmission,
@@ -6,6 +7,7 @@ import type {
   SubmissionSaveResult
 } from "@form-engine-ts/core";
 import {
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   createFormLifecycleAdapter,
   type FormLifecycleBackend,
@@ -29,6 +31,7 @@ export interface SqliteStorageOptions {
   readonly db: SqliteExecutor;
   readonly schemasTable?: string;
   readonly responsesTable?: string;
+  readonly runtimeSettingsTable?: string;
   readonly autoMigrate?: boolean;
 }
 
@@ -131,6 +134,11 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
   }
   const schemasTable = identifier(options.schemasTable, "form_schemas", "schemasTable");
   const responsesTableName = options.responsesTable ?? "form_responses";
+  const runtimeSettingsTable = identifier(
+    options.runtimeSettingsTable,
+    "form_runtime_settings",
+    "runtimeSettingsTable"
+  );
   const responsesTable = identifier(responsesTableName, "form_responses", "responsesTable");
   const responsesIndex = identifier(`${responsesTableName}_lookup_idx`, "form_responses_lookup_idx", "responsesTable");
   let migration: Promise<void> | undefined;
@@ -153,6 +161,10 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
         submitted_at TEXT NOT NULL,
         submission_json TEXT NOT NULL
       )`);
+      await options.db.run(`CREATE TABLE IF NOT EXISTS ${runtimeSettingsTable} (
+        form_id TEXT PRIMARY KEY,
+        settings_json TEXT NOT NULL
+      )`);
       await options.db.run(
         `CREATE INDEX IF NOT EXISTS ${responsesIndex} ON ${responsesTable} (form_id, submitted_at, response_id)`
       );
@@ -166,18 +178,25 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
     };
     const marker = (_index: number) => "?";
     return {
-      resources: ["schema", "submission"],
+      resources: ["schema", "submission", "runtimeSettings"],
       async list(formId) {
         await ensureReady();
         const records: FormResource[] = [];
-        for (const kind of ["schema", "submission"] as const) {
-          const table = kind === "schema" ? schemasTable : responsesTable;
+        for (const kind of ["schema", "submission", "runtimeSettings"] as const) {
+          const table =
+            kind === "schema" ? schemasTable : kind === "submission" ? responsesTable : runtimeSettingsTable;
           const rows = await query(`SELECT * FROM ${table} WHERE form_id = ${marker(1)}`, [formId]);
           for (const row of rows) {
             if (!isRecord(row)) throw new TypeError("Invalid lifecycle row.");
-            const payload = row[kind === "schema" ? "schema_json" : "submission_json"];
+            const payload =
+              row[kind === "schema" ? "schema_json" : kind === "submission" ? "submission_json" : "settings_json"];
             const value = parseJson(payload, "lifecycle");
-            const id = kind === "schema" ? JSON.stringify([row.form_id, row.form_version]) : String(row.response_id);
+            const id =
+              kind === "schema"
+                ? JSON.stringify([row.form_id, row.form_version])
+                : kind === "submission"
+                  ? String(row.response_id)
+                  : formId;
             records.push({ kind, id, value: { row, value } });
           }
         }
@@ -188,16 +207,23 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
           throw new TypeError("Invalid lifecycle resource.");
         const row = resource.value.row;
         const schema = resource.kind === "schema";
-        const table = schema ? schemasTable : responsesTable;
-        const payloadColumn = schema ? "schema_json" : "submission_json";
+        const settings = resource.kind === "runtimeSettings";
+        const table = schema ? schemasTable : settings ? runtimeSettingsTable : responsesTable;
+        const payloadColumn = schema ? "schema_json" : settings ? "settings_json" : "submission_json";
         const payload = row[payloadColumn];
-        const params: unknown[] = schema ? [row.form_id, row.form_version] : [row.response_id, row.form_id];
+        const params: unknown[] = schema
+          ? [row.form_id, row.form_version]
+          : settings
+            ? [row.form_id]
+            : [row.response_id, row.form_id];
         const identity = schema
           ? `form_id = ${marker(1)} AND form_version = ${marker(2)}`
-          : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
+          : settings
+            ? `form_id = ${marker(1)}`
+            : `response_id = ${marker(1)} AND form_id = ${marker(2)}`;
         params.push(typeof payload === "string" ? payload : JSON.stringify(payload));
         const deleted = await query(
-          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(3)} RETURNING ${schema ? "form_id" : "response_id"}`,
+          `DELETE FROM ${table} WHERE ${identity} AND ${payloadColumn} = ${marker(params.length)} RETURNING ${schema ? "form_id" : settings ? "form_id" : "response_id"}`,
           params
         );
         if (deleted.length === 0) throw new Error("Deletion revision conflict or record disappeared.");
@@ -250,6 +276,26 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
       );
       return row === undefined ? null : parseSchemaRow(row, 0, options.schemaValidation);
     },
+    async getRuntimeSettings(formId) {
+      await ensureReady();
+      const row = await options.db.get<{ readonly settings_json: unknown }>(
+        `SELECT settings_json FROM ${runtimeSettingsTable} WHERE form_id = ?`,
+        [formId]
+      );
+      if (row === undefined) return null;
+      const settings = parseJson(row.settings_json, "runtime settings") as FormRuntimeSettings;
+      assertValidFormRuntimeSettings(settings);
+      return cloneJson(settings);
+    },
+    async saveRuntimeSettings(settings) {
+      await ensureReady();
+      assertValidFormRuntimeSettings(settings);
+      await options.db.run(
+        `INSERT INTO ${runtimeSettingsTable} (form_id, settings_json) VALUES (?, ?)
+         ON CONFLICT (form_id) DO UPDATE SET settings_json = excluded.settings_json`,
+        [settings.formId, JSON.stringify(settings)]
+      );
+    },
     async listSchemas() {
       await ensureReady();
       const rows = await options.db.all<SchemaRow>(
@@ -299,8 +345,8 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
           return { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
         }
         const row = await db.get<{ readonly count: number }>(
-          `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE form_id = ? AND form_version = ?`,
-          [stored.formId, stored.formVersion]
+          `SELECT COUNT(*) AS count FROM ${responsesTable} WHERE form_id = ?${saveOptions.responseLimitScope === "form" ? "" : " AND form_version = ?"}`,
+          saveOptions.responseLimitScope === "form" ? [stored.formId] : [stored.formId, stored.formVersion]
         );
         if (Number(row?.count ?? 0) >= maxResponses) return { status: "limit_reached" };
         await db.run(
@@ -369,6 +415,7 @@ export function createSqliteStorage(options: SqliteStorageOptions): FormStorageA
       await ensureReady();
       await options.db.run(`DELETE FROM ${responsesTable}`);
       await options.db.run(`DELETE FROM ${schemasTable}`);
+      await options.db.run(`DELETE FROM ${runtimeSettingsTable}`);
     }
   };
 }

@@ -413,6 +413,19 @@ export interface SaveSubmissionOptions {
   readonly validator?: FormSubmissionValidationSource;
   /** Explicit schema alias for adapters that expose schema-oriented options. */
   readonly schema?: FormSubmissionValidationSource;
+  /** Scope used by atomic response limits. Defaults to the form version. */
+  readonly responseLimitScope?: "form" | "version";
+}
+
+export interface FormRuntimeSettings {
+  readonly formId: string;
+  readonly openAt?: string;
+  readonly closeAt?: string;
+  readonly maxResponses?: number;
+  readonly iconKey?: string;
+  readonly colorToken?: string;
+  readonly metadata?: Readonly<Record<string, JsonValue>>;
+  readonly updatedAt: string;
 }
 
 /** A submission whose persisted or transport representation always includes a locale. */
@@ -474,7 +487,7 @@ export interface SubmissionQueryOptions {
 
 export interface StorageAdapter {
   saveSubmission(submission: FormSubmission): Promise<void>;
-  /** Atomically saves a submission only while the form version remains below its response limit. */
+  /** Atomically saves a submission only while its version or form-wide response limit has capacity. */
   saveSubmissionWithinLimit?(
     submission: FormSubmission,
     maxResponses: number,
@@ -496,9 +509,16 @@ export interface FormStorageAdapter extends StorageAdapter {
   listSchemas(): Promise<readonly FormSchema[]>;
   deleteSchema(formId: string, formVersion: number): Promise<void>;
   deleteSubmission(submissionId: string): Promise<void>;
+  getRuntimeSettings?(formId: string): Promise<FormRuntimeSettings | null>;
+  saveRuntimeSettings?(settings: FormRuntimeSettings): Promise<void>;
   readonly inspectFormDeletion?: import("./lifecycle").FormLifecycleAdapter["inspectFormDeletion"];
   readonly deleteForm?: import("./lifecycle").FormLifecycleAdapter["deleteForm"];
   readonly lifecycleCapabilities?: import("./lifecycle").FormLifecycleAdapter["lifecycleCapabilities"];
+}
+
+export interface FormRuntimeSettingsStorageAdapter extends FormStorageAdapter {
+  getRuntimeSettings(formId: string): Promise<FormRuntimeSettings | null>;
+  saveRuntimeSettings(settings: FormRuntimeSettings): Promise<void>;
 }
 
 export interface SubmissionPageQueryOptions {
@@ -604,7 +624,7 @@ export interface UnifiedSubmissionStorageAdapter<TMeta extends BaseSubmissionMet
     submission: FormSubmission<TMeta>,
     options?: SaveSubmissionOptions
   ): Promise<undefined | SubmissionSaveResult<TMeta>>;
-  /** Atomically saves a submission only while the form version remains below its response limit. */
+  /** Atomically saves a submission only while its version or form-wide response limit has capacity. */
   saveSubmissionWithinLimit(
     submission: FormSubmission<TMeta>,
     maxResponses: number,

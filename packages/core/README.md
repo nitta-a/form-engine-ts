@@ -237,6 +237,59 @@ acceptance before saving. Storage adapters must implement
 `countSubmissions(formId, formVersion?, { since, until }?)`; the pipeline uses that count directly instead of scanning
 submission pages. Core also exports vendor-neutral honeypot, challenge, and rate-limit guards.
 
+### Versioned schema and current runtime settings
+
+Schemas and respondent-visible copy are stored per `(formId, version)`. Current operational settings are stored once
+per `formId`, separately from schemas. Submissions retain the schema version used to answer:
+
+```ts
+const schemaV1 = {
+  id: "contact",
+  version: 1,
+  title: "Contact",
+  description: "Tell us how to reach you.",
+  completionMessage: "Thanks for your response.",
+  translations: {
+    ja: { title: "お問い合わせ", description: "連絡先を教えてください。", completionMessage: "回答ありがとうございます。" }
+  },
+  fields: [{ id: "email", type: "email", title: "Email", required: true }]
+};
+
+const runtimeSettings = {
+  formId: "contact",
+  openAt: "2026-10-01T00:00:00.000Z",
+  closeAt: "2026-12-31T23:59:59.000Z",
+  maxResponses: 200,
+  iconKey: "mail",
+  colorToken: "blue",
+  updatedAt: "2026-09-27T03:00:00.000Z"
+};
+
+const submission = {
+  id: "response-123",
+  formId: "contact",
+  formVersion: 1,
+  values: { email: "ada@example.com" },
+  submittedAt: "2026-10-02T01:23:00.000Z"
+};
+```
+
+`openAt`, `closeAt`, `maxResponses`, `iconKey`, and `colorToken` are optional. Missing dates and a missing response cap
+mean no restriction; when present, the current settings are authoritative for every schema version. The response cap
+counts all versions together, and database adapters check capacity and save the response atomically. The LocalStorage
+adapter uses the browser Web Locks API to coordinate limited saves across tabs when available; without it, the count
+and write are synchronous only within one JavaScript context. Lowering a cap below the existing response count keeps
+prior responses and rejects new ones. Forms remain viewable outside the acceptance window; the renderer can show the
+current acceptance status, and the submission pipeline can receive a provider to fetch current settings again for each
+submission.
+
+Built-in form storage adapters expose `getRuntimeSettings` and `saveRuntimeSettings`. The React builder accepts
+`runtimeSettings`, `onRuntimeSettingsChange`, and `runtimeSettingsOptions` to edit these fields without changing the
+schema version. Call `migrateFormRuntimeSettings(publishedSchema, updatedAt)` once with the currently published schema
+to copy its legacy acceptance window and response cap into the separate record. This helper does not modify the schema.
+Titles, descriptions, completion messages, and their translations remain versioned; the optional metadata field can
+carry host-owned scope data for lifecycle deletion.
+
 `collectTranslationSlots`, `computeSourceTextHash`, and `getTranslationStatus` expose canonical translation targets
 and missing, translated, stale, or manual states for authoring tools. `populateSchemaTranslations` can populate stale
 and missing entries while preserving manual translations and reports skipped reasons.

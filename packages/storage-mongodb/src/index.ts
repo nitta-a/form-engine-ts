@@ -2,6 +2,7 @@ import type {
   BaseSubmissionMetadata,
   FormAnalytics,
   FormDeletionRequest,
+  FormRuntimeSettings,
   FormSchema,
   FormSubmission,
   FormSubmissionValidationSource,
@@ -26,6 +27,7 @@ import type {
 } from "@form-engine-ts/core";
 import {
   aggregateResponses,
+  assertValidFormRuntimeSettings,
   assertValidFormSchema,
   assertValidFormSubmission,
   assertValidFormSubmissionWith,
@@ -68,10 +70,12 @@ export interface MongoDbStorageOptions {
   readonly responsesCollectionName?: string;
   readonly versionsCollectionName?: string;
   readonly versionStatesCollectionName?: string;
+  readonly runtimeSettingsCollectionName?: string;
   readonly collectionNames?: {
     readonly forms?: string;
     readonly formVersions?: string;
     readonly formVersionStates?: string;
+    readonly formRuntimeSettings?: string;
     readonly formResponses?: string;
   };
   readonly customIndexes?: {
@@ -95,6 +99,8 @@ export interface MongoDbStorageOptions {
 }
 
 export interface MongoDbStorageAdapter extends PagedSubmissionStorageAdapter, VersionedFormStorageAdapter {
+  getRuntimeSettings?(formId: string): Promise<FormRuntimeSettings | null>;
+  saveRuntimeSettings?(settings: FormRuntimeSettings): Promise<void>;
   createIndexes(): Promise<void>;
   aggregateResponses(schema: FormSchema, options?: SubmissionPageQueryOptions): Promise<FormAnalytics>;
   exportResponsesToCsv(schema: FormSchema, options?: StorageSubmissionExportOptions): Promise<string>;
@@ -504,6 +510,13 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       ? "versionStatesCollectionName"
       : "collectionNames.formVersionStates"
   );
+  const runtimeSettingsCollectionName = collectionName(
+    collectionNames?.formRuntimeSettings ?? options.runtimeSettingsCollectionName,
+    "form_runtime_settings",
+    collectionNames?.formRuntimeSettings === undefined
+      ? "runtimeSettingsCollectionName"
+      : "collectionNames.formRuntimeSettings"
+  );
   const versionEventsCollectionName = "form_version_events";
   const schemas = options.db.collection<StoredSchemaDocument>(schemasCollectionName);
   const submissions = options.db.collection<StoredSubmissionDocument>(responsesCollectionName);
@@ -513,6 +526,9 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
   const versions = options.db.collection<StoredVersionDocument>(versionsCollectionName);
   const versionStates = options.db.collection<StoredVersionStateDocument>(versionStatesCollectionName);
   const versionEvents = options.db.collection<StoredVersionEventDocument>(versionEventsCollectionName);
+  const runtimeSettings = options.db.collection<Document & { _id: string; settings: FormRuntimeSettings }>(
+    runtimeSettingsCollectionName
+  );
 
   const storageRevisionConflict = async (
     plan: VersionTransitionPlan
@@ -625,18 +641,19 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
     submission: responsesCollectionName,
     version: versionsCollectionName,
     state: versionStatesCollectionName,
+    runtimeSettings: runtimeSettingsCollectionName,
     auditEvent: versionEventsCollectionName
   };
   function lifecycleBackend(session?: ClientSession, includeTransaction = session === undefined): FormLifecycleBackend {
     const sessionOptions = session === undefined ? {} : { session };
     return {
-      resources: ["schema", "submission", "version", "state", "auditEvent"],
+      resources: ["schema", "submission", "version", "state", "runtimeSettings", "auditEvent"],
       async list(formId) {
         const result: FormResource[] = [];
-        for (const kind of ["schema", "submission", "version", "state", "auditEvent"] as const) {
+        for (const kind of ["schema", "submission", "version", "state", "runtimeSettings", "auditEvent"] as const) {
           const collection = options.db.collection<Document & { _id: string }>(lifecycleCollections[kind]);
           const documents = await collection
-            .find(kind === "state" ? { _id: formId } : { formId }, sessionOptions)
+            .find(kind === "state" || kind === "runtimeSettings" ? { _id: formId } : { formId }, sessionOptions)
             .toArray();
           for (const value of documents) result.push({ kind, id: value._id, value });
         }
@@ -678,6 +695,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
             const value =
               resource.value.schema ??
               resource.value.submission ??
+              resource.value.settings ??
               resource.value.record ??
               resource.value.event ??
               resource.value;
@@ -710,6 +728,20 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
     async getSchema(formId, formVersion) {
       const document = await schemas.findOne({ _id: schemaDocumentId(formId, formVersion) });
       return document === null ? null : parseSchemaDocument(document, options.schemaValidation);
+    },
+    async getRuntimeSettings(formId) {
+      const document = await runtimeSettings.findOne({ _id: formId });
+      if (document === null) return null;
+      assertValidFormRuntimeSettings(document.settings);
+      return cloneJson(document.settings);
+    },
+    async saveRuntimeSettings(settings) {
+      assertValidFormRuntimeSettings(settings);
+      await runtimeSettings.updateOne(
+        { _id: settings.formId },
+        { $set: { settings: cloneJson(settings) } },
+        { upsert: true }
+      );
     },
     async listSchemas() {
       const documents = await schemas.find({}).toArray();
@@ -833,14 +865,15 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
                 : { status: "conflict", submissionId: stored.id, payloadHash, existingPayloadHash };
             return;
           }
-          const capacityId = `${stored.formId}@${stored.formVersion}`;
+          const formScope = saveOptions.responseLimitScope === "form";
+          const capacityId = formScope ? `form:${stored.formId}` : `${stored.formId}@${stored.formVersion}`;
           await submissionCapacities.updateOne(
             { _id: capacityId },
             { $inc: { revision: 1 } },
             { upsert: true, session }
           );
           const count = await submissions.countDocuments(
-            { formId: stored.formId, formVersion: stored.formVersion },
+            formScope ? { formId: stored.formId } : { formId: stored.formId, formVersion: stored.formVersion },
             { session }
           );
           if (count >= maxResponses) {
@@ -1102,6 +1135,7 @@ export function createMongoDbStorage<TMeta extends BaseSubmissionMetadata | unde
       await Promise.all([
         schemas.deleteMany({}),
         submissions.deleteMany({}),
+        runtimeSettings.deleteMany({}),
         versions.deleteMany({}),
         versionStates.deleteMany({}),
         versionEvents.deleteMany({})

@@ -49,7 +49,8 @@ source can be supplied per call as `saveSubmission(submission, { validation })`.
 Zod-compatible object with `safeParse`, or an async validator callback.
 
 `saveSubmissionWithinLimit(submission, maxResponses, options?)` uses an ETag-protected capacity entity and an Azure
-Table transaction to update capacity and create the response together. The submission codec must place a form's
+Table transaction to update capacity and create the response together. Set `responseLimitScope: "form"` to share its
+capacity row across all versions. The submission codec must place a form's
 responses in one partition (the default codec does), and the injected client must expose `submitTransaction`.
 
 `listTextAnswerPage` accepts either the legacy single field ID or `TextAnswerPageQueryOptions.fieldIds`. Page size counts

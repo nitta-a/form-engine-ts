@@ -1,4 +1,11 @@
-export type FormResourceKind = "schema" | "version" | "state" | "submission" | "auditEvent" | "internal";
+export type FormResourceKind =
+  | "schema"
+  | "version"
+  | "state"
+  | "submission"
+  | "runtimeSettings"
+  | "auditEvent"
+  | "internal";
 export type FormDeletionCounts = Readonly<Record<FormResourceKind, number>>;
 export interface FormDeletionScope {
   readonly tenantId?: string;
@@ -50,7 +57,7 @@ export interface FormLifecycleBackend {
 }
 
 export function emptyFormDeletionCounts(): Record<FormResourceKind, number> {
-  return { schema: 0, version: 0, state: 0, submission: 0, auditEvent: 0, internal: 0 };
+  return { schema: 0, version: 0, state: 0, submission: 0, runtimeSettings: 0, auditEvent: 0, internal: 0 };
 }
 
 export function createFormLifecycleAdapter(

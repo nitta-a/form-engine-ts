@@ -109,6 +109,22 @@ describe("createLocalStorageAdapter", () => {
     ).toEqual(["early", "a", "z"]);
   });
 
+  it("serializes limited saves with the browser lock for the form", async () => {
+    const request = vi.fn((_name: string, operation: () => Promise<unknown>) => operation());
+    vi.stubGlobal("navigator", { locks: { request } });
+    try {
+      const adapter = createLocalStorageAdapter("locked_", createStorage());
+      const result = await adapter.saveSubmissionWithinLimit?.(submission("limited"), 1, {
+        idempotent: true,
+        responseLimitScope: "form"
+      });
+      expect(result?.status).toBe("created");
+      expect(request).toHaveBeenCalledWith("locked_response-limit:form", expect.any(Function));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("clears every version for one form while retaining schemas, prefixes, and other forms", async () => {
     const storage = createStorage();
     const first = createLocalStorageAdapter("a_", storage);
