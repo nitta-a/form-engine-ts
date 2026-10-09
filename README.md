@@ -55,8 +55,8 @@ pnpm test
 
 ### Current release
 
-The latest release is **v8.2.0** (2026-09-27). All public packages are currently aligned to version `8.2.0`.
-This release adds mutable form-wide runtime settings for response windows, limits, and appearance without creating a new schema version.
+The latest release is **v8.2.1** (2026-10-09). All public packages are currently aligned to version `8.2.1`.
+This patch adds captured Preview screenshots to the demo documentation.
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
 
 ### Authoring and respondent experience
@@ -479,8 +479,8 @@ pnpm test
 
 ### 最新リリース
 
-最新版は **v8.2.0**（2026-09-27）です。公開パッケージはすべてバージョン `8.2.0` に揃えています。
-本リリースでは、版番号を変えずに受付期間・回答上限・表示を管理するフォーム全体の現在設定を追加しました。
+最新版は **v8.2.1**（2026-10-09）です。公開パッケージはすべてバージョン `8.2.1` に揃えています。
+本パッチでは、PreviewのデモキャプチャをREADMEに追加しました。
 全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
 
 ### 編集・回答体験
@@ -845,6 +845,10 @@ For a design-system-neutral respondent screen, import `ContentRenderer` from
 the same Provider and submission state rendered with MUI or Tailwind. Persistence and
 authorization remain host responsibilities.
 
+The respondent preview demonstrates the localized, multi-page form flow:
+
+![Form Engine respondent preview](docs/assets/respondent-preview.jpg)
+
 ## アンケート・投票・クイズのデモ
 
 preview の **フォーム一覧** から、共通の Memory / LocalStorage 保存領域で種別フィルタ
@@ -862,3 +866,7 @@ Provider・回答値・送信状態をMUI/Tailwindで切り替えて確認でき
 ホスト側の責務です。
 公開パッケージではv7のroot export互換性を維持しながら、MUIの`/builder`、`/renderer`、
 `/survey-summary`、`/survey-domain`を用途別にimportできます。
+
+回答者向けの多言語・複数ページフォームの表示例です。
+
+![Form Engineの回答者プレビュー](docs/assets/respondent-preview.jpg)

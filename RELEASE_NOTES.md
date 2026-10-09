@@ -3,6 +3,10 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.2.1 — 2026-10-09
+
+- Added a captured respondent Preview screen to the English and Japanese README demo sections.
+
 ## v8.2.0 — 2026-09-27
 
 - Added form-wide runtime settings for response windows, response caps, and candidate icon/color tokens without changing the schema version.
