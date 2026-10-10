@@ -1,7 +1,6 @@
 import {
   type AuthoringIntent,
   cloneVersionToDraft,
-  createInitialSchemaByMode,
   createPublishTransitionPlan,
   createResponseAccumulator,
   deleteDraft,
@@ -10,7 +9,6 @@ import {
   type FormVersionState,
   validateFormSchema
 } from "@form-engine-ts/core";
-import { type SurveyAiCreationLabels, SurveyAiCreationPanel } from "@form-engine-ts/custom-survey-client";
 import { MuiAuthoringFieldAction, MuiAuthoringPrompt, MuiAuthoringSuggestionPreview } from "@form-engine-ts/mui";
 import {
   type BuilderButtonProps,
@@ -22,100 +20,13 @@ import {
   useFormBuilder
 } from "@form-engine-ts/react";
 import { mockAsyncTranslator, mockTranslator } from "@form-engine-ts/translator-mock";
-import { Button, Dialog, DialogContent, DialogTitle, TextField } from "@mui/material";
-import { type ChangeEvent, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { usePreviewWorkspace } from "../workspace/PreviewWorkspaceContext";
 import { useBuilderPreview } from "./BuilderPreviewContext";
 import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
-import { mockCreationAssistantAdapter } from "./mockCreationAssistantAdapter";
-import { previewCreationPolicy, previewPolicy } from "./previewPolicy";
-
-const previewEnglishSurveyAiLabels: SurveyAiCreationLabels = {
-  title: "AI survey creation assistant",
-  conversation: "Conversation",
-  initialNotice:
-    "This AI assistant helps you create a survey. Tell us what you would like to learn, or choose a suggestion below.",
-  initialPrompt: "What would you like to know with this survey?",
-  initialQuickReplies: [
-    { id: "satisfaction", label: "I want to know satisfaction", value: "I want to know satisfaction" },
-    { id: "improvement", label: "I want to know improvement needs", value: "I want to know improvement needs" }
-  ],
-  assistant: "Assistant",
-  user: "You",
-  purposeInput: "Tell us what you want to learn",
-  messageInput: "Tell us more",
-  send: "Send",
-  retry: "Retry",
-  cancel: "Cancel",
-  generate: "Create with this information",
-  generating: "Generating survey…",
-  applying: "Applying survey…",
-  error: (code) => code,
-  brief: "Survey brief",
-  showBrief: "Show survey brief",
-  hideBrief: "Hide survey brief",
-  audience: "Audience",
-  questionCount: "Questions",
-  notSet: "Not set",
-  review: "Draft review",
-  questionType: "Type",
-  required: "Required",
-  optional: "Optional",
-  choices: "Choices",
-  removeQuestion: "Remove question",
-  preview: "Preview",
-  previewTitle: "Survey preview",
-  previewNotice: "You are viewing the current draft. Answers cannot be submitted from this preview.",
-  closePreview: "Close preview",
-  createSurvey: "Open in editor",
-  emptyQuestions: "No questions",
-  fieldType: (type) => type
-};
-
-function previewSurveyAiLabels(locale: string): SurveyAiCreationLabels {
-  if (!locale.startsWith("ja")) return previewEnglishSurveyAiLabels;
-  return {
-    ...previewEnglishSurveyAiLabels,
-    title: "AIでアンケートを作成",
-    conversation: "AIとのやり取り",
-    initialNotice:
-      "AIアシスタントにアンケートの作成を依頼できます。知りたいことを入力するか、候補から選択してください。",
-    initialPrompt: "このアンケートで何を知りたいですか？",
-    initialQuickReplies: [
-      { id: "satisfaction", label: "満足度を知りたい", value: "満足度を知りたい" },
-      { id: "improvement", label: "改善点を知りたい", value: "改善点を知りたい" }
-    ],
-    assistant: "AI",
-    user: "あなた",
-    purposeInput: "このアンケートで知りたいことを入力してください。",
-    messageInput: "候補にない回答を入力",
-    send: "送信",
-    retry: "再試行",
-    cancel: "キャンセル",
-    generate: "この情報で作成",
-    generating: "アンケートを作成中…",
-    applying: "アンケートを反映中…",
-    error: (code) => `エラー: ${code}`,
-    brief: "アンケート概要",
-    showBrief: "アンケート概要を表示",
-    hideBrief: "アンケート概要を非表示",
-    audience: "対象者",
-    questionCount: "質問数",
-    notSet: "未設定",
-    review: "作成内容の確認",
-    questionType: "種類",
-    required: "必須",
-    optional: "任意",
-    choices: "選択肢",
-    removeQuestion: "質問を削除",
-    preview: "回答画面をプレビュー",
-    previewTitle: "回答画面プレビュー",
-    previewNotice: "現在編集中の内容を表示しています。プレビューから回答は送信されません。",
-    closePreview: "プレビューを閉じる",
-    createSurvey: "アンケートを作成",
-    emptyQuestions: "質問がありません"
-  };
-}
+import { previewPolicy } from "./previewPolicy";
+import { SurveyCreationAssistant } from "./SurveyCreationAssistant";
+import { SurveySchemaTools } from "./SurveySchemaTools";
 
 function PreviewMuiButton({
   children,
@@ -448,67 +359,20 @@ function AuthoringAssistantDemo({
   );
 }
 
-function CreationAssistantDemo({
-  locale,
-  onComplete
-}: {
-  readonly locale: string;
-  readonly onComplete: (schema: FormSchema) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const labels = previewSurveyAiLabels(locale);
-  const isJapanese = locale.startsWith("ja");
-  const surveyTheme = isJapanese ? "観光地の感想" : "Travel destination impressions";
-  const dialogTitle = isJapanese ? labels.title : "Create survey with AI";
-  const initialSchema = useMemo(
-    () => createInitialSchemaByMode("survey", { id: "ai-created-survey", title: surveyTheme, locale }),
-    [locale, surveyTheme]
-  );
-  return (
-    <>
-      <Button variant="contained" onClick={() => setOpen(true)}>
-        {isJapanese ? "AIでアンケートを作成" : "Create survey with AI"}
-      </Button>
-      <Dialog className="preview-ai-creation-dialog" fullWidth maxWidth="sm" open={open} onClose={() => setOpen(false)}>
-        <DialogTitle>{dialogTitle}</DialogTitle>
-        <DialogContent dividers>
-          <p className="preview-ai-creation-theme">
-            {isJapanese ? "アンケートのテーマ: 🏞️ 観光地の感想" : "Survey theme: 🏞️ Travel destination impressions"}
-          </p>
-          <SurveyAiCreationPanel
-            key={locale}
-            creationAdapter={mockCreationAssistantAdapter}
-            authoringAdapter={mockAuthoringAssistantAdapter}
-            initialSchema={initialSchema}
-            sourceLocale={locale}
-            policy={previewCreationPolicy}
-            labels={labels}
-            showBrief={false}
-            renderMessageInput={({ id, value, disabled, placeholder, onChange }) => (
-              <TextField
-                id={id}
-                value={value}
-                disabled={disabled}
-                placeholder={placeholder}
-                onChange={(event) => onChange(event.target.value)}
-                fullWidth
-                size="small"
-              />
-            )}
-            onCancel={() => setOpen(false)}
-            onComplete={(createdSchema) => {
-              onComplete(createdSchema);
-              setOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+interface BuilderPanelProps {
+  readonly active?: boolean;
 }
 
-export function BuilderPanel() {
-  const { schema, locale, workspaceReady, changeSchema } = usePreviewWorkspace();
+export function BuilderPanel({ active = true }: BuilderPanelProps) {
+  const { schema: savedSchema, locale, workspaceReady, changeSchema, openSchema } = usePreviewWorkspace();
+  const [schema, setSchema] = useState(savedSchema);
+  const draftValid = validateFormSchema(schema).valid;
+  const japanese = locale.startsWith("ja");
+  useEffect(() => setSchema(savedSchema), [savedSchema]);
+  const updateSchema = (nextSchema: FormSchema) => {
+    setSchema(nextSchema);
+    if (validateFormSchema(nextSchema).valid) changeSchema(nextSchema);
+  };
   const {
     translationOverwrite,
     translationReport,
@@ -530,85 +394,111 @@ export function BuilderPanel() {
     setBuilderActionStatus,
     runTranslationPolicy
   } = useBuilderPreview();
+  if (!active) return null;
   return (
     <div className="builder-grid">
       <section className="workspace-card">
-        <fieldset className="translation-policy-demo">
-          <legend>v2 Translation overwrite policy</legend>
-          <label>
-            Overwrite
-            <select
-              value={translationOverwrite}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                setTranslationOverwrite(event.currentTarget.value as "missing-only" | "all")
-              }
-            >
-              <option value="missing-only">missing-only</option>
-              <option value="all">all</option>
-            </select>
-          </label>
-          <button type="button" disabled={!workspaceReady} onClick={() => void runTranslationPolicy()}>
-            Run translation policy
-          </button>
-          {translationReport === null ? null : <output>{translationReport}</output>}
-        </fieldset>
-        <HeadlessBuilderDemo schema={schema} onChange={changeSchema} />
-        <CreationAssistantDemo locale={locale} onComplete={changeSchema} />
-        <AuthoringAssistantDemo schema={schema} onChange={changeSchema} />
-        <DomainApiDemo schema={schema} />
-        <fieldset className="renderer-demo-controls">
-          <legend>v2.4 MUI-compatible Builder components</legend>
-          <label>
-            <input
-              type="checkbox"
-              checked={builderReadOnly}
-              onChange={(event) => setBuilderReadOnly(event.currentTarget.checked)}
-            />
-            Read-only builder
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={pagesEnabled}
-              onChange={(event) => setPagesEnabled(event.currentTarget.checked)}
-            />
-            Pages feature
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={localizationEnabled}
-              onChange={(event) => setLocalizationEnabled(event.currentTarget.checked)}
-            />
-            Localization feature
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={conditionsEnabled}
-              onChange={(event) => setConditionsEnabled(event.currentTarget.checked)}
-            />
-            Conditions feature
-          </label>
-          <label>
-            Page editor
-            <select
-              value={pageEditorMode}
-              onChange={(event) => setPageEditorMode(event.currentTarget.value as "all" | "single")}
-            >
-              <option value="single">One page at a time</option>
-              <option value="all">All pages</option>
-            </select>
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={useCustomBuilderUi}
-              onChange={(event) => setUseCustomBuilderUi(event.currentTarget.checked)}
-            />
-            Use custom Builder UI
-          </label>
-        </fieldset>
+        <header className="panel-heading">
+          <div>
+            <p className="eyebrow">{japanese ? "高度な編集" : "Advanced editing"}</p>
+            <h2>{japanese ? "アンケートの詳細設定" : "Questionnaire settings"}</h2>
+            <p>
+              {japanese
+                ? "質問・ページ・翻訳・表示条件をまとめて編集します。"
+                : "Edit questions, pages, translations, and display conditions together."}
+            </p>
+          </div>
+          <SurveyCreationAssistant
+            locale={locale}
+            disabled={!workspaceReady || builderReadOnly}
+            onComplete={openSchema}
+          />
+        </header>
+        <details className="workspace-details builder-developer-tools">
+          <summary>{japanese ? "エディターの設定と開発者向けデモ" : "Editor settings and developer tools"}</summary>
+          <fieldset className="translation-policy-demo">
+            <legend>v2 Translation overwrite policy</legend>
+            <label>
+              Overwrite
+              <select
+                value={translationOverwrite}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                  setTranslationOverwrite(event.currentTarget.value as "missing-only" | "all")
+                }
+              >
+                <option value="missing-only">missing-only</option>
+                <option value="all">all</option>
+              </select>
+            </label>
+            <button type="button" disabled={!workspaceReady} onClick={() => void runTranslationPolicy()}>
+              Run translation policy
+            </button>
+            {translationReport === null ? null : <output>{translationReport}</output>}
+          </fieldset>
+          <HeadlessBuilderDemo schema={schema} onChange={updateSchema} />
+          <AuthoringAssistantDemo schema={schema} onChange={updateSchema} />
+          <DomainApiDemo schema={savedSchema} />
+          <fieldset className="renderer-demo-controls">
+            <legend>v2.4 MUI-compatible Builder components</legend>
+            <label>
+              <input
+                type="checkbox"
+                checked={builderReadOnly}
+                onChange={(event) => setBuilderReadOnly(event.currentTarget.checked)}
+              />
+              Read-only builder
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={pagesEnabled}
+                onChange={(event) => setPagesEnabled(event.currentTarget.checked)}
+              />
+              Pages feature
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={localizationEnabled}
+                onChange={(event) => setLocalizationEnabled(event.currentTarget.checked)}
+              />
+              Localization feature
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={conditionsEnabled}
+                onChange={(event) => setConditionsEnabled(event.currentTarget.checked)}
+              />
+              Conditions feature
+            </label>
+            <label>
+              Page editor
+              <select
+                value={pageEditorMode}
+                onChange={(event) => setPageEditorMode(event.currentTarget.value as "all" | "single")}
+              >
+                <option value="single">One page at a time</option>
+                <option value="all">All pages</option>
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={useCustomBuilderUi}
+                onChange={(event) => setUseCustomBuilderUi(event.currentTarget.checked)}
+              />
+              Use custom Builder UI
+            </label>
+          </fieldset>
+        </details>
+        {draftValid ? null : (
+          <p className="workspace-error" role="status">
+            {japanese
+              ? "編集中のエラーを修正してください。無効な内容は保存されず、回答画面の確認には最後の有効なアンケートを使用します。"
+              : "Fix the draft errors to continue. Invalid changes are not saved; Answer preview uses the last valid questionnaire."}
+          </p>
+        )}
         {builderActionStatus === null ? null : (
           <p className="builder-action-status" role="status">
             {builderActionStatus}
@@ -619,7 +509,7 @@ export function BuilderPanel() {
           locale={locale}
           translator={mockTranslator}
           translationAdapter={mockAsyncTranslator}
-          onChange={changeSchema}
+          onChange={updateSchema}
           policy={previewPolicy}
           defaultFieldType="textarea"
           readOnly={builderReadOnly}
@@ -645,12 +535,20 @@ export function BuilderPanel() {
           })}
         />
       </section>
-      <section className="workspace-card json-card">
-        <h2>{mockTranslator.translate("preview.schemaJson", locale) ?? "preview.schemaJson"}</h2>
-        <pre>
-          <code>{JSON.stringify(schema, null, 2)}</code>
-        </pre>
-      </section>
+      <aside className="workspace-card builder-support-card">
+        <h2>{japanese ? "編集のヒント" : "Editor checklist"}</h2>
+        <ol className="survey-checklist">
+          <li>{japanese ? "聞きたいことを1つずつ質問にする" : "Ask one clear thing in each question"}</li>
+          <li>{japanese ? "必要な質問だけを必須にする" : "Require only essential answers"}</li>
+          <li>{japanese ? "回答画面で流れと分岐を確認する" : "Check the respondent flow and conditions"}</li>
+        </ol>
+        <SurveySchemaTools
+          schema={schema}
+          locale={locale}
+          disabled={!workspaceReady || builderReadOnly}
+          onChange={openSchema}
+        />
+      </aside>
     </div>
   );
 }

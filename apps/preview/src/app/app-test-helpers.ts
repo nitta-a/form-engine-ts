@@ -3,6 +3,7 @@ import type userEvent from "@testing-library/user-event";
 
 export function clearPreviewStorage() {
   globalThis.localStorage.clear();
+  window.history.replaceState(null, "", "/");
 }
 
 export async function submitCompleteResponse(user: ReturnType<typeof userEvent.setup>, expectSuccess = true) {

@@ -198,56 +198,59 @@ export function ContentAnswer({ schema, locale, storage, storageKind = "default"
   );
   return (
     <Stack spacing={2}>
-      <fieldset className="renderer-demo-controls">
-        <legend>{ja ? "回答UI" : "Answer UI"}</legend>
-        <label>
-          <input
-            type="radio"
-            name={`renderer-${schema.id}`}
-            checked={rendererKind === "mui"}
-            onChange={() => setRendererKind("mui")}
-          />{" "}
-          MUI
-        </label>
-        <label>
-          <input
-            type="radio"
-            name={`renderer-${schema.id}`}
-            checked={rendererKind === "tailwind"}
-            onChange={() => setRendererKind("tailwind")}
-          />{" "}
-          Tailwind
-        </label>
-      </fieldset>
-      {mode === "poll" ? (
-        <>
-          <FormControlLabel
-            label={ja ? "締切済み" : "Closed"}
-            control={<Checkbox checked={closed} onChange={(_, checked) => setClosed(checked)} />}
-          />
-          <FormControlLabel
-            label={ja ? "結果の閲覧権限" : "Result access"}
-            control={<Checkbox checked={canViewResults} onChange={(_, checked) => setCanViewResults(checked)} />}
-          />
-          <FormControlLabel
-            label={ja ? "集計エラーを再現" : "Simulate results error"}
-            control={<Checkbox checked={failResults} onChange={(_, checked) => setFailResults(checked)} />}
-          />
-          <FormControlLabel
-            label={ja ? "結果 Embed を表示" : "Show results embed"}
-            control={<Checkbox checked={showEmbed} onChange={(_, checked) => setShowEmbed(checked)} />}
-          />
-          <p>
-            {ja
-              ? "一人一票のデモはこのブラウザー内で再現します。"
-              : "One-vote enforcement in this demo is limited to this browser."}
-          </p>
-        </>
-      ) : null}
-      <FormControlLabel
-        label={ja ? "送信エラーを再現" : "Simulate submission error"}
-        control={<Checkbox checked={failSubmit} onChange={(_, checked) => setFailSubmit(checked)} />}
-      />
+      <details className="content-demo-settings">
+        <summary>{ja ? "デモの詳細設定" : "Advanced demo settings"}</summary>
+        <fieldset className="renderer-demo-controls">
+          <legend>{ja ? "回答UI" : "Answer UI"}</legend>
+          <label>
+            <input
+              type="radio"
+              name={`renderer-${schema.id}`}
+              checked={rendererKind === "mui"}
+              onChange={() => setRendererKind("mui")}
+            />{" "}
+            MUI
+          </label>
+          <label>
+            <input
+              type="radio"
+              name={`renderer-${schema.id}`}
+              checked={rendererKind === "tailwind"}
+              onChange={() => setRendererKind("tailwind")}
+            />{" "}
+            Tailwind
+          </label>
+        </fieldset>
+        {mode === "poll" ? (
+          <>
+            <FormControlLabel
+              label={ja ? "締切済み" : "Closed"}
+              control={<Checkbox checked={closed} onChange={(_, checked) => setClosed(checked)} />}
+            />
+            <FormControlLabel
+              label={ja ? "結果の閲覧権限" : "Result access"}
+              control={<Checkbox checked={canViewResults} onChange={(_, checked) => setCanViewResults(checked)} />}
+            />
+            <FormControlLabel
+              label={ja ? "集計エラーを再現" : "Simulate results error"}
+              control={<Checkbox checked={failResults} onChange={(_, checked) => setFailResults(checked)} />}
+            />
+            <FormControlLabel
+              label={ja ? "結果 Embed を表示" : "Show results embed"}
+              control={<Checkbox checked={showEmbed} onChange={(_, checked) => setShowEmbed(checked)} />}
+            />
+            <p>
+              {ja
+                ? "一人一票のデモはこのブラウザー内で再現します。"
+                : "One-vote enforcement in this demo is limited to this browser."}
+            </p>
+          </>
+        ) : null}
+        <FormControlLabel
+          label={ja ? "送信エラーを再現" : "Simulate submission error"}
+          control={<Checkbox checked={failSubmit} onChange={(_, checked) => setFailSubmit(checked)} />}
+        />
+      </details>
       <FormProvider
         schema={schema}
         locale={locale}

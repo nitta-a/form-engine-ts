@@ -20,6 +20,7 @@ describe("poll publication and vote persistence", () => {
       await storage.saveSchema(schema);
       const query = vi.spyOn(storage, "listSubmissions");
       render(<ContentAnswer schema={schema} locale="en" storage={storage} />);
+      await user.click(screen.getByText("Advanced demo settings"));
       if (resultVisibility === "always")
         await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
       else expect(query).not.toHaveBeenCalled();
@@ -51,6 +52,7 @@ describe("poll publication and vote persistence", () => {
     await waitFor(() => expect(screen.getByText("Submitted.")).toBeVisible());
     view.unmount();
     render(<ContentAnswer schema={schema} locale="en" storage={storage} />);
+    await user.click(screen.getByText("Advanced demo settings"));
     await user.click(screen.getByRole("radio", { name: "Option 2" }));
     await user.click(screen.getByRole("button", { name: "Send response" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("already voted"));
@@ -73,6 +75,7 @@ describe("poll publication and vote persistence", () => {
     await waitFor(() => expect(screen.getByText("Submitted.")).toBeVisible());
     first.unmount();
     render(<ContentAnswer schema={schema} locale="en" storage={storage} />);
+    await user.click(screen.getByText("Advanced demo settings"));
     await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
     expect(screen.getByText("1 votes (100%)")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Poll results" })).not.toBeInTheDocument();
@@ -89,6 +92,7 @@ describe("poll publication and vote persistence", () => {
     const schema = createInitialSchemaByMode("poll", { title: "Poll", locale: "en" });
     await storage.saveSchema(schema);
     render(<ContentAnswer schema={schema} locale="en" storage={storage} />);
+    await user.click(screen.getByText("Advanced demo settings"));
     await user.click(screen.getByLabelText("Simulate results error"));
     await user.click(screen.getByRole("radio", { name: "Option 1" }));
     await user.click(screen.getByRole("button", { name: "Send response" }));

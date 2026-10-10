@@ -3,6 +3,13 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.2.2 — 2026-10-10
+
+- Reworked the Preview app into a customer survey workspace with survey templates, editing, respondent preview, response search, analytics, and export flows.
+- Added validated schema backup/import, reviewable mock AI drafts, and navigation that preserves in-session drafts and respondent progress.
+- Updated workspace dependency resolutions for `source-map-js` and `undici`.
+- Aligned all public packages to version 8.2.2.
+
 ## v8.2.1 — 2026-10-09
 
 - Added a captured respondent Preview screen to the English and Japanese README demo sections.

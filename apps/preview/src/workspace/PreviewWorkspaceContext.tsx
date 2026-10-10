@@ -15,7 +15,7 @@ import type { SubmitContext } from "@form-engine-ts/react";
 import { createLocalStorageAdapter } from "@form-engine-ts/storage-localstorage";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { customerFeedbackSchema } from "./schema";
 
 export type StorageKind = "memory" | "local";
@@ -39,6 +39,7 @@ export interface PreviewWorkspaceContextValue {
   readonly setStorageKind: (kind: StorageKind) => void;
   readonly setSimulateServerError: (value: boolean) => void;
   readonly changeSchema: (schema: FormSchema) => void;
+  readonly openSchema: (schema: FormSchema) => Promise<void>;
   readonly submit: (values: FormValues, context: SubmitContext) => Promise<void>;
   readonly downloadCsv: () => Promise<void>;
   readonly resetResponses: () => Promise<void>;
@@ -58,6 +59,8 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   const [isClearing, setIsClearing] = useState(false);
   const [simulateServerError, setSimulateServerError] = useState(false);
   const [workspaceReady, setWorkspaceReady] = useState(false);
+  const workspaceGeneration = useRef(0);
+  const selectedSchema = useRef<FormSchema>(customerFeedbackSchema);
   const [resetStatus, setResetStatus] = useState<{
     readonly kind: "success" | "error";
     readonly message: string;
@@ -65,7 +68,13 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   const storage: FormStorageAdapter = storageKind === "memory" ? memoryStorage : localStorage;
   const analytics = useMemo(() => aggregateResponses(schema, submissions), [schema, submissions]);
   const telemetryAdapter = useMemo<FormTelemetryAdapter>(
-    () => ({ track: (event) => setInteractionEvents((current) => [...current, event]) }),
+    () => ({
+      track: (event) => {
+        const currentSchema = selectedSchema.current;
+        if (event.formId !== currentSchema.id || event.formVersion !== currentSchema.version) return;
+        setInteractionEvents((current) => [...current, event]);
+      }
+    }),
     []
   );
   const interactionAnalytics = useMemo(() => aggregateInteractionEvents(interactionEvents), [interactionEvents]);
@@ -73,40 +82,93 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   const translate = useCallback((key: string) => mockTranslator.translate(key, locale) ?? key, [locale]);
 
   const loadWorkspace = useCallback(async (adapter: FormStorageAdapter) => {
+    const generation = ++workspaceGeneration.current;
+    setWorkspaceReady(false);
     try {
-      const stored = await adapter.getSchema(customerFeedbackSchema.id, customerFeedbackSchema.version);
-      const nextSchema = stored ?? customerFeedbackSchema;
+      const currentSchema = selectedSchema.current;
+      const stored = await adapter.getSchema(currentSchema.id, currentSchema.version);
+      const nextSchema = stored ?? currentSchema;
       if (stored === null) await adapter.saveSchema(nextSchema);
       const nextSubmissions = await adapter.listSubmissions(nextSchema.id, nextSchema.version);
+      if (generation !== workspaceGeneration.current) return;
       setSchema(nextSchema);
+      selectedSchema.current = nextSchema;
       setSubmissions(nextSubmissions);
       setInteractionEvents([]);
       setLoadError(null);
       setResetStatus(null);
+      setIsClearing(false);
     } catch (cause) {
+      if (generation !== workspaceGeneration.current) return;
+      setSubmissions([]);
       setLoadError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      if (generation === workspaceGeneration.current) setWorkspaceReady(true);
     }
   }, []);
 
   useEffect(() => {
-    setWorkspaceReady(false);
-    void loadWorkspace(storage).finally(() => setWorkspaceReady(true));
+    void loadWorkspace(storage);
+    return () => {
+      workspaceGeneration.current++;
+    };
   }, [loadWorkspace, storage]);
 
-  const changeSchema = useCallback(
-    (nextSchema: FormSchema) => {
-      setSchema(nextSchema);
-      setInteractionEvents([]);
-      setResetStatus(null);
-      void storage
-        .saveSchema(nextSchema)
-        .catch((cause: unknown) => setLoadError(cause instanceof Error ? cause.message : String(cause)));
+  const openSchema = useCallback(
+    async (nextSchema: FormSchema) => {
+      const generation = ++workspaceGeneration.current;
+      setWorkspaceReady(false);
+      try {
+        await storage.saveSchema(nextSchema);
+        const nextSubmissions = await storage.listSubmissions(nextSchema.id, nextSchema.version);
+        if (generation !== workspaceGeneration.current) return;
+        setSchema(nextSchema);
+        selectedSchema.current = nextSchema;
+        setSubmissions(nextSubmissions);
+        setInteractionEvents([]);
+        setResetStatus(null);
+        setIsClearing(false);
+        setLoadError(null);
+      } catch (cause) {
+        if (generation === workspaceGeneration.current) {
+          setLoadError(cause instanceof Error ? cause.message : String(cause));
+        }
+        throw cause;
+      } finally {
+        if (generation === workspaceGeneration.current) setWorkspaceReady(true);
+      }
     },
     [storage]
   );
 
+  const changeSchema = useCallback(
+    (nextSchema: FormSchema) => {
+      if (nextSchema.id !== schema.id || nextSchema.version !== schema.version) {
+        void openSchema(nextSchema).catch(() => undefined);
+        return;
+      }
+      setSchema(nextSchema);
+      selectedSchema.current = nextSchema;
+      setInteractionEvents([]);
+      setResetStatus(null);
+      const generation = workspaceGeneration.current;
+      void storage.saveSchema(nextSchema).catch((cause: unknown) => {
+        if (generation === workspaceGeneration.current) {
+          setLoadError(cause instanceof Error ? cause.message : String(cause));
+        }
+      });
+    },
+    [openSchema, schema.id, schema.version, storage]
+  );
+
   const submit = useCallback(
     async (values: FormValues, context: SubmitContext) => {
+      const generation = workspaceGeneration.current;
+      if (!workspaceReady || loadError !== null) {
+        throw new Error(
+          locale.startsWith("ja") ? "フォームの読み込みを確認してください。" : "Check the form loading status."
+        );
+      }
       setResetStatus(null);
       if (simulateServerError) {
         setSimulateServerError(false);
@@ -127,9 +189,11 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
         metadata: { source: "preview", storage: storageKind }
       });
       await storage.saveSubmission(submission);
-      setSubmissions(await storage.listSubmissions(schema.id, schema.version));
+      if (generation !== workspaceGeneration.current) return;
+      const nextSubmissions = await storage.listSubmissions(schema.id, schema.version);
+      if (generation === workspaceGeneration.current) setSubmissions(nextSubmissions);
     },
-    [locale, schema, simulateServerError, storage, storageKind]
+    [loadError, locale, schema, simulateServerError, storage, storageKind, workspaceReady]
   );
 
   const downloadCsv = useCallback(async () => {
@@ -137,17 +201,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       for (const submission of submissions) yield submission;
     }
     const chunks: string[] = [];
-    for await (const chunk of exportResponsesToCsvStream(schema, submissionStream(), {
-      columns: [
-        {
-          header: "asyncReview",
-          getValue: async ({ submission }) => {
-            await Promise.resolve();
-            return submission.metadata?.source === "preview" ? "reviewed" : "external";
-          }
-        }
-      ]
-    })) {
+    for await (const chunk of exportResponsesToCsvStream(schema, submissionStream())) {
       chunks.push(chunk);
     }
     const csv = chunks.join("");
@@ -160,7 +214,9 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
   }, [schema, submissions]);
 
   const resetResponses = useCallback(async () => {
+    const generation = workspaceGeneration.current;
     const previousSubmissions = submissions;
+    const previousEvents = interactionEvents;
     setIsClearing(true);
     setResetStatus(null);
     setSubmissions([]);
@@ -168,18 +224,22 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
     try {
       if (storage.clearResponses === undefined) throw new Error(translate("preview.resetUnavailable"));
       await storage.clearResponses(schema.id);
-      setSubmissions(await storage.listSubmissions(schema.id, schema.version));
+      const nextSubmissions = await storage.listSubmissions(schema.id, schema.version);
+      if (generation !== workspaceGeneration.current) return;
+      setSubmissions(nextSubmissions);
       setResetStatus({ kind: "success", message: translate("preview.resetSuccess") });
     } catch (cause) {
+      if (generation !== workspaceGeneration.current) return;
       setSubmissions(previousSubmissions);
+      setInteractionEvents(previousEvents);
       setResetStatus({
         kind: "error",
         message: `${translate("preview.resetError")}${cause instanceof Error ? ` ${cause.message}` : ""}`
       });
     } finally {
-      setIsClearing(false);
+      if (generation === workspaceGeneration.current) setIsClearing(false);
     }
-  }, [schema, storage, submissions, translate]);
+  }, [interactionEvents, schema, storage, submissions, translate]);
 
   const contextValue = useMemo<PreviewWorkspaceContextValue>(
     () => ({
@@ -201,6 +261,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       setStorageKind,
       setSimulateServerError,
       changeSchema,
+      openSchema,
       submit,
       downloadCsv,
       resetResponses
@@ -214,6 +275,7 @@ export function PreviewWorkspaceProvider({ children }: { readonly children: Reac
       interactionEvents,
       loadError,
       locale,
+      openSchema,
       resetResponses,
       resetStatus,
       schema,

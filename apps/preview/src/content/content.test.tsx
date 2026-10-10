@@ -15,7 +15,7 @@ describe("content mode demo", () => {
   it("creates a poll, allows another question, saves and shows current results", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("tab", { name: "Surveys" }));
     await user.click(screen.getByRole("button", { name: "Create form" }));
     const dialog = within(screen.getByRole("dialog"));
     await user.click(dialog.getByRole("button", { name: "Poll" }));
@@ -35,6 +35,7 @@ describe("content mode demo", () => {
     expect(firstProgress).toHaveAttribute("aria-valuenow", "100");
     expect(firstProgress.closest("label")).toContainElement(screen.getByRole("radio", { name: "Option 1" }));
     expect(screen.queryByText("Poll results")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Advanced demo settings"));
     await user.click(screen.getByRole("radio", { name: "Tailwind" }));
     await waitFor(() => expect(screen.getAllByRole("progressbar")).toHaveLength(2));
     const [tailwindProgress] = screen.getAllByRole("progressbar");
@@ -59,7 +60,7 @@ describe("content mode demo", () => {
   it("filters templates by mode and creates a selected survey template", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("tab", { name: "Surveys" }));
     await user.click(screen.getByRole("button", { name: "Create form" }));
     const dialog = within(screen.getByRole("dialog"));
     expect(dialog.getByRole("button", { name: /Satisfaction survey/ })).toBeInTheDocument();
@@ -80,7 +81,7 @@ describe("content mode demo", () => {
   it("returns to blank creation when the mode changes or the dialog is cancelled", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("tab", { name: "Surveys" }));
     await user.click(screen.getByRole("button", { name: "Create form" }));
     await user.click(screen.getByRole("button", { name: /Satisfaction survey/ }));
     expect(screen.getByText("Template contents")).toBeInTheDocument();
@@ -97,7 +98,7 @@ describe("content mode demo", () => {
   it("shows the required title and selected creation choices", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("tab", { name: "Surveys" }));
     await user.click(screen.getByRole("button", { name: "Create form" }));
     const dialog = within(screen.getByRole("dialog"));
     const create = dialog.getByRole("button", { name: "Create" });
@@ -124,7 +125,7 @@ describe("content mode demo", () => {
   it("edits quiz correctness and explanation then renders the submitted result", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Forms" }));
+    await user.click(screen.getByRole("tab", { name: "Surveys" }));
     await user.click(screen.getByRole("button", { name: "Create form" }));
     const dialog = within(screen.getByRole("dialog"));
     await user.click(dialog.getByRole("button", { name: "Quiz" }));
@@ -159,6 +160,7 @@ describe("content mode demo", () => {
     expect(screen.getByText("Correct", { exact: true })).toBeVisible();
     await user.click(screen.getByRole("radio", { name: "Option 2" }));
     expect(screen.getByText("Incorrect", { exact: true })).toBeVisible();
+    await user.click(screen.getByText("Advanced demo settings"));
     fireEvent.click(screen.getByLabelText("Simulate submission error"));
     await user.click(screen.getByRole("button", { name: "Send response" }));
     await waitFor(() => expect(screen.getByText("Submission failed")).toBeVisible());
@@ -177,6 +179,7 @@ describe("content mode demo", () => {
     };
     const { container } = render(<ContentAnswer schema={schema} locale="en" storage={createMemoryStorageAdapter()} />);
     await user.click(screen.getByRole("radio", { name: "Option 2" }));
+    await user.click(screen.getByText("Advanced demo settings"));
     await user.click(screen.getByRole("radio", { name: "Tailwind" }));
     expect(screen.getByRole("radio", { name: "Option 2" })).toBeChecked();
     expect(container.querySelector("form")).toHaveClass("mx-auto");

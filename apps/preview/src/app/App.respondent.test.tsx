@@ -1,7 +1,12 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { clearPreviewStorage, submitCompleteResponse } from "./app-test-helpers";
+
+function openDemoSettings(name: string) {
+  const summary = screen.getByText(name);
+  if (!summary.closest("details")?.open) fireEvent.click(summary);
+}
 
 describe("preview application respondent and analytics workspaces", () => {
   beforeEach(clearPreviewStorage);
@@ -9,13 +14,15 @@ describe("preview application respondent and analytics workspaces", () => {
   it("switches locale and completes submission-to-analytics flow", async () => {
     const user = userEvent.setup();
     render(<App />);
-    expect(screen.getByRole("tab", { name: "Form Builder" })).toHaveAttribute("aria-selected", "true");
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
+    expect(screen.getByRole("tab", { name: "Surveys" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
     await user.click(screen.getByRole("button", { name: "日本語" }));
     expect(screen.getByRole("heading", { name: "サービスの満足度" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "EN" }));
     await submitCompleteResponse(user);
-    await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+    await user.click(screen.getByRole("tab", { name: "Responses & insights" }));
+    openDemoSettings("Advanced analytics & demo tools");
     expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("1");
     expect(screen.getByRole("heading", { name: "Optimization Insights" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Version Comparison API Fixture" })).toBeInTheDocument();
@@ -30,18 +37,21 @@ describe("preview application respondent and analytics workspaces", () => {
     await user.click(screen.getByRole("button", { name: "Confirm reset" }));
     await waitFor(() => expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("0"));
     expect(screen.getByRole("status")).toHaveTextContent("All responses");
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
     expect(within(screen.getByRole("tabpanel")).getByLabelText(/^Your name/)).toHaveValue("");
   });
 
   it("switches storage and keeps builder JSON synchronized", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Advanced editor" }));
     expect(screen.getByText(/"customer-feedback"/)).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
-    await user.click(screen.getByLabelText("LocalStorage"));
-    await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
-    await user.click(screen.getByRole("tab", { name: "Form Builder" }));
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
+    await user.click(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage"));
+    await waitFor(() => expect(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage")).toBeChecked());
+    await user.click(screen.getByRole("tab", { name: "Advanced editor" }));
     await user.click(screen.getByRole("button", { name: "Add question" }));
     expect(screen.getByRole("group", { name: "New question" })).toBeInTheDocument();
   });
@@ -63,7 +73,9 @@ describe("preview application respondent and analytics workspaces", () => {
 
     try {
       render(<App />);
-      await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+      await user.click(screen.getByRole("tab", { name: "Responses & insights" }));
+      const analyticsSettings = screen.getByText("Advanced analytics & demo tools");
+      if (!analyticsSettings.closest("details")?.open) fireEvent.click(analyticsSettings);
       await user.click(screen.getByRole("button", { name: "Download CSV" }));
       await waitFor(() => expect(capturedBlob).toBeDefined());
       expect(capturedBlob?.type).toBe("text/csv;charset=utf-8;");
@@ -74,7 +86,7 @@ describe("preview application respondent and analytics workspaces", () => {
         reader.readAsArrayBuffer(capturedBlob as Blob);
       });
       expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-      expect(new TextDecoder().decode(bytes)).toContain("asyncReview");
+      expect(new TextDecoder().decode(bytes)).toContain("submissionId,submittedAt,locale");
     } finally {
       Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
       Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
@@ -84,7 +96,8 @@ describe("preview application respondent and analytics workspaces", () => {
   it("renders cross-tabulation controls and simulates a webhook without network access", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+    await user.click(screen.getByRole("tab", { name: "Responses & insights" }));
+    openDemoSettings("Advanced analytics & demo tools");
     expect(screen.getByRole("heading", { name: "Cross tabulation" })).toBeInTheDocument();
     expect(screen.getByLabelText("Row question")).toBeInTheDocument();
     expect(screen.getByLabelText("Column question")).toBeInTheDocument();
@@ -95,7 +108,8 @@ describe("preview application respondent and analytics workspaces", () => {
   it("demonstrates custom UI slots and cancellation without losing entered values", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
     await user.click(screen.getByLabelText("Use custom UI slots"));
     expect(screen.getByTestId("preview-slot-header")).toHaveTextContent("UI SLOT");
     expect(screen.getByRole("navigation", { name: "Custom step navigation" })).toBeInTheDocument();
@@ -109,10 +123,12 @@ describe("preview application respondent and analytics workspaces", () => {
   it("round-trips schema and response metadata through LocalStorage", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await user.click(screen.getByRole("tab", { name: "Advanced editor" }));
     expect(screen.getByText(/"release": "v2.9.0"/)).toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
-    await user.click(screen.getByLabelText("LocalStorage"));
-    await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
+    await user.click(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage"));
+    await waitFor(() => expect(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage")).toBeChecked());
     await submitCompleteResponse(user);
     const stored = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
       .filter((key): key is string => key !== null)
@@ -124,30 +140,34 @@ describe("preview application respondent and analytics workspaces", () => {
   it("clears LocalStorage responses from the respondent tab", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
-    await user.click(screen.getByLabelText("LocalStorage"));
-    await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
+    await user.click(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage"));
+    await waitFor(() => expect(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage")).toBeChecked());
     await submitCompleteResponse(user);
     await user.click(screen.getByRole("button", { name: "Reset responses" }));
     await user.click(screen.getByRole("button", { name: "Confirm reset" }));
     await waitFor(() => expect(screen.getByText("All responses for this form were deleted.")).toBeInTheDocument());
-    await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+    await user.click(screen.getByRole("tab", { name: "Responses & insights" }));
+    openDemoSettings("Advanced analytics & demo tools");
     expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("0");
   });
 
   it("restores responses and reports an error when LocalStorage reset fails", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole("tab", { name: "Respondent Preview" }));
-    await user.click(screen.getByLabelText("LocalStorage"));
-    await waitFor(() => expect(screen.getByLabelText("LocalStorage")).toBeChecked());
+    await user.click(screen.getByRole("tab", { name: "Answer preview" }));
+    openDemoSettings("Demo settings & submission testing");
+    await user.click(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage"));
+    await waitFor(() => expect(within(screen.getByRole("tabpanel")).getByLabelText("LocalStorage")).toBeChecked());
     await submitCompleteResponse(user);
     globalThis.localStorage.setItem("form-engine-preview_submission:corrupt", "{");
     await user.click(screen.getByRole("button", { name: "Reset responses" }));
     await user.click(screen.getByRole("button", { name: "Confirm reset" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("invalid"));
     globalThis.localStorage.removeItem("form-engine-preview_submission:corrupt");
-    await user.click(screen.getByRole("tab", { name: "Analytics dashboard" }));
+    await user.click(screen.getByRole("tab", { name: "Responses & insights" }));
+    openDemoSettings("Advanced analytics & demo tools");
     expect(screen.getByText("Responses").previousElementSibling).toHaveTextContent("1");
   });
 });

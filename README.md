@@ -27,7 +27,7 @@ A schema-driven, pluggable survey engine for TypeScript and React. Form definiti
 | Translator utility | `@form-engine-ts/translator-cache` | Storage-neutral TTL cache wrapper for asynchronous translation adapters |
 | Privacy utility | `@form-engine-ts/privacy` | Standard and extensible sensitive-data detection for text answers |
 | Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
-| Demo app | `@form-engine-ts/preview` | Private Vite sandbox for building, responding, switching storage, analytics, and CSV export |
+| Demo app | `@form-engine-ts/preview` | Customer survey workspace for templates, editing, answer previews, response search, analytics, and exports |
 
 The library packages build as public dual ESM/CommonJS packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
 
@@ -451,7 +451,7 @@ TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なア�
 | Translator Utility | `@form-engine-ts/translator-cache` | 非同期翻訳adapter向けのstorage非依存TTL cache wrapper |
 | Privacy Utility | `@form-engine-ts/privacy` | テキスト回答向けの標準・拡張可能な機密データ検出 |
 | Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
-| デモアプリ | `@form-engine-ts/preview` | Builder・回答・集計/CSVの3タブを備えた非公開Viteサンドボックス |
+| デモアプリ | `@form-engine-ts/preview` | テンプレート・編集・回答確認・回答検索・分析・出力を備えた顧客アンケート用デモ |
 
 ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESM/CommonJS両対応パッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
 
@@ -827,7 +827,20 @@ JavaScript processまたはbrowser pageの再読み込み時にリセットさ�
 
 ## Survey / Poll / Quiz demo
 
-The preview's **Forms** tab provides a shared Memory/LocalStorage library, mode
+The demo opens in **Surveys** and follows a customer feedback workflow: select or create a survey,
+use **Use in workspace** to open the **Survey editor**, check **Answer preview**, then review **Responses & insights**.
+The library supports title/description search, a focused satisfaction template, and duplication with a new form ID
+without copying responses. Unsaved library edits require confirmation before leaving or switching storage.
+Responses can be searched by answer or ID, filtered by language, and expanded individually; analytics and CSV use only
+the selected form and version. The editor offers JSON backup and validated import, and mock AI drafts can be reviewed
+before saving. Advanced editors, translation comparisons, and failure simulations remain under developer tools.
+Navigation is keyboard accessible, view selection uses `?view=mui|respondent|analytics|builder|comparison`, and browser
+Back/Forward preserves in-session library drafts and respondent progress. Memory storage clears on reload; LocalStorage
+keeps data in this browser. This demo does not publish a survey or create a public collection link.
+
+![Survey library with templates and form search](docs/assets/survey-library.jpg)
+
+The preview's **Surveys** tab provides a shared Memory/LocalStorage library, mode
 filter (`?mode=survey|poll|quiz`), creation cards, the integrated `MuiFormBuilder` with
 mode-specific policy and validation, and `MuiContentRenderer` respondent results. Save a valid schema before
 opening the answer screen. An empty survey stays an editing draft until its first
@@ -845,11 +858,28 @@ For a design-system-neutral respondent screen, import `ContentRenderer` from
 the same Provider and submission state rendered with MUI or Tailwind. Persistence and
 authorization remain host responsibilities.
 
-The respondent preview demonstrates the localized, multi-page form flow:
+The screenshots below show the editor, respondent flow, and response dashboard:
 
-![Form Engine respondent preview](docs/assets/respondent-preview.jpg)
+![Survey editor with question outline and live respondent preview](docs/assets/survey-editor.jpg)
+
+![Customer answer preview](docs/assets/answer-preview.jpg)
+
+![Response analytics, search, language filter, and CSV export](docs/assets/response-analytics.jpg)
 
 ## アンケート・投票・クイズのデモ
+
+デモは **フォーム一覧** から始まり、アンケートを選択・作成し、**ワークスペースで開く** から
+**アンケートを編集** → **回答画面を確認** → **回答・分析** の順に操作できます。
+タイトル・説明の検索、3問の満足度テンプレート、回答をコピーしない新しいフォームIDでの複製に対応します。
+一覧の未保存の編集を破棄する場合や保存先を切り替える場合は確認画面を表示します。
+回答は内容・IDで検索し、言語で絞り込み、個別に詳細を確認できます。集計とCSVは選択中のフォーム・バージョンだけを対象にします。
+編集画面ではJSONのバックアップと検証付き読み込み、固定候補を使うAIデモの下書き確認ができます。
+詳細エディター・翻訳比較・失敗のシミュレーションは開発者ツールにまとめています。
+キーボードで画面を切り替え、`?view=mui|respondent|analytics|builder|comparison` とブラウザの戻る・進むを使えます。
+画面の切り替えでは一覧の編集中データと回答プレビューの進捗を保持します。Memoryは再読み込みで消え、LocalStorageは
+このブラウザに保存します。このデモはアンケートの外部公開や公開回答URLの発行を行いません。
+
+![テンプレートと検索を備えたアンケート一覧](docs/assets/survey-studio.jpg)
 
 preview の **フォーム一覧** から、共通の Memory / LocalStorage 保存領域で種別フィルタ
 （`?mode=survey|poll|quiz`）、新規作成、mode別制約・検証を統合した`MuiFormBuilder`による編集、

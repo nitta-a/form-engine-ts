@@ -37,7 +37,7 @@ export const mockAuthoringAssistantAdapter: AuthoringAssistantAdapter = {
           {
             operationId: "form-title",
             type: "updateForm",
-            patch: { title: japanese ? "観光地の満足度調査" : "Satisfaction survey" }
+            patch: { title: japanese ? "顧客満足度調査" : "Satisfaction survey" }
           },
           {
             operationId: "rating",
@@ -51,7 +51,7 @@ export const mockAuthoringAssistantAdapter: AuthoringAssistantAdapter = {
               type: "radio",
               title: japanese ? "改善してほしい点" : "What stood out?",
               options: japanese
-                ? [{ label: "交通の利便性" }, { label: "施設設備" }]
+                ? [{ label: "サービス品質" }, { label: "価格" }]
                 : [{ label: "Service" }, { label: "Value" }]
             }
           },

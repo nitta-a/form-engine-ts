@@ -4,11 +4,15 @@ import App from "./App";
 import { clearPreviewStorage } from "./app-test-helpers";
 
 describe("preview application builder workspaces", () => {
-  beforeEach(clearPreviewStorage);
+  beforeEach(() => {
+    clearPreviewStorage();
+    window.history.replaceState(null, "", "/?view=builder");
+  });
 
   it("localizes form builder controls when Japanese is selected", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
 
     await user.click(screen.getByRole("button", { name: "日本語" }));
 
@@ -23,10 +27,11 @@ describe("preview application builder workspaces", () => {
   it("opens the MUI mode preview with MUI controls", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
 
-    await user.click(screen.getByRole("tab", { name: "MUI Mode" }));
+    await user.click(screen.getByRole("tab", { name: "Survey editor" }));
 
-    const panel = screen.getByRole("tabpanel", { name: "MUI Mode" });
+    const panel = screen.getByRole("tabpanel", { name: "Survey editor" });
     expect(panel).toBeVisible();
     expect(panel.querySelector("#builder-form-title")).toBeInTheDocument();
     expect(within(panel).getByRole("button", { name: "Add question" })).toBeInTheDocument();
@@ -35,10 +40,11 @@ describe("preview application builder workspaces", () => {
   it("opens the source and translation comparison workspace", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
 
-    await user.click(screen.getByRole("tab", { name: "Translation Comparison" }));
+    await user.click(screen.getByRole("tab", { name: "Translation comparison" }));
 
-    const panel = screen.getByRole("tabpanel", { name: "Translation Comparison" });
+    const panel = screen.getByRole("tabpanel", { name: "Translation comparison" });
     expect(panel).toBeVisible();
     expect(
       within(panel).getByRole("heading", { name: "Translation comparison workspace", level: 6 })
@@ -48,6 +54,7 @@ describe("preview application builder workspaces", () => {
 
   it("runs the translation overwrite policy and displays its report", async () => {
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     fireEvent.change(screen.getByLabelText("Overwrite"), { target: { value: "all" } });
     const runTranslation = screen.getByRole("button", { name: "Run translation policy" });
     await waitFor(() => expect(runTranslation).toBeEnabled());
@@ -63,6 +70,7 @@ describe("preview application builder workspaces", () => {
   it("demonstrates headless factory actions with Core and React policy parity", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     const parity = screen.getByTestId("policy-parity");
     const match = parity.textContent?.match(/Core (\d+) \/ React (\d+)/);
     expect(match?.[1]).toBe(match?.[2]);
@@ -77,6 +85,7 @@ describe("preview application builder workspaces", () => {
   it("runs the creation assistant from conversation through draft review and editor handoff", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     await user.click(screen.getByRole("button", { name: "Create survey with AI" }));
     const dialog = await screen.findByRole("dialog", { name: "Create survey with AI" });
     const assistant = within(dialog).getByRole("region", { name: "AI survey creation assistant" });
@@ -102,6 +111,7 @@ describe("preview application builder workspaces", () => {
   it("closes the AI creation dialog when cancelled", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     await user.click(screen.getByRole("button", { name: "Create survey with AI" }));
     const dialog = await screen.findByRole("dialog", { name: "Create survey with AI" });
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -113,10 +123,11 @@ describe("preview application builder workspaces", () => {
   it("switches AI creation dialog copy with the preview locale", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     await user.click(screen.getByRole("button", { name: "日本語" }));
     await user.click(screen.getByRole("button", { name: "AIでアンケートを作成" }));
     const dialog = await screen.findByRole("dialog", { name: "AIでアンケートを作成" });
-    expect(within(dialog).getByText("アンケートのテーマ: 🏞️ 観光地の感想")).toBeInTheDocument();
+    expect(within(dialog).getByText("アンケートのテーマ: 顧客体験とサービス改善")).toBeInTheDocument();
     expect(within(dialog).getByText("このアンケートで何を知りたいですか？")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "満足度を知りたい" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "改善点を知りたい" })).toBeInTheDocument();
@@ -125,6 +136,7 @@ describe("preview application builder workspaces", () => {
   it("simulates draft publication and incremental analytics", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     expect(screen.getByText("Incremental submissions: 2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clone published version to draft" }));
     expect(screen.getByText("Draft v2")).toBeInTheDocument();
@@ -137,6 +149,7 @@ describe("preview application builder workspaces", () => {
   it("demonstrates Visual Builder defaults and manual translation metadata", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     await user.click(screen.getByRole("button", { name: "Add question" }));
     const added = screen.getByRole("group", { name: "New question" });
     expect(within(added).getByLabelText("Type")).toHaveValue("textarea");
@@ -151,6 +164,7 @@ describe("preview application builder workspaces", () => {
   it("demonstrates read-only and feature-scoped builder modes", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     await user.click(screen.getByLabelText("Read-only builder"));
     expect(screen.getByRole("button", { name: "Add question" })).toBeDisabled();
     await user.click(screen.getByLabelText("Pages feature"));
@@ -164,6 +178,7 @@ describe("preview application builder workspaces", () => {
   it("demonstrates injected Builder primitives and the ARGS translation action slot", async () => {
     const user = userEvent.setup();
     render(<App />);
+    fireEvent.click(screen.getByText("Editor settings and developer tools"));
     await user.click(screen.getByLabelText("Use custom Builder UI"));
     expect(screen.getByRole("button", { name: "Add question" })).toHaveClass("preview-mui-button");
     expect(screen.getAllByLabelText("Page title")[0]).toHaveClass("preview-mui-input");
