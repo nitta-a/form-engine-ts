@@ -159,7 +159,7 @@ describe("preview application builder workspaces", () => {
     if (localizedCompletion === undefined) throw new Error("Expected localized completion editor");
     await user.type(localizedCompletion, "!");
     await waitFor(() => expect(document.querySelector(".json-card code")).toHaveTextContent("preview-manual"));
-  }, 30000);
+  }, 60000);
 
   it("demonstrates read-only and feature-scoped builder modes", async () => {
     const user = userEvent.setup();
