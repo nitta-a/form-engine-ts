@@ -19,6 +19,5 @@ export async function submitCompleteResponse(user: ReturnType<typeof userEvent.s
   await user.click(respondent.getByRole("button", { name: "Next" }));
   await user.click(respondent.getByLabelText(/I agree that this response/));
   await user.click(respondent.getByRole("button", { name: "Send response" }));
-  if (expectSuccess)
-    await waitFor(() => expect(respondent.getByText(/Response saved|Thank you/)).toBeInTheDocument());
+  if (expectSuccess) await waitFor(() => expect(respondent.getByText(/Response saved|Thank you/)).toBeInTheDocument());
 }
