@@ -1,155 +1,21 @@
 # form-engine-ts
 
+[English](#english) · [日本語](#日本語)
+
 ## English
 
-A schema-driven, pluggable survey engine for TypeScript and React. Form definitions, runtime validation, submissions, and analytics live in a framework-independent core; translation and storage are injected through small adapter interfaces.
+A schema-driven form engine for TypeScript and React. Build surveys, polls, and quizzes with a framework-independent Core, accessible UI components, and interchangeable storage and translation adapters.
 
-### What's included
+### Features
 
-| Area | Package | Purpose |
-| --- | --- | --- |
-| Core | `@form-engine-ts/core` | Schema, visibility, validation, submissions, analytics, CSV, and shared adapter types |
-| React renderer / builder | `@form-engine-ts/react` | SSR-safe provider, conditional renderer, accessible visual builder, hooks, overrides, and base styles |
-| Survey client | `@form-engine-ts/custom-survey-client` | Adapter-driven survey editor, free-text translation, version actions, and localized response summaries |
-| Storage adapter | `@form-engine-ts/storage-memory` | Process-local form/submission storage with defensive copying and duplicate protection |
-| Storage adapter | `@form-engine-ts/storage-localstorage` | Prefix-isolated browser persistence with injectable storage for tests and SSR callers |
-| Storage adapter | `@form-engine-ts/storage-mongodb` | MongoDB Native Driver implementation of the complete form storage contract |
-| Storage adapter | `@form-engine-ts/storage-postgres` | PostgreSQL storage through an injected node-postgres-compatible query client |
-| Storage adapter | `@form-engine-ts/storage-sqlite` | Driver-neutral SQLite storage through synchronous or asynchronous executors |
-| Storage adapter | `@form-engine-ts/storage-d1` | Cloudflare D1 storage using prepared statements and transactional batches |
-| Storage adapter | `@form-engine-ts/storage-azure-table` | Azure Table Storage through an injected `@azure/data-tables`-compatible client |
-| Translator adapter | `@form-engine-ts/translator-mock` | English/Japanese synchronous catalogs plus deterministic async batch translation for demos |
-| Translator adapter | `@form-engine-ts/translator-azure` | Server-side Azure AI Translator REST API v3.0 integration with optional regional routing |
-| Translator adapter | `@form-engine-ts/translator-deepl` | Server-side DeepL Free/Pro text translation using injectable `fetch` |
-| Translator adapter | `@form-engine-ts/translator-google` | Google Cloud Translation Basic v2 using API Key or Bearer authentication |
-| Translator adapter | `@form-engine-ts/translator-google-v3` | Google Cloud Translation Advanced v3 with glossaries, labels, chunking, and retry |
-| Translator adapter | `@form-engine-ts/translator-i18next` | Official i18next adapter for synchronous UI translation lookups |
-| Translator utility | `@form-engine-ts/translator-cache` | Storage-neutral TTL cache wrapper for asynchronous translation adapters |
-| Privacy utility | `@form-engine-ts/privacy` | Standard and extensible sensitive-data detection for text answers |
-| Zod validator | `@form-engine-ts/zod` | `FormSchema` to Zod 4 answer-validator generation with Core-compatible issues |
-| Demo app | `@form-engine-ts/preview` | Customer survey workspace for templates, editing, answer previews, response search, analytics, and exports |
+- Define typed schemas with validation, conditional questions, and multi-page navigation.
+- Build and render forms with React or MUI; customize the UI with hooks and slots.
+- Start from templates, localize form content, and optionally let respondents resume saved drafts.
+- Save versioned forms and responses; manage acceptance windows and response limits separately.
+- Aggregate responses, export CSV, and analyze interaction funnels without collecting answer values in telemetry by default.
+- Review and apply AI-generated drafts through injected adapters and Core validation.
 
-The library packages build as public dual ESM/CommonJS packages with declarations and explicit `exports`. The publish workflow expects an `NPM_TOKEN` repository secret, publishes all `packages/*` libraries to npm, and creates a GitHub Release for tags in the `vX.Y.Z` format after verifying that every package has the matching version.
-
-### Requirements and commands
-
-- Node.js 22.22.2 or newer
-- pnpm 11
-
-```bash
-pnpm install
-pnpm dev
-```
-
-The preview is served by Vite. Repository-wide acceptance commands are:
-
-```bash
-pnpm build
-pnpm check
-pnpm typecheck
-pnpm lint
-pnpm test
-```
-
-`pnpm lint` uses Biome to verify formatting, recommended lint rules, and import organization.
-
-### Current release
-
-The latest release is **v8.2.1** (2026-10-09). All public packages are currently aligned to version `8.2.1`.
-This patch adds captured Preview screenshots to the demo documentation.
-See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the complete history.
-
-### Authoring and respondent experience
-
-Optional `pages` turn a schema into a validated wizard with conditional page skipping and accessible progress. The React
-renderer can debounce versioned drafts to `localStorage` with `autoSaveKey`. Authoring-time translations are stored in the
-schema, populated in batches through `populateSchemaTranslations`, and applied synchronously by `resolveLocalizedSchema`.
-For anonymous respondents, combine `autoSaveKey` with `draftResume={{}}` to offer same-browser resume. The renderer asks
-whether to continue or start over, restores the current page, and expires resumable drafts after seven days by default.
-The builder exposes page membership and locale override controls. Set `pageEditorMode="single"` to edit one selected page
-at a time; the default `"all"` mode remains available. Core also provides `calculateCrossTabulation` for
-two-choice pivot analysis and `dispatchWebhook` for timeout-aware, optionally HMAC-signed form events. Zod validators accept
-an optional `{ pageIndex }` for step-scoped validation.
-Core also supports typed `date`, `time`, `email`, `tel`, and `url` fields, deterministic choice shuffling, response
-windows and limits, vendor-neutral submission guards, and optimized response counting across storage adapters.
-Quiz authors can enable or disable the passing-score threshold; when it is disabled, respondent results omit total score
-and pass/fail status.
-
-### Versioned form data and current settings
-
-Each schema version stores its title, description, completion message, translations, and questions. One separate current
-settings record per `formId` stores the mutable acceptance window, response cap, and appearance. Responses retain their
-own `formVersion`:
-
-```json
-{
-  "schema": { "id": "contact", "version": 3, "title": "Contact", "description": "Reach us", "completionMessage": "Thanks", "translations": { "ja": { "title": "お問い合わせ" } } },
-  "runtimeSettings": { "formId": "contact", "openAt": "2026-10-01T00:00:00.000Z", "closeAt": "2026-12-31T23:59:59.000Z", "maxResponses": 200, "iconKey": "mail", "colorToken": "blue", "updatedAt": "2026-09-27T03:00:00.000Z" },
-  "submission": { "id": "response-123", "formId": "contact", "formVersion": 3, "values": { "email": "ada@example.com" }, "submittedAt": "2026-10-02T01:23:00.000Z" }
-}
-```
-
-The runtime record is keyed by `formId` and follows the form when its published version changes. A missing date or
-response cap means there is no restriction. The response cap counts submissions across all versions and database
-adapters enforce it atomically. The LocalStorage adapter uses the browser Web Locks API to coordinate limited saves
-across tabs when available; without it, the count and write are synchronous only within one JavaScript context.
-Changing the cap does not rewrite past responses;
-reducing it below the current count blocks new responses. The form can still be viewed outside its acceptance window,
-while the respondent UI shows the current status. Give the submission pipeline a settings provider to re-fetch current
-settings on the server during submission. Use `migrateFormRuntimeSettings` with the
-currently published schema to copy its legacy dates and cap once. Titles, descriptions, completion messages, and their
-translations continue to change only through a new schema version.
-
-AI Authoring is provider-neutral: an injected server-backed adapter returns an `AuthoringSuggestion`, Core parses and
-validates it, and the UI shows a controlled Before/After preview before applying selected operations. Providers never
-write `FormSchema` directly, generated field/option IDs are assigned by Core, and answer data and provider credentials
-stay outside the browser. `createAuthoringRequestFromQualityIssue()` can turn a survey quality issue into a targeted
-rewrite or option-generation request.
-`applyAndRecheckQuality()` reruns the existing quality adapter only after a successful selected-operation apply.
-`SurveyQualityPanel` uses the existing custom-survey translation scope for its default quality actions and empty states,
-with English fallbacks when those keys are not configured.
-
-The recommended flow is:
-
-```text
-Host UI → useAuthoringAssistant → AuthoringAssistantAdapter → host server API → AI provider
-         → AuthoringSuggestion → parse → preview → human approval → apply
-```
-
-`AuthoringRequest` contains only intent, prompt, target, and bounded context. It intentionally has no complete
-`FormSchema`; keep provider secrets server-side, never include answers, submissions, responses, or analytics in context,
-and persist only the validated Core apply result.
-
-```tsx
-const assistant = useAuthoringAssistant({ schema, adapter, policy, onChange: setSchema });
-
-<MuiAuthoringPrompt intent="rewrite_field" target={{ kind: "field", fieldId: "q1" }} onSubmit={assistant.suggest} />
-<MuiAuthoringSuggestionPreview
-  suggestion={assistant.suggestion}
-  preview={assistant.preview}
-  selectedOperationIds={assistant.selectedOperationIds}
-  onSelectionChange={assistant.setSelectedOperationIds}
-  onApply={assistant.apply}
-  onReject={assistant.reject}
-/>
-```
-
-Keep provider credentials and calls server-side. Send the bounded authoring context, never submission answers, and persist
-only a validated Core apply result.
-
-At the Core boundary, use `parseAuthoringSuggestion()` and
-`previewAuthoringSuggestion(schema, suggestion, { operationIds, policy })` before applying anything. A quality fix can be
-composed as `createAuthoringRequestFromQualityIssue(issue, schema)` followed by
-`applyAndRecheckQuality(() => assistant.applySelected(), quality.run)`.
-
-The Core package includes four bilingual purpose templates (satisfaction, improvements, popular choice, and
-understanding check). A host can filter them with `getFormTemplates({ mode, locale })` and create an independent schema
-with `createSchemaFromTemplate({ template, id, title })`; blank forms continue to use `createInitialSchemaByMode`.
-Core owns template definitions and generation, while the host owns the new-form entry point, ID issuance, saving, and
-navigation. The templates avoid contact questions, request that respondents do not enter personal information, and do
-not promise a reply or a storage-dependent anonymity guarantee.
-
-### Define and render a form
+### Quick start
 
 ```bash
 pnpm add @form-engine-ts/core @form-engine-ts/react @form-engine-ts/translator-mock react react-dom
@@ -161,418 +27,122 @@ import { FormProvider, FormRenderer } from "@form-engine-ts/react";
 import "@form-engine-ts/react/styles.css";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 
-const schema = {
-  id: "contact",
+const schema: FormSchema = {
+  id: "feedback",
   version: 1,
-  title: "Contact us",
-  description: "Tell us how we can help.",
-  submitLabelKey: "contact.submit",
-  fields: [
-    {
-      id: "q_0192ab34",
-      type: "text",
-      title: "Your name",
-      translationKey: "contact.name",
-      required: true,
-      minLength: 2
-    },
-    {
-      id: "q_12ab34cd",
-      type: "select",
-      title: "How can we help?",
-      translationKey: "contact.topic",
-      required: true,
-      options: [
-        { id: "opt_23bc45de", label: "Support" },
-        { id: "opt_34cd56ef", label: "Sales" }
-      ]
-    },
-    {
-      id: "q_45de67f0",
-      type: "rating",
-      title: "How satisfied are you?",
-      required: false,
-      min: 1,
-      max: 5
-    },
-    {
-      id: "q_56ef7801",
-      type: "textarea",
-      title: "Describe the problem",
-      required: false,
-      displayCondition: {
-        questionId: "q_12ab34cd",
-        operator: "equals",
-        value: "opt_23bc45de"
-      }
-    }
-  ]
-} as const satisfies FormSchema;
+  title: "Feedback",
+  fields: [{ id: "comment", type: "textarea", title: "Your feedback", required: true }]
+};
 
-export function ContactForm() {
+export function FeedbackForm() {
   return (
     <FormProvider
       schema={schema}
       locale="en"
       translator={mockTranslator}
       onSubmit={async (values) => console.log(values)}
-      resetOnSuccess
     >
-      <FormRenderer successMessageKey="contact.success" />
+      <FormRenderer />
     </FormProvider>
   );
 }
 ```
 
-`FormProvider` validates the schema at runtime. Conditions update as answers change, hidden controls and errors leave the DOM, and retained hidden values are removed from the submitted values. Changing the controlled `locale` prop does not clear answers. `useForm` exposes the complete form state and actions, while `useField(id)` provides one field's definition, value, error, and setter. `FormRenderer.components` can replace any default field renderer. `FormBuilder` generates hidden `q_…` and `opt_…` IDs, edits natural-language titles and labels, and permits display conditions to reference prior questions only.
+`FormProvider` validates the schema and answers; hidden answers are excluded from submission. Replace the example's console output with your application's save handler. Use `FormBuilder` to edit the same schema, or `ContentRenderer` for poll and quiz flows. See the [React guide](packages/react/README.md) for configuration and examples.
 
-This schema format is intentionally breaking: legacy `titleKey`, `labelKey`, and option `value` properties are not accepted. Every question must explicitly set `required`.
+### Choose packages
 
-Use `validateSchemaStructure(schema)` for focused duplicate/dangling/self/cycle diagnostics and `sanitizeSchema(schema)` to return a new schema without unsafe condition references. Sanitization never guesses how duplicate question or choice IDs should be renamed, so duplicates are reported but preserved.
+Install only what your application needs. Package names use the `@form-engine-ts/` prefix; each link opens its API and setup guide.
 
-### Adapter contracts
-
-Natural-language schema copy is rendered directly. Synchronous translations remain available for validation, submit/status messages, placeholders, and builder UI so rendering does not depend on effects:
-
-```ts
-interface TranslationAdapter {
-  translate(
-    key: string,
-    locale: string,
-    params?: Readonly<Record<string, string | number>>
-  ): string;
-}
-```
-
-Network translation uses a separate asynchronous contract so React rendering remains synchronous:
-
-```ts
-interface AsyncTranslationAdapter {
-  translateText(text: string, targetLocale: string, sourceLocale?: string): Promise<string>;
-  translateBatch(
-    texts: readonly string[],
-    targetLocale: string,
-    sourceLocale?: string
-  ): Promise<readonly string[]>;
-}
-
-const deepl = createDeeplTranslator({
-  apiKey: process.env.DEEPL_API_KEY,
-  apiType: "pro"
-});
-const japanese = await deepl.translateText("Thank you", "JA", "EN");
-const translatedSchema = await resolveFormTranslation(schema, deepl, "JA", "EN");
-```
-
-`resolveFormTranslation` translates form/question titles and descriptions plus option labels in one ordered batch while preserving every internal ID, condition, validation rule, and optional question `translationKey`.
-
-DeepL credentials must remain on a trusted server. The adapter uses POST JSON with the authorization header, supports an injected `fetchFn`, and reports HTTP/API errors without automatic retries.
-
-Google Cloud Translation Basic v2 supports exactly one authentication strategy per adapter. API Key credentials are sent as the `key` query parameter; OAuth2 or Service Account callers inject a fresh Bearer token provider:
-
-```ts
-const googleWithApiKey = createGoogleTranslator({
-  apiKey: process.env.GOOGLE_TRANSLATE_API_KEY
-});
-
-const googleWithBearer = createGoogleTranslator({
-  getAccessToken: async () => credentials.getAccessToken()
-});
-
-const german = await googleWithBearer.translateBatch(["Hello", "Goodbye"], "de", "en");
-```
-
-Google credentials must also remain on a trusted server. The adapter sends plain-text translation requests, decodes HTML entities in returned text, accepts up to 128 texts per request, and reports HTTP/API errors without automatic retries. Token creation, refresh, ADC, and Service Account signing remain the caller's responsibility.
-
-Azure AI Translator uses subscription-key authentication and optionally sends the resource region for regional or multi-service resources. `endpoint` is the complete Translate operation URL, so custom-domain callers include `/translator/text/v3.0/translate`:
-
-```ts
-const azure = createAzureTranslator({
-  apiKey: process.env.AZURE_TRANSLATOR_KEY,
-  region: "japaneast",
-  endpoint: "https://example.cognitiveservices.azure.com/translator/text/v3.0/translate"
-});
-
-const french = await azure.translateBatch(["Hello", "Goodbye"], "fr", "en");
-```
-
-Keep Azure credentials on a trusted server. The adapter preserves custom endpoint query parameters, enforces the current 1,000-item and 50,000-character request limits, accepts an injected `fetchFn`, redacts the subscription key from API errors, and does not retry failed requests automatically.
-
-Storage is asynchronous so the same form can later use a database or HTTP-backed implementation:
-
-```ts
-interface SubmissionQueryOptions {
-  readonly since?: string;
-  readonly until?: string;
-}
-
-interface StorageAdapter {
-  saveSubmission(submission: FormSubmission): Promise<void>;
-  listSubmissions(
-    formId: string,
-    formVersion?: number,
-    options?: SubmissionQueryOptions
-  ): Promise<readonly FormSubmission[]>;
-  clearResponses?(formId: string): Promise<void>;
-  clear(): Promise<void>;
-}
-
-interface FormStorageAdapter extends StorageAdapter {
-  saveSchema(schema: FormSchema): Promise<void>;
-  getSchema(formId: string, formVersion: number): Promise<FormSchema | null>;
-  listSchemas(): Promise<readonly FormSchema[]>;
-  deleteSchema(formId: string, formVersion: number): Promise<void>;
-  deleteSubmission(submissionId: string): Promise<void>;
-}
-```
-
-Create a validated immutable submission, save it, then aggregate matching responses:
-
-```ts
-const submission = createSubmission(schema, values, {
-  id: crypto.randomUUID(),
-  locale: "en",
-  submittedAt: new Date().toISOString()
-});
-
-await storage.saveSubmission(submission);
-const responses = await storage.listSubmissions(schema.id, schema.version, {
-  since: "2026-01-01T00:00:00.000Z",
-  until: "2026-01-31T23:59:59.999Z"
-});
-const analytics = aggregateResponses(schema, responses);
-```
-
-`since` and `until` are inclusive ISO 8601 boundaries. They can be combined with a form version, and every adapter returns results by `submittedAt`, then submission ID. Use `createMemoryStorageAdapter()`, `createLocalStorageAdapter()`, and the database factories to create storage adapters. Duplicate submission IDs are rejected globally within an adapter. `clearResponses(formId)` removes every response version for that form while retaining schemas and other forms; `clear()` resets only the adapter's configured data. Aggregation and CSV export reject a different form ID/version; values removed from or incompatible with the current schema are treated as unanswered.
-
-MongoDB callers create and own the connection, then inject its `Db` object. Call `createIndexes()` to create named form/timestamp and locale indexes. Documents remain scoped to the configured collections; `clear()` deletes their documents without dropping collections or indexes.
-
-```ts
-const storage = createMongoDbStorage({
-  db: mongoClient.db("forms"),
-  schemasCollectionName: "form_schemas",
-  responsesCollectionName: "form_responses"
-});
-await storage.createIndexes();
-```
-
-Postgres accepts a `Pool`, `Client`, or compatible query wrapper. SQLite accepts a thin synchronous or asynchronous `run/get/all` executor, allowing applications to adapt `better-sqlite3`, `bun:sqlite`, libSQL, or another driver without adding one as a library dependency. D1 accepts the Worker API's structural `prepare/bind/first/all/run/batch` surface. All SQL adapters default `autoMigrate` to `false`; enabling it lazily creates the current tables and indexes once, while production connection, transaction, and migration lifecycles remain application responsibilities.
-
-```ts
-const postgresStorage = createPostgresStorage({ client: pool, autoMigrate: true });
-const sqliteStorage = createSqliteStorage({ db: sqliteExecutor });
-const d1Storage = createD1Storage({ db: env.DB });
-```
-
-Generate a Zod 4 validator without duplicating the Core validation rules:
-
-```ts
-const answerSchema = createZodFormSchema(schema);
-const result = answerSchema.safeParse(candidateAnswers);
-```
-
-Zod failures use the field ID as their path and expose the Core validation code, translation message key, and interpolation values in custom issue parameters. Hidden answers are ignored during validation but are not transformed out of successful parse results.
-
-### Extended APIs and migration
-
-Use `FormPolicy.contentMode` from `@form-engine-ts/core` to configure question counts, option counts, and allowed field types. Poll now defaults to at least one question with no upper bound; preserve the old single-question rule with `{ contentMode: { maxFields: 1 } }` and pass the same policy to storage, Builder, and answer validation. The `mapSchema` helpers preserve unknown metadata, translation metadata, pages, and conditions.
-
-Storage adapters expose `inspectFormDeletion` and `deleteForm` through the lifecycle contract, and `@form-engine-ts/storage/testing` provides framework-independent fixtures and scenarios. Transactions are required by default; pass `allowNonAtomic: true` explicitly for adapters without transaction support. `aggregateForms` combines locale, Content Mode, metadata, and Quiz scores across forms and versions.
-
-| Package group | Supported version |
+| Purpose | Packages |
 | --- | --- |
-| Core / React / MUI | 8.1.x |
-| Storage (Memory, MongoDB, Azure Table, Postgres, SQLite, D1, LocalStorage) | 8.1.x |
-| Translator / Zod / Privacy | 8.1.x (existing contracts) |
+| Schemas, validation, submissions, analytics, CSV | [core](packages/core/README.md) |
+| React provider, renderer, builder, hooks | [react](packages/react/README.md) |
+| Material UI components | [mui](packages/mui/README.md) |
+| Survey editor, translation, version management, response summaries | [custom-survey-client](packages/custom-survey-client/README.md) |
+| Storage contracts and testing utilities | [storage](packages/storage/README.md) |
+| In-memory or browser storage | [storage-memory](packages/storage-memory/README.md), [storage-localstorage](packages/storage-localstorage/README.md) |
+| Database storage | [storage-mongodb](packages/storage-mongodb/README.md), [storage-postgres](packages/storage-postgres/README.md), [storage-sqlite](packages/storage-sqlite/README.md), [storage-d1](packages/storage-d1/README.md), [storage-azure-table](packages/storage-azure-table/README.md) |
+| UI translation and demos | [translator-i18next](packages/translator-i18next/README.md), [translator-mock](packages/translator-mock/README.md) |
+| Server-side text translation | [translator-azure](packages/translator-azure/README.md), [translator-deepl](packages/translator-deepl/README.md), [translator-google](packages/translator-google/README.md), [translator-google-v3](packages/translator-google-v3/README.md) |
+| Translation caching | [translator-cache](packages/translator-cache/README.md) |
+| Sensitive-data detection | [privacy](packages/privacy/README.md) |
+| Zod 4 validation | [zod](packages/zod/README.md) |
 
-Existing `StorageAdapter`, `aggregateResponses`, and `validateContentMode` APIs remain available. Adopt the new lifecycle, cross-form aggregation, and mapping contracts incrementally.
+### Demo
 
-### Analytics semantics
+Run `pnpm dev` from this repository, then open the URL printed by Vite.
 
-Interaction Telemetry is a separate, privacy-preserving model for form behavior. Inject a `FormTelemetryAdapter` into
-`FormRenderer` to collect view, start, page, field, validation, submit, and exit events, then use
-`aggregateInteractionEvents(events)` for form, page, and field funnels. Events do not include answer values, labels, or
-validation messages by default; adapter failures never block form interaction.
+1. Select or create a form in **Surveys**; choose survey, poll, or quiz.
+2. Open it in the workspace and edit questions, pages, and translations.
+3. Save the schema and try **Answer preview**.
+4. Review **Responses & insights**, search responses, and export CSV.
 
-- Percentages use all valid submissions as the denominator.
-- Multi-select percentages describe the share of submissions choosing each option and may total more than 100%.
-- Text and textarea analytics expose only answered/unanswered counts; free-text content is never copied into aggregates.
-- Number fields expose answered/unanswered counts plus minimum, maximum, and average.
-- Rating fields default to integer values from 1 through 5 and share numeric analytics.
-- Select, radio, multi-select, and checkbox fields expose counts and percentages.
-- `page.completed` means that an explicit schema page passed validation; the final page emits it before `form.submitted` (or `form.submit_failed`). Field duration uses focus-to-completion, then presented-to-completion when focus is unavailable.
-- `analyzeInteractionAnalytics(analytics, options)` emits deterministic, privacy-safe Optimization Insights for low start,
-  abandonment, page drop-off, field focus/completion, validation friction, submit failures, and opt-in slow completion.
-  Rate thresholds use 0–100 percentages; the default minimum samples are 30 form-level observations, 20 page views, and
-  20 field presentations. Default rate thresholds are 50% low start, 50% abandonment, 40% page drop-off, 70% field
-  completion, 20% validation friction, and 10% submit failure. `dropoffRate` is `100 - completionRate`; field-focus
-  diagnostics are opt-in because focus capture may be disabled or unavailable for custom renderers. Slow-completion
-  thresholds are opt-in.
-- `compareInteractionAnalytics(before, after)` compares the same form across versions. Pages and fields match by ID;
-  added/removed entities are preserved, rate changes are percentage-point deltas, and duration changes are `after - before`
-  milliseconds. The API reports metrics only and does not infer success or statistical significance.
-- Survey radio options can set `textInput: true`; the renderer returns `{ optionId, text }` for the selected option and clears the supplement when selection changes.
-- `calculateChoiceDistribution` and `calculateNumericSummary` support focused dashboards. An empty numeric summary uses `null` for average/min/max and `0` for total.
-- `exportResponsesToCsv` returns UTF-8 BOM-prefixed RFC 4180 CSV by default; pass `{ withBom: false }` to omit the BOM. Rows use CRLF and the columns are exactly `submissionId`, `submittedAt`, `locale`, then the schema-order field columns; arrays are JSON-encoded.
-- `escapeCsvCell` neutralizes formula-like strings by default and quotes commas, double quotes, CR, and LF while doubling embedded quotes.
+![Survey library with templates, form search, and storage selection](docs/assets/survey-library.jpg)
 
-### SSR and MVP boundaries
+<details>
+<summary>Editor, respondent flow, and analytics screenshots</summary>
 
-The published libraries do not read DOM or browser-only globals during rendering. The default renderer uses its submitted form element only from event handling to focus the first invalid control. LocalStorage is resolved when `createLocalStorageAdapter()` is called, never on import; pass a `StorageLike` implementation outside a browser. Builder UUIDs are generated only from user-event handlers; the Vite preview owns timestamp, Blob, and download behavior.
+Edit questions alongside a live preview.
 
-The library remains intentionally driver-neutral: callers own database connections, production migrations, credentials,
-and cache storage. Builder ordering uses accessible up/down controls, and the memory adapter resets whenever its JavaScript
-process or browser page is reloaded.
+![Survey editor with question outline and live preview](docs/assets/survey-editor.jpg)
 
-## 日本語
+Check the customer-facing answer screen.
 
-TypeScriptとReact向けの、スキーマ駆動・プラグイン可能なアンケートエンジンです。フォーム定義、実行時バリデーション、回答の保存、分析機能はフレームワーク非依存のコアに集約し、翻訳とストレージは小さなアダプターインターフェースを通じて注入できます。
+![Customer answer preview](docs/assets/answer-preview.jpg)
 
-### 含まれるもの
+Try a multilingual, multi-page respondent form.
 
-| 分類 | パッケージ | 用途 |
-| --- | --- | --- |
-| Core | `@form-engine-ts/core` | JSON互換型とスキーマ・表示条件・検証・回答・集計・CSVの純粋関数 |
-| React Renderer / Builder | `@form-engine-ts/react` | SSR対応Provider、条件付きRenderer、アクセシブルなBuilder、フック、標準CSS |
-| Survey client | `@form-engine-ts/custom-survey-client` | adapter駆動のSurvey Editor、自由記述翻訳、version action、ローカライズ済み回答サマリー |
-| Storage Adapter | `@form-engine-ts/storage-memory` | フォームと回答を防御的コピーで保持するプロセス内ストレージ |
-| Storage Adapter | `@form-engine-ts/storage-localstorage` | prefix分離とstorage注入に対応するブラウザ永続化 |
-| Storage Adapter | `@form-engine-ts/storage-mongodb` | MongoDB Native Driver向けの完全なフォームストレージ |
-| Storage Adapter | `@form-engine-ts/storage-postgres` | node-postgres互換query clientを注入するPostgreSQLストレージ |
-| Storage Adapter | `@form-engine-ts/storage-sqlite` | 同期・非同期executorに対応するdriver非依存SQLiteストレージ |
-| Storage Adapter | `@form-engine-ts/storage-d1` | prepared statementとtransactional batchを使うCloudflare D1ストレージ |
-| Storage Adapter | `@form-engine-ts/storage-azure-table` | `@azure/data-tables`互換clientを注入するAzure Table Storage |
-| Translator Adapter | `@form-engine-ts/translator-mock` | 英語・日本語の同期カタログとデモ用の決定的な非同期バッチ翻訳 |
-| Translator Adapter | `@form-engine-ts/translator-azure` | region指定に対応するAzure AI Translator REST API v3.0連携 |
-| Translator Adapter | `@form-engine-ts/translator-deepl` | 注入可能な`fetch`でDeepL Free/Proを利用する非同期翻訳 |
-| Translator Adapter | `@form-engine-ts/translator-google` | API KeyまたはBearer認証に対応するGoogle Cloud Translation Basic v2連携 |
-| Translator Adapter | `@form-engine-ts/translator-google-v3` | 用語集・label・分割送信・retry対応のGoogle Cloud Translation Advanced v3連携 |
-| Translator Adapter | `@form-engine-ts/translator-i18next` | i18nextを利用する公式同期UI翻訳アダプター |
-| Translator Utility | `@form-engine-ts/translator-cache` | 非同期翻訳adapter向けのstorage非依存TTL cache wrapper |
-| Privacy Utility | `@form-engine-ts/privacy` | テキスト回答向けの標準・拡張可能な機密データ検出 |
-| Zod Validator | `@form-engine-ts/zod` | Core互換issueを返す`FormSchema`からZod 4検証器への変換 |
-| デモアプリ | `@form-engine-ts/preview` | テンプレート・編集・回答確認・回答検索・分析・出力を備えた顧客アンケート用デモ |
+![Multilingual respondent preview with page navigation](docs/assets/respondent-preview.jpg)
 
-ライブラリパッケージは、宣言ファイルと明示的な`exports`を含む公開用のESM/CommonJS両対応パッケージとしてビルドされます。公開workflowはリポジトリシークレット`NPM_TOKEN`を使い、`packages/*`のライブラリをnpmへ公開し、全パッケージのバージョンが一致する`vX.Y.Z`タグに対してGitHub Releaseを作成します。
+Search and filter responses, inspect analytics, and export CSV.
 
-### 必要な環境とコマンド
+![Response dashboard with search, language filter, analytics, and CSV export](docs/assets/response-analytics.jpg)
 
-- Node.js 22.22.2以上
-- pnpm 11
+</details>
+
+Memory storage clears on reload; LocalStorage keeps data in this browser. AI features use mock adapters by default. The demo does not publish forms or issue public response URLs; production identity and access control belong in your application.
+
+### Integration notes
+
+- Core is framework-independent; React supports SSR. Inject a storage implementation when using the LocalStorage adapter outside a browser.
+- Store schema content per version and current runtime settings per form. Recheck acceptance windows and response limits at server-side submission.
+- Keep database connections, authorization, and translation/AI credentials in your application. Send only bounded form context to AI providers, exclude response data, and persist only validated, approved changes. See the [server-side authoring example](examples/azure-openai-authoring/README.md).
+
+### Development
+
+Requires **Node.js >=22.22.2** and **pnpm 11**.
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-プレビューはViteで起動します。リポジトリ全体の受け入れ確認には、次のコマンドを使用します。
+Run repository checks before submitting changes:
 
 ```bash
-pnpm build
-pnpm check
-pnpm typecheck
 pnpm lint
+pnpm typecheck
+pnpm build
 pnpm test
 ```
 
-`pnpm lint`では、Biomeによりフォーマット、推奨リントルール、インポート順を検証します。
+For a focused check, use `pnpm --filter @form-engine-ts/core test` (replace the package as needed). Release history is in [RELEASE_NOTES.md](RELEASE_NOTES.md). License: [MIT](LICENSE).
 
-### 最新リリース
+## 日本語
 
-最新版は **v8.2.1**（2026-10-09）です。公開パッケージはすべてバージョン `8.2.1` に揃えています。
-本パッチでは、PreviewのデモキャプチャをREADMEに追加しました。
-全更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)を参照してください。
+TypeScriptとReact向けのスキーマ駆動フォームエンジンです。フレームワーク非依存のCore、アクセシブルなUI、差し替え可能な保存・翻訳アダプターを組み合わせて、アンケート・投票・クイズを作成できます。
 
-### 編集・回答体験
+### 主な機能
 
-任意の`pages`を定義すると、条件付きページの自動スキップ、ページ検証、アクセシブルな進捗表示を備えた
-ウィザードになります。React Rendererは`autoSaveKey`によりversion付き下書きを500ms debounceで`localStorage`へ
-保存・復元できます。編集時翻訳はスキーマへ保持され、`populateSchemaTranslations`で一括生成し、
-`resolveLocalizedSchema`でAPI通信なしに同期解決します。Builderはページ所属と各言語の手動訳文を編集できます。
-回答者向けには`autoSaveKey`と`draftResume={{}}`を組み合わせると、同じブラウザーで回答途中から再開できます。
-再開前に「続きから／最初から」を選べ、回答中ページも復元されます。既定の保存期間は7日間で、回答者は
-端末保存を停止できます。localStorageが利用できない場合も回答送信は継続できます。
-大きな複数ページフォームでは`pageEditorMode="single"`を指定するとページを選択して1ページずつ編集でき、
-新しい質問は選択中のページへ追加されます。既定の`"all"`表示も利用でき、各ページに最低1問を残す制約は維持されます。
-Coreには2つの単一選択質問を集計する`calculateCrossTabulation`と、timeout・任意HMAC署名対応の
-`dispatchWebhook`も追加され、Zodは任意の`{ pageIndex }`によるページ単位検証に対応します。
-`date`・`time`・`email`・`tel`・`url`の型付き質問、選択肢シャッフル、受付期間・回答上限、
-ベンダー非依存のsubmission guard、storage adapterの回答数取得にも対応します。
-クイズでは合格ラインの設定有無を切り替えられ、未設定の場合は回答結果に合計点と合否を表示しません。
+- 型付きスキーマによる入力検証、条件付き設問、複数ページのフォーム。
+- React・MUIによる編集／回答画面と、フック・スロットによるUIのカスタマイズ。
+- テンプレートからの作成、多言語対応、任意で有効にする回答下書きの保存・再開。
+- フォームと回答のバージョン管理、版とは別に管理する受付期間・回答数上限。
+- 回答集計、CSV出力、既定では回答値を収集しない操作イベントによるファネル分析。
+- アダプターを通じたAI下書きの生成と、Coreの検証を経た確認・適用。
 
-### 版付きフォームデータと現在設定
-
-各スキーマ版にはタイトル、説明、回答完了メッセージ、翻訳、質問を保存します。受付期間・回答数上限・表示用の
-アイコンと色は、`formId`ごとに1件の現在設定として別に保存します。回答データには回答時の`formVersion`を残します。
-
-```json
-{
-  "schema": { "id": "contact", "version": 3, "title": "お問い合わせ", "description": "ご連絡ください", "completionMessage": "回答ありがとうございます", "translations": { "en": { "title": "Contact" } } },
-  "runtimeSettings": { "formId": "contact", "openAt": "2026-10-01T00:00:00.000Z", "closeAt": "2026-12-31T23:59:59.000Z", "maxResponses": 200, "iconKey": "mail", "colorToken": "blue", "updatedAt": "2026-09-27T03:00:00.000Z" },
-  "submission": { "id": "response-123", "formId": "contact", "formVersion": 3, "values": { "email": "ada@example.com" }, "submittedAt": "2026-10-02T01:23:00.000Z" }
-}
-```
-
-現在設定は`formId`をキーにするため、公開版を切り替えても引き継がれます。日付や回答数上限を省略すると制限しません。
-回答数上限は全版の回答合計に対して適用し、データベースアダプターでは上限判定と回答保存を原子的に行います。
-LocalStorageアダプターはWeb Locks API対応ブラウザーで複数タブ間の送信を直列化します。未対応環境では同じ
-JavaScriptコンテキスト内に限り件数確認と保存を同期実行します。上限を既存回答数より低くしても過去の回答は残り、
-新しい回答が拒否されます。受付期間外もフォームは
-閲覧でき、画面には現在の受付状態を表示します。送信パイプラインに設定Providerを渡すと、サーバー側で送信時に
-現在設定を再取得して判定できます。`migrateFormRuntimeSettings`に
-現在公開中のスキーマを渡すと、従来の受付期間と上限を一度だけ現在設定へコピーできます。タイトル・説明・回答完了
-メッセージと翻訳は、引き続き新しいスキーマ版で変更します。
-
-AI AuthoringはProviderに依存しません。サーバー側のAdapterが`AuthoringSuggestion`を返し、Coreが構造とPolicyを
-検証した後、UIがcontrolledな変更前/変更後Previewを表示し、利用者が選んだ操作だけを適用します。Providerが
-`FormSchema`を直接書き換えることはなく、Field/Option IDはCoreが適用時に発行します。回答データとProviderの
-認証情報はブラウザー外に置き、`createAuthoringRequestFromQualityIssue()`で品質問題から質問修正や選択肢生成の
-依頼を作成できます。
-`applyAndRecheckQuality()`を使うと、選択した操作の適用成功後だけ既存のQuality adapterを再実行できます。
-`SurveyQualityPanel`の標準アクションと空状態は既存のcustom-survey翻訳scopeを使い、キーが未設定の場合は英語へ
-フォールバックします。
-
-推奨フローは次のとおりです。
-
-```text
-Host UI → useAuthoringAssistant → AuthoringAssistantAdapter → Host Server API → AI Provider
-         → AuthoringSuggestion → parse → preview → human approval → apply
-```
-
-`AuthoringRequest`はintent、prompt、target、bounded contextだけを持ち、完全な`FormSchema`は含みません。
-Providerの認証情報をブラウザーへ渡さず、answers・submission・responses・analyticsをcontextへ含めず、Coreで
-検証・適用した結果だけを保存してください。
-
-```tsx
-const assistant = useAuthoringAssistant({ schema, adapter, policy, onChange: setSchema });
-
-<MuiAuthoringPrompt intent="rewrite_field" target={{ kind: "field", fieldId: "q1" }} onSubmit={assistant.suggest} />
-<MuiAuthoringSuggestionPreview
-  suggestion={assistant.suggestion}
-  preview={assistant.preview}
-  selectedOperationIds={assistant.selectedOperationIds}
-  onSelectionChange={assistant.setSelectedOperationIds}
-  onApply={assistant.apply}
-  onReject={assistant.reject}
-/>
-```
-
-Providerの認証情報と呼び出しはサーバー側に置き、boundedなAuthoring contextだけを送り、回答データを送らず、
-Coreで検証・適用した結果だけを保存してください。
-
-Core境界では`parseAuthoringSuggestion()`と
-`previewAuthoringSuggestion(schema, suggestion, { operationIds, policy })`を通してから適用します。Quality問題は
-`createAuthoringRequestFromQualityIssue(issue, schema)`で依頼に変換し、
-`applyAndRecheckQuality(() => assistant.applySelected(), quality.run)`で適用成功後に再チェックできます。
-
-Coreパッケージには、満足度、意見改善、人気投票、理解度チェックの4種類の日英対応目的別テンプレートが
-含まれます。利用側は`getFormTemplates({ mode, locale })`で種別と言語を絞り、
-`createSchemaFromTemplate({ template, id, title })`で独立したスキーマを生成できます。白紙は引き続き
-`createInitialSchemaByMode`を使います。テンプレート定義と生成はCore、新規作成入口・ID発行・保存・画面遷移は
-利用側が担当します。連絡先の質問は含めず、回答者には個人情報を入力しないよう案内し、返信や保存環境に
-依存する匿名性を約束しません。
-
-### フォームの定義とレンダリング
+### はじめる
 
 ```bash
 pnpm add @form-engine-ts/core @form-engine-ts/react @form-engine-ts/translator-mock react react-dom
@@ -584,319 +154,104 @@ import { FormProvider, FormRenderer } from "@form-engine-ts/react";
 import "@form-engine-ts/react/styles.css";
 import { mockTranslator } from "@form-engine-ts/translator-mock";
 
-const schema = {
-  id: "contact",
+const schema: FormSchema = {
+  id: "feedback",
   version: 1,
-  title: "お問い合わせ",
-  description: "ご用件を入力してください。",
-  submitLabelKey: "contact.submit",
-  fields: [
-    {
-      id: "q_a1b2c3d4",
-      type: "text",
-      title: "お名前",
-      translationKey: "contact.name",
-      required: true,
-      minLength: 2
-    },
-    {
-      id: "q_e5f6a7b8",
-      type: "select",
-      title: "お問い合わせの種類",
-      translationKey: "contact.topic",
-      required: false,
-      options: [
-        { id: "opt_11223344", label: "サポート" },
-        { id: "opt_55667788", label: "営業へのご相談" }
-      ]
-    }
-  ]
-} as const satisfies FormSchema;
+  title: "ご意見",
+  fields: [{ id: "comment", type: "textarea", title: "ご意見をお聞かせください", required: true }]
+};
 
-export function ContactForm() {
+export function FeedbackForm() {
   return (
     <FormProvider
       schema={schema}
       locale="ja"
       translator={mockTranslator}
       onSubmit={async (values) => console.log(values)}
-      resetOnSuccess
     >
-      <FormRenderer successMessageKey="contact.success" />
+      <FormRenderer />
     </FormProvider>
   );
 }
 ```
 
-`FormProvider`はスキーマを実行時に検証します。表示条件は回答変更時に再計算され、非表示のコントロールとエラーはDOMから除外されます。回答値は再表示に備えてUI内に保持されますが、送信値からは除外されます。`FormBuilder`は同じ`FormSchema`を編集する制御コンポーネントで、質問・選択肢の一意なIDをユーザー操作時に自動生成して画面から隠し、先行質問だけを参照する表示条件を保証します。
+`FormProvider`がスキーマと回答を検証し、非表示の設問の回答を送信対象から除外します。例のコンソール出力を、アプリケーションの保存処理へ置き換えてください。`FormBuilder`で同じスキーマを編集し、投票・クイズには`ContentRenderer`を利用できます。設定や使用例は[Reactガイド](packages/react/README.md)を参照してください。
 
-この形式は破壊的変更です。旧`titleKey`、`descriptionKey`、`helpTextKey`、選択肢の`value`／`labelKey`は読み込まれません。保存済みスキーマは、自然文の`title`／`description`／`label`と内部キーの`id`へ移行してください。
+### パッケージを選ぶ
 
-`validateSchemaStructure(schema)`は重複・dangling・自己参照・循環参照を診断します。`sanitizeSchema(schema)`は危険な条件参照を除去した新しいスキーマを返します。重複IDの安全な改名方法は推測できないため、重複質問・選択肢は診断されますが自動削除されません。
+必要なパッケージだけを導入できます。パッケージ名の接頭辞は`@form-engine-ts/`です。各リンク先にAPIと設定方法を記載しています。
 
-### アダプターの契約
-
-スキーマ内の自然文はそのまま表示します。同期翻訳は検証、送信・状態メッセージ、プレースホルダー、Builder UIで引き続き使用するため、レンダリングがエフェクトに依存しません。
-
-```ts
-interface TranslationAdapter {
-  translate(
-    key: string,
-    locale: string,
-    params?: Readonly<Record<string, string | number>>
-  ): string;
-}
-```
-
-ネットワーク翻訳には別の非同期契約を使用し、Reactの同期レンダリングを維持します。
-
-```ts
-interface AsyncTranslationAdapter {
-  translateText(text: string, targetLocale: string, sourceLocale?: string): Promise<string>;
-  translateBatch(
-    texts: readonly string[],
-    targetLocale: string,
-    sourceLocale?: string
-  ): Promise<readonly string[]>;
-}
-
-const deepl = createDeeplTranslator({
-  apiKey: process.env.DEEPL_API_KEY,
-  apiType: "pro"
-});
-const japanese = await deepl.translateText("Thank you", "JA", "EN");
-const translatedSchema = await resolveFormTranslation(schema, deepl, "JA", "EN");
-```
-
-`resolveFormTranslation`はフォーム・質問のタイトルと説明、選択肢ラベルを順序どおり1回のバッチで翻訳し、内部ID、表示条件、検証設定、質問の任意`translationKey`を保持します。
-
-DeepLの認証情報は信頼できるサーバーだけで扱ってください。このアダプターは認証ヘッダー付きPOST JSON、`fetchFn`注入、HTTP/APIエラー通知に対応し、自動再試行は行いません。
-
-Google Cloud Translation Basic v2では、アダプターごとにAPI KeyまたはBearer token providerのどちらか一方だけを使用します。API Keyは`key` query parameterへ設定し、OAuth2／Service Account利用者は更新可能なBearer token providerを注入します。
-
-```ts
-const googleWithApiKey = createGoogleTranslator({
-  apiKey: process.env.GOOGLE_TRANSLATE_API_KEY
-});
-
-const googleWithBearer = createGoogleTranslator({
-  getAccessToken: async () => credentials.getAccessToken()
-});
-
-const german = await googleWithBearer.translateBatch(["Hello", "Goodbye"], "de", "en");
-```
-
-Googleの認証情報も信頼できるサーバーだけで扱ってください。このアダプターはplain text翻訳、返却テキストのHTML entityデコード、1リクエスト最大128テキスト、HTTP/APIエラー通知に対応し、自動再試行は行いません。token生成・更新、ADC、Service Account署名は呼び出し側の責務です。
-
-Azure AI Translatorはsubscription key認証を使用し、regionalまたはmulti-service resourceでは任意のregionを送信できます。`endpoint`には完全なTranslate操作URLを指定するため、custom domain利用時は`/translator/text/v3.0/translate`まで含めます。
-
-```ts
-const azure = createAzureTranslator({
-  apiKey: process.env.AZURE_TRANSLATOR_KEY,
-  region: "japaneast",
-  endpoint: "https://example.cognitiveservices.azure.com/translator/text/v3.0/translate"
-});
-
-const french = await azure.translateBatch(["Hello", "Goodbye"], "fr", "en");
-```
-
-Azureの認証情報も信頼できるサーバーだけで扱ってください。このアダプターはcustom endpointのquery parameterを保持し、現行の1,000要素・50,000文字のリクエスト上限を通信前に検証します。`fetchFn`注入とAPIエラー内のsubscription key秘匿に対応し、自動再試行は行いません。
-
-ストレージは非同期処理です。そのため、同じフォームを後からデータベースやHTTPベースの実装に切り替えられます。
-
-```ts
-interface SubmissionQueryOptions {
-  readonly since?: string;
-  readonly until?: string;
-}
-
-interface StorageAdapter {
-  saveSubmission(submission: FormSubmission): Promise<void>;
-  listSubmissions(
-    formId: string,
-    formVersion?: number,
-    options?: SubmissionQueryOptions
-  ): Promise<readonly FormSubmission[]>;
-  clearResponses?(formId: string): Promise<void>;
-  clear(): Promise<void>;
-}
-```
-
-検証済みでイミュータブルな回答を作成して保存し、一致する回答を集計します。
-
-```ts
-const submission = createSubmission(schema, values, {
-  id: crypto.randomUUID(),
-  locale: "en",
-  submittedAt: new Date().toISOString()
-});
-
-await storage.saveSubmission(submission);
-const responses = await storage.listSubmissions(schema.id, schema.version, {
-  since: "2026-01-01T00:00:00.000Z",
-  until: "2026-01-31T23:59:59.999Z"
-});
-const analytics = aggregateResponses(schema, responses);
-```
-
-`since`と`until`は包含境界となるISO 8601文字列です。form versionと併用でき、すべてのアダプターが`submittedAt`、同値時はsubmission ID順で返します。`createMemoryStorageAdapter()`、`createLocalStorageAdapter()`、各データベースのファクトリでストレージを生成します。重複submission IDはアダプター内でグローバルに拒否されます。`clearResponses(formId)`は指定フォームの全version回答だけを削除し、スキーマと他フォームを保持します。`clear()`は設定されたアダプターデータだけを初期化します。PreviewではRespondent/Analytics両タブから確認付きで回答をクリアできます。
-
-MongoDB接続は呼び出し側が所有し、`Db`をファクトリへ注入します。`createIndexes()`は名前付きのform/timestamp複合indexとlocale indexを作成します。`clear()`は設定されたコレクション内のドキュメントだけを削除し、コレクションとindexは保持します。
-
-```ts
-const storage = createMongoDbStorage({
-  db: mongoClient.db("forms"),
-  schemasCollectionName: "form_schemas",
-  responsesCollectionName: "form_responses"
-});
-await storage.createIndexes();
-```
-
-Postgresは`Pool`、`Client`、互換query wrapperを受け取ります。SQLiteは同期または非同期の`run/get/all` executorを受け取るため、`better-sqlite3`、`bun:sqlite`、libSQLなどをライブラリのruntime依存にせず薄くラップできます。D1はWorker APIの構造的な`prepare/bind/first/all/run/batch`を利用します。全SQLアダプターの`autoMigrate`既定値は`false`です。有効時は現在のテーブルとindexを最初の操作前に一度だけ遅延作成しますが、本番の接続、transaction、migration lifecycleはアプリケーション側が管理します。
-
-```ts
-const postgresStorage = createPostgresStorage({ client: pool, autoMigrate: true });
-const sqliteStorage = createSqliteStorage({ db: sqliteExecutor });
-const d1Storage = createD1Storage({ db: env.DB });
-```
-
-Coreの検証規則を重複実装せず、Zod 4の回答検証器を生成できます。
-
-```ts
-const answerSchema = createZodFormSchema(schema);
-const result = answerSchema.safeParse(candidateAnswers);
-```
-
-Zod issueはfield IDをpathとし、Coreの検証code、翻訳message key、補間値をcustom paramsに保持します。非表示回答は検証対象外ですが、成功したparse結果からは削除されません。
-
-### 分析の仕様
-
-Interaction Telemetryは回答送信後の分析とは分離された、フォーム操作専用のプライバシー配慮モデルです。
-`FormRenderer`へ`FormTelemetryAdapter`を注入すると、表示、開始、ページ、設問、検証、送信、離脱イベントを収集でき、
-`aggregateInteractionEvents(events)`でフォーム・ページ・設問単位のファネルを集計できます。既定のイベントには回答値、
-ラベル、検証メッセージを含めず、Adapterの失敗がフォーム操作を止めることもありません。
-明示したページの`page.completed`は検証通過を意味し、最終ページでは`form.submitted`（または`form.submit_failed`）の前に発火します。
-設問時間はfocusから完了までを優先し、focusを取得できない場合は表示から完了までを使います。
-
-`analyzeInteractionAnalytics(analytics, options)` は、開始率低下、離脱、ページ離脱、設問のfocus/completion低下、
-検証摩擦、送信失敗、明示的な時間超過を決定論的でプライバシー安全なOptimization Insightとして返します。
-率のthresholdは0〜100のパーセントで、既定の最小サンプル数はフォーム単位30、ページ20、設問20です。
-既定の率thresholdは開始率低下50%、離脱50%、ページ離脱40%、completion低下70%、検証摩擦20%、送信失敗10%です。
-`dropoffRate`は`100 - completionRate`です。focus計測は無効またはcustom rendererで利用できない場合があるため、
-設問focus低下の診断は`lowFieldFocusRate`を明示した場合だけ有効です。時間超過のthresholdも明示した場合だけ有効です。
-
-`compareInteractionAnalytics(before, after)` は同じFormのVersion間を比較します。ページと設問はIDで対応付け、
-追加・削除を保持します。率はpercentage-point差、時間は`after - before`のミリ秒差で、成功判定や統計的有意差は推測しません。
-
-#### 7.18.x の拡張APIと移行
-
-`@form-engine-ts/core` の `FormPolicy.contentMode` で Content Mode の設問数・選択肢数・許可形式を設定できます。
-Pollは既定で1問以上・上限なしになりました。従来の1問制約が必要な場合は
-`{ contentMode: { maxFields: 1 } }` を保存・Builder・回答検証へ同じく渡してください。
-`mapSchema` 系の変換ヘルパーは未知のmetadata、翻訳metadata、ページ、条件分岐を保持します。
-
-Storage Adapterには `inspectFormDeletion` / `deleteForm` と `@form-engine-ts/storage/testing` が追加されました。
-削除はTransaction対応を既定とし、非対応Adapterでは `allowNonAtomic: true` を明示します。
-`aggregateForms` は複数Form・Versionのlocale、Content Mode、metadata、Quiz得点を横断集計します。
-
-| パッケージ群 | 対応バージョン |
+| 用途 | パッケージ |
 | --- | --- |
-| Core / React / MUI | 7.18.x |
-| Storage（Memory、MongoDB、Azure Table、Postgres、SQLite、D1、LocalStorage） | 7.18.x |
-| Translator / Zod / Privacy | 7.18.x（既存契約） |
+| スキーマ・検証・回答データ・集計・CSV | [core](packages/core/README.md) |
+| ReactのProvider・回答画面・Builder・フック | [react](packages/react/README.md) |
+| Material UIコンポーネント | [mui](packages/mui/README.md) |
+| アンケート編集・翻訳・版管理・回答サマリー | [custom-survey-client](packages/custom-survey-client/README.md) |
+| 保存の共通契約・テスト用ユーティリティ | [storage](packages/storage/README.md) |
+| メモリー・ブラウザーへの保存 | [storage-memory](packages/storage-memory/README.md), [storage-localstorage](packages/storage-localstorage/README.md) |
+| データベースへの保存 | [storage-mongodb](packages/storage-mongodb/README.md), [storage-postgres](packages/storage-postgres/README.md), [storage-sqlite](packages/storage-sqlite/README.md), [storage-d1](packages/storage-d1/README.md), [storage-azure-table](packages/storage-azure-table/README.md) |
+| UI翻訳・デモ用翻訳 | [translator-i18next](packages/translator-i18next/README.md), [translator-mock](packages/translator-mock/README.md) |
+| サーバー側のテキスト翻訳 | [translator-azure](packages/translator-azure/README.md), [translator-deepl](packages/translator-deepl/README.md), [translator-google](packages/translator-google/README.md), [translator-google-v3](packages/translator-google-v3/README.md) |
+| 翻訳キャッシュ | [translator-cache](packages/translator-cache/README.md) |
+| 機密データの検出 | [privacy](packages/privacy/README.md) |
+| Zod 4による検証 | [zod](packages/zod/README.md) |
 
-既存の `StorageAdapter`、`aggregateResponses`、`validateContentMode` は維持されます。新しい削除・横断集計・変換APIへ移行する場合も、まず既存APIを残したまま追加契約を導入できます。
+### デモ
 
-- パーセンテージの分母には、すべての有効な回答を使用します。
-- 複数選択のパーセンテージは、各選択肢を選んだ回答の割合を示すため、合計が100%を超える場合があります。
-- textとtextareaの分析では回答済み・未回答の件数のみを公開し、自由記述の内容を集計結果へコピーしません。
-- numberフィールドでは回答済み・未回答の件数に加え、最小値、最大値、平均値を公開します。
-- ratingは既定で1～5の整数を扱い、numberと同じ数値集計を行います。
-- select、radio、multi-select、checkboxフィールドでは件数とパーセンテージを公開します。
-- surveyモードのradio選択肢には`textInput: true`を設定でき、選択中だけ補足入力を表示します。送信値は`{ optionId, text }`で、選択を変えると補足を破棄します。
-- `exportResponsesToCsv`はデフォルトで数式形式の文字列を無害化し、UTF-8 BOM付きのRFC 4180 CSVを返します。列は正確に`submissionId`、`submittedAt`、`locale`、続いてスキーマ順の設問列です。BOMを省く場合は`{ withBom: false }`、無害化を無効にする場合は`{ neutralizeFormulas: false }`を渡します。
-- `escapeCsvCell`も同じ数式対策とRFC 4180の引用・内部引用符二重化を行う公開純粋関数です。
+このリポジトリで`pnpm dev`を実行し、Viteが表示するURLを開きます。
 
-### SSRとMVPの範囲
+1. **フォーム一覧**でアンケート・投票・クイズを選択、または新規作成します。
+2. ワークスペースで開き、設問・ページ・翻訳を編集します。
+3. スキーマを保存して、**回答画面を確認**で回答を試します。
+4. **回答・分析**で回答を検索・集計し、CSVを出力します。
 
-公開ライブラリはレンダリング中にDOMやブラウザ専用グローバルへアクセスしません。LocalStorageはファクトリ呼び出し時にだけ解決され、SSRでは`StorageLike`を注入できます。BuilderのUUIDはユーザー操作イベント内だけで生成し、現在時刻、Blob、CSVダウンロードはPreviewのイベント処理に限定しています。
+![テンプレート・検索・保存先切り替えを備えたフォーム一覧](docs/assets/survey-studio.jpg)
 
-ライブラリはdriver非依存を維持しているため、データベース接続、production migration、credential、cache storageの
-管理は呼び出し側が担当します。Builderの並び替えにはアクセシブルな上下ボタンを使用し、memory adapterは
-JavaScript processまたはbrowser pageの再読み込み時にリセットされます。
+<details>
+<summary>編集・回答・分析画面のキャプチャ</summary>
 
-## Survey / Poll / Quiz demo
+プレビューを見ながら設問を編集できます。
 
-The demo opens in **Surveys** and follows a customer feedback workflow: select or create a survey,
-use **Use in workspace** to open the **Survey editor**, check **Answer preview**, then review **Responses & insights**.
-The library supports title/description search, a focused satisfaction template, and duplication with a new form ID
-without copying responses. Unsaved library edits require confirmation before leaving or switching storage.
-Responses can be searched by answer or ID, filtered by language, and expanded individually; analytics and CSV use only
-the selected form and version. The editor offers JSON backup and validated import, and mock AI drafts can be reviewed
-before saving. Advanced editors, translation comparisons, and failure simulations remain under developer tools.
-Navigation is keyboard accessible, view selection uses `?view=mui|respondent|analytics|builder|comparison`, and browser
-Back/Forward preserves in-session library drafts and respondent progress. Memory storage clears on reload; LocalStorage
-keeps data in this browser. This demo does not publish a survey or create a public collection link.
+![設問一覧とライブプレビューを備えた編集画面](docs/assets/survey-editor.jpg)
 
-![Survey library with templates and form search](docs/assets/survey-library.jpg)
+回答者に見える画面を確認できます。
 
-The preview's **Surveys** tab provides a shared Memory/LocalStorage library, mode
-filter (`?mode=survey|poll|quiz`), creation cards, the integrated `MuiFormBuilder` with
-mode-specific policy and validation, and `MuiContentRenderer` respondent results. Save a valid schema before
-opening the answer screen. An empty survey stays an editing draft until its first
-question is saved. Poll results support all four visibility policies and independent
-aggregation retries and are shown inside each answer input row. The selected vote is reflected optimistically while the aggregate request is pending. When the host identifies a previous vote,
-`after_submit` results can be shown on the initial render without resubmitting; quiz supports immediate and post-submit feedback, local or server evaluation, and rewards. Core validation rejects mode-invalid schemas before persistence. Demo controls
-simulate closing, result access and request failures. One-vote identity is scoped to
-this browser and form, across versions; clearing browser data resets it. Production
-hosts must enforce identity/access at persistence. Existing workspaces remain available.
-The Survey template picker includes **Radio with details**, an executable example of an optional supplement on one radio option.
-Published consumers can use the focused MUI `/builder`, `/renderer`, `/survey-summary`
-and `/survey-domain` subpaths while the v7 root export remains compatible.
-For a design-system-neutral respondent screen, import `ContentRenderer` from
-`@form-engine-ts/react` and pass typed `classNames`/slots; the preview demonstrates
-the same Provider and submission state rendered with MUI or Tailwind. Persistence and
-authorization remain host responsibilities.
+![顧客向けアンケートの回答プレビュー](docs/assets/answer-preview.jpg)
 
-The screenshots below show the editor, respondent flow, and response dashboard:
+多言語・複数ページのフォームも試せます。
 
-![Survey editor with question outline and live respondent preview](docs/assets/survey-editor.jpg)
+![ページ移動を備えた多言語フォームの回答プレビュー](docs/assets/respondent-preview.jpg)
 
-![Customer answer preview](docs/assets/answer-preview.jpg)
+回答の検索・言語による絞り込み・集計・CSV出力を確認できます。
 
-![Response analytics, search, language filter, and CSV export](docs/assets/response-analytics.jpg)
+![回答検索・言語フィルター・集計・CSV出力を備えた分析画面](docs/assets/response-analytics.jpg)
 
-## アンケート・投票・クイズのデモ
+</details>
 
-デモは **フォーム一覧** から始まり、アンケートを選択・作成し、**ワークスペースで開く** から
-**アンケートを編集** → **回答画面を確認** → **回答・分析** の順に操作できます。
-タイトル・説明の検索、3問の満足度テンプレート、回答をコピーしない新しいフォームIDでの複製に対応します。
-一覧の未保存の編集を破棄する場合や保存先を切り替える場合は確認画面を表示します。
-回答は内容・IDで検索し、言語で絞り込み、個別に詳細を確認できます。集計とCSVは選択中のフォーム・バージョンだけを対象にします。
-編集画面ではJSONのバックアップと検証付き読み込み、固定候補を使うAIデモの下書き確認ができます。
-詳細エディター・翻訳比較・失敗のシミュレーションは開発者ツールにまとめています。
-キーボードで画面を切り替え、`?view=mui|respondent|analytics|builder|comparison` とブラウザの戻る・進むを使えます。
-画面の切り替えでは一覧の編集中データと回答プレビューの進捗を保持します。Memoryは再読み込みで消え、LocalStorageは
-このブラウザに保存します。このデモはアンケートの外部公開や公開回答URLの発行を行いません。
+Memoryのデータは再読み込みで消え、LocalStorageはこのブラウザーに保存します。AI機能は既定でモックを利用します。デモはフォームの外部公開や公開回答URLの発行を行いません。本番の回答者識別と権限制御はアプリケーション側で実装してください。
 
-![テンプレートと検索を備えたアンケート一覧](docs/assets/survey-studio.jpg)
+### 組み込み時の注意点
 
-preview の **フォーム一覧** から、共通の Memory / LocalStorage 保存領域で種別フィルタ
-（`?mode=survey|poll|quiz`）、新規作成、mode別制約・検証を統合した`MuiFormBuilder`による編集、
-`MuiContentRenderer`による回答・結果表示を
-操作できます。有効なスキーマを保存してから回答画面を開きます。空のアンケートは最初の
-設問を保存するまで編集中のドラフトとして保持します。投票は公開タイミング4種類と集計だけの
-再試行に対応し、結果は各回答INPUT行の中に進捗・票数・割合として表示します。投票直後は集計取得を待たずに選択肢へ楽観的に反映します。投票済みの回答者には、`after_submit`でも再送信なしに初期表示から結果を表示します。クイズは選択直後・送信後の解説、ローカル／サーバー判定、特典表示に対応します。Coreはmode固有の不正なスキーマを保存前に拒否します。締切・閲覧権限・通信失敗をデモ操作で
-切り替えられます。surveyのテンプレート選択には補足入力付きradioの実行例も含まれます。一人一票はブラウザーとフォーム単位でバージョンをまたいで再現し、
-ブラウザーデータを削除するとリセットされます。本番の識別・権限制御は保存処理で強制してください。
-既存デモの各ワークスペースも引き続き利用できます。
-MUIに依存しない回答画面は`@form-engine-ts/react`の`ContentRenderer`を使い、
-型付き`classNames`とslotでTailwind等の見た目を組み立てられます。previewでは同じ
-Provider・回答値・送信状態をMUI/Tailwindで切り替えて確認できます。保存と認可は
-ホスト側の責務です。
-公開パッケージではv7のroot export互換性を維持しながら、MUIの`/builder`、`/renderer`、
-`/survey-summary`、`/survey-domain`を用途別にimportできます。
+- Coreはフレームワーク非依存、ReactはSSRに対応します。ブラウザー外でLocalStorageアダプターを使う場合は保存実装を注入してください。
+- スキーマの内容は版ごと、現在の受付設定はフォームごとに保存します。送信時にはサーバー側で受付期間と回答数上限を再確認してください。
+- データベース接続・認可・翻訳／AIの認証情報はアプリケーション側で管理します。AIには必要な範囲のフォーム情報だけを送り、回答データを含めず、検証・承認した変更だけを保存してください。[サーバー側のAI編集例](examples/azure-openai-authoring/README.md)を参照できます。
 
-回答者向けの多言語・複数ページフォームの表示例です。
+### 開発
 
-![Form Engineの回答者プレビュー](docs/assets/respondent-preview.jpg)
+**Node.js >=22.22.2**と**pnpm 11**が必要です。
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+変更時はリポジトリ全体のチェックを実行します。
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm test
+```
+
+個別の確認には`pnpm --filter @form-engine-ts/core test`を使います。対象パッケージ名は適宜変更してください。更新履歴は[RELEASE_NOTES.md](RELEASE_NOTES.md)、ライセンスは[MIT](LICENSE)を参照してください。
