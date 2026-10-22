@@ -3,6 +3,11 @@
 This file is the historical record of user-visible changes. The README focuses on the
 current release and usage information.
 
+## v8.2.3 — 2026-10-22
+
+- Updated the Vite and Vitest toolchain to patched versions to resolve development dependency advisories.
+- Aligned all 21 published packages to version 8.2.3.
+
 ## v8.2.2 — 2026-10-10
 
 - Reworked the Preview app into a customer survey workspace with survey templates, editing, respondent preview, response search, analytics, and export flows.
