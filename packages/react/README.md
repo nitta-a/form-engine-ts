@@ -79,13 +79,13 @@ Radio, checkbox, and multi-select questions use the flat layout by default. Set 
 to render them as bordered, accessible `<fieldset>` groups with `<legend>` titles:
 
 ```tsx
-<FormRenderer appearance={{ choiceField: "grouped" }} />
+<FormRenderer appearance={{ choiceField: "grouped" }} />;
 ```
 
 Use an object to configure each choice type independently. Unspecified types remain flat:
 
 ```tsx
-<FormRenderer appearance={{ choiceField: { radio: "grouped", checkbox: "default" } }} />
+<FormRenderer appearance={{ choiceField: { radio: "grouped", checkbox: "default" } }} />;
 ```
 
 Grouped wrappers can be replaced with `slots.renderChoiceGroup`; `slotProps.choiceGroup` accepts a class name and
@@ -109,7 +109,7 @@ A Field Type override still wins; otherwise the renderer uses the primitive and 
     TextInput: (props) => <MyTextInput {...props} />,
     Radio: (props) => <MyRadio {...props} />
   }}
-/>
+/>;
 ```
 
 `ContentRenderer` renders rating choices as accessible left-to-right stars by default. Selected values fill every star up
@@ -123,7 +123,7 @@ provided input inside `slots.renderChoiceOption` to retain native input semantic
 `cancel`, `retry`, `draft-resume`, `draft-start-over`, and `reset`. Existing button primitives may ignore it.
 
 ```tsx
-  <FormRenderer
+<FormRenderer
   slots={{
     renderChoiceOption: ({ option, inputId, children }) => (
       <label htmlFor={inputId} data-option-id={option.id} className="choice-card">
@@ -131,7 +131,7 @@ provided input inside `slots.renderChoiceOption` to retain native input semantic
       </label>
     )
   }}
-/>
+/>;
 ```
 
 `renderChoiceOptionAfter` continues to render alongside the option label, including poll and quiz content. A custom
@@ -145,14 +145,16 @@ unknown or hidden fields are ignored safely:
       <ul>
         {issues.map((issue) => (
           <li key={`${issue.fieldId}-${issue.messageKey}`}>
-            <button type="button" onClick={() => onIssueSelect(issue)}>{issue.fieldId}</button>
+            <button type="button" onClick={() => onIssueSelect(issue)}>
+              {issue.fieldId}
+            </button>
           </li>
         ))}
       </ul>
     )
   }}
   pageTransition={{ scroll: "instant", focus: "first-field", respectReducedMotion: true }}
-/>
+/>;
 ```
 
 `pageTransition` defaults to the existing smooth scroll and page-header focus behavior. `scroll: "none"` and
@@ -165,7 +167,7 @@ progress indicator. Pass `autoSaveKey` to persist a versioned draft in `localSto
 on the next mount:
 
 ```tsx
-<FormRenderer autoSaveKey={`contact-draft:${schema.version}`} />
+<FormRenderer autoSaveKey={`contact-draft:${schema.version}`} />;
 ```
 
 For anonymous respondent resume, combine `autoSaveKey` with `draftResume={{}}`. The renderer asks whether to continue
@@ -231,7 +233,7 @@ from the schema's `defaultLocale` and `supportedLocales`:
 ```tsx
 <FormEngineI18nProvider locale="ja">
   <MuiFormBuilder schema={schema} onChange={setSchema} />
-</FormEngineI18nProvider>
+</FormEngineI18nProvider>;
 ```
 
 ## Headless builder and renderer lifecycle
@@ -308,11 +310,13 @@ to `currentType`, `allowedTypes`, and `onChangeType`.
   onChange={setSchema}
   slots={{
     fieldTypeSelect: ({ currentType, onChangeType }) => (
-      <button type="button" onClick={() => onChangeType("textarea")}>{currentType}</button>
+      <button type="button" onClick={() => onChangeType("textarea")}>
+        {currentType}
+      </button>
     ),
     fieldEditorHeader: ({ field }) => <h3>{field.title}</h3>
   }}
-/>
+/>;
 ```
 
 In `fieldEditorMode="single"`, `slots.fieldEditorPreview` customizes the non-selected question preview. The slot
@@ -331,7 +335,7 @@ title-only preview remains unchanged.
       </button>
     )
   }}
-/>
+/>;
 ```
 
 ```tsx
@@ -340,7 +344,7 @@ title-only preview remains unchanged.
   onChange={setSchema}
   components={{ Button: MuiButtonAdapter, TextInput: MuiTextFieldAdapter }}
   slots={{ translationActions: ArgsAiTranslationActions }}
-/>
+/>;
 ```
 
 `FormRenderer` can also be used without an explicit provider:
@@ -349,7 +353,7 @@ title-only preview remains unchanged.
 <FormRenderer
   schema={schema}
   locale="en"
-  beforeSubmit={async (values) => (await confirmValues(values) ? "continue" : "cancel")}
+  beforeSubmit={async (values) => ((await confirmValues(values)) ? "continue" : "cancel")}
   onSubmit={saveValues}
   onDraftSave={saveDraft}
   slots={{
@@ -357,11 +361,13 @@ title-only preview remains unchanged.
     renderPageHeader: ({ page }) => <MyPageHeader page={page} />,
     renderField: (props) => <MyField {...props} />,
     renderSubmitButton: ({ isSubmitting, disabled, onSubmit }) => (
-      <MyButton loading={isSubmitting} disabled={disabled} onClick={onSubmit}>Save</MyButton>
+      <MyButton loading={isSubmitting} disabled={disabled} onClick={onSubmit}>
+        Save
+      </MyButton>
     ),
     renderSubmitError: ({ error, onRetry }) => <MyError error={error} onRetry={onRetry} />
   }}
-/>
+/>;
 ```
 
 Validation runs before `beforeSubmit`. A `"cancel"` result does not call `onSubmit` and preserves values and drafts.
@@ -474,7 +480,7 @@ import { ContentRenderer } from "@form-engine-ts/react";
     quizQuestionCorrect: "border-green-600",
     quizQuestionIncorrect: "border-red-600"
   }}
-/>
+/>;
 ```
 
 Quiz feedback appears inside each answer field with text, an icon and `aria-live`.

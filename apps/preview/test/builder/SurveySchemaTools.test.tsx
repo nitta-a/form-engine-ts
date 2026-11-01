@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { customerFeedbackSchema } from "../workspace/schema";
-import { SurveySchemaTools } from "./SurveySchemaTools";
+import { SurveySchemaTools } from "../../src/builder/SurveySchemaTools";
+import { customerFeedbackSchema } from "../../src/workspace/schema";
 
 afterEach(cleanup);
 

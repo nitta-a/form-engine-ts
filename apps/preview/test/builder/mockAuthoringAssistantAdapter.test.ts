@@ -7,8 +7,8 @@ import {
   previewAuthoringSuggestion
 } from "@form-engine-ts/core";
 import { describe, expect, it } from "vitest";
-import { mockAuthoringAssistantAdapter } from "./mockAuthoringAssistantAdapter";
-import { previewCreationPolicy } from "./previewPolicy";
+import { mockAuthoringAssistantAdapter } from "../../src/builder/mockAuthoringAssistantAdapter";
+import { previewCreationPolicy } from "../../src/builder/previewPolicy";
 
 const schema: FormSchema = {
   ...createInitialSchemaByMode("survey", { id: "preview-authoring", title: "Survey", locale: "en" }),

@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/mui",
-  "version": "8.2.4",
+  "version": "8.2.5",
   "publishConfig": {
     "access": "public"
   },
@@ -89,9 +89,9 @@
     "@form-engine-ts/react": "workspace:*",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

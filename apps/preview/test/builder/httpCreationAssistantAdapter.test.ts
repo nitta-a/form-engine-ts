@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createHttpCreationAssistantAdapter } from "./httpCreationAssistantAdapter";
+import { createHttpCreationAssistantAdapter } from "../../src/builder/httpCreationAssistantAdapter";
 
 describe("HTTP creation assistant adapter", () => {
   it("posts the structured conversation request and forwards the response", async () => {

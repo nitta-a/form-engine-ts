@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createHttpAuthoringAssistantAdapter } from "./httpAuthoringAssistantAdapter";
+import { createHttpAuthoringAssistantAdapter } from "../../src/builder/httpAuthoringAssistantAdapter";
 
 afterEach(() => vi.unstubAllGlobals());
 

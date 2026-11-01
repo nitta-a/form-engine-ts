@@ -6,7 +6,7 @@ React composite APIs for survey applications. The package composes the existing 
 <SurveyUiProvider locale="ja" translationAdapter={uiTranslations}>
   <SurveyEditor schema={schema} adapter={editorAdapter} onChange={setSchema} />
   <SurveyResponseSummary summary={summary} version={version} sourceLanguage="ja" />
-</SurveyUiProvider>
+</SurveyUiProvider>;
 ```
 
 The package has no dependency on Maker authentication, tRPC, Jotai, or URL state. Network and persistence concerns are injected through transport-neutral adapters:
@@ -34,7 +34,7 @@ import "@form-engine-ts/custom-survey-client/ai-creation/styles.css";
   labels={labels}
   onComplete={setSchema}
   onCancel={closeDialog}
-/>
+/>;
 ```
 
 `SurveyAiCreationLabels.error` receives codes such as `provider_unavailable`, `network_error`, `invalid_response`, and `stale_schema`; `fieldType` supplies localized question-type names. `onCancel` is optional and is called after any in-flight request is aborted. `previewMode="inline"` renders the respondent preview inside a host dialog; the default is its own accessible dialog. `SurveyEditorPreviewDialog` is exported from the same subpath for reuse.
@@ -174,7 +174,7 @@ const summaryDomain = useSurveyResponseSummaryDomain({
   languageLabel: (language) => languageNames[language] ?? language
 });
 
-<SurveyResponseSummaryDomain {...summaryDomain} />
+<SurveyResponseSummaryDomain {...summaryDomain} />;
 ```
 
 The all-languages tab uses the top-level `summary` and does not call `summaryLoader`. Use `selectedTab`, `defaultTab`, and
@@ -221,7 +221,7 @@ support the `languageTabs` slot, localized default labels, and `languageLabel`.
   labels={{ languages: "言語", answered: "回答済み", unanswered: "未回答" }}
   languageLabel={(language) => languageNames[language] ?? language}
   slots={{ languageTabs: renderLanguageTabs }}
-/>
+/>;
 ```
 
 Use `translateSurveySchema` for one package-owned translation operation covering
@@ -344,14 +344,14 @@ remove the local DTO mapper, controller state, and generic panel once the
 corresponding package hook is adopted. The old v7.3 names remain available while
 the migration is staged.
 
-| Local implementation | v7.4 replacement | Keep in Maker |
-| --- | --- | --- |
-| `client/editor.tsx`, schema conversion, generic builder state | `useSurveyEditorDomain` and `SurveyEditorDomainAdapter` | Domain adapter, validation policy, tRPC/auth |
-| Response summary mapper and language-tab state | `useSurveyResponseSummaryDomain` / `SurveyResponseSummaryDomain` | Aggregation query and custom render slots |
-| `qualityIssuesRef`, raw quality DTO conversion | `useSurveyVersionDomainActions` and `SurveyVersionQualityResult` | Quality procedure, policy, dialog copy |
-| `surveyWorkflow.ts` display wrapper | `SurveyWorkflowControlled` / `useSurveyWorkflowControlled` | Workflow calculation and tab routing |
-| Mapping CRUD state and reload handling | `useSurveyMappingCrud` / `SurveyMappingCrudAdapter` | Deck/group selection semantics and auth |
-| Local `SurveyUiProvider` translation wrapper | `SurveyProvider`, `SurveyTranslationScope` | Resource loading and locale selection |
+| Local implementation                                          | v7.4 replacement                                                 | Keep in Maker                                |
+| ------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------- |
+| `client/editor.tsx`, schema conversion, generic builder state | `useSurveyEditorDomain` and `SurveyEditorDomainAdapter`          | Domain adapter, validation policy, tRPC/auth |
+| Response summary mapper and language-tab state                | `useSurveyResponseSummaryDomain` / `SurveyResponseSummaryDomain` | Aggregation query and custom render slots    |
+| `qualityIssuesRef`, raw quality DTO conversion                | `useSurveyVersionDomainActions` and `SurveyVersionQualityResult` | Quality procedure, policy, dialog copy       |
+| `surveyWorkflow.ts` display wrapper                           | `SurveyWorkflowControlled` / `useSurveyWorkflowControlled`       | Workflow calculation and tab routing         |
+| Mapping CRUD state and reload handling                        | `useSurveyMappingCrud` / `SurveyMappingCrudAdapter`              | Deck/group selection semantics and auth      |
+| Local `SurveyUiProvider` translation wrapper                  | `SurveyProvider`, `SurveyTranslationScope`                       | Resource loading and locale selection        |
 
 The package root exports these types and controllers; feature-folder paths are
 implementation details. MUI dialogs and application notifications remain slots,
@@ -382,14 +382,14 @@ v7.4 completes the generic boundary needed by a Maker application. The package
 owns the controller state and default UI; the application supplies only domain
 mapping, transport, authentication, business rules, and screen-specific dialogs.
 
-| Feature | v7.2 / v7.3 | v7.4 surface | Maker code that can be deleted | Responsibility that remains in Maker |
-| --- | --- | --- | --- | --- |
-| Editor | Schema-first editor and v7.3 domain helper | `useSurveyEditorDomain`, `SurveyEditorDomainAdapter`, question adapter, settings slots | FormSchema conversion hooks, save/preview controller, generic question reorder/add state | Domain `toFormSchema`/`fromFormSchema`, tRPC/auth, business validation policy |
-| Response summary | `toSurveyResponseSummary` for Form Analytics | `useSurveyResponseSummaryDomain` / `SurveyResponseSummaryDomain` with language aggregates, skip reasons, question/choice definitions, label resolution, and render slots | FormSchema conversion, summary mapper, language-tab state, generic summary view state | Maker aggregation query and domain-specific aggregate calculation |
-| Quality / Version | Separate quality panel and version actions | `useSurveyQualityController`, original `response`/`rawResponse`, `runId`, `checkedRevision`, unified accept/reject, action effects | `qualityIssuesRef`, generic quality result conversion, cache/notification plumbing | Quality provider procedure, auth, warning/dialog copy, quality policy |
-| Workflow | Uncontrolled transition list | `SurveyWorkflowControlled` / `useSurveyWorkflowControlled` with generic `state`, `expanded`/`onToggle`, progress, navigation, and slots | Workflow panel state, progress calculation wiring, tab transition plumbing | Calculation of domain completion/progress and application tab routing |
-| Mapping | Save-only mapping adapter | `SurveyMappingCrudAdapter` / `useSurveyMappingCrud` with individual create/remove/reorder, list refresh, selection payload, operation state, and invalidation | Mapping CRUD state, reload/error/loading handling | Deck/group query semantics, auth, domain mapping rules |
-| Provider | `SurveyUiProvider` and i18next-shaped `i18n` | One provider for Form Engine plus `common`/`customSurvey` namespaces | Local provider and translation-function wrapper | Resource loading and application locale selection |
+| Feature           | v7.2 / v7.3                                  | v7.4 surface                                                                                                                                                             | Maker code that can be deleted                                                           | Responsibility that remains in Maker                                          |
+| ----------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Editor            | Schema-first editor and v7.3 domain helper   | `useSurveyEditorDomain`, `SurveyEditorDomainAdapter`, question adapter, settings slots                                                                                   | FormSchema conversion hooks, save/preview controller, generic question reorder/add state | Domain `toFormSchema`/`fromFormSchema`, tRPC/auth, business validation policy |
+| Response summary  | `toSurveyResponseSummary` for Form Analytics | `useSurveyResponseSummaryDomain` / `SurveyResponseSummaryDomain` with language aggregates, skip reasons, question/choice definitions, label resolution, and render slots | FormSchema conversion, summary mapper, language-tab state, generic summary view state    | Maker aggregation query and domain-specific aggregate calculation             |
+| Quality / Version | Separate quality panel and version actions   | `useSurveyQualityController`, original `response`/`rawResponse`, `runId`, `checkedRevision`, unified accept/reject, action effects                                       | `qualityIssuesRef`, generic quality result conversion, cache/notification plumbing       | Quality provider procedure, auth, warning/dialog copy, quality policy         |
+| Workflow          | Uncontrolled transition list                 | `SurveyWorkflowControlled` / `useSurveyWorkflowControlled` with generic `state`, `expanded`/`onToggle`, progress, navigation, and slots                                  | Workflow panel state, progress calculation wiring, tab transition plumbing               | Calculation of domain completion/progress and application tab routing         |
+| Mapping           | Save-only mapping adapter                    | `SurveyMappingCrudAdapter` / `useSurveyMappingCrud` with individual create/remove/reorder, list refresh, selection payload, operation state, and invalidation            | Mapping CRUD state, reload/error/loading handling                                        | Deck/group query semantics, auth, domain mapping rules                        |
+| Provider          | `SurveyUiProvider` and i18next-shaped `i18n` | One provider for Form Engine plus `common`/`customSurvey` namespaces                                                                                                     | Local provider and translation-function wrapper                                          | Resource loading and application locale selection                             |
 
 Domain-first editor usage:
 

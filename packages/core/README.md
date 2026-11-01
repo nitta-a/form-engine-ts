@@ -250,7 +250,11 @@ const schemaV1 = {
   description: "Tell us how to reach you.",
   completionMessage: "Thanks for your response.",
   translations: {
-    ja: { title: "お問い合わせ", description: "連絡先を教えてください。", completionMessage: "回答ありがとうございます。" }
+    ja: {
+      title: "お問い合わせ",
+      description: "連絡先を教えてください。",
+      completionMessage: "回答ありがとうございます。"
+    }
   },
   fields: [{ id: "email", type: "email", title: "Email", required: true }]
 };
@@ -309,15 +313,15 @@ are not rendered as user-facing labels.
 
 The React builder uses canonical keys with legacy aliases when resolving UI translations:
 
-| Canonical key | Legacy alias |
-| --- | --- |
-| `builder.fields.typeText` | `builder.fieldType.text` |
-| `builder.fields.typeTextarea` | `builder.fieldType.textarea` |
-| `builder.fields.typeNumber` | `builder.fieldType.number` |
-| `builder.fields.typeRating` | `builder.fieldType.rating` |
-| `builder.fields.typeRadio` | `builder.fieldType.radio` |
-| `builder.fields.typeCheckbox` | `builder.fieldType.checkbox` |
-| `builder.fields.typeSelect` | `builder.fieldType.select` |
+| Canonical key                    | Legacy alias                     |
+| -------------------------------- | -------------------------------- |
+| `builder.fields.typeText`        | `builder.fieldType.text`         |
+| `builder.fields.typeTextarea`    | `builder.fieldType.textarea`     |
+| `builder.fields.typeNumber`      | `builder.fieldType.number`       |
+| `builder.fields.typeRating`      | `builder.fieldType.rating`       |
+| `builder.fields.typeRadio`       | `builder.fieldType.radio`        |
+| `builder.fields.typeCheckbox`    | `builder.fieldType.checkbox`     |
+| `builder.fields.typeSelect`      | `builder.fieldType.select`       |
 | `builder.fields.typeMultiSelect` | `builder.fieldType.multi-select` |
 
 Adapters should return `undefined` or `null` for missing keys so the builder can try aliases and its default catalog. For
@@ -438,7 +442,9 @@ editor and respondent diagnostics.
 import { createInitialSchemaByMode, getContentModePolicy } from "@form-engine-ts/core";
 
 const schema = createInitialSchemaByMode("poll", {
-  id: "lunch-vote", title: "Lunch", locale: "en"
+  id: "lunch-vote",
+  title: "Lunch",
+  locale: "en"
 });
 const policy = getContentModePolicy("poll", { maxOptionsPerField: 8 });
 ```

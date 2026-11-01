@@ -11,13 +11,13 @@ The Core-specific changes are:
 
 The canonical builder key mapping is:
 
-| v3 | v4 |
-| --- | --- |
-| `builder.fieldType.text` | `builder.fields.typeText` |
-| `builder.fieldType.textarea` | `builder.fields.typeTextarea` |
-| `builder.fieldType.number` | `builder.fields.typeNumber` |
-| `builder.fieldType.rating` | `builder.fields.typeRating` |
-| `builder.fieldType.radio` | `builder.fields.typeRadio` |
-| `builder.fieldType.checkbox` | `builder.fields.typeCheckbox` |
-| `builder.fieldType.select` | `builder.fields.typeSelect` |
+| v3                               | v4                               |
+| -------------------------------- | -------------------------------- |
+| `builder.fieldType.text`         | `builder.fields.typeText`        |
+| `builder.fieldType.textarea`     | `builder.fields.typeTextarea`    |
+| `builder.fieldType.number`       | `builder.fields.typeNumber`      |
+| `builder.fieldType.rating`       | `builder.fields.typeRating`      |
+| `builder.fieldType.radio`        | `builder.fields.typeRadio`       |
+| `builder.fieldType.checkbox`     | `builder.fields.typeCheckbox`    |
+| `builder.fieldType.select`       | `builder.fields.typeSelect`      |
 | `builder.fieldType.multi-select` | `builder.fields.typeMultiSelect` |

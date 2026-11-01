@@ -41,14 +41,14 @@ idempotency, revision conflicts, translation metadata, CSV, and form deletion. A
 `inspectFormDeletion` and `deleteForm` through the lifecycle contract when their implementation supports it;
 transactional deletion is required by default and `allowNonAtomic: true` is an explicit fallback.
 
-| Package | v8 contract status |
-| --- | --- |
-| `storage-memory` | lifecycle, pagination, idempotency, process-local atomic response limits |
-| `storage-mongodb` | lifecycle, version state/events, transaction-backed response limits |
-| `storage-azure-table` | lifecycle, pagination, same-partition transactional response limits |
-| `storage-postgres` / `storage-sqlite` | lifecycle, pagination, transaction-backed response limits |
-| `storage-d1` | lifecycle, pagination, single-statement conditional response limits |
-| `storage-localstorage` | lifecycle, pagination, same-JavaScript-agent response limits |
+| Package                               | v8 contract status                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| `storage-memory`                      | lifecycle, pagination, idempotency, process-local atomic response limits |
+| `storage-mongodb`                     | lifecycle, version state/events, transaction-backed response limits      |
+| `storage-azure-table`                 | lifecycle, pagination, same-partition transactional response limits      |
+| `storage-postgres` / `storage-sqlite` | lifecycle, pagination, transaction-backed response limits                |
+| `storage-d1`                          | lifecycle, pagination, single-statement conditional response limits      |
+| `storage-localstorage`                | lifecycle, pagination, same-JavaScript-agent response limits             |
 
 Existing `StorageAdapter` methods remain valid. To migrate, pass `schemaValidation` to an adapter when
 Content Mode policy must be enforced at persistence, then use `inspectFormDeletion` before deletion and

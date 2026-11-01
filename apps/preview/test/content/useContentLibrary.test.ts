@@ -2,7 +2,7 @@ import { createSubmission, type FormSchema } from "@form-engine-ts/core";
 import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useContentLibrary } from "./useContentLibrary";
+import { useContentLibrary } from "../../src/content/useContentLibrary";
 
 const schema: FormSchema = {
   id: "feedback",

@@ -1,6 +1,6 @@
 import { type FormSchema, type FormSubmission, resolveLocalizedSchema } from "@form-engine-ts/core";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { ResponseInbox } from "./ResponseInbox";
+import { ResponseInbox } from "../../src/analytics/ResponseInbox";
 
 const schema: FormSchema = {
   id: "feedback",

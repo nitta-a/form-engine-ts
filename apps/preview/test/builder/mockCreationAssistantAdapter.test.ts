@@ -1,6 +1,6 @@
 import { parseCreationAssistantResponse } from "@form-engine-ts/core";
 import { describe, expect, it } from "vitest";
-import { mockCreationAssistantAdapter } from "./mockCreationAssistantAdapter";
+import { mockCreationAssistantAdapter } from "../../src/builder/mockCreationAssistantAdapter";
 
 describe("preview creation mock", () => {
   it("walks purpose, audience, goals, and ready", async () => {

@@ -54,20 +54,20 @@ export function FeedbackForm() {
 
 Install only what your application needs. Package names use the `@form-engine-ts/` prefix; each link opens its API and setup guide.
 
-| Purpose | Packages |
-| --- | --- |
-| Schemas, validation, submissions, analytics, CSV | [core](packages/core/README.md) |
-| React provider, renderer, builder, hooks | [react](packages/react/README.md) |
-| Material UI components | [mui](packages/mui/README.md) |
-| Survey editor, translation, version management, response summaries | [custom-survey-client](packages/custom-survey-client/README.md) |
-| Storage contracts and testing utilities | [storage](packages/storage/README.md) |
-| In-memory or browser storage | [storage-memory](packages/storage-memory/README.md), [storage-localstorage](packages/storage-localstorage/README.md) |
-| Database storage | [storage-mongodb](packages/storage-mongodb/README.md), [storage-postgres](packages/storage-postgres/README.md), [storage-sqlite](packages/storage-sqlite/README.md), [storage-d1](packages/storage-d1/README.md), [storage-azure-table](packages/storage-azure-table/README.md) |
-| UI translation and demos | [translator-i18next](packages/translator-i18next/README.md), [translator-mock](packages/translator-mock/README.md) |
-| Server-side text translation | [translator-azure](packages/translator-azure/README.md), [translator-deepl](packages/translator-deepl/README.md), [translator-google](packages/translator-google/README.md), [translator-google-v3](packages/translator-google-v3/README.md) |
-| Translation caching | [translator-cache](packages/translator-cache/README.md) |
-| Sensitive-data detection | [privacy](packages/privacy/README.md) |
-| Zod 4 validation | [zod](packages/zod/README.md) |
+| Purpose                                                            | Packages                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schemas, validation, submissions, analytics, CSV                   | [core](packages/core/README.md)                                                                                                                                                                                                                                                 |
+| React provider, renderer, builder, hooks                           | [react](packages/react/README.md)                                                                                                                                                                                                                                               |
+| Material UI components                                             | [mui](packages/mui/README.md)                                                                                                                                                                                                                                                   |
+| Survey editor, translation, version management, response summaries | [custom-survey-client](packages/custom-survey-client/README.md)                                                                                                                                                                                                                 |
+| Storage contracts and testing utilities                            | [storage](packages/storage/README.md)                                                                                                                                                                                                                                           |
+| In-memory or browser storage                                       | [storage-memory](packages/storage-memory/README.md), [storage-localstorage](packages/storage-localstorage/README.md)                                                                                                                                                            |
+| Database storage                                                   | [storage-mongodb](packages/storage-mongodb/README.md), [storage-postgres](packages/storage-postgres/README.md), [storage-sqlite](packages/storage-sqlite/README.md), [storage-d1](packages/storage-d1/README.md), [storage-azure-table](packages/storage-azure-table/README.md) |
+| UI translation and demos                                           | [translator-i18next](packages/translator-i18next/README.md), [translator-mock](packages/translator-mock/README.md)                                                                                                                                                              |
+| Server-side text translation                                       | [translator-azure](packages/translator-azure/README.md), [translator-deepl](packages/translator-deepl/README.md), [translator-google](packages/translator-google/README.md), [translator-google-v3](packages/translator-google-v3/README.md)                                    |
+| Translation caching                                                | [translator-cache](packages/translator-cache/README.md)                                                                                                                                                                                                                         |
+| Sensitive-data detection                                           | [privacy](packages/privacy/README.md)                                                                                                                                                                                                                                           |
+| Zod 4 validation                                                   | [zod](packages/zod/README.md)                                                                                                                                                                                                                                                   |
 
 ### Demo
 
@@ -111,7 +111,7 @@ Memory storage clears on reload; LocalStorage keeps data in this browser. AI fea
 
 ### Development
 
-Requires **Node.js >=22.22.2** and **pnpm 11**.
+Requires **Node.js >=22.22.2** and **pnpm 12**.
 
 ```bash
 pnpm install --frozen-lockfile
@@ -181,20 +181,20 @@ export function FeedbackForm() {
 
 必要なパッケージだけを導入できます。パッケージ名の接頭辞は`@form-engine-ts/`です。各リンク先にAPIと設定方法を記載しています。
 
-| 用途 | パッケージ |
-| --- | --- |
-| スキーマ・検証・回答データ・集計・CSV | [core](packages/core/README.md) |
-| ReactのProvider・回答画面・Builder・フック | [react](packages/react/README.md) |
-| Material UIコンポーネント | [mui](packages/mui/README.md) |
-| アンケート編集・翻訳・版管理・回答サマリー | [custom-survey-client](packages/custom-survey-client/README.md) |
-| 保存の共通契約・テスト用ユーティリティ | [storage](packages/storage/README.md) |
-| メモリー・ブラウザーへの保存 | [storage-memory](packages/storage-memory/README.md), [storage-localstorage](packages/storage-localstorage/README.md) |
-| データベースへの保存 | [storage-mongodb](packages/storage-mongodb/README.md), [storage-postgres](packages/storage-postgres/README.md), [storage-sqlite](packages/storage-sqlite/README.md), [storage-d1](packages/storage-d1/README.md), [storage-azure-table](packages/storage-azure-table/README.md) |
-| UI翻訳・デモ用翻訳 | [translator-i18next](packages/translator-i18next/README.md), [translator-mock](packages/translator-mock/README.md) |
-| サーバー側のテキスト翻訳 | [translator-azure](packages/translator-azure/README.md), [translator-deepl](packages/translator-deepl/README.md), [translator-google](packages/translator-google/README.md), [translator-google-v3](packages/translator-google-v3/README.md) |
-| 翻訳キャッシュ | [translator-cache](packages/translator-cache/README.md) |
-| 機密データの検出 | [privacy](packages/privacy/README.md) |
-| Zod 4による検証 | [zod](packages/zod/README.md) |
+| 用途                                       | パッケージ                                                                                                                                                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| スキーマ・検証・回答データ・集計・CSV      | [core](packages/core/README.md)                                                                                                                                                                                                                                                 |
+| ReactのProvider・回答画面・Builder・フック | [react](packages/react/README.md)                                                                                                                                                                                                                                               |
+| Material UIコンポーネント                  | [mui](packages/mui/README.md)                                                                                                                                                                                                                                                   |
+| アンケート編集・翻訳・版管理・回答サマリー | [custom-survey-client](packages/custom-survey-client/README.md)                                                                                                                                                                                                                 |
+| 保存の共通契約・テスト用ユーティリティ     | [storage](packages/storage/README.md)                                                                                                                                                                                                                                           |
+| メモリー・ブラウザーへの保存               | [storage-memory](packages/storage-memory/README.md), [storage-localstorage](packages/storage-localstorage/README.md)                                                                                                                                                            |
+| データベースへの保存                       | [storage-mongodb](packages/storage-mongodb/README.md), [storage-postgres](packages/storage-postgres/README.md), [storage-sqlite](packages/storage-sqlite/README.md), [storage-d1](packages/storage-d1/README.md), [storage-azure-table](packages/storage-azure-table/README.md) |
+| UI翻訳・デモ用翻訳                         | [translator-i18next](packages/translator-i18next/README.md), [translator-mock](packages/translator-mock/README.md)                                                                                                                                                              |
+| サーバー側のテキスト翻訳                   | [translator-azure](packages/translator-azure/README.md), [translator-deepl](packages/translator-deepl/README.md), [translator-google](packages/translator-google/README.md), [translator-google-v3](packages/translator-google-v3/README.md)                                    |
+| 翻訳キャッシュ                             | [translator-cache](packages/translator-cache/README.md)                                                                                                                                                                                                                         |
+| 機密データの検出                           | [privacy](packages/privacy/README.md)                                                                                                                                                                                                                                           |
+| Zod 4による検証                            | [zod](packages/zod/README.md)                                                                                                                                                                                                                                                   |
 
 ### デモ
 
@@ -238,7 +238,7 @@ Memoryのデータは再読み込みで消え、LocalStorageはこのブラウ�
 
 ### 開発
 
-**Node.js >=22.22.2**と**pnpm 11**が必要です。
+**Node.js >=22.22.2**と**pnpm 12**が必要です。
 
 ```bash
 pnpm install --frozen-lockfile

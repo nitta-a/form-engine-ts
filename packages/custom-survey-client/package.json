@@ -1,6 +1,6 @@
 {
   "name": "@form-engine-ts/custom-survey-client",
-  "version": "8.2.4",
+  "version": "8.2.5",
   "publishConfig": {
     "access": "public"
   },
@@ -64,10 +64,10 @@
     "@form-engine-ts/privacy": "workspace:*",
     "@form-engine-ts/react": "workspace:*",
     "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

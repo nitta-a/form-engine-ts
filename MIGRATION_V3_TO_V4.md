@@ -69,15 +69,15 @@ safe corrected copy is desired.
 
 The builder uses the following canonical keys. The former `builder.fieldType.*` names remain aliases during migration.
 
-| v3 key | v4 key |
-| --- | --- |
-| `builder.fieldType.text` | `builder.fields.typeText` |
-| `builder.fieldType.textarea` | `builder.fields.typeTextarea` |
-| `builder.fieldType.number` | `builder.fields.typeNumber` |
-| `builder.fieldType.rating` | `builder.fields.typeRating` |
-| `builder.fieldType.radio` | `builder.fields.typeRadio` |
-| `builder.fieldType.checkbox` | `builder.fields.typeCheckbox` |
-| `builder.fieldType.select` | `builder.fields.typeSelect` |
+| v3 key                           | v4 key                           |
+| -------------------------------- | -------------------------------- |
+| `builder.fieldType.text`         | `builder.fields.typeText`        |
+| `builder.fieldType.textarea`     | `builder.fields.typeTextarea`    |
+| `builder.fieldType.number`       | `builder.fields.typeNumber`      |
+| `builder.fieldType.rating`       | `builder.fields.typeRating`      |
+| `builder.fieldType.radio`        | `builder.fields.typeRadio`       |
+| `builder.fieldType.checkbox`     | `builder.fields.typeCheckbox`    |
+| `builder.fieldType.select`       | `builder.fields.typeSelect`      |
 | `builder.fieldType.multi-select` | `builder.fields.typeMultiSelect` |
 
 ## MongoDB storage options

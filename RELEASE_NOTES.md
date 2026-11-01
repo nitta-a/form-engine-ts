@@ -1,3 +1,10 @@
+## v8.2.5 — 2026-11-02
+
+- Added preview and storage integration coverage for idempotent retries, response limits, and runtime settings failures.
+- Moved Preview tests into a dedicated test directory.
+- Updated the React, Vite, Vitest, jsdom, and Biome development toolchain.
+- Aligned all 21 published packages to version 8.2.5.
+
 # Release notes
 
 This file is the historical record of user-visible changes. The README focuses on the

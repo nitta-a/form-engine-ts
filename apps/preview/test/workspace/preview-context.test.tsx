@@ -2,9 +2,9 @@ import { createSubmission, type FormSchema } from "@form-engine-ts/core";
 import type { SubmitContext } from "@form-engine-ts/react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { BuilderPreviewProvider, useBuilderPreview } from "../builder/BuilderPreviewContext";
-import { RespondentPreviewProvider, useRespondentPreview } from "../respondent/RespondentPreviewContext";
-import { PreviewWorkspaceProvider, usePreviewWorkspace } from "./PreviewWorkspaceContext";
+import { BuilderPreviewProvider, useBuilderPreview } from "../../src/builder/BuilderPreviewContext";
+import { RespondentPreviewProvider, useRespondentPreview } from "../../src/respondent/RespondentPreviewContext";
+import { PreviewWorkspaceProvider, usePreviewWorkspace } from "../../src/workspace/PreviewWorkspaceContext";
 
 function BuilderContextWrapper({ children }: { readonly children: ReactNode }) {
   return (
@@ -151,6 +151,11 @@ describe("selected survey response isolation", () => {
     expect(await storage.listSubmissions(firstSurvey.id, firstSurvey.version)).toHaveLength(1);
     await act(async () => result.current.openSchema(firstSurvey));
     expect(result.current.submissions[0]?.values.message).toBe("First customer");
+    await act(async () => result.current.resetResponses());
+    expect(result.current.submissions).toHaveLength(0);
+    await act(async () => result.current.openSchema(secondSurvey));
+    expect(result.current.submissions[0]?.values.message).toBe("Second customer");
+    expect(result.current.analytics.submissionCount).toBe(1);
   });
 
   it.each(["saveSchema", "listSubmissions"] as const)(

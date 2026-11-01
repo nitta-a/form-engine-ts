@@ -4,6 +4,7 @@ import {
   type FormSchema,
   type FormSubmission,
   type FormVersionRecord,
+  runSubmissionPipeline,
   type VersionTransitionPlan
 } from "@form-engine-ts/core";
 import {
@@ -230,6 +231,65 @@ function submission(id: string, formId = "form", version = 1, submittedAt = "202
     translationMetadata: { ja: { title: { provider: "human" } } }
   };
 }
+
+describe("submission pipeline with MongoDB storage", () => {
+  const form = schema();
+  const submittedAt = "2026-08-24T00:00:00.000Z";
+  const values = { answer: "Original answer" };
+
+  it("returns a duplicate after the save succeeds but its response is lost", async () => {
+    const adapter = createMongoDbStorage<undefined>({ db: createDbStub().db, idempotency: true });
+    const storage = {
+      ...adapter,
+      saveSubmission: async (...args: Parameters<typeof adapter.saveSubmission>) => {
+        await adapter.saveSubmission(...args);
+        throw new Error("Response lost after save");
+      }
+    };
+    const options = { schema: form, storage, id: "retry", locale: "en", submittedAt };
+    await expect(runSubmissionPipeline(options, values)).rejects.toMatchObject({ payload: { code: "STORAGE_ERROR" } });
+    expect(await adapter.countSubmissions(form.id, form.version)).toBe(1);
+    expect((await runSubmissionPipeline({ ...options, storage: adapter }, values)).status).toBe("duplicate");
+    expect(await adapter.countSubmissions(form.id, form.version)).toBe(1);
+  });
+
+  it("reports a conflict without replacing an existing response", async () => {
+    const storage = createMongoDbStorage<undefined>({ db: createDbStub().db, idempotency: true });
+    const options = { schema: form, storage, id: "conflict", locale: "en", submittedAt };
+    expect((await runSubmissionPipeline(options, values)).status).toBe("created");
+    expect((await runSubmissionPipeline(options, { answer: "Changed answer" })).status).toBe("conflict");
+    const saved = await storage.listSubmissions(form.id, form.version);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.values).toEqual(values);
+  });
+
+  it("enforces a form-wide response limit across versions", async () => {
+    const storage = createMongoDbStorage<undefined>({ db: createDbStub().db, idempotency: true });
+    const runtimeSettings = { formId: form.id, updatedAt: submittedAt, maxResponses: 2 };
+    const options = { storage, locale: "en", submittedAt, runtimeSettings };
+    await runSubmissionPipeline({ ...options, schema: form, id: "v1" }, values);
+    await runSubmissionPipeline({ ...options, schema: schema(form.id, 2), id: "v2" }, values);
+    await expect(runSubmissionPipeline({ ...options, schema: form, id: "over-limit" }, values)).rejects.toMatchObject({
+      payload: { code: "FORM_CLOSED", messageKey: "form.responseLimitReached" }
+    });
+    expect(await storage.countSubmissions(form.id)).toBe(2);
+    expect(await storage.countSubmissions(form.id, 1)).toBe(1);
+    expect(await storage.countSubmissions(form.id, 2)).toBe(1);
+  });
+
+  it("fails closed when runtime settings cannot be read and succeeds after recovery", async () => {
+    const storage = createMongoDbStorage<undefined>({ db: createDbStub().db, idempotency: true });
+    const runtimeSettings = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Settings unavailable"))
+      .mockResolvedValueOnce(null);
+    const options = { schema: form, storage, id: "settings-retry", locale: "en", submittedAt, runtimeSettings };
+    await expect(runSubmissionPipeline(options, values)).rejects.toMatchObject({ payload: { code: "STORAGE_ERROR" } });
+    expect(await storage.countSubmissions(form.id)).toBe(0);
+    expect((await runSubmissionPipeline(options, values)).status).toBe("created");
+    expect(await storage.countSubmissions(form.id)).toBe(1);
+  });
+});
 
 describe("createMongoDbStorage", () => {
   it("supports versioned schema CRUD, replacement, ordering, and defensive copies", async () => {

@@ -1,5 +1,6 @@
 import type { TableClient } from "@azure/data-tables";
 import type { FormSchema, FormSubmission } from "@form-engine-ts/core";
+import { runSubmissionPipeline } from "@form-engine-ts/core";
 import {
   runIdempotencyContract,
   runLifecycleContract,
@@ -109,6 +110,66 @@ function submission(id: string, submittedAt = "2026-08-24T00:00:00.000Z"): FormS
     metadata: { channel: "ARGS", cohort: id.endsWith("0") ? "even" : "other" }
   };
 }
+
+describe("submission pipeline with Azure Table storage", () => {
+  const submittedAt = "2026-08-24T00:00:00.000Z";
+  const values = { answer: "Original answer" };
+
+  it("returns a duplicate after the save succeeds but its response is lost", async () => {
+    const adapter = createAzureTableStorage<undefined>({ client: createClientStub().client, idempotency: true });
+    const storage = {
+      ...adapter,
+      saveSubmission: async (...args: Parameters<typeof adapter.saveSubmission>) => {
+        await adapter.saveSubmission(...args);
+        throw new Error("Response lost after save");
+      }
+    };
+    const options = { schema, storage, id: "retry", locale: "en", submittedAt };
+    await expect(runSubmissionPipeline(options, values)).rejects.toMatchObject({ payload: { code: "STORAGE_ERROR" } });
+    expect(await adapter.countSubmissions(schema.id, schema.version)).toBe(1);
+    const retried = await runSubmissionPipeline({ ...options, storage: adapter }, values);
+    expect(retried.status).toBe("duplicate");
+    expect(await adapter.countSubmissions(schema.id, schema.version)).toBe(1);
+  });
+
+  it("reports a conflict without replacing an existing response", async () => {
+    const storage = createAzureTableStorage<undefined>({ client: createClientStub().client, idempotency: true });
+    const options = { schema, storage, id: "conflict", locale: "en", submittedAt };
+    expect((await runSubmissionPipeline(options, values)).status).toBe("created");
+    expect((await runSubmissionPipeline(options, { answer: "Changed answer" })).status).toBe("conflict");
+    const page = await storage.listSubmissionPage(schema.id, { version: schema.version });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.values).toEqual(values);
+  });
+
+  it("enforces a form-wide response limit across versions", async () => {
+    const storage = createAzureTableStorage<undefined>({ client: createClientStub().client, idempotency: true });
+    const settings = { formId: schema.id, updatedAt: submittedAt, maxResponses: 2 };
+    const options = { storage, locale: "en", submittedAt, runtimeSettings: settings };
+    await runSubmissionPipeline({ ...options, schema: { ...schema, version: 1 }, id: "v1" }, values);
+    const results = await Promise.allSettled([
+      runSubmissionPipeline({ ...options, schema, id: "v2-a" }, values),
+      runSubmissionPipeline({ ...options, schema, id: "v2-b" }, values)
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.find((result) => result.status === "rejected")).toMatchObject({
+      reason: { payload: { code: "FORM_CLOSED", messageKey: "form.responseLimitReached" } }
+    });
+    expect(await storage.countSubmissions(schema.id)).toBe(2);
+    expect(await storage.countSubmissions(schema.id, 1)).toBe(1);
+    expect(await storage.countSubmissions(schema.id, 2)).toBe(1);
+  });
+
+  it("fails closed when runtime settings cannot be read and succeeds after recovery", async () => {
+    const storage = createAzureTableStorage<undefined>({ client: createClientStub().client, idempotency: true });
+    const readSettings = vi.fn().mockRejectedValueOnce(new Error("Settings unavailable")).mockResolvedValueOnce(null);
+    const options = { schema, storage, id: "settings-retry", locale: "en", submittedAt, runtimeSettings: readSettings };
+    await expect(runSubmissionPipeline(options, values)).rejects.toMatchObject({ payload: { code: "STORAGE_ERROR" } });
+    expect(await storage.countSubmissions(schema.id)).toBe(0);
+    expect((await runSubmissionPipeline(options, values)).status).toBe("created");
+    expect(await storage.countSubmissions(schema.id)).toBe(1);
+  });
+});
 
 describe("createAzureTableStorage", () => {
   it("accepts the official Azure TableClient shape", () => {

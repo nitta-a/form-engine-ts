@@ -2,10 +2,10 @@ import { type FormSchema, resolveLocalizedSchema } from "@form-engine-ts/core";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PreviewWorkspaceProvider } from "../workspace/PreviewWorkspaceContext";
-import { customerFeedbackSchema } from "../workspace/schema";
-import { ContentEditor } from "./ContentEditor";
-import { ContentLibrary } from "./ContentLibrary";
+import { ContentEditor } from "../../src/content/ContentEditor";
+import { ContentLibrary } from "../../src/content/ContentLibrary";
+import { PreviewWorkspaceProvider } from "../../src/workspace/PreviewWorkspaceContext";
+import { customerFeedbackSchema } from "../../src/workspace/schema";
 
 describe("customer survey library", () => {
   afterEach(cleanup);

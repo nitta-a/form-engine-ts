@@ -16,7 +16,7 @@ radio, and multi-select fields by default. An explicit `actions` prop overrides 
 provider will handle the request:
 
 ```tsx
-<MuiAuthoringFieldAction field={field} onRequest={assistant.suggest} />
+<MuiAuthoringFieldAction field={field} onRequest={assistant.suggest} />;
 ```
 
 ## Migration notes
@@ -37,7 +37,7 @@ import { MuiChoiceGroupSlot } from "@form-engine-ts/mui";
   slots={{ renderChoiceGroup: MuiChoiceGroupSlot }}
   schema={schema}
   onSubmit={save}
-/>
+/>;
 ```
 
 `ConditionEditor` edits nested `DisplayRule` conditions in the field editor, including `all`/`any` groups and
@@ -227,7 +227,7 @@ set the star size. The radio options keep numeric accessible names.
       }
     }
   }}
-/>
+/>;
 ```
 
 ```tsx
@@ -236,7 +236,7 @@ set the star size. The radio options keep numeric accessible names.
   onChange={setSchema}
   fieldEditorMode="single"
   muiSlotProps={{ questionPreview: { sx: { borderRadius: 3 }, "data-testid": "question-preview" } }}
-/>
+/>;
 ```
 `fieldEditorOptions.fieldTypeOptions` can explicitly order, sort, or transform the generated type choices without
 mutating the defaults.
@@ -258,9 +258,7 @@ import { useState } from "react";
 
 function Creator() {
   // Use "poll" for a poll, "quiz" for a quiz, or "survey" for a survey.
-  const [schema, setSchema] = useState(() =>
-    createInitialSchemaByMode("quiz", { title: "My quiz", locale: "en" })
-  );
+  const [schema, setSchema] = useState(() => createInitialSchemaByMode("quiz", { title: "My quiz", locale: "en" }));
   return (
     <MuiFormBuilder
       schema={schema}
@@ -343,7 +341,7 @@ import { MuiContentRenderer } from "@form-engine-ts/mui/renderer";
   contentModeOptions={{
     poll: { adapter: analyticsAdapter, alreadyVoted, closed, canViewResults, submissionRevision }
   }}
-/>
+/>;
 ```
 
 `QuizResultView` accepts a `QuizEvaluationResult` directly, plus an optional schema
@@ -367,12 +365,12 @@ the domain summary subpath keeps that integration explicit.
 The required `custom-survey-client` peer and root domain export remain unchanged in v7;
 a future major can make that peer optional and require `/survey-domain` for the domain adapter.
 
-| Use case | Recommended v7 import | Existing root import |
-| --- | --- | --- |
-| Creator | `@form-engine-ts/mui/builder` | remains supported |
-| Respondent and results | `@form-engine-ts/mui/renderer` | remains supported |
-| Mapped survey summary | `@form-engine-ts/mui/survey-summary` | remains supported |
-| Survey client domain adapter | `@form-engine-ts/mui/survey-domain` | remains supported |
+| Use case                     | Recommended v7 import                | Existing root import |
+| ---------------------------- | ------------------------------------ | -------------------- |
+| Creator                      | `@form-engine-ts/mui/builder`        | remains supported    |
+| Respondent and results       | `@form-engine-ts/mui/renderer`       | remains supported    |
+| Mapped survey summary        | `@form-engine-ts/mui/survey-summary` | remains supported    |
+| Survey client domain adapter | `@form-engine-ts/mui/survey-domain`  | remains supported    |
 
 日本語: 回答側は`@form-engine-ts/mui/renderer`の`MuiContentRenderer`を使うと、
 クイズの即時解説・送信後採点と投票結果の公開条件・読込・エラー・再試行をまとめて構成できます。
@@ -497,7 +495,7 @@ and draft review. It accepts the provider-neutral `CreationAssistantAdapter` plu
   initialSchema={initialSchema}
   policy={policy}
   onComplete={(nextSchema) => openSurveyEditor(nextSchema)}
-/>
+/>;
 ```
 
 Use `renderBrief`, `renderConversation`, and `renderDraftReview` to replace the structured summary,

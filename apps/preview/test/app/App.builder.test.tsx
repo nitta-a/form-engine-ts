@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import App from "./App";
-import { clearPreviewStorage } from "./app-test-helpers";
+import App from "../../src/app/App";
+import { clearPreviewStorage } from "../../src/app/app-test-helpers";
 
 describe("preview application builder workspaces", () => {
   beforeEach(() => {

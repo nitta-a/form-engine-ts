@@ -3,7 +3,7 @@ import { createMemoryStorageAdapter } from "@form-engine-ts/storage-memory";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ContentAnswer } from "./ContentAnswer";
+import { ContentAnswer } from "../../src/content/ContentAnswer";
 
 describe("poll publication and vote persistence", () => {
   afterEach(cleanup);

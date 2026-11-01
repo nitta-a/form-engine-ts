@@ -22,8 +22,8 @@
     "@form-engine-ts/translator-mock": "workspace:*",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
